@@ -59,48 +59,65 @@ void UOpenAIRequester::SendOpenAIRequest()
 
 			// chat/completions response parsing
             TSharedPtr<FJsonObject> Root;
-			const TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Res->GetContentAsString());
+            const FString Body = Res->GetContentAsString();
+            const TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
             if (!FJsonSerializer::Deserialize(Reader, Root) || !Root.IsValid())
             {
                 UE_LOG(LogTemp, Warning, TEXT("[OpenAI] Top JSON parsing failed"));
                 return;
             }
 
-            const TArray<TSharedPtr<FJsonValue>>* Choices = nullptr;
-            if (!Root->TryGetArrayField(TEXT("choices"), Choices) || Choices->Num() <= 0)
+            // 2) output[0]
+            const TArray<TSharedPtr<FJsonValue>>* OutputArray = nullptr;
+            if (!Root->TryGetArrayField(TEXT("output"), OutputArray) || OutputArray->Num() <= 0)
             {
-                UE_LOG(LogTemp, Warning, TEXT("[OpenAI] choices empty"));
+                UE_LOG(LogTemp, Warning, TEXT("[OpenAI] output empty"));
+                return;
+            }
+            const TSharedPtr<FJsonObject> Output0 = (*OutputArray)[0]->AsObject();
+            if (!Output0.IsValid())
+            {
+                UE_LOG(LogTemp, Warning, TEXT("[OpenAI] output[0] parsing failed"));
                 return;
             }
 
-            const TSharedPtr<FJsonObject> Choice0 = (*Choices)[0]->AsObject();
-            if (!Choice0.IsValid())
+            // 3) output[0].content[0]
+            const TArray<TSharedPtr<FJsonValue>>* ContentArray = nullptr;
+            if (!Output0->TryGetArrayField(TEXT("content"), ContentArray) || ContentArray->Num() <= 0)
             {
-                UE_LOG(LogTemp, Warning, TEXT("[OpenAI] choice[0] parsing failed"));
+                UE_LOG(LogTemp, Warning, TEXT("[OpenAI] content empty"));
+                return;
+            }
+            const TSharedPtr<FJsonObject> Content0 = (*ContentArray)[0]->AsObject();
+            if (!Content0.IsValid())
+            {
+                UE_LOG(LogTemp, Warning, TEXT("[OpenAI] content[0] parsing failed"));
                 return;
             }
 
-            const TSharedPtr<FJsonObject> Message = Choice0->GetObjectField(TEXT("message"));
-            if (!Message.IsValid())
+            // 4) content[0].text  →  JSON 문자열(개행/들여쓰기 포함)
+            FString Text;
+            if (!Content0->TryGetStringField(TEXT("text"), Text))
             {
-                UE_LOG(LogTemp, Warning, TEXT("[OpenAI] message parsing failed"));
+                UE_LOG(LogTemp, Warning, TEXT("[OpenAI] no text in content[0]"));
                 return;
             }
 
-            FString Content;
-            if (!Message->TryGetStringField(TEXT("content"), Content))
+            // (선택) 코드펜스 제거/트림
+            Text.TrimStartAndEndInline();
+            if (Text.StartsWith(TEXT("```")))
             {
-                UE_LOG(LogTemp, Warning, TEXT("[OpenAI] no content"));
-                return;
+                const int32 First = Text.Find(TEXT("\n"));
+                const int32 Last = Text.Find(TEXT("```"), ESearchCase::IgnoreCase, ESearchDir::FromEnd);
+                if (First != INDEX_NONE && Last != INDEX_NONE && Last > First)
+                    Text = Text.Mid(First + 1, Last - (First + 1)).TrimStartAndEnd();
             }
 
-            Content = TrimAndStrip(Content);
-
+            // 5) 내부 JSON 파싱 (우리가 원하는 4개 값)
             TSharedPtr<FJsonObject> Inner;
-            const TSharedRef<TJsonReader<>> Reader2 = TJsonReaderFactory<>::Create(Content);
-            if (!FJsonSerializer::Deserialize(Reader2, Inner) || !Inner.IsValid())
+            if (!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), Inner) || !Inner.IsValid())
             {
-                UE_LOG(LogTemp, Warning, TEXT("[OpenAI] content JSON parsing failed. content=%s"), *Content);
+                UE_LOG(LogTemp, Warning, TEXT("[OpenAI] inner JSON parse failed: %s"), *Text);
                 return;
             }
 
