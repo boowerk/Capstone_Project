@@ -16,6 +16,7 @@ public class Project_Eden : ModuleRules
 			"EnhancedInput",
 			"Json",
 			"JsonUtilities",
+            "PCG"
         });
 
 		PrivateDependencyModuleNames.AddRange(new string[] {  });
