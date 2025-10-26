@@ -8,7 +8,16 @@ public class Project_Eden : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 	
-		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput" });
+		PublicDependencyModuleNames.AddRange(new string[] { 
+			"Core", "CoreUObject",
+            "Engine", 
+			"HTTP", 
+			"InputCore", 
+			"EnhancedInput",
+			"Json",
+			"JsonUtilities",
+            "PCG"
+        });
 
 		PrivateDependencyModuleNames.AddRange(new string[] {  });
 
