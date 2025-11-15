@@ -33,7 +33,11 @@ struct FPCGItemDetails
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "PCG Item")
     FRotator MaxRotation = FRotator::ZeroRotator;
 
-    // Z축 오프셋 (지면에 더 박거나 띄울 때 사용)
+    // 오프셋
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "PCG Item")
-    float Z_Offset = 0.0f;
+    FVector MinOffset = FVector(0.0f);
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "PCG Item")
+    FVector MaxOffset = FVector(0.0f);
+
 };

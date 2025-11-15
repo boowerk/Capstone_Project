@@ -15,16 +15,6 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Biome")
     FString BiomeName = "DefaultBiome";
 
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Biome|Item Groups")
-    TSoftObjectPtr<UPDA_PCGItemGroup> TreeGroup;
-
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Biome|Item Groups")
-    TSoftObjectPtr<UPDA_PCGItemGroup> RockGroup;
-
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Biome|Item Groups")
-    TSoftObjectPtr<UPDA_PCGItemGroup> BushGroup;
-
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Biome|Visuals")
-    FLinearColor FogColor = FLinearColor::White;
-
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Biome|Item Groups")
+	TMap<FName, TSoftObjectPtr<UPDA_PCGItemGroup>> ItemGroups;
 };
