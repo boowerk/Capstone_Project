@@ -74,5 +74,5 @@ Plugins/**/Intermediate/*
 DerivedDataCache/*
 
 Content/*
-!Content/Project_Eden/
-!Content/Project_Eden/*
+!Content/GAS_Pattern/
+!Content/GAS_Pattern/*
