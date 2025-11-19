@@ -17,7 +17,10 @@ public class Project_Eden : ModuleRules
 			"Json",
 			"JsonUtilities",
             "PCG",
-			
+            "GameplayAbilities",
+            "GameplayTasks",
+            "GameplayTags",
+
         });
 
 		PrivateDependencyModuleNames.AddRange(new string[] {});
