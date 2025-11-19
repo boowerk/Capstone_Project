@@ -34,7 +34,7 @@
 			"Enabled": true
 		},
 		{
-			"Name": "GameplayStateTree",
+			"Name": "GameplayAbilities",
 			"Enabled": true
 		}
 	]
