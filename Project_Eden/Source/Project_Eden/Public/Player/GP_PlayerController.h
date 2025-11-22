@@ -7,6 +7,7 @@
 class UInputMappingContext;
 class UInputAction;
 struct FInputActionValue;
+struct FGameplayTag;
 UCLASS()
 class PROJECT_EDEN_API AGP_PlayerController : public APlayerController
 {
@@ -43,10 +44,7 @@ private:
 
 	void Primary();
 	void Rolling();
+	void ActivateAbilityByTag(const FGameplayTag& AbilityTag) const;
 
-
-
-	
-	
 	
 };
