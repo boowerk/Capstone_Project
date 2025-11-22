@@ -7,5 +7,6 @@ namespace GPTags
 	namespace GPAbilities
 	{
 		UE_DEFINE_GAMEPLAY_TAG_COMMENT(Primary, "GPTags.GPAbilities.Primary", "Tag for the Primary Ability");
+		UE_DEFINE_GAMEPLAY_TAG_COMMENT(Rolling, "GPTags.GPAbilities.Rolling", "Tag for the Rolling Ability");
 	}
 }
