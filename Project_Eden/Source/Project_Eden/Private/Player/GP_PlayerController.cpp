@@ -1,10 +1,11 @@
 #include "Player/GP_PlayerController.h"
-#include "EnhancedInputSubsystems.h"
-#include "EnhancedInputComponent.h"
-#include "GameFramework/Character.h"
 
-#include "GameFramework/PlayerState.h"
-#include "Engine/World.h"
+#include "AbilitySystemBlueprintLibrary.h"
+#include "AbilitySystemComponent.h" 
+#include "EnhancedInputComponent.h"
+#include "EnhancedInputSubsystems.h"
+#include "GameFramework/Character.h"
+#include "GameplayTags/GP_Tags.h"
 
 void AGP_PlayerController::SetupInputComponent()
 {
@@ -24,7 +25,7 @@ void AGP_PlayerController::SetupInputComponent()
 	EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ThisClass::StopJump);
 	EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ThisClass::Look);
 
-	EnhancedInputComponent->BindAction(PrimaryAction, ETriggerEvent::Started, this, &ThisClass::Primary);
+	EnhancedInputComponent->BindAction(PrimaryAction, ETriggerEvent::Triggered, this, &ThisClass::Primary);
 	EnhancedInputComponent->BindAction(RollingAction, ETriggerEvent::Started, this, &ThisClass::Rolling);
 }
 
@@ -64,12 +65,19 @@ void AGP_PlayerController::StopJump()
 
 void AGP_PlayerController::Primary()
 {
-	UE_LOG(LogTemp, Warning, TEXT("Primary"));
-
-
+	ActivateAbilityByTag(GPTags::GPAbilities::Primary);
 }
 
 void AGP_PlayerController::Rolling()
 {
 	UE_LOG(LogTemp, Warning, TEXT("Rolling"));
+	ActivateAbilityByTag(GPTags::GPAbilities::Rolling);
+}
+
+void AGP_PlayerController::ActivateAbilityByTag(const FGameplayTag& AbilityTag) const
+{
+	UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn());
+	if (!IsValid(ASC)) return;
+
+	ASC->TryActivateAbilitiesByTag(AbilityTag.GetSingleTagContainer());
 }
