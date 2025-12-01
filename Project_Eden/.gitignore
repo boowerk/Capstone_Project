@@ -76,3 +76,5 @@ DerivedDataCache/*
 Content/*
 !Content/GAS_Pattern/
 !Content/GAS_Pattern/*
+
+.idea/*
