@@ -73,8 +73,7 @@ Plugins/**/Intermediate/*
 # Cache files for the editor to use
 DerivedDataCache/*
 
-Content/*
-!Content/GAS_Pattern/
-!Content/GAS_Pattern/*
+Content/ParagonGideon/
+Content/ParagonGideon/*
 
 .idea/*
