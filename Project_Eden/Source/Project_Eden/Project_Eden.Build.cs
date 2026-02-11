@@ -20,7 +20,7 @@ public class Project_Eden : ModuleRules
             "GameplayAbilities",
             "GameplayTasks",
             "GameplayTags",
-
+            "AIModule",
         });
 
 		PrivateDependencyModuleNames.AddRange(new string[] {});
