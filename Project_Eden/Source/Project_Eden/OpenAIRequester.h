@@ -2,9 +2,11 @@
 #include "CoreMinimal.h"
 #include "UObject/NoExportTypes.h"
 #include "PcgDataTypes.h"
+#include "PlayerBehaviorTreeBuilder.h"
 #include "OpenAIRequester.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnScatterParams, FPCGScatterParams, Params);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPlayerEvaluationReady, const FPlayerEvaluationSnapshot&, Snapshot);
 
 UCLASS(BlueprintType, Blueprintable)
 class PROJECT_EDEN_API UOpenAIRequester : public UObject
@@ -14,9 +16,16 @@ public:
     UPROPERTY(BlueprintAssignable, Category = "OpenAI")
         FOnScatterParams OnScatterParams;
 
+    UPROPERTY(BlueprintAssignable, Category = "OpenAI")
+        FOnPlayerEvaluationReady OnPlayerEvaluationReady;
+
     UFUNCTION(BlueprintCallable, Category = "OpenAI")
         void SendOpenAIRequest();
 
+    UFUNCTION(BlueprintCallable, Category = "OpenAI")
+        void SendPlayerEvaluationRequest();
+
 private:
-    FString BuildPayloadJSON() const;
+    FString BuildScatterPayloadJSON() const;
+    FString BuildEvaluationPayloadJSON() const;
 };
