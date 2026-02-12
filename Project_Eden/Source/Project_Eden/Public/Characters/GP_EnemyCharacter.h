@@ -6,6 +6,8 @@
 
 class UAbilitySystemComponent;
 class UAttributeSet;
+class UPlayerBehaviorTreeBuilder;
+class UBehaviorTree;
 
 UCLASS()
 class PROJECT_EDEN_API AGP_EnemyCharacter : public AGP_BaseCharacter
@@ -36,8 +38,14 @@ public:
 	//void StopMovementUntilLanded();
 protected:
 	virtual void BeginPlay() override;
+
+	/** C++에서 동적으로 생성할 행동트리용 평가 JSON */
+	UPROPERTY(EditAnywhere, Category = "AI|BehaviorTree")
+	FString BehaviorEvaluationJson = TEXT("{\"aggression\":0.7,\"exploration\":0.3,\"survival\":0.5,\"support\":0.2}");
+
 	//virtual void HandleDeath() override;
 private:
+	void InitializeRuntimeBehaviorTree();
 
 	//UFUNCTION()
 	//void EnableMovementOnLanded(const FHitResult& Hit);
@@ -48,4 +56,9 @@ private:
 	//UPROPERTY()
 	//TObjectPtr<UAttributeSet> AttributeSet;
 
+	UPROPERTY(Transient)
+	TObjectPtr<UPlayerBehaviorTreeBuilder> BehaviorTreeBuilder;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UBehaviorTree> RuntimeBehaviorTree;
 };

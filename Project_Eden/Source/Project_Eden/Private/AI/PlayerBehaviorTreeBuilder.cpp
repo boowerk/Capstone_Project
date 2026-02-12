@@ -1,4 +1,4 @@
-#include "PlayerBehaviorTreeBuilder.h"
+#include "AI/PlayerBehaviorTreeBuilder.h"
 
 #include "BehaviorTree/Composites/BTComposite_Selector.h"
 #include "BehaviorTree/Composites/BTComposite_Sequence.h"

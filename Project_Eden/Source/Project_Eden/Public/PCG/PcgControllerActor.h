@@ -2,7 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "PcgDataTypes.h"
+#include "PCG/PcgDataTypes.h"
 #include "PcgControllerActor.generated.h"
 
 class UOpenAIRequester;
