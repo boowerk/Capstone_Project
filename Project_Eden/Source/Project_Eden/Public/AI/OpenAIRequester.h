@@ -1,7 +1,7 @@
 #pragma once
 #include "CoreMinimal.h"
 #include "UObject/NoExportTypes.h"
-#include "PcgDataTypes.h"
+#include "PCG/PcgDataTypes.h"
 #include "PlayerBehaviorTreeBuilder.h"
 #include "OpenAIRequester.generated.h"
 

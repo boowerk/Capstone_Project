@@ -1,5 +1,5 @@
-#include "PcgControllerActor.h"
-#include "OpenAIRequester.h"
+#include "PCG/PcgControllerActor.h"
+#include "AI/OpenAIRequester.h"
 #include "Components/SceneComponent.h"
 
 

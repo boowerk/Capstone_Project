@@ -1,8 +1,10 @@
 #include "Characters/GP_EnemyCharacter.h"
 
 #include "AbilitySystemComponent.h"
+#include "AIController.h"
+#include "BehaviorTree/BehaviorTree.h"
+#include "AI/PlayerBehaviorTreeBuilder.h"
 //#include "AbilitySystemBlueprintLibrary.h"
-//#include "AIController.h"
 //#include "AbilitySystem/GP_AbilitySystemComponent.h"
 //#include "AbilitySystem/GP_AttributeSet.h"
 //#include "GameplayTags/GPTags.h"
@@ -68,12 +70,46 @@ void AGP_EnemyCharacter::BeginPlay()
 	if (!HasAuthority()) return;
 
 	GiveStartupAbilities();
+	InitializeRuntimeBehaviorTree();
 //	InitializeAttributes();
 //
 //	UGP_AttributeSet* GP_AttributeSet = Cast<UGP_AttributeSet>(GetAttributeSet());
 //	if (!IsValid(GP_AttributeSet)) return;
 //
 //	GetAbilitySystemComponent()->GetGameplayAttributeValueChangeDelegate(GP_AttributeSet->GetHealthAttribute()).AddUObject(this, &ThisClass::OnHealthChanged);
+}
+
+void AGP_EnemyCharacter::InitializeRuntimeBehaviorTree()
+{
+	SpawnDefaultController();
+	AAIController* AIController = Cast<AAIController>(GetController());
+	if (!IsValid(AIController))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[EnemyAI] Failed to run Behavior Tree: AIController is not valid for %s"), *GetName());
+	}
+
+	BehaviorTreeBuilder = NewObject<UPlayerBehaviorTreeBuilder>(this);
+	if (!BehaviorTreeBuilder)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[EnemyAI] Failed to create behavior tree builder for %s"), *GetName());
+		return;
+	}
+
+	RuntimeBehaviorTree = BehaviorTreeBuilder->BuildBehaviorTreeFromJson(BehaviorEvaluationJson);
+	if (!IsValid(RuntimeBehaviorTree))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[EnemyAI] Failed to build runtime behavior tree for %s. Json: %s"), *GetName(), *BehaviorEvaluationJson);
+		return;
+	}
+
+	const bool bIsRunning = AIController->RunBehaviorTree(RuntimeBehaviorTree);
+	if (!bIsRunning)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[EnemyAI] RunBehaviorTree failed for %s"), *GetName());
+		return;
+	}
+
+	UE_LOG(LogTemp, Log, TEXT("[EnemyAI] Runtime behavior tree applied to %s"), *GetName());
 }
 
 //void AGP_EnemyCharacter::HandleDeath()
