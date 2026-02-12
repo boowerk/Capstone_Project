@@ -55,6 +55,42 @@ protected:
     virtual FString GetStaticDescription() const override;
 };
 
+/** 가장 가까운 플레이어를 향해 이동하는 태스크 **/
+UCLASS()
+class PROJECT_EDEN_API UBTTask_MoveToPlayer : public UBTTaskNode
+{
+    GENERATED_BODY()
+
+public:
+    UBTTask_MoveToPlayer();
+
+    UPROPERTY(EditAnywhere, Category = "Behavior")
+    float AcceptanceRadius = 140.0f;
+
+protected:
+    virtual EBTNodeResult::Type ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory) override;
+    virtual void TickTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, float DeltaSeconds) override;
+};
+
+/** 근접 범위에서 플레이어에게 데미지를 적용하는 태스크 **/
+UCLASS()
+class PROJECT_EDEN_API UBTTask_AttackPlayer : public UBTTaskNode
+{
+    GENERATED_BODY()
+
+public:
+    UBTTask_AttackPlayer();
+
+    UPROPERTY(EditAnywhere, Category = "Behavior")
+    float AttackRange = 220.0f;
+
+    UPROPERTY(EditAnywhere, Category = "Behavior")
+    float DamageAmount = 10.0f;
+
+protected:
+    virtual EBTNodeResult::Type ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory) override;
+};
+
 /**
  * 플레이어 평가 JSON을 기반으로 간단한 행동트리를 생성하는 빌더
  */
@@ -82,4 +118,7 @@ private:
 
     UBTTask_Wait* CreateWaitTask(UBehaviorTree* TreeOuter, float WaitTimeSeconds) const;
     UBTTask_LogAction* CreateLogTask(UBehaviorTree* TreeOuter, const FString& Label) const;
+
+    UBTTask_MoveToPlayer* CreateMoveToPlayerTask(UBehaviorTree* TreeOuter, float AcceptanceRadius) const;
+    UBTTask_AttackPlayer* CreateAttackPlayerTask(UBehaviorTree* TreeOuter, float AttackRange, float DamageAmount) const;
 };
