@@ -21,6 +21,7 @@ public class Project_Eden : ModuleRules
             "GameplayTasks",
             "GameplayTags",
             "AIModule",
+            "NavigationSystem",
         });
 
 		PrivateDependencyModuleNames.AddRange(new string[] {});
