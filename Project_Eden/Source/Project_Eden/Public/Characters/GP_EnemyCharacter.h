@@ -18,6 +18,7 @@ public:
 	AGP_EnemyCharacter();
 	//virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
+	FVector GetBehaviorAnchorLocation() const;
 	//virtual UAttributeSet* GetAttributeSet() const override;
 
 	//UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Crash|AI")
@@ -39,9 +40,12 @@ public:
 protected:
 	virtual void BeginPlay() override;
 
-	/** C++에서 동적으로 생성할 행동트리용 평가 JSON */
 	UPROPERTY(EditAnywhere, Category = "AI|BehaviorTree")
 	FString BehaviorEvaluationJson = TEXT("{\"aggression\":0.7,\"exploration\":0.3,\"survival\":0.5,\"support\":0.2}");
+
+	/** Editor-adjustable local offset for the patrol home location. */
+	UPROPERTY(EditInstanceOnly, Category = "AI|BehaviorTree", meta = (MakeEditWidget = "true"))
+	FVector BehaviorAnchorOffset = FVector::ZeroVector;
 
 	//virtual void HandleDeath() override;
 private:
@@ -61,4 +65,6 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UBehaviorTree> RuntimeBehaviorTree;
+
+	FVector BehaviorAnchorLocation = FVector::ZeroVector;
 };

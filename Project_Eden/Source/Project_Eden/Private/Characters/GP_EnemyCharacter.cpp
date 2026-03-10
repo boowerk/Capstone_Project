@@ -34,6 +34,11 @@ UAbilitySystemComponent* AGP_EnemyCharacter::GetAbilitySystemComponent() const
 	return AbilitySystemComponent;
 }
 
+FVector AGP_EnemyCharacter::GetBehaviorAnchorLocation() const
+{
+	return BehaviorAnchorLocation.IsNearlyZero() ? GetActorLocation() : BehaviorAnchorLocation;
+}
+
 //UAttributeSet* AGP_EnemyCharacter::GetAttributeSet() const
 //{
 //	return AttributeSet;
@@ -65,6 +70,7 @@ void AGP_EnemyCharacter::BeginPlay()
 	if (!IsValid(GetAbilitySystemComponent())) return;
 
 	GetAbilitySystemComponent()->InitAbilityActorInfo(this, this);
+	BehaviorAnchorLocation = GetActorTransform().TransformPosition(BehaviorAnchorOffset);
 //	OnASCInitialized.Broadcast(GetAbilitySystemComponent(), GetAttributeSet());
 //
 	if (!HasAuthority()) return;
@@ -86,6 +92,7 @@ void AGP_EnemyCharacter::InitializeRuntimeBehaviorTree()
 	if (!IsValid(AIController))
 	{
 		UE_LOG(LogTemp, Warning, TEXT("[EnemyAI] Failed to run Behavior Tree: AIController is not valid for %s"), *GetName());
+		return;
 	}
 
 	BehaviorTreeBuilder = NewObject<UPlayerBehaviorTreeBuilder>(this);
