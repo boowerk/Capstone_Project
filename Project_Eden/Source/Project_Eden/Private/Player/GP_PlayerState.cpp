@@ -1,12 +1,12 @@
 #include "Player/GP_PlayerState.h"
-#include "AbilitySystemComponent.h"
+#include "AbilitySystem/GP_AbilitySystemComponent.h"
 
 
 AGP_PlayerState::AGP_PlayerState()
 {
 	SetNetUpdateFrequency(100.f);
 
-	AbilitySystemComponent = CreateDefaultSubobject<UAbilitySystemComponent>("AbilitySystemComponent");
+	AbilitySystemComponent = CreateDefaultSubobject<UGP_AbilitySystemComponent>("AbilitySystemComponent");
 	AbilitySystemComponent->SetIsReplicated(true);
 	AbilitySystemComponent->SetReplicationMode(EGameplayEffectReplicationMode::Mixed);
 

@@ -1,7 +1,7 @@
 #include "Characters/GP_EnemyCharacter.h"
 
-#include "AbilitySystemComponent.h"
 #include "AIController.h"
+#include "AbilitySystem/GP_AbilitySystemComponent.h"
 #include "BehaviorTree/BehaviorTree.h"
 #include "AI/PlayerBehaviorTreeBuilder.h"
 //#include "AbilitySystemBlueprintLibrary.h"
@@ -15,19 +15,13 @@ AGP_EnemyCharacter::AGP_EnemyCharacter()
 {
 	PrimaryActorTick.bCanEverTick = false;
 
-	AbilitySystemComponent = CreateDefaultSubobject<UAbilitySystemComponent>("AbilitySystemComponent");
+	AbilitySystemComponent = CreateDefaultSubobject<UGP_AbilitySystemComponent>("AbilitySystemComponent");
 	AbilitySystemComponent->SetIsReplicated(true);
 	AbilitySystemComponent->SetReplicationMode(EGameplayEffectReplicationMode::Minimal);
 
-	//AttributeSet = CreateDefaultSubobject<UGP_AttributeSet>("AttributeSet");
 }
 
-//void AGP_EnemyCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
-//{
-//	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-//
-//	DOREPLIFETIME(ThisClass, bIsBeingLaunched);
-//}
+
 
 UAbilitySystemComponent* AGP_EnemyCharacter::GetAbilitySystemComponent() const
 {
@@ -39,29 +33,6 @@ FVector AGP_EnemyCharacter::GetBehaviorAnchorLocation() const
 	return BehaviorAnchorLocation.IsNearlyZero() ? GetActorLocation() : BehaviorAnchorLocation;
 }
 
-//UAttributeSet* AGP_EnemyCharacter::GetAttributeSet() const
-//{
-//	return AttributeSet;
-//}
-
-//void AGP_EnemyCharacter::StopMovementUntilLanded()
-//{
-//	bIsBeingLaunched = true;
-//	AAIController* AIController = GetController<AAIController>();
-//	if (!IsValid(AIController)) return;
-//	AIController->StopMovement();
-//	if (!LandedDelegate.IsAlreadyBound(this, &ThisClass::EnableMovementOnLanded))
-//	{
-//		LandedDelegate.AddDynamic(this, &ThisClass::EnableMovementOnLanded);
-//	}
-//}
-
-//void AGP_EnemyCharacter::EnableMovementOnLanded(const FHitResult& Hit)
-//{
-//	bIsBeingLaunched = false;
-//	UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(this, GPTags::Events::Enemy::EndAttack, FGameplayEventData());
-//	LandedDelegate.RemoveAll(this);
-//}
 
 void AGP_EnemyCharacter::BeginPlay()
 {
@@ -70,19 +41,14 @@ void AGP_EnemyCharacter::BeginPlay()
 	if (!IsValid(GetAbilitySystemComponent())) return;
 
 	GetAbilitySystemComponent()->InitAbilityActorInfo(this, this);
-	BehaviorAnchorLocation = GetActorTransform().TransformPosition(BehaviorAnchorOffset);
-//	OnASCInitialized.Broadcast(GetAbilitySystemComponent(), GetAttributeSet());
-//
+
 	if (!HasAuthority()) return;
 
 	GiveStartupAbilities();
+	
+	// 백지훈 추가 
 	InitializeRuntimeBehaviorTree();
-//	InitializeAttributes();
-//
-//	UGP_AttributeSet* GP_AttributeSet = Cast<UGP_AttributeSet>(GetAttributeSet());
-//	if (!IsValid(GP_AttributeSet)) return;
-//
-//	GetAbilitySystemComponent()->GetGameplayAttributeValueChangeDelegate(GP_AttributeSet->GetHealthAttribute()).AddUObject(this, &ThisClass::OnHealthChanged);
+	BehaviorAnchorLocation = GetActorTransform().TransformPosition(BehaviorAnchorOffset); // HasAuthority 판독 후로 이동, 어빌리티의 구조를 침범하므로 제거예정
 }
 
 void AGP_EnemyCharacter::InitializeRuntimeBehaviorTree()
@@ -118,12 +84,3 @@ void AGP_EnemyCharacter::InitializeRuntimeBehaviorTree()
 
 	UE_LOG(LogTemp, Log, TEXT("[EnemyAI] Runtime behavior tree applied to %s"), *GetName());
 }
-
-//void AGP_EnemyCharacter::HandleDeath()
-//{
-//	Super::HandleDeath();
-//
-//	AAIController* AIController = GetController<AAIController>();
-//	if (!IsValid(AIController)) return;
-//	AIController->StopMovement();
-//}
