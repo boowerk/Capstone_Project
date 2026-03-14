@@ -1,33 +1,39 @@
 #include "AbilitySystem/GP_AbilitySystemComponent.h"
 
+#include "GameplayTags/GP_Tags.h"
 
-// Sets default values for this component's properties
-UGP_AbilitySystemComponent::UGP_AbilitySystemComponent()
+
+// 주의! 
+// AbilitySpec은 CDO값으로 실제 인스턴스에서 실시간으로 얻은 값이 아닌 CDO 즉 템플릿 값이라
+// 읽기 전용으로 태그 데이터만 읽어오게 구현했음 - 슝
+
+void UGP_AbilitySystemComponent::OnGiveAbility(FGameplayAbilitySpec& AbilitySpec)
 {
-	// Set this component to be initialized when the game starts, and to be ticked every frame.  You can turn these features
-	// off to improve performance if you don't need them.
-	PrimaryComponentTick.bCanEverTick = true;
-
-	// ...
-}
-
-
-// Called when the game starts
-void UGP_AbilitySystemComponent::BeginPlay()
-{
-	Super::BeginPlay();
-
-	// ...
+	Super::OnGiveAbility(AbilitySpec);
 	
+	HandleAutoActivatedAbility(AbilitySpec);
 }
 
-
-// Called every frame
-void UGP_AbilitySystemComponent::TickComponent(float DeltaTime, ELevelTick TickType,
-                                               FActorComponentTickFunction* ThisTickFunction)
+void UGP_AbilitySystemComponent::OnRep_ActivateAbilities()
 {
-	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-
-	// ...
+	Super::OnRep_ActivateAbilities();
+	
+	FScopedAbilityListLock ActivateScopeLock(*this);
+	for (const FGameplayAbilitySpec& AbilitySpec : GetActivatableAbilities())
+	{
+		HandleAutoActivatedAbility(AbilitySpec);
+	}
 }
 
+void UGP_AbilitySystemComponent::HandleAutoActivatedAbility(const FGameplayAbilitySpec& AbilitySpec)
+{
+	if (!IsValid(AbilitySpec.Ability)) return;
+	for (const FGameplayTag& Tag : AbilitySpec.Ability->GetAssetTags()) 
+	{
+		if (Tag.MatchesTagExact(GPTags::GPAbilities::ActivateOnGiven))
+		{
+			TryActivateAbility(AbilitySpec.Handle);
+		} 
+		
+	}
+}

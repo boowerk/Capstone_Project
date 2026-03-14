@@ -12,11 +12,11 @@ class PROJECT_EDEN_API UGP_AbilitySystemComponent : public UAbilitySystemCompone
 	GENERATED_BODY()
 
 
-protected:
-	virtual void BeginPlay() override;
-
 public:
-	UGP_AbilitySystemComponent();
-	virtual void TickComponent(float DeltaTime, ELevelTick TickType,
-	                           FActorComponentTickFunction* ThisTickFunction) override;
+	virtual void OnGiveAbility(FGameplayAbilitySpec& AbilitySpec) override;
+	virtual void OnRep_ActivateAbilities() override;
+	
+private:
+	void HandleAutoActivatedAbility(const FGameplayAbilitySpec& AbilitySpec);
+	
 };

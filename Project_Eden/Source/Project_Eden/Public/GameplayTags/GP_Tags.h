@@ -8,6 +8,8 @@ namespace GPTags
 {
 	namespace GPAbilities
 	{
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(ActivateOnGiven);
+		
 		UE_DECLARE_GAMEPLAY_TAG_EXTERN(Primary);
 		UE_DECLARE_GAMEPLAY_TAG_EXTERN(Rolling);
 	}
