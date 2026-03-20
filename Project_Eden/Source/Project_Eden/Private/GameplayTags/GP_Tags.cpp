@@ -8,7 +8,7 @@ namespace GPTags
 	{
 		UE_DEFINE_GAMEPLAY_TAG_COMMENT(ActivateOnGiven, "GPTags.GPAbilities.ActivateOnGiven", "Tag for Abilities");
 		UE_DEFINE_GAMEPLAY_TAG_COMMENT(Primary, "GPTags.GPAbilities.Primary", "Tag for the Primary Ability");
-		UE_DEFINE_GAMEPLAY_TAG_COMMENT(Rolling, "GPTags.GPAbilities.Rolling", "Tag for the Rolling Ability");
+		UE_DEFINE_GAMEPLAY_TAG_COMMENT(Targeting, "GPTags.GPAbilities.Targeting", "Tag for the Targeting Ability");
 	}
 	
 	namespace Events

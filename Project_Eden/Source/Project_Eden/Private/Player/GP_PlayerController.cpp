@@ -26,7 +26,7 @@ void AGP_PlayerController::SetupInputComponent()
 	EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ThisClass::Look);
 
 	EnhancedInputComponent->BindAction(PrimaryAction, ETriggerEvent::Triggered, this, &ThisClass::Primary);
-	EnhancedInputComponent->BindAction(RollingAction, ETriggerEvent::Started, this, &ThisClass::Rolling);
+	EnhancedInputComponent->BindAction(TargetingAction, ETriggerEvent::Started, this, &ThisClass::Targeting);
 }
 
 void AGP_PlayerController::Move(const FInputActionValue& Value)
@@ -68,10 +68,10 @@ void AGP_PlayerController::Primary()
 	ActivateAbilityByTag(GPTags::GPAbilities::Primary);
 }
 
-void AGP_PlayerController::Rolling()
+void AGP_PlayerController::Targeting()
 {
-	UE_LOG(LogTemp, Warning, TEXT("Rolling"));
-	ActivateAbilityByTag(GPTags::GPAbilities::Rolling);
+	UE_LOG(LogTemp, Warning, TEXT("Targeting"));
+	ActivateAbilityByTag(GPTags::GPAbilities::Targeting);
 }
 
 void AGP_PlayerController::ActivateAbilityByTag(const FGameplayTag& AbilityTag) const

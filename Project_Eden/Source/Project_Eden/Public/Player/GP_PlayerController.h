@@ -33,7 +33,7 @@ private:
 	TObjectPtr<UInputAction> PrimaryAction;
 
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
-	TObjectPtr<UInputAction> RollingAction;
+	TObjectPtr<UInputAction> TargetingAction;
 
 
 
@@ -43,7 +43,7 @@ private:
 	void StopJump();
 
 	void Primary();
-	void Rolling();
+	void Targeting();
 	void ActivateAbilityByTag(const FGameplayTag& AbilityTag) const;
 
 	
