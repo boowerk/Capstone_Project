@@ -7,7 +7,12 @@ namespace GPTags
 	namespace GPAbilities
 	{
 		UE_DEFINE_GAMEPLAY_TAG_COMMENT(ActivateOnGiven, "GPTags.GPAbilities.ActivateOnGiven", "Tag for Abilities");
+		
 		UE_DEFINE_GAMEPLAY_TAG_COMMENT(Primary, "GPTags.GPAbilities.Primary", "Tag for the Primary Ability");
+		UE_DEFINE_GAMEPLAY_TAG_COMMENT(Skill, "GPTags.GPAbilities.Skill", "Tag for the Skill Ability");
+		UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ultimate, "GPTags.GPAbilities.Ultimate", "Tag for the Ultimate Ability");
+		UE_DEFINE_GAMEPLAY_TAG_COMMENT(Dash, "GPTags.GPAbilities.Dash", "Tag for the Dash Ability");
+		
 		UE_DEFINE_GAMEPLAY_TAG_COMMENT(Targeting, "GPTags.GPAbilities.Targeting", "Tag for the Targeting Ability");
 	}
 	

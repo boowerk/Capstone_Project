@@ -36,15 +36,27 @@ private:
 	TObjectPtr<UInputAction> TargetingAction;
 
 
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
+	TObjectPtr<UInputAction> SkillAction;
 
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
+	TObjectPtr<UInputAction> UltimateAction;
+
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Movement")
+	TObjectPtr<UInputAction> DashAction;
+
+	
 	void Move(const FInputActionValue& Value);
 	void Look(const FInputActionValue& Value);
 	void Jump();
 	void StopJump();
 
 	void Primary();
-	void Targeting();
 	void ActivateAbilityByTag(const FGameplayTag& AbilityTag) const;
+	void Skill();
+	void Ultimate();
+	void Dash();
 
+	void Targeting();
 	
 };

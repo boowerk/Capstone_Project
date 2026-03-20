@@ -26,6 +26,10 @@ void AGP_PlayerController::SetupInputComponent()
 	EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ThisClass::Look);
 
 	EnhancedInputComponent->BindAction(PrimaryAction, ETriggerEvent::Triggered, this, &ThisClass::Primary);
+	EnhancedInputComponent->BindAction(SkillAction, ETriggerEvent::Triggered, this, &ThisClass::Skill);
+	EnhancedInputComponent->BindAction(UltimateAction, ETriggerEvent::Triggered, this, &ThisClass::Ultimate);
+	EnhancedInputComponent->BindAction(DashAction, ETriggerEvent::Triggered, this, &ThisClass::Dash);
+	
 	EnhancedInputComponent->BindAction(TargetingAction, ETriggerEvent::Started, this, &ThisClass::Targeting);
 }
 
@@ -81,3 +85,10 @@ void AGP_PlayerController::ActivateAbilityByTag(const FGameplayTag& AbilityTag) 
 
 	ASC->TryActivateAbilitiesByTag(AbilityTag.GetSingleTagContainer());
 }
+
+
+
+// 하단 구현부
+void AGP_PlayerController::Skill() { ActivateAbilityByTag(GPTags::GPAbilities::Skill); }
+void AGP_PlayerController::Ultimate() { ActivateAbilityByTag(GPTags::GPAbilities::Ultimate); }
+void AGP_PlayerController::Dash() { ActivateAbilityByTag(GPTags::GPAbilities::Dash); }
