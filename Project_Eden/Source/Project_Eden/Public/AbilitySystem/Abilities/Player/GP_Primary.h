@@ -16,9 +16,15 @@ class PROJECT_EDEN_API UGP_Primary : public UGP_GameplayAbility
 	GENERATED_BODY()
 public:
 	UFUNCTION(BlueprintCallable, Category = "GAS|Abilities")
-	void HitboxOverlapTest();
+	TArray<AActor*> HitboxOverlapTest();
+	
+	UFUNCTION(BlueprintCallable, Category = "GAS|Abilities")
+	void SendHitReactEventToActors(const TArray<AActor*>& ActorsHit);
+	
 	
 private:
+	void DrawDebugsHitBoxOverlap(const TArray<FOverlapResult>& OverlapResults, const FVector& HitBoxLocation) const;
+	
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Abilities")
 	float HitBoxRadius = 100.0f;	
 	

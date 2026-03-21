@@ -3,8 +3,10 @@
 #include "AbilitySystem/Abilities/Player/GP_Primary.h"
 
 #include "Engine/OverlapResult.h"
+#include "AbilitySystemBlueprintLibrary.h"
+#include "GameplayTags/GP_Tags.h"
 
-void UGP_Primary::HitboxOverlapTest()
+TArray<AActor*> UGP_Primary::HitboxOverlapTest()
 {
 	TArray<AActor*> ActorToIgnore;
 	ActorToIgnore.Add(GetAvatarActorFromActorInfo());
@@ -25,15 +27,39 @@ void UGP_Primary::HitboxOverlapTest()
 	GetWorld()->OverlapMultiByChannel(OverlapResults, HitBoxLocation, FQuat::Identity, 
 		ECC_Visibility, CollisionShapeSphere, CollisionQueryParams,CollisionResponseParams);
 
-	if (bDrawDebugs)
+	TArray<AActor*> ActorsHit;
+	for (const FOverlapResult& Result : OverlapResults)
 	{
-		DrawDebugSphere(GetWorld(), HitBoxLocation, HitBoxRadius, 16, FColor::Red, false,  3.f);
-		for (const FOverlapResult& Result : OverlapResults)
-		{
-			FVector DebugLocation = Result.GetActor()->GetActorLocation();
-			DebugLocation.Z += 100.f;
-			DrawDebugSphere(GetWorld(), DebugLocation, 30.f, 10, FColor::Green, false,  3.f);
-		}
+		if (!IsValid(Result.GetActor())) continue;
+		ActorsHit.AddUnique(Result.GetActor());		
 	}
 	
+	if (bDrawDebugs)
+	{
+		DrawDebugsHitBoxOverlap(OverlapResults, HitBoxLocation);
+	}
+	
+	return ActorsHit;
+	
+}
+
+void UGP_Primary::SendHitReactEventToActors(const TArray<AActor*>& ActorsHit)
+{
+	for (AActor* HitActor : ActorsHit)
+	{
+		FGameplayEventData Payload;
+		Payload.Instigator = GetAvatarActorFromActorInfo();
+		UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(HitActor, GPTags::Events::Enemy::HitReact, Payload);
+	}
+}
+
+void UGP_Primary::DrawDebugsHitBoxOverlap(const TArray<FOverlapResult>& OverlapResults, const FVector& HitBoxLocation) const
+{
+	DrawDebugSphere(GetWorld(), HitBoxLocation, HitBoxRadius, 16, FColor::Red, false,  3.f);
+	for (const FOverlapResult& Result : OverlapResults)
+	{
+		FVector DebugLocation = Result.GetActor()->GetActorLocation();
+		DebugLocation.Z += 100.f;
+		DrawDebugSphere(GetWorld(), DebugLocation, 30.f, 10, FColor::Green, false,  3.f);
+	}
 }
