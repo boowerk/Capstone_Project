@@ -1,4 +1,4 @@
-#include "Characters/GP_EnemyCharacter.h"
+﻿#include "Characters/GP_EnemyCharacter.h"
 
 #include "AIController.h"
 #include "AbilitySystem/GP_AbilitySystemComponent.h"
@@ -33,6 +33,16 @@ FVector AGP_EnemyCharacter::GetBehaviorAnchorLocation() const
 	return BehaviorAnchorLocation.IsNearlyZero() ? GetActorLocation() : BehaviorAnchorLocation;
 }
 
+FText AGP_EnemyCharacter::GetBossDisplayName() const
+{
+	if (!BossDisplayName.IsEmpty())
+	{
+		return BossDisplayName;
+	}
+
+	return FText::FromString(GetName());
+}
+
 
 void AGP_EnemyCharacter::BeginPlay()
 {
@@ -46,9 +56,9 @@ void AGP_EnemyCharacter::BeginPlay()
 
 	GiveStartupAbilities();
 	
-	// 백지훈 추가 
+	// 諛깆???異붽? 
 	InitializeRuntimeBehaviorTree();
-	BehaviorAnchorLocation = GetActorTransform().TransformPosition(BehaviorAnchorOffset); // HasAuthority 판독 후로 이동, 어빌리티의 구조를 침범하므로 제거예정
+	BehaviorAnchorLocation = GetActorTransform().TransformPosition(BehaviorAnchorOffset); // HasAuthority ?먮룆 ?꾨줈 ?대룞, ?대퉴由ы떚??援ъ“瑜?移⑤쾾?섎?濡??쒓굅?덉젙
 }
 
 void AGP_EnemyCharacter::InitializeRuntimeBehaviorTree()

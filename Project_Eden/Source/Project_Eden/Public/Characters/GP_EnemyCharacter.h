@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 #include "CoreMinimal.h"
 #include "Characters/GP_BaseCharacter.h"
@@ -17,25 +17,37 @@ class PROJECT_EDEN_API AGP_EnemyCharacter : public AGP_BaseCharacter
 public:
 	AGP_EnemyCharacter();
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
-	
+
+	UFUNCTION(BlueprintPure, Category = "Boss")
+	bool IsBossEnemy() const { return bIsBossEnemy; }
+
+	UFUNCTION(BlueprintPure, Category = "Boss")
+	FText GetBossDisplayName() const;
+
 	FVector GetBehaviorAnchorLocation() const;//
 
 protected:
 	virtual void BeginPlay() override;
 
-	//¹ºÁö¸ğ¸¦ ¶ËÆ®¸®
+	//ë­”ì§€ëª¨ë¥¼ ë˜¥íŠ¸ë¦¬
 	UPROPERTY(EditAnywhere, Category = "AI|BehaviorTree")
 	FString BehaviorEvaluationJson = TEXT("{\"aggression\":0.7,\"exploration\":0.3,\"survival\":0.5,\"support\":0.2}");
 	
 	UPROPERTY(EditInstanceOnly, Category = "AI|BehaviorTree", meta = (MakeEditWidget = "true"))
 	FVector BehaviorAnchorOffset = FVector::ZeroVector;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss")
+	bool bIsBossEnemy = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss", meta = (EditCondition = "bIsBossEnemy"))
+	FText BossDisplayName;
 private:
 	
 
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UAbilitySystemComponent> AbilitySystemComponent;
 	
-	//¹éÁöÈÆÄÚµå - ¾îºô¸®Æ¼ÀÇ ±¸Á¶¸¦ Ä§¹üÇÏ¹Ç·Î Á¦°Å¿¹Á¤
+	//ë°±ì§€í›ˆì½”ë“œ - ì–´ë¹Œë¦¬í‹°ì˜ êµ¬ì¡°ë¥¼ ì¹¨ë²”í•˜ë¯€ë¡œ ì œê±°ì˜ˆì •
 	void InitializeRuntimeBehaviorTree();
 	UPROPERTY(Transient)
 	TObjectPtr<UPlayerBehaviorTreeBuilder> BehaviorTreeBuilder;

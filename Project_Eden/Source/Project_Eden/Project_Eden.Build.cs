@@ -14,6 +14,7 @@ public class Project_Eden : ModuleRules
 			"HTTP", 
 			"InputCore", 
 			"EnhancedInput",
+			"UMG",
 			"Json",
 			"JsonUtilities",
             "PCG",
@@ -24,7 +25,7 @@ public class Project_Eden : ModuleRules
             "NavigationSystem",
         });
 
-		PrivateDependencyModuleNames.AddRange(new string[] {});
+		PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });
         
     }
 }

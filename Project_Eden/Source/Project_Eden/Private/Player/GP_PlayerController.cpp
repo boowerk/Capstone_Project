@@ -1,11 +1,64 @@
 #include "Player/GP_PlayerController.h"
 
 #include "AbilitySystemBlueprintLibrary.h"
-#include "AbilitySystemComponent.h" 
+#include "AbilitySystemComponent.h"
+#include "Blueprint/UserWidget.h"
+#include "Characters/GP_EnemyCharacter.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "GameFramework/Character.h"
 #include "GameplayTags/GP_Tags.h"
+#include "Kismet/GameplayStatics.h"
+#include "Logging/LogMacros.h"
+#include "UI/GP_PlayerHUDWidget.h"
+
+AGP_PlayerController::AGP_PlayerController()
+{
+	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bStartWithTickEnabled = true;
+}
+
+void AGP_PlayerController::BeginPlay()
+{
+	Super::BeginPlay();
+
+	if (!IsLocalController() || HUDWidget)
+	{
+		return;
+	}
+
+	UClass* WidgetClass = HUDWidgetClass ? HUDWidgetClass.Get() : nullptr;
+	if (!IsValid(WidgetClass))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("HUDWidgetClass is not set on %s. Assign a Widget Blueprint based on GP_PlayerHUDWidget."), *GetName());
+		return;
+	}
+
+	UUserWidget* CreatedWidget = CreateWidget<UUserWidget>(this, WidgetClass);
+	if (!IsValid(CreatedWidget))
+	{
+		return;
+	}
+
+	CreatedWidget->AddToViewport();
+	HUDWidget = Cast<UGP_PlayerHUDWidget>(CreatedWidget);
+	if (HUDWidget)
+	{
+		HUDWidget->SetBossVisible(false);
+	}
+}
+
+void AGP_PlayerController::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+
+	BossRefreshAccumulator += DeltaSeconds;
+	if (BossRefreshAccumulator >= BossRefreshInterval)
+	{
+		BossRefreshAccumulator = 0.0f;
+		RefreshBossHUD();
+	}
+}
 
 void AGP_PlayerController::SetupInputComponent()
 {
@@ -14,7 +67,8 @@ void AGP_PlayerController::SetupInputComponent()
 	UEnhancedInputLocalPlayerSubsystem* InputSubsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer());
 	if (!IsValid(InputSubsystem)) return;
 
-	for (UInputMappingContext* Context : InputMappingContexts) {
+	for (UInputMappingContext* Context : InputMappingContexts)
+	{
 		InputSubsystem->AddMappingContext(Context, 0);
 	}
 
@@ -29,13 +83,12 @@ void AGP_PlayerController::SetupInputComponent()
 	EnhancedInputComponent->BindAction(SkillAction, ETriggerEvent::Triggered, this, &ThisClass::Skill);
 	EnhancedInputComponent->BindAction(UltimateAction, ETriggerEvent::Triggered, this, &ThisClass::Ultimate);
 	EnhancedInputComponent->BindAction(DashAction, ETriggerEvent::Triggered, this, &ThisClass::Dash);
-	
 	EnhancedInputComponent->BindAction(TargetingAction, ETriggerEvent::Started, this, &ThisClass::Targeting);
 }
 
 void AGP_PlayerController::Move(const FInputActionValue& Value)
 {
-	if (!IsValid(GetPawn()))return;
+	if (!IsValid(GetPawn())) return;
 	const FVector2D MovementVector = Value.Get<FVector2D>();
 
 	const FRotator YawRotation(0.f, GetControlRotation().Yaw, 0.f);
@@ -48,7 +101,7 @@ void AGP_PlayerController::Move(const FInputActionValue& Value)
 
 void AGP_PlayerController::Look(const FInputActionValue& Value)
 {
-	if (!IsValid(GetPawn()))return;
+	if (!IsValid(GetPawn())) return;
 	const FVector2D LookAxisVector = Value.Get<FVector2D>();
 
 	AddYawInput(LookAxisVector.X);
@@ -57,13 +110,13 @@ void AGP_PlayerController::Look(const FInputActionValue& Value)
 
 void AGP_PlayerController::Jump()
 {
-	if(!IsValid(GetCharacter()))return;
+	if (!IsValid(GetCharacter())) return;
 	GetCharacter()->Jump();
 }
 
 void AGP_PlayerController::StopJump()
 {
-	if(!IsValid(GetCharacter()))return;
+	if (!IsValid(GetCharacter())) return;
 	GetCharacter()->StopJumping();
 }
 
@@ -86,9 +139,59 @@ void AGP_PlayerController::ActivateAbilityByTag(const FGameplayTag& AbilityTag) 
 	ASC->TryActivateAbilitiesByTag(AbilityTag.GetSingleTagContainer());
 }
 
+void AGP_PlayerController::Skill()
+{
+	ActivateAbilityByTag(GPTags::GPAbilities::Skill);
+}
 
+void AGP_PlayerController::Ultimate()
+{
+	ActivateAbilityByTag(GPTags::GPAbilities::Ultimate);
+}
 
-// 하단 구현부
-void AGP_PlayerController::Skill() { ActivateAbilityByTag(GPTags::GPAbilities::Skill); }
-void AGP_PlayerController::Ultimate() { ActivateAbilityByTag(GPTags::GPAbilities::Ultimate); }
-void AGP_PlayerController::Dash() { ActivateAbilityByTag(GPTags::GPAbilities::Dash); }
+void AGP_PlayerController::Dash()
+{
+	ActivateAbilityByTag(GPTags::GPAbilities::Dash);
+}
+
+void AGP_PlayerController::RefreshBossHUD()
+{
+	if (!HUDWidget || !GetPawn())
+	{
+		return;
+	}
+
+	TArray<AActor*> EnemyActors;
+	UGameplayStatics::GetAllActorsOfClass(this, AGP_EnemyCharacter::StaticClass(), EnemyActors);
+
+	AGP_EnemyCharacter* ClosestBoss = nullptr;
+	float ClosestDistanceSq = BossDetectionRange * BossDetectionRange;
+	const FVector PlayerLocation = GetPawn()->GetActorLocation();
+
+	for (AActor* Actor : EnemyActors)
+	{
+		AGP_EnemyCharacter* EnemyCharacter = Cast<AGP_EnemyCharacter>(Actor);
+		if (!EnemyCharacter || !EnemyCharacter->IsBossEnemy())
+		{
+			continue;
+		}
+
+		const float DistanceSq = FVector::DistSquared(PlayerLocation, EnemyCharacter->GetActorLocation());
+		if (DistanceSq <= ClosestDistanceSq)
+		{
+			ClosestDistanceSq = DistanceSq;
+			ClosestBoss = EnemyCharacter;
+		}
+	}
+
+	if (!ClosestBoss)
+	{
+		CurrentBossEnemy = nullptr;
+		HUDWidget->SetBossVisible(false);
+		return;
+	}
+
+	CurrentBossEnemy = ClosestBoss;
+	HUDWidget->SetBossText(CurrentBossEnemy->GetBossDisplayName());
+	HUDWidget->SetBossVisible(true);
+}
