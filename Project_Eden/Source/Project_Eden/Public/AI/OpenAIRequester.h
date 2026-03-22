@@ -1,5 +1,6 @@
 #pragma once
 #include "CoreMinimal.h"
+#include "Interfaces/IHttpRequest.h"
 #include "UObject/NoExportTypes.h"
 #include "PCG/PcgDataTypes.h"
 #include "PlayerBehaviorTreeBuilder.h"
@@ -26,6 +27,7 @@ public:
         void SendPlayerEvaluationRequest();
 
 private:
+    bool TryCreateAuthorizedRequest(const FString& Payload, TSharedRef<IHttpRequest, ESPMode::ThreadSafe>& OutRequest) const;
     FString BuildScatterPayloadJSON() const;
     FString BuildEvaluationPayloadJSON() const;
 };

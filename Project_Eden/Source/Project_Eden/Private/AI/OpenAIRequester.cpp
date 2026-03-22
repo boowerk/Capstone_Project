@@ -1,8 +1,10 @@
 #include "AI/OpenAIRequester.h"
 #include "HttpModule.h"
+#include "HAL/PlatformMisc.h"
 #include "Interfaces/IHttpRequest.h"
 #include "Interfaces/IHttpResponse.h"
 #include "Dom/JsonObject.h"
+#include "Dom/JsonValue.h"
 #include "Serialization/JsonSerializer.h"
 #include "Serialization/JsonWriter.h"
 
@@ -25,6 +27,65 @@ static FString TrimAndStrip(const FString& Input)
 
 namespace
 {
+    FString SerializeJsonObject(const TSharedRef<FJsonObject>& JsonObject)
+    {
+        FString Payload;
+        const TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Payload);
+        FJsonSerializer::Serialize(JsonObject, Writer);
+        return Payload;
+    }
+
+    FString BuildTextOnlyInputPayload(const FString& Model, const FString& Prompt, int32 MaxOutputTokens)
+    {
+        const TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
+        Root->SetStringField(TEXT("model"), Model);
+        Root->SetNumberField(TEXT("max_output_tokens"), MaxOutputTokens);
+
+        const TSharedRef<FJsonObject> InputMessage = MakeShared<FJsonObject>();
+        InputMessage->SetStringField(TEXT("role"), TEXT("user"));
+
+        const TSharedRef<FJsonObject> InputText = MakeShared<FJsonObject>();
+        InputText->SetStringField(TEXT("type"), TEXT("input_text"));
+        InputText->SetStringField(TEXT("text"), Prompt);
+
+        TArray<TSharedPtr<FJsonValue>> ContentArray;
+        ContentArray.Add(MakeShared<FJsonValueObject>(InputText));
+        InputMessage->SetArrayField(TEXT("content"), ContentArray);
+
+        TArray<TSharedPtr<FJsonValue>> InputArray;
+        InputArray.Add(MakeShared<FJsonValueObject>(InputMessage));
+        Root->SetArrayField(TEXT("input"), InputArray);
+
+        return SerializeJsonObject(Root);
+    }
+
+    bool TryAppendTextField(const TSharedPtr<FJsonObject>& JsonObject, FString& InOutText)
+    {
+        if (!JsonObject.IsValid())
+        {
+            return false;
+        }
+
+        FString TextValue;
+        if (JsonObject->TryGetStringField(TEXT("text"), TextValue))
+        {
+            InOutText += TextValue;
+            return true;
+        }
+
+        const TSharedPtr<FJsonObject>* NestedTextObject = nullptr;
+        if (JsonObject->TryGetObjectField(TEXT("text"), NestedTextObject) && NestedTextObject && NestedTextObject->IsValid())
+        {
+            if ((*NestedTextObject)->TryGetStringField(TEXT("value"), TextValue))
+            {
+                InOutText += TextValue;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     bool ExtractResponseText(const FString& Body, FString& OutText)
     {
 		TSharedPtr<FJsonObject> Root;
@@ -36,6 +97,13 @@ namespace
             return false;
         }
 
+        FString TopLevelOutputText;
+        if (Root->TryGetStringField(TEXT("output_text"), TopLevelOutputText))
+        {
+            OutText = TrimAndStrip(TopLevelOutputText);
+            return !OutText.IsEmpty();
+        }
+
         const TArray<TSharedPtr<FJsonValue>>* OutputArray = nullptr;
         if (!Root->TryGetArrayField(TEXT("output"), OutputArray) || OutputArray->Num() <= 0)
         {
@@ -43,63 +111,84 @@ namespace
             return false;
         }
 
-        const TSharedPtr<FJsonObject> Output0 = (*OutputArray)[0]->AsObject();
-        if (!Output0.IsValid())
+        FString CombinedText;
+        for (const TSharedPtr<FJsonValue>& OutputValue : *OutputArray)
         {
-            UE_LOG(LogTemp, Warning, TEXT("[OpenAI] output[0] parsing failed"));
+            const TSharedPtr<FJsonObject> OutputObject = OutputValue.IsValid() ? OutputValue->AsObject() : nullptr;
+            if (!OutputObject.IsValid())
+            {
+                continue;
+            }
+
+            const TArray<TSharedPtr<FJsonValue>>* ContentArray = nullptr;
+            if (!OutputObject->TryGetArrayField(TEXT("content"), ContentArray) || !ContentArray)
+            {
+                continue;
+            }
+
+            for (const TSharedPtr<FJsonValue>& ContentValue : *ContentArray)
+            {
+                const TSharedPtr<FJsonObject> ContentObject = ContentValue.IsValid() ? ContentValue->AsObject() : nullptr;
+                if (!TryAppendTextField(ContentObject, CombinedText))
+                {
+                    continue;
+                }
+            }
+        }
+
+        OutText = TrimAndStrip(CombinedText);
+        if (OutText.IsEmpty())
+        {
+            UE_LOG(LogTemp, Warning, TEXT("[OpenAI] text not found in response body"));
             return false;
         }
 
-        const TArray<TSharedPtr<FJsonValue>>* ContentArray = nullptr;
-        if (!Output0->TryGetArrayField(TEXT("content"), ContentArray) || ContentArray->Num() <= 0)
-        {
-            UE_LOG(LogTemp, Warning, TEXT("[OpenAI] content empty"));
-            return false;
-        }
-
-        const TSharedPtr<FJsonObject> Content0 = (*ContentArray)[0]->AsObject();
-        if (!Content0.IsValid())
-        {
-            UE_LOG(LogTemp, Warning, TEXT("[OpenAI] no text in content[0]"));
-            return false;
-        }
-
-        OutText = TrimAndStrip(OutText);
         return true;
     }
 }
 
 FString UOpenAIRequester::BuildScatterPayloadJSON() const
 {
-    const FString Payload = R"({
-        "model": "gpt-4.1",
-        "input": "You must output ONLY valid JSON with EXACT keys: scaleMin, scaleMax, rotationMin, rotationMax. No prose, no code fences.",
-        "max_output_tokens": 60
-    })";
-	return Payload;
+    return BuildTextOnlyInputPayload(
+        TEXT("gpt-4.1"),
+        TEXT("You must output ONLY valid JSON with EXACT keys: scaleMin, scaleMax, rotationMin, rotationMax. No prose, no code fences."),
+        60);
 }
 
 FString UOpenAIRequester::BuildEvaluationPayloadJSON() const
 {
-    const FString Payload = R"({
-        "model\": \"gpt-4.1",
-        "input": \"Summarize the player's behavior as JSON with keys aggression, exploration, survival, support (0.0~1.0). Output only JSON.",
-        "max_output_tokens": 120
-    })";
-    return Payload;
+    return BuildTextOnlyInputPayload(
+        TEXT("gpt-4.1"),
+        TEXT("Summarize the player's behavior as JSON with keys aggression, exploration, survival, support (0.0~1.0). Output only JSON."),
+        120);
 }
 
+bool UOpenAIRequester::TryCreateAuthorizedRequest(const FString& Payload, TSharedRef<IHttpRequest, ESPMode::ThreadSafe>& OutRequest) const
+{
+    const FString ApiKey = FPlatformMisc::GetEnvironmentVariable(TEXT("OPENAI_API_KEY"));
+    if (ApiKey.IsEmpty())
+    {
+        UE_LOG(LogTemp, Error, TEXT("[OpenAI] OPENAI_API_KEY environment variable is not set."));
+        return false;
+    }
+
+    OutRequest->SetURL(TEXT("https://api.openai.com/v1/responses"));
+    OutRequest->SetVerb(TEXT("POST"));
+    OutRequest->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
+    OutRequest->SetHeader(TEXT("Authorization"), FString::Printf(TEXT("Bearer %s"), *ApiKey));
+    OutRequest->SetContentAsString(Payload);
+    return true;
+}
 
 void UOpenAIRequester::SendOpenAIRequest()
 {
 	const FString Payload = BuildScatterPayloadJSON();
 
     TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = FHttpModule::Get().CreateRequest();
-    Request->SetURL("https://api.openai.com/v1/responses");
-    Request->SetVerb("POST");
-    Request->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
-    Request->SetHeader(TEXT("Authorization"), TEXT("Bearer Your-OpenAI Key"));
-    Request->SetContentAsString(Payload);
+    if (!TryCreateAuthorizedRequest(Payload, Request))
+    {
+        return;
+    }
 
 	UE_LOG(LogTemp, Log, TEXT("Sending Request: %s"), *Payload);
 
@@ -177,11 +266,10 @@ void UOpenAIRequester::SendPlayerEvaluationRequest()
     const FString Payload = BuildEvaluationPayloadJSON();
 
     TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = FHttpModule::Get().CreateRequest();
-    Request->SetURL("https://api.openai.com/v1/responses");
-    Request->SetVerb("POST");
-    Request->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
-    Request->SetHeader(TEXT("Authorization"), TEXT("Bearer Your-OpenAI Key"));
-    Request->SetContentAsString(Payload);
+    if (!TryCreateAuthorizedRequest(Payload, Request))
+    {
+        return;
+    }
 
     UE_LOG(LogTemp, Log, TEXT("Sending Evaluation Request: %s"), *Payload);
 
