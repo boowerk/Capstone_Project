@@ -1,6 +1,6 @@
 {
 	"FileVersion": 3,
-	"EngineAssociation": "5.7",
+	"EngineAssociation": "{2C610CE9-48F6-BB3F-768E-36A88CC8C299}",
 	"Category": "",
 	"Description": "",
 	"Modules": [
@@ -36,6 +36,14 @@
 		},
 		{
 			"Name": "GameplayAbilities",
+			"Enabled": true
+		},
+		{
+			"Name": "PCGBiomeCore",
+			"Enabled": true
+		},
+		{
+			"Name": "PCGBiomeSample",
 			"Enabled": true
 		}
 	]
