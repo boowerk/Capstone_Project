@@ -73,8 +73,18 @@ Plugins/**/Intermediate/*
 # Cache files for the editor to use
 DerivedDataCache/*
 
-<<<<<<< HEAD
 .idea/*
-=======
-.idea/*
->>>>>>> pcg-map
+
+# VS 2026 AI
+.vsai/
+.copilot/
+.devtunnels/
+.vsremote/
+
+# VS 2026
+*.vspqcache
+*.project.json.cache
+*.hotreload.json
+*.delta.pdb
+*.delta.dtb
+*.binlog
