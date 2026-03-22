@@ -1,2 +1,6 @@
 *.uasset filter=lfs diff=lfs merge=lfs -text
 *.umap filter=lfs diff=lfs merge=lfs -text
+<<<<<<< HEAD
+=======
+*.fbx filter=lfs diff=lfs merge=lfs -text
+>>>>>>> pcg-map

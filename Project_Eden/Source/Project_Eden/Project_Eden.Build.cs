@@ -25,7 +25,12 @@ public class Project_Eden : ModuleRules
             "NavigationSystem",
         });
 
-		PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });
-        
-    }
+		PrivateDependencyModuleNames.AddRange(new string[] { 
+			"Slate", 
+			"SlateCore",
+			"UnrealEd" 
+		});
+
+		// To include OnlineSubsystemSteam, add it to the plugins section in your uproject file with the Enabled attribute set to true
+	}
 }
