@@ -73,6 +73,9 @@ class PROJECT_EDEN_API UPDA_WeaponItemCollection : public UPrimaryDataAsset
 public:
     UPDA_WeaponItemCollection();
 
+    UFUNCTION(BlueprintPure, Category = "Weapon")
+    bool GetWeaponDataById(FName InItemId, FWeaponItemData& OutWeaponData) const;
+
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon")
     TArray<FWeaponItemData> Weapons;
 };

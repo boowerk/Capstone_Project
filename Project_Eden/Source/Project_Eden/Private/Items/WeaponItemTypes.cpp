@@ -134,4 +134,21 @@ UPDA_WeaponItemCollection::UPDA_WeaponItemCollection()
     };
 }
 
+bool UPDA_WeaponItemCollection::GetWeaponDataById(FName InItemId, FWeaponItemData& OutWeaponData) const
+{
+    const FWeaponItemData* FoundWeapon = Weapons.FindByPredicate(
+        [&InItemId](const FWeaponItemData& Weapon)
+        {
+            return Weapon.ItemId == InItemId;
+        });
+
+    if (!FoundWeapon)
+    {
+        return false;
+    }
+
+    OutWeaponData = *FoundWeapon;
+    return true;
+}
+
 #undef LOCTEXT_NAMESPACE

@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 #include "CoreMinimal.h"
 #include "Characters/GP_BaseCharacter.h"
@@ -8,6 +8,7 @@
 
 class USpringArmComponent;
 class UCameraComponent;
+class UPDA_WeaponItemCollection;
 
 UCLASS()
 class PROJECT_EDEN_API AGP_PlayerCharacter : public AGP_BaseCharacter
@@ -30,12 +31,22 @@ private:
 	
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Combat|LockOn")
-	bool bIsLockOn = false; // lockOn ÁÖ¼® ÇÑ±Û·Î ¿Ü¾ÈµÇ´Â°Å¾ßÀÌ¾ß
+	bool bIsLockOn = false; // lockOn ì£¼ì„ í•œê¸€ë¡œ ì™¸ì•ˆë˜ëŠ”ê±°ì•¼ì´ì•¼
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Combat|LockOn")
 	TObjectPtr<AActor> TargetActor; // lockOn Target
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|LockOn")
-	float LockOnRotationInterpSpeed = 10.0f;// lockOn Ä«¸Ş¶ó µå·¡±× ±¸Çö¿ë
+	float LockOnRotationInterpSpeed = 10.0f;// lockOn ì¹´ë©”ë¼ ë“œë˜ê·¸ êµ¬í˜„ìš©
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment|Weapon", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UPDA_WeaponItemCollection> DefaultWeaponCollection;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment|Weapon", meta = (AllowPrivateAccess = "true"))
+	FName DefaultWeaponId = TEXT("WP_Common_Fire_Sword");
+
+private:
+	void ApplyDefaultWeaponToAbilitySystem();
 
 };
+
