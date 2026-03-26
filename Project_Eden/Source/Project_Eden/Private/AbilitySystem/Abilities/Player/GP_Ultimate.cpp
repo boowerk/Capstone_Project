@@ -1,4 +1,4 @@
-#include "AbilitySystem/Abilities/Player/GP_Ultimate.h"
+ï»¿#include "AbilitySystem/Abilities/Player/GP_Ultimate.h"
 
 UGP_Ultimate::UGP_Ultimate()
 {
@@ -14,5 +14,5 @@ void UGP_Ultimate::ActivateAbility(const FGameplayAbilitySpecHandle Handle, cons
 		UE_LOG(LogTemp, Warning, TEXT("Ultimate Ability Activated!"));
 	}
 	
-	// TODO: ±Ã±Ø±â ÄÆ½Å ¿¬Ãâ, ½Ã°£ Á¤Áö ¶Ç´Â ½½·Î¿ì ¸ğ¼Ç(Time Dilation) Ã³¸®
+	// TODO: ê¶ê·¹ê¸° ì»·ì‹  ì—°ì¶œ, ì‹œê°„ ì •ì§€ ë˜ëŠ” ìŠ¬ë¡œìš° ëª¨ì…˜(Time Dilation) ì²˜ë¦¬
 }

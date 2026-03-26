@@ -1,4 +1,4 @@
-#include "UI/GP_PlayerHUDWidget.h"
+﻿#include "UI/GP_PlayerHUDWidget.h"
 
 #include "Components/ProgressBar.h"
 #include "Components/TextBlock.h"

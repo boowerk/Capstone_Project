@@ -1,4 +1,4 @@
-#include "AI/OpenAIRequester.h"
+﻿#include "AI/OpenAIRequester.h"
 #include "HttpModule.h"
 #include "HAL/PlatformMisc.h"
 #include "Interfaces/IHttpRequest.h"

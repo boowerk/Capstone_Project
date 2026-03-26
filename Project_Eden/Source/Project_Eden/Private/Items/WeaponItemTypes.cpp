@@ -1,4 +1,4 @@
-#include "Items/WeaponItemTypes.h"
+﻿#include "Items/WeaponItemTypes.h"
 
 #define LOCTEXT_NAMESPACE "WeaponItemCollection"
 
