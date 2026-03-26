@@ -1,13 +1,16 @@
-#include "Characters/GP_BaseCharacter.h"
+ï»¿#include "Characters/GP_BaseCharacter.h"
 #include "AbilitySystemComponent.h"
+#include "Items/WeaponItemTypes.h"
+#include "UI/GP_DamageNumberActor.h"
 
 
 AGP_BaseCharacter::AGP_BaseCharacter()
 {
 	PrimaryActorTick.bCanEverTick = false;
 
-	// ´ëµð ¼­¹ö¿¡¼­ º¸ÀÌµç ¾È º¸ÀÌµç ¾Ö´Ï¸ÞÀÌ¼ÇÀÌ ¸ØÃßÁö ¾Êµµ·Ï °¡½Ã¼º ¹«°ü ¾Ö´Ï¸ÞÀÌ¼Ç À¯Áö - ½¹¹Î
+	// ëŒ€ë”” ì„œë²„ì—ì„œ ë³´ì´ë“  ì•ˆ ë³´ì´ë“  ì• ë‹ˆë©”ì´ì…˜ì´ ë©ˆì¶”ì§€ ì•Šë„ë¡ ê°€ì‹œì„± ë¬´ê´€ ì• ë‹ˆë©”ì´ì…˜ ìœ ì§€ - ìŠë¯¼
 	GetMesh()->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
+	DamageNumberActorClass = AGP_DamageNumberActor::StaticClass();
 
 }
 
@@ -23,4 +26,46 @@ void AGP_BaseCharacter::GiveStartupAbilities()
 		FGameplayAbilitySpec AbilitySpec = FGameplayAbilitySpec(Ability);
 		GetAbilitySystemComponent()->GiveAbility(AbilitySpec);
 	}
+}
+
+void AGP_BaseCharacter::ShowDamageNumber(int32 DamageAmount, EWeaponElement Element)
+{
+	if (HasAuthority())
+	{
+		// ì„œë²„ê°€ íƒ€ê²© ê²°ê³¼ë¥¼ í™•ì •í•˜ê³  ëª¨ë“  í´ë¼ì´ì–¸íŠ¸ì— ê°™ì€ ìˆ«ìžë¥¼ ë¿Œë¦°ë‹¤.
+		MulticastShowDamageNumber(DamageAmount, Element);
+		return;
+	}
+
+	SpawnDamageNumberActor(DamageAmount, Element);
+}
+
+void AGP_BaseCharacter::MulticastShowDamageNumber_Implementation(int32 DamageAmount, EWeaponElement Element)
+{
+	SpawnDamageNumberActor(DamageAmount, Element);
+}
+
+void AGP_BaseCharacter::SpawnDamageNumberActor(int32 DamageAmount, EWeaponElement Element)
+{
+	if (!IsValid(GetWorld()) || !IsValid(DamageNumberActorClass))
+	{
+		return;
+	}
+
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+	AGP_DamageNumberActor* DamageNumberActor = GetWorld()->SpawnActor<AGP_DamageNumberActor>(
+		DamageNumberActorClass,
+		GetActorLocation(),
+		FRotator::ZeroRotator,
+		SpawnParams);
+
+	if (!IsValid(DamageNumberActor))
+	{
+		return;
+	}
+
+	// ì  ìœ„ì¹˜ ê¸°ì¤€ìœ¼ë¡œ ì›”ë“œ ë°ë¯¸ì§€ ìˆ«ìž ì•¡í„°ë¥¼ ì¦‰ì‹œ ì´ˆê¸°í™”í•œë‹¤.
+	DamageNumberActor->InitializeDamageNumber(DamageAmount, Element);
 }

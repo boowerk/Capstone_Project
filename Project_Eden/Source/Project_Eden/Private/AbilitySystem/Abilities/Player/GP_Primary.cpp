@@ -2,9 +2,52 @@
 
 #include "AbilitySystem/Abilities/Player/GP_Primary.h"
 
-#include "Engine/OverlapResult.h"
 #include "AbilitySystemBlueprintLibrary.h"
+#include "AbilitySystem/GP_WeaponAttributeSet.h"
+#include "Characters/GP_BaseCharacter.h"
+#include "Engine/OverlapResult.h"
 #include "GameplayTags/GP_Tags.h"
+#include "Player/GP_PlayerState.h"
+
+namespace
+{
+int32 GetWeaponDamageAmount(const AActor* SourceActor)
+{
+	const APawn* SourcePawn = Cast<APawn>(SourceActor);
+	if (!IsValid(SourcePawn))
+	{
+		return 1;
+	}
+
+	const AGP_PlayerState* PlayerState = SourcePawn->GetPlayerState<AGP_PlayerState>();
+	if (!IsValid(PlayerState) || !IsValid(PlayerState->GetWeaponAttributeSet()))
+	{
+		return 1;
+	}
+
+	const UGP_WeaponAttributeSet* WeaponAttributeSet = PlayerState->GetWeaponAttributeSet();
+	// 지금은 단순 표시용 합산식으로 계산하고, 이후 실제 전투 계산식으로 교체하기 쉽게 분리했다.
+	const float DamageAmount = WeaponAttributeSet->GetAttackPower() + (WeaponAttributeSet->GetMagicPower() * 0.35f);
+	return FMath::Max(1, FMath::RoundToInt(DamageAmount));
+}
+
+EWeaponElement GetWeaponElement(const AActor* SourceActor)
+{
+	const APawn* SourcePawn = Cast<APawn>(SourceActor);
+	if (!IsValid(SourcePawn))
+	{
+		return EWeaponElement::Fire;
+	}
+
+	const AGP_PlayerState* PlayerState = SourcePawn->GetPlayerState<AGP_PlayerState>();
+	if (!IsValid(PlayerState))
+	{
+		return EWeaponElement::Fire;
+	}
+
+	return PlayerState->GetEquippedWeaponElement();
+}
+}
 
 TArray<AActor*> UGP_Primary::HitboxOverlapTest()
 {
@@ -45,10 +88,21 @@ TArray<AActor*> UGP_Primary::HitboxOverlapTest()
 
 void UGP_Primary::SendHitReactEventToActors(const TArray<AActor*>& ActorsHit)
 {
+	const AActor* SourceActor = GetAvatarActorFromActorInfo();
+	const int32 DamageAmount = GetWeaponDamageAmount(SourceActor);
+	const EWeaponElement WeaponElement = GetWeaponElement(SourceActor);
+
 	for (AActor* HitActor : ActorsHit)
 	{
+		if (AGP_BaseCharacter* HitCharacter = Cast<AGP_BaseCharacter>(HitActor))
+		{
+			// 피격 대상 머리 위에 원소 색상을 반영한 데미지 숫자를 띄운다.
+			HitCharacter->ShowDamageNumber(DamageAmount, WeaponElement);
+		}
+
 		FGameplayEventData Payload;
 		Payload.Instigator = GetAvatarActorFromActorInfo();
+		Payload.EventMagnitude = static_cast<float>(DamageAmount);
 		UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(HitActor, GPTags::Events::Enemy::HitReact, Payload);
 	}
 }
