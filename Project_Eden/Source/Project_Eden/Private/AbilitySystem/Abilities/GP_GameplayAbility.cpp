@@ -1,4 +1,4 @@
-#include "AbilitySystem/Abilities/GP_GameplayAbility.h"
+﻿#include "AbilitySystem/Abilities/GP_GameplayAbility.h"
 
 //void UGP_GameplayAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle, 
 //	const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, 

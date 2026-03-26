@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
@@ -9,31 +9,31 @@ struct FPCGItemDetails
 {
     GENERATED_BODY()
 
-    // ½ºÆùµÉ ½ºÅÂÆ½ ¸Ş½Ã
+    // ìŠ¤í°ë  ìŠ¤íƒœí‹± ë©”ì‹œ
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "PCG Item")
     TSoftObjectPtr<UStaticMesh> Mesh;
 
-    // ½ºÆù °¡ÁßÄ¡
+    // ìŠ¤í° ê°€ì¤‘ì¹˜
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "PCG Item", meta = (ClampMin = "0.0"))
     float Weight = 1.0f;
 
-    // ÃÖ¼Ò ½ºÄÉÀÏ
+    // ìµœì†Œ ìŠ¤ì¼€ì¼
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "PCG Item")
     FVector MinScale = FVector(1.0f);
 
-    // ÃÖ´ë ½ºÄÉÀÏ
+    // ìµœëŒ€ ìŠ¤ì¼€ì¼
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "PCG Item")
     FVector MaxScale = FVector(1.0f);
 
-    // ÃÖ¼Ò È¸Àü
+    // ìµœì†Œ íšŒì „
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "PCG Item")
     FRotator MinRotation = FRotator::ZeroRotator;
 
-    // ÃÖ´ë È¸Àü
+    // ìµœëŒ€ íšŒì „
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "PCG Item")
     FRotator MaxRotation = FRotator::ZeroRotator;
 
-    // ¿ÀÇÁ¼Â
+    // ì˜¤í”„ì…‹
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "PCG Item")
     FVector MinOffset = FVector(0.0f);
 

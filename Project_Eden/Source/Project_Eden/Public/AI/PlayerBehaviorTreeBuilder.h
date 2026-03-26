@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "BehaviorTree/BehaviorTreeComponent.h"
@@ -12,33 +12,33 @@ class UBTComposite_Selector;
 class UBTComposite_Sequence;
 class UBTTask_Wait;
 
-/** 간단한 플레이어 평가 지표 */
+/** 媛꾨떒???뚮젅?댁뼱 ?됯? 吏??*/
 USTRUCT(BlueprintType)
 struct PROJECT_EDEN_API FPlayerEvaluationSnapshot
 {
     GENERATED_BODY()
 
-    /** 0~1 사이의 공격 성향 */
+    /** 0~1 ?ъ씠??怨듦꺽 ?깊뼢 */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Evaluation")
     float AggressionScore = 0.5f;
 
-    /** 0~1 사이의 탐색/이동 성향 */
+    /** 0~1 ?ъ씠???먯깋/?대룞 ?깊뼢 */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Evaluation")
     float ExplorationScore = 0.5f;
 
-    /** 0~1 사이의 생존/방어 성향 */
+    /** 0~1 ?ъ씠???앹〈/諛⑹뼱 ?깊뼢 */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Evaluation")
     float SurvivalScore = 0.5f;
 
-    /** 0~1 사이의 지원/군중제어 선호도 */
+    /** 0~1 ?ъ씠??吏??援곗쨷?쒖뼱 ?좏샇??*/
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Evaluation")
     float SupportScore = 0.5f;
 
-    /** JSON 페이로드에서 점수를 읽어와 구조체를 채웁니다. */
+    /** JSON ?섏씠濡쒕뱶?먯꽌 ?먯닔瑜??쎌뼱? 援ъ“泥대? 梨꾩썎?덈떎. */
     static bool FromJson(const FString& JsonPayload, FPlayerEvaluationSnapshot& OutSnapshot);
 };
 
-/** 단순히 행동 라벨을 로그로 남기는 태스크 */
+/** ?⑥닚???됰룞 ?쇰꺼??濡쒓렇濡??④린???쒖뒪??*/
 UCLASS()
 class PROJECT_EDEN_API UBTTask_LogAction : public UBTTaskNode
 {
@@ -55,7 +55,7 @@ protected:
     virtual FString GetStaticDescription() const override;
 };
 
-/** 가장 가까운 플레이어를 향해 이동하는 태스크 **/
+/** 媛??媛源뚯슫 ?뚮젅?댁뼱瑜??ν빐 ?대룞?섎뒗 ?쒖뒪??**/
 UCLASS()
 class PROJECT_EDEN_API UBTTask_MoveToPlayer : public UBTTaskNode
 {
@@ -75,7 +75,7 @@ protected:
     virtual void TickTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, float DeltaSeconds) override;
 };
 
-/** 근접 범위에서 플레이어에게 데미지를 적용하는 태스크 **/
+/** 洹쇱젒 踰붿쐞?먯꽌 ?뚮젅?댁뼱?먭쾶 ?곕?吏瑜??곸슜?섎뒗 ?쒖뒪??**/
 UCLASS()
 class PROJECT_EDEN_API UBTTask_AttackPlayer : public UBTTaskNode
 {
@@ -95,7 +95,7 @@ protected:
 };
 
 /**
- * 플레이어 평가 JSON을 기반으로 간단한 행동트리를 생성하는 빌더
+ * ?뚮젅?댁뼱 ?됯? JSON??湲곕컲?쇰줈 媛꾨떒???됰룞?몃━瑜??앹꽦?섎뒗 鍮뚮뜑
  */
 UCLASS()
 class PROJECT_EDEN_API UBTTask_DetectPlayer : public UBTTaskNode
@@ -106,10 +106,10 @@ public:
     UBTTask_DetectPlayer();
 
     UPROPERTY(EditAnywhere, Category = "Behavior")
-    float DetectionRange = 1000.0f;                    // 플레이어 감지 반경
+    float DetectionRange = 1000.0f;                    // ?뚮젅?댁뼱 媛먯? 諛섍꼍
 
     UPROPERTY(EditAnywhere, Category = "Behavior")
-    float MaxChaseDistance = 0.0f;                     // 홈 위치 기준 추적 유지 반경
+    float MaxChaseDistance = 0.0f;                     // ???꾩튂 湲곗? 異붿쟻 ?좎? 諛섍꼍
 
 protected:
     virtual EBTNodeResult::Type ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory) override;
@@ -140,10 +140,10 @@ public:
     UBTTask_Wander();
 
     UPROPERTY(EditAnywhere, Category = "Behavior")
-    float WanderRadius = 700.0f;                         // 무작위 이동 반경
+    float WanderRadius = 700.0f;                         // 臾댁옉???대룞 諛섍꼍
 
     UPROPERTY(EditAnywhere, Category = "Behavior")
-    float AcceptanceRadius = 100.0f;                    // 이동 목표에 도달한 것으로 간주하는 반경
+    float AcceptanceRadius = 100.0f;                    // ?대룞 紐⑺몴???꾨떖??寃껋쑝濡?媛꾩＜?섎뒗 諛섍꼍
 
 protected:
     virtual EBTNodeResult::Type ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory) override;
@@ -157,11 +157,11 @@ class PROJECT_EDEN_API UPlayerBehaviorTreeBuilder : public UObject
     GENERATED_BODY()
 
 public:
-    /** JSON 문자열을 받아 런타임용 행동트리 인스턴스를 생성합니다. */
+    /** JSON 臾몄옄?댁쓣 諛쏆븘 ?고??꾩슜 ?됰룞?몃━ ?몄뒪?댁뒪瑜??앹꽦?⑸땲?? */
     UFUNCTION(BlueprintCallable, Category = "Behavior")
     UBehaviorTree* BuildBehaviorTreeFromJson(const FString& EvaluationJson);
 
-    /** 이미 파싱된 스냅샷을 받아 행동트리를 만듭니다. */
+    /** ?대? ?뚯떛???ㅻ깄?룹쓣 諛쏆븘 ?됰룞?몃━瑜?留뚮벊?덈떎. */
     UFUNCTION(BlueprintCallable, Category = "Behavior")
     UBehaviorTree* BuildBehaviorTreeFromSnapshot(const FPlayerEvaluationSnapshot& Snapshot);
 
