@@ -17,6 +17,7 @@ class PROJECT_EDEN_API AGP_DamageNumberActor : public AActor
 public:
     AGP_DamageNumberActor();
 
+    virtual void OnConstruction(const FTransform& Transform) override;
     virtual void BeginPlay() override;
     virtual void Tick(float DeltaSeconds) override;
 
@@ -28,6 +29,9 @@ protected:
 
     UPROPERTY(VisibleAnywhere, Category = "Damage Number")
     TObjectPtr<UWidgetComponent> WidgetComponent;
+
+    UPROPERTY(EditDefaultsOnly, Category = "Damage Number|Widget")
+    TSubclassOf<UGP_DamageNumberWidget> DamageNumberWidgetClass;
 
     UPROPERTY(EditDefaultsOnly, Category = "Damage Number")
     float LifetimeSeconds = 0.85f;
@@ -41,7 +45,14 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category = "Damage Number")
     float LateralSpread = 48.0f;
 
+    UPROPERTY(EditDefaultsOnly, Category = "Damage Number|Preview", meta = (ClampMin = "0", UIMin = "0"))
+    int32 PreviewDamageValue = 1234;
+
+    UPROPERTY(EditDefaultsOnly, Category = "Damage Number|Preview")
+    EWeaponElement PreviewElement = EWeaponElement::Fire;
+
 private:
+    void SyncWidgetComponentClass();
     void RefreshWidget();
 
     UPROPERTY(Transient)

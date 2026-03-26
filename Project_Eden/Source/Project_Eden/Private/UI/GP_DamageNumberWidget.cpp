@@ -3,23 +3,30 @@
 #include "Blueprint/WidgetTree.h"
 #include "Components/TextBlock.h"
 
+void UGP_DamageNumberWidget::NativePreConstruct()
+{
+    Super::NativePreConstruct();
+
+    EnsureWidgetTree();
+
+    if (IsDesignTime())
+    {
+        ApplyDamageData(PreviewDamageValue, PreviewElement);
+    }
+}
+
 void UGP_DamageNumberWidget::NativeConstruct()
 {
     Super::NativeConstruct();
     EnsureWidgetTree();
+    ApplyDamageData(CurrentDamageValue, CurrentElement);
 }
 
 void UGP_DamageNumberWidget::SetDamageData(int32 InDamageValue, EWeaponElement InElement)
 {
-    EnsureWidgetTree();
-
-    if (!DamageTextBlock)
-    {
-        return;
-    }
-
-    DamageTextBlock->SetText(FText::AsNumber(InDamageValue));
-    DamageTextBlock->SetColorAndOpacity(FSlateColor(GetElementColor(InElement)));
+    CurrentDamageValue = InDamageValue;
+    CurrentElement = InElement;
+    ApplyDamageData(InDamageValue, InElement);
 }
 
 void UGP_DamageNumberWidget::SetDisplayOpacity(float InOpacity)
@@ -39,7 +46,22 @@ void UGP_DamageNumberWidget::EnsureWidgetTree()
         return;
     }
 
-    // C++만으로도 바로 사용할 수 있게 런타임에 텍스트 위젯을 구성한다.
+    if (WidgetTree)
+    {
+        DamageTextBlock = Cast<UTextBlock>(WidgetTree->FindWidget(TEXT("DamageText")));
+    }
+
+    if (DamageTextBlock)
+    {
+        return;
+    }
+
+    if (!WidgetTree || WidgetTree->RootWidget)
+    {
+        return;
+    }
+
+    // 위젯 블루프린트를 아직 만들지 않은 경우에도 기본 텍스트 위젯으로 동작하게 둔다.
     DamageTextBlock = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("DamageText"));
     WidgetTree->RootWidget = DamageTextBlock;
 
@@ -49,6 +71,19 @@ void UGP_DamageNumberWidget::EnsureWidgetTree()
     DamageTextBlock->SetJustification(ETextJustify::Center);
     DamageTextBlock->SetShadowOffset(FVector2D(2.0f, 3.0f));
     DamageTextBlock->SetShadowColorAndOpacity(FLinearColor(0.02f, 0.02f, 0.02f, 0.85f));
+}
+
+void UGP_DamageNumberWidget::ApplyDamageData(int32 InDamageValue, EWeaponElement InElement)
+{
+    EnsureWidgetTree();
+
+    if (!DamageTextBlock)
+    {
+        return;
+    }
+
+    DamageTextBlock->SetText(FText::AsNumber(InDamageValue));
+    DamageTextBlock->SetColorAndOpacity(FSlateColor(GetElementColor(InElement)));
 }
 
 FLinearColor UGP_DamageNumberWidget::GetElementColor(EWeaponElement InElement) const

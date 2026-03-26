@@ -19,6 +19,17 @@ AGP_DamageNumberActor::AGP_DamageNumberActor()
     WidgetComponent->SetDrawAtDesiredSize(true);
     WidgetComponent->SetPivot(FVector2D(0.5f, 0.5f));
     WidgetComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+    DamageNumberWidgetClass = UGP_DamageNumberWidget::StaticClass();
+    WidgetComponent->SetWidgetClass(DamageNumberWidgetClass);
+}
+
+void AGP_DamageNumberActor::OnConstruction(const FTransform& Transform)
+{
+    Super::OnConstruction(Transform);
+
+    SyncWidgetComponentClass();
+    RefreshWidget();
 }
 
 void AGP_DamageNumberActor::BeginPlay()
@@ -28,12 +39,11 @@ void AGP_DamageNumberActor::BeginPlay()
     StartLocation = GetActorLocation() + FVector(0.0f, 0.0f, SpawnHeightOffset);
     SetActorLocation(StartLocation);
 
-    // 매 타격 숫자가 완전히 겹치지 않도록 살짝 옆으로 퍼지게 만든다.
+    // 같은 위치에 여러 숫자가 뜰 때 전부 겹치지 않도록 살짝 퍼뜨린다.
     const float RandomYaw = FMath::FRandRange(0.0f, 360.0f);
     DriftOffset = FRotator(0.0f, RandomYaw, 0.0f).Vector() * FMath::FRandRange(12.0f, LateralSpread);
 
-    DamageWidget = CreateWidget<UGP_DamageNumberWidget>(GetWorld(), UGP_DamageNumberWidget::StaticClass());
-    WidgetComponent->SetWidget(DamageWidget);
+    SyncWidgetComponentClass();
     RefreshWidget();
 }
 
@@ -44,7 +54,7 @@ void AGP_DamageNumberActor::Tick(float DeltaSeconds)
     ElapsedSeconds += DeltaSeconds;
     const float Alpha = FMath::Clamp(ElapsedSeconds / LifetimeSeconds, 0.0f, 1.0f);
 
-    // 원신식처럼 위로 떠오르면서 끝부분에서 자연스럽게 사라지도록 보간한다.
+    // 위로 부드럽게 떠오르면서 후반부에 자연스럽게 사라지도록 보간한다.
     const float VerticalOffset = FMath::InterpEaseOut(0.0f, FloatHeight, Alpha, 1.7f);
     const FVector NewLocation = StartLocation + DriftOffset * Alpha + FVector(0.0f, 0.0f, VerticalOffset);
     SetActorLocation(NewLocation);
@@ -83,13 +93,41 @@ void AGP_DamageNumberActor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>
     DOREPLIFETIME(AGP_DamageNumberActor, DamageElement);
 }
 
+void AGP_DamageNumberActor::SyncWidgetComponentClass()
+{
+    if (!WidgetComponent)
+    {
+        return;
+    }
+
+    UClass* WidgetClassToUse = DamageNumberWidgetClass.Get();
+    if (!WidgetClassToUse)
+    {
+        WidgetClassToUse = UGP_DamageNumberWidget::StaticClass();
+    }
+
+    WidgetComponent->SetWidgetClass(WidgetClassToUse);
+    WidgetComponent->InitWidget();
+    DamageWidget = Cast<UGP_DamageNumberWidget>(WidgetComponent->GetUserWidgetObject());
+}
+
 void AGP_DamageNumberActor::RefreshWidget()
 {
+    if (!DamageWidget && WidgetComponent)
+    {
+        DamageWidget = Cast<UGP_DamageNumberWidget>(WidgetComponent->GetUserWidgetObject());
+    }
+
     if (!DamageWidget)
     {
         return;
     }
 
-    // 복제된 값이 도착해도 같은 경로로 위젯 내용을 다시 갱신한다.
-    DamageWidget->SetDamageData(DamageValue, DamageElement);
+    UWorld* World = GetWorld();
+    const bool bUsePreviewData = !World || !World->IsGameWorld();
+    const int32 DisplayDamageValue = bUsePreviewData ? PreviewDamageValue : DamageValue;
+    const EWeaponElement DisplayElement = bUsePreviewData ? PreviewElement : DamageElement;
+
+    // 복제 시점과 무관하게 마지막 데미지 데이터를 같은 경로로 반영한다.
+    DamageWidget->SetDamageData(DisplayDamageValue, DisplayElement);
 }
