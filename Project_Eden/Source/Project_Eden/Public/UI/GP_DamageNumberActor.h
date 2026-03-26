@@ -39,6 +39,12 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category = "Damage Number")
     float FloatHeight = 120.0f;
 
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Damage Number")
+    float ArcHeight = 80.0f;   // 위로 뜨는 최고 높이
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Damage Number")
+    float FallDistance = 30.0f; // 마지막에 아래로 조금 떨어지는 정도
+
     UPROPERTY(EditDefaultsOnly, Category = "Damage Number")
     float SpawnHeightOffset = 110.0f;
 

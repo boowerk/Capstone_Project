@@ -43,6 +43,12 @@ void AGP_DamageNumberActor::BeginPlay()
     const float RandomYaw = FMath::FRandRange(0.0f, 360.0f);
     DriftOffset = FRotator(0.0f, RandomYaw, 0.0f).Vector() * FMath::FRandRange(12.0f, LateralSpread);
 
+    const int32 Direction = FMath::RandBool() ? 1 : -1;
+    const float HorizontalDistance = FMath::FRandRange(30.0f, 70.0f);
+
+    // 오른쪽/왼쪽 랜덤
+    DriftOffset = FVector(0.0f, Direction * HorizontalDistance, 0.0f);
+
     SyncWidgetComponentClass();
     RefreshWidget();
 }
@@ -54,15 +60,25 @@ void AGP_DamageNumberActor::Tick(float DeltaSeconds)
     ElapsedSeconds += DeltaSeconds;
     const float Alpha = FMath::Clamp(ElapsedSeconds / LifetimeSeconds, 0.0f, 1.0f);
 
-    // 위로 부드럽게 떠오르면서 후반부에 자연스럽게 사라지도록 보간한다.
-    const float VerticalOffset = FMath::InterpEaseOut(0.0f, FloatHeight, Alpha, 1.7f);
-    const FVector NewLocation = StartLocation + DriftOffset * Alpha + FVector(0.0f, 0.0f, VerticalOffset);
+    // 좌우 랜덤 이동 (BeginPlay나 Spawn 시 정해둔 DriftOffset 사용)
+    const FVector HorizontalOffset = DriftOffset * Alpha;
+
+    // 포물선 높이 계산
+    // Alpha: 0 ~ 1
+    // 4 * Alpha * (1 - Alpha) 는 0 -> 1 -> 0 형태의 포물선
+    const float ArcZ = ArcHeight * 4.0f * Alpha * (1.0f - Alpha);
+
+    // 시작 높이보다 약간 아래로 떨어지게 하고 싶으면 FallOffset 추가
+    const float FallZ = -FallDistance * Alpha;
+
+    const FVector NewLocation = StartLocation + HorizontalOffset + FVector(0.0f, 0.0f, ArcZ + FallZ);
     SetActorLocation(NewLocation);
 
     if (DamageWidget)
     {
         const float Opacity = Alpha < 0.65f ? 1.0f : 1.0f - ((Alpha - 0.65f) / 0.35f);
         const float Scale = 0.92f + (FMath::Sin(Alpha * PI) * 0.18f);
+
         DamageWidget->SetDisplayOpacity(Opacity);
         DamageWidget->SetDisplayScale(Scale);
     }
