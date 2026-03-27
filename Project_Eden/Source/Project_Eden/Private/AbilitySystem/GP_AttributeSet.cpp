@@ -1,4 +1,5 @@
 #include "AbilitySystem/GP_AttributeSet.h"
+#include "GameplayEffectExtension.h"
 #include "Net/UnrealNetwork.h"
 
 void UGP_AttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -9,6 +10,26 @@ void UGP_AttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	DOREPLIFETIME_CONDITION_NOTIFY(ThisClass, MaxHealth, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(ThisClass, Mana, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(ThisClass, MaxMana, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME(ThisClass, bAttributesInitialized);
+}
+
+void UGP_AttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data)
+{
+	Super::PostGameplayEffectExecute(Data);
+	if (!bAttributesInitialized)
+	{
+		bAttributesInitialized = true;
+		OnAttributesInitialized.Broadcast();
+	}
+}
+
+void UGP_AttributeSet::OnRep_AttributesInitialized()
+{
+	if (!bAttributesInitialized)
+	{
+		bAttributesInitialized = true;
+		OnAttributesInitialized.Broadcast();
+	}
 }
 
 void UGP_AttributeSet::OnRep_Health(const FGameplayAttributeData& OldValue)

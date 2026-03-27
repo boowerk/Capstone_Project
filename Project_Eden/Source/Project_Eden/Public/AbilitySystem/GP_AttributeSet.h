@@ -12,12 +12,25 @@ GAMEPLAYATTRIBUTE_VALUE_GETTER(PropertyName) \
 GAMEPLAYATTRIBUTE_VALUE_SETTER(PropertyName) \
 GAMEPLAYATTRIBUTE_VALUE_INITTER(PropertyName)
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FAttributesInitialized);
+
 UCLASS()
 class PROJECT_EDEN_API UGP_AttributeSet : public UAttributeSet
 {
 	GENERATED_BODY()
 public:
+	using ThisClass = UGP_AttributeSet;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	virtual void PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data) override;
+
+	UPROPERTY(BlueprintAssignable)
+	FAttributesInitialized OnAttributesInitialized;
+
+	UPROPERTY(ReplicatedUsing = OnRep_AttributesInitialized)
+	bool bAttributesInitialized = false;
+
+	UFUNCTION()
+	void OnRep_AttributesInitialized();
 
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_Health)
 	FGameplayAttributeData Health;
