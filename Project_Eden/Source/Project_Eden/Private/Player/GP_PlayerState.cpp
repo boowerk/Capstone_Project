@@ -3,6 +3,7 @@
 #include "AbilitySystem/GP_WeaponAttributeSet.h"
 #include "AbilitySystemComponent.h"
 #include "Net/UnrealNetwork.h"
+#include "AbilitySystem/GP_AttributeSet.h"
 
 
 AGP_PlayerState::AGP_PlayerState()
@@ -13,7 +14,9 @@ AGP_PlayerState::AGP_PlayerState()
 	AbilitySystemComponent->SetIsReplicated(true);
 	AbilitySystemComponent->SetReplicationMode(EGameplayEffectReplicationMode::Mixed);
 
-	WeaponAttributeSet = CreateDefaultSubobject<UGP_WeaponAttributeSet>("WeaponAttributeSet");
+	AttributeSet = CreateDefaultSubobject<UGP_AttributeSet>("AttributeSet");
+	
+	WeaponAttributeSet = CreateDefaultSubobject<UGP_WeaponAttributeSet>("WeaponAttributeSet");//
 }
 
 UAbilitySystemComponent* AGP_PlayerState::GetAbilitySystemComponent() const {

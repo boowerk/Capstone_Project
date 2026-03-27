@@ -6,6 +6,7 @@
 #include "GP_BaseCharacter.generated.h"
 
 class UGameplayAbility;
+class UGameplayEffect;
 class AGP_DamageNumberActor;
 enum class EWeaponElement : uint8;
 
@@ -21,6 +22,7 @@ public:
 
 protected:
 	void GiveStartupAbilities();
+	void InitializeAttributes() const;
 
 	UPROPERTY(EditDefaultsOnly, Category = "UI|Damage")
 	TSubclassOf<AGP_DamageNumberActor> DamageNumberActorClass;
@@ -29,8 +31,12 @@ protected:
 	void MulticastShowDamageNumber(int32 DamageAmount, EWeaponElement Element);
 
 	void SpawnDamageNumberActor(int32 DamageAmount, EWeaponElement Element);
+	
 private:
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Abilities")
 	TArray<TSubclassOf<UGameplayAbility>> StartupAbilities;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Effects")
+	TSubclassOf<UGameplayEffect> InitializeAttributesEffect;
 };
 

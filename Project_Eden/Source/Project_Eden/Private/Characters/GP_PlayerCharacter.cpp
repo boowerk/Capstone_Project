@@ -52,7 +52,8 @@ void AGP_PlayerCharacter::PossessedBy(AController* NewController)
 
 	GetAbilitySystemComponent()->InitAbilityActorInfo(GetPlayerState(), this);
 	GiveStartupAbilities();
-	ApplyDefaultWeaponToAbilitySystem();
+	InitializeAttributes();
+	ApplyDefaultWeaponToAbilitySystem();//
 }
 
 void AGP_PlayerCharacter::OnRep_PlayerState()

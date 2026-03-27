@@ -7,6 +7,7 @@
 
 #include "GP_PlayerState.generated.h"
 
+class UAttributeSet;
 class UAbilitySystemComponent;
 class UGP_WeaponAttributeSet;
 class UPDA_WeaponItemCollection;
@@ -40,6 +41,9 @@ private:
 
 	UPROPERTY(VisibleAnywhere, Category = "GAS|Abilities")
 	TObjectPtr<UAbilitySystemComponent> AbilitySystemComponent;
+	
+		UPROPERTY()
+    	TObjectPtr<UAttributeSet> AttributeSet;
 
 	UPROPERTY(VisibleAnywhere, Category = "GAS|Attributes")
 	TObjectPtr<UGP_WeaponAttributeSet> WeaponAttributeSet;
