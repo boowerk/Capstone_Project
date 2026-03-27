@@ -44,6 +44,14 @@ UAbilitySystemComponent* AGP_PlayerCharacter::GetAbilitySystemComponent() const
 	return GPPlayerState->GetAbilitySystemComponent();
 }
 
+UAttributeSet* AGP_PlayerCharacter::GetAttributeSet() const
+{
+	AGP_PlayerState* GPPlayerState = Cast<AGP_PlayerState>(GetPlayerState());
+	if (!IsValid(GPPlayerState)) return nullptr;
+
+	return GPPlayerState->GetAttributeSet();
+}
+
 void AGP_PlayerCharacter::PossessedBy(AController* NewController)
 {
 	Super::PossessedBy(NewController);
@@ -51,6 +59,7 @@ void AGP_PlayerCharacter::PossessedBy(AController* NewController)
 	if (!IsValid(GetAbilitySystemComponent()) || !HasAuthority()) return;
 
 	GetAbilitySystemComponent()->InitAbilityActorInfo(GetPlayerState(), this);
+	OnASCInitialized.Broadcast(GetAbilitySystemComponent(), GetAttributeSet());
 	GiveStartupAbilities();
 	InitializeAttributes();
 	ApplyDefaultWeaponToAbilitySystem();//
@@ -62,6 +71,7 @@ void AGP_PlayerCharacter::OnRep_PlayerState()
 	if (!IsValid(GetAbilitySystemComponent())) return;
 
 	GetAbilitySystemComponent()->InitAbilityActorInfo(GetPlayerState(), this);
+	OnASCInitialized.Broadcast(GetAbilitySystemComponent(), GetAttributeSet());
 }
 
 void AGP_PlayerCharacter::ApplyDefaultWeaponToAbilitySystem()

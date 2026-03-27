@@ -5,10 +5,13 @@
 
 #include "GP_BaseCharacter.generated.h"
 
+class UAttributeSet;
 class UGameplayAbility;
 class UGameplayEffect;
 class AGP_DamageNumberActor;
 enum class EWeaponElement : uint8;
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FASCInitialized, UAbilitySystemComponent*, ASC, UAttributeSet*, AS);
 
 UCLASS(abstract)
 class PROJECT_EDEN_API AGP_BaseCharacter : public ACharacter, public IAbilitySystemInterface
@@ -18,7 +21,12 @@ class PROJECT_EDEN_API AGP_BaseCharacter : public ACharacter, public IAbilitySys
 public:
 	AGP_BaseCharacter();
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
+	virtual UAttributeSet* GetAttributeSet() const { return nullptr; }
+	
 	void ShowDamageNumber(int32 DamageAmount, EWeaponElement Element);
+	
+	UPROPERTY(BlueprintAssignable)
+	FASCInitialized OnASCInitialized;
 
 protected:
 	void GiveStartupAbilities();

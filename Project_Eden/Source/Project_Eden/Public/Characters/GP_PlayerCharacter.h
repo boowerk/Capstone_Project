@@ -18,6 +18,7 @@ class PROJECT_EDEN_API AGP_PlayerCharacter : public AGP_BaseCharacter
 public:
 	AGP_PlayerCharacter();
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
+	virtual UAttributeSet* GetAttributeSet() const override;
 	virtual void PossessedBy(AController* NewController) override;
 	virtual void OnRep_PlayerState() override;
 	

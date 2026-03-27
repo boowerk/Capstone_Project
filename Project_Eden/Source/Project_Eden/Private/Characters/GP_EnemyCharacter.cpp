@@ -5,11 +5,6 @@
 #include "BehaviorTree/BehaviorTree.h"
 #include "AI/PlayerBehaviorTreeBuilder.h"
 #include "AbilitySystem/GP_AttributeSet.h"
-//#include "AbilitySystemBlueprintLibrary.h"
-//#include "AbilitySystem/GP_AbilitySystemComponent.h"
-
-//#include "GameplayTags/GPTags.h"
-//#include "Net/UnrealNetwork.h"
 
 
 AGP_EnemyCharacter::AGP_EnemyCharacter()
@@ -24,7 +19,10 @@ AGP_EnemyCharacter::AGP_EnemyCharacter()
 
 }
 
-
+UAttributeSet* AGP_EnemyCharacter::GetAttributeSet() const
+{
+	return AttributeSet;
+}
 
 UAbilitySystemComponent* AGP_EnemyCharacter::GetAbilitySystemComponent() const
 {
@@ -54,7 +52,8 @@ void AGP_EnemyCharacter::BeginPlay()
 	if (!IsValid(GetAbilitySystemComponent())) return;
 
 	GetAbilitySystemComponent()->InitAbilityActorInfo(this, this);
-
+	OnASCInitialized.Broadcast(GetAbilitySystemComponent(), GetAttributeSet());
+	
 	if (!HasAuthority()) return;
 
 	GiveStartupAbilities();
