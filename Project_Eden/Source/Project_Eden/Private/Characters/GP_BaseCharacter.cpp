@@ -1,5 +1,6 @@
 ﻿#include "Characters/GP_BaseCharacter.h"
 #include "AbilitySystemComponent.h"
+#include "AbilitySystem/GP_AttributeSet.h"
 #include "Items/WeaponItemTypes.h"
 #include "UI/GP_DamageNumberActor.h"
 
@@ -12,6 +13,7 @@ AGP_BaseCharacter::AGP_BaseCharacter()
 	GetMesh()->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
 	DamageNumberActorClass = AGP_DamageNumberActor::StaticClass();
 
+	OnASCInitialized.AddDynamic(this, &ThisClass::BindAttributeDelegates);
 }
 
 UAbilitySystemComponent* AGP_BaseCharacter::GetAbilitySystemComponent() const
@@ -77,4 +79,32 @@ void AGP_BaseCharacter::SpawnDamageNumberActor(int32 DamageAmount, EWeaponElemen
 
 	// 적 위치 기준으로 월드 데미지 숫자 액터를 즉시 초기화한다.
 	DamageNumberActor->InitializeDamageNumber(DamageAmount, Element);
+}
+
+void AGP_BaseCharacter::BindAttributeDelegates(UAbilitySystemComponent* ASC, UAttributeSet* AS)
+{
+	if (UGP_AttributeSet* GP_AS = Cast<UGP_AttributeSet>(AS))
+	{
+		// ASC와 AttributeSet이 완벽히 준비된 시점이므로 안전하게 바인딩!
+		GP_AS->OnDamageTaken.AddDynamic(this, &ThisClass::HandleDamageTaken);
+	}
+}
+
+void AGP_BaseCharacter::HandleDamageTaken(AActor* InstigatorActor, AActor* TargetActor, float DamageAmount, FGameplayTag ElementTag)
+{
+	// 내가 맞은 게 아니면 무시
+	if (TargetActor != this) return;
+
+	// (임시) UI용 Enum 변환. 추후 UI가 태그 기반으로 바뀌면 이 부분도 날아갑니다.
+	EWeaponElement ElementToShow = EWeaponElement::Fire;
+	if (ElementTag.MatchesTagExact(FGameplayTag::RequestGameplayTag(FName("Weapon.Element.Water"))))
+	{
+		ElementToShow = EWeaponElement::Water;
+	}
+	else if (ElementTag.MatchesTagExact(FGameplayTag::RequestGameplayTag(FName("Weapon.Element.Lightning"))))
+	{
+		ElementToShow = EWeaponElement::Lightning;
+	}
+
+	ShowDamageNumber(FMath::RoundToInt(DamageAmount), ElementToShow);
 }

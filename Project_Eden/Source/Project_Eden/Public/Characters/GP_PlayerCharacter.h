@@ -45,9 +45,6 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment|Weapon", meta = (AllowPrivateAccess = "true"))
 	FName DefaultWeaponId = TEXT("WP_Common_Fire_Sword");
-
-private:
-	void ApplyDefaultWeaponToAbilitySystem();
-
+	
 };
 

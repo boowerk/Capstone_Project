@@ -62,7 +62,6 @@ void AGP_PlayerCharacter::PossessedBy(AController* NewController)
 	OnASCInitialized.Broadcast(GetAbilitySystemComponent(), GetAttributeSet());
 	GiveStartupAbilities();
 	InitializeAttributes();
-	ApplyDefaultWeaponToAbilitySystem();//
 }
 
 void AGP_PlayerCharacter::OnRep_PlayerState()
@@ -72,27 +71,5 @@ void AGP_PlayerCharacter::OnRep_PlayerState()
 
 	GetAbilitySystemComponent()->InitAbilityActorInfo(GetPlayerState(), this);
 	OnASCInitialized.Broadcast(GetAbilitySystemComponent(), GetAttributeSet());
-}
-
-void AGP_PlayerCharacter::ApplyDefaultWeaponToAbilitySystem()
-{
-	if (!HasAuthority() || DefaultWeaponId.IsNone())
-	{
-		return;
-	}
-
-	AGP_PlayerState* GPPlayerState = Cast<AGP_PlayerState>(GetPlayerState());
-	if (!IsValid(GPPlayerState))
-	{
-		return;
-	}
-
-	UPDA_WeaponItemCollection* WeaponCollection = DefaultWeaponCollection;
-	if (!IsValid(WeaponCollection))
-	{
-		WeaponCollection = GetMutableDefault<UPDA_WeaponItemCollection>();
-	}
-
-	GPPlayerState->EquipWeaponFromCollection(WeaponCollection, DefaultWeaponId);
 }
 

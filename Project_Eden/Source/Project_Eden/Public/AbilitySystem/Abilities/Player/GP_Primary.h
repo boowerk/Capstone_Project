@@ -21,6 +21,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "GAS|Abilities")
 	void SendHitReactEventToActors(const TArray<AActor*>& ActorsHit);
 	
+protected:
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Effects")
+	TSubclassOf<UGameplayEffect> DamageEffectClass;
 	
 private:
 	void DrawDebugsHitBoxOverlap(const TArray<FOverlapResult>& OverlapResults, const FVector& HitBoxLocation) const;

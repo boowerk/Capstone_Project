@@ -40,6 +40,14 @@ protected:
 
 	void SpawnDamageNumberActor(int32 DamageAmount, EWeaponElement Element);
 	
+	// ASC가 초기화되었을 때 AttributeSet의 델리게이트를 구독할 함수
+	UFUNCTION()
+	void BindAttributeDelegates(UAbilitySystemComponent* ASC, UAttributeSet* AS);
+
+	// 데미지 델리게이트 수신용 함수
+	UFUNCTION()
+	void HandleDamageTaken(AActor* InstigatorActor, AActor* TargetActor, float DamageAmount, FGameplayTag ElementTag);
+	
 private:
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Abilities")
 	TArray<TSubclassOf<UGameplayAbility>> StartupAbilities;

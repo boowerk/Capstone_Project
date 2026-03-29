@@ -6,6 +6,7 @@
 
 class UStaticMesh;
 class UTexture2D;
+class UGameplayEffect;
 
 UENUM(BlueprintType)
 enum class EWeaponRarity : uint8
@@ -28,41 +29,27 @@ struct PROJECT_EDEN_API FWeaponItemData
 {
     GENERATED_BODY()
 
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon")
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Info")
     FName ItemId = NAME_None;
 
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon")
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Info")
     FText Name = FText::GetEmpty();
 
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon", meta = (MultiLine = "true"))
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Info", meta = (MultiLine = "true"))
     FText Description = FText::GetEmpty();
-
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon")
-    EWeaponRarity Rarity = EWeaponRarity::Common;
-
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon")
-    EWeaponElement Element = EWeaponElement::Fire;
-
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon")
+    
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Visual")
     TSoftObjectPtr<UStaticMesh> Mesh;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon")
     TSoftObjectPtr<UTexture2D> Icon;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon", meta = (ClampMin = "0"))
-    int32 AttackPower = 10;
-
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon", meta = (ClampMin = "0"))
-    int32 MagicPower = 0;
-
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon", meta = (ClampMin = "0.0"))
-    float AttackSpeed = 1.0f;
-
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon", meta = (ClampMin = "0.0", ClampMax = "1.0"))
-    float CriticalChance = 0.05f;
-
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon", meta = (ClampMin = "0"))
     int32 SellPrice = 50;
+
+    // ASC에 적용될 유지형 GE 클래스
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|GAS")
+    TSubclassOf<UGameplayEffect> EquipEffectClass;
 };
 
 UCLASS(BlueprintType)
