@@ -5,6 +5,7 @@
 #include "Characters/GP_BaseCharacter.h"
 #include "UI/GP_AttributeWidget.h"
 #include "Blueprint/WidgetTree.h"
+#include "GeometryCollection/GeometryCollectionParticlesData.h"
 
 void UGP_WidgetComponent::BeginPlay()
 {
@@ -54,10 +55,20 @@ void UGP_WidgetComponent::OnASCInitialized(UAbilitySystemComponent* ASC, UAttrib
 }
 void UGP_WidgetComponent::BindToAttributeChanges()
 {
+	
+	UUserWidget* UserWidget = GetUserWidgetObject();
+	if (!IsValid(UserWidget)) return;
+	
 	for (const TTuple<FGameplayAttribute, FGameplayAttribute>& Pair : AttributeMap)
 	{
-		BindWidgetToAttributeChanges(GetUserWidgetObject(), Pair); // for checking the owned widget object.
-		
+		BindWidgetToAttributeChanges(GetUserWidgetObject(), Pair);
+		if( UserWidget->WidgetTree)
+		{
+			UserWidget->WidgetTree->ForEachWidget([this,Pair](UWidget* ChildWidget)
+			{
+				BindWidgetToAttributeChanges(ChildWidget, Pair);
+			});
+		}
 		GetUserWidgetObject()->WidgetTree->ForEachWidget([this, &Pair](UWidget* ChildWidget)
 		{
 			BindWidgetToAttributeChanges(ChildWidget, Pair);
@@ -73,9 +84,17 @@ void UGP_WidgetComponent::BindWidgetToAttributeChanges(UWidget* WidgetObject, co
 
 	AttributeWidget->OnAttributeChange(Pair, AttributeSet.Get());
 
-	AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(Pair.Key).AddLambda([this, AttributeWidget, &Pair](const FOnAttributeChangeData& AttributeChangeData)
+	// 메모리 누수 및 크래시 방지를 위해 약은 포인터(TWeakObjectPtr)로 캡처
+	TWeakObjectPtr<UGP_AttributeWidget> WeakWidget(AttributeWidget);
+	TWeakObjectPtr<UGP_AttributeSet> WeakAS(AttributeSet.Get());
+
+	AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(Pair.Key).AddLambda([WeakWidget, Pair, WeakAS](const FOnAttributeChangeData& AttributeChangeData)
 	{
-		AttributeWidget->OnAttributeChange(Pair, AttributeSet.Get());
+		// 람다가 실행될 때 위젯과 AttributeSet이 유효한지 검사
+		if (WeakWidget.IsValid() && WeakAS.IsValid())
+		{
+			WeakWidget->OnAttributeChange(Pair, WeakAS.Get());
+		}
 	});
 }
 

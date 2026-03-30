@@ -95,13 +95,13 @@ void AGP_BaseCharacter::HandleDamageTaken(AActor* InstigatorActor, AActor* Targe
 	// 내가 맞은 게 아니면 무시
 	if (TargetActor != this) return;
 
-	// (임시) UI용 Enum 변환. 추후 UI가 태그 기반으로 바뀌면 이 부분도 날아갑니다.
 	EWeaponElement ElementToShow = EWeaponElement::Fire;
-	if (ElementTag.MatchesTagExact(FGameplayTag::RequestGameplayTag(FName("Weapon.Element.Water"))))
+
+	if (ElementTag.MatchesTagExact(FGameplayTag::RequestGameplayTag(FName("Weapon.Element.Water"), false)))
 	{
 		ElementToShow = EWeaponElement::Water;
 	}
-	else if (ElementTag.MatchesTagExact(FGameplayTag::RequestGameplayTag(FName("Weapon.Element.Lightning"))))
+	else if (ElementTag.MatchesTagExact(FGameplayTag::RequestGameplayTag(FName("Weapon.Element.Lightning"), false)))
 	{
 		ElementToShow = EWeaponElement::Lightning;
 	}

@@ -44,16 +44,15 @@ void UGP_AttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallbac
 			AActor* InstigatorActor = Data.EffectSpec.GetContext().GetOriginalInstigator();
 			UAbilitySystemComponent* SourceASC = Data.EffectSpec.GetContext().GetOriginalInstigatorAbilitySystemComponent();
 
-			// 3. 공격자의 무기 속성 태그 추출
 			FGameplayTag ElementTag = FGameplayTag::EmptyTag;
 			if (IsValid(SourceASC))
 			{
-				if (SourceASC->HasMatchingGameplayTag(FGameplayTag::RequestGameplayTag(FName("Weapon.Element.Water"))))
-					ElementTag = FGameplayTag::RequestGameplayTag(FName("Weapon.Element.Water"));
-				else if (SourceASC->HasMatchingGameplayTag(FGameplayTag::RequestGameplayTag(FName("Weapon.Element.Lightning"))))
-					ElementTag = FGameplayTag::RequestGameplayTag(FName("Weapon.Element.Lightning"));
+				if (SourceASC->HasMatchingGameplayTag(FGameplayTag::RequestGameplayTag(FName("Weapon.Element.Water"), false)))
+					ElementTag = FGameplayTag::RequestGameplayTag(FName("Weapon.Element.Water"), false);
+				else if (SourceASC->HasMatchingGameplayTag(FGameplayTag::RequestGameplayTag(FName("Weapon.Element.Lightning"), false)))
+					ElementTag = FGameplayTag::RequestGameplayTag(FName("Weapon.Element.Lightning"), false);
 				else
-					ElementTag = FGameplayTag::RequestGameplayTag(FName("Weapon.Element.Fire")); // 기본값
+					ElementTag = FGameplayTag::RequestGameplayTag(FName("Weapon.Element.Fire"), false); 
 			}
 
 			// 4. UI 호출 대신 델리게이트 방송
