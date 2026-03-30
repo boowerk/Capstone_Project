@@ -2,11 +2,14 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "GameplayEffectTypes.h" // FOnAttributeChangeData 사용을 위해 필요
+#include "GP_AttributeWidget.h"
 #include "GP_PlayerHUDWidget.generated.h"
 
 class UTextBlock;
 class UProgressBar;
 class UWidget;
+class UAbilitySystemComponent;
 
 UCLASS()
 class PROJECT_EDEN_API UGP_PlayerHUDWidget : public UUserWidget
@@ -16,8 +19,9 @@ class PROJECT_EDEN_API UGP_PlayerHUDWidget : public UUserWidget
 public:
 	UGP_PlayerHUDWidget(const FObjectInitializer& ObjectInitializer);
 
-	UFUNCTION(BlueprintCallable, Category = "EldenRing HUD")
-	void SetVitals(float InHealthPercent, float InFocusPercent, float InStaminaPercent);
+	// ASC를 받아서 델리게이트를 연결할 함수
+	UFUNCTION(BlueprintCallable, Category = "EldenRing HUD|GAS")
+	void BindToASC(UAbilitySystemComponent* InASC);
 
 	UFUNCTION(BlueprintCallable, Category = "EldenRing HUD")
 	void SetLocationText(const FText& InLocationText);
@@ -34,15 +38,18 @@ protected:
 
 private:
 	void RefreshPreview();
+	
+	UFUNCTION()
+	void OnASCInitializedCallback(class UAbilitySystemComponent* ASC, class UAttributeSet* AS);
+	
+	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "HUD", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UGP_AttributeWidget> HealthBar;
 
 	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "HUD", meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UProgressBar> HealthBar;
+	TObjectPtr<UGP_AttributeWidget> ManaBar;
 
 	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "HUD", meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UProgressBar> FocusBar;
-
-	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "HUD", meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UProgressBar> StaminaBar;
+	TObjectPtr<UGP_AttributeWidget> StaminaBar;
 
 	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "HUD", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UTextBlock> LocationTextBlock;
@@ -52,15 +59,6 @@ private:
 
 	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "HUD", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UWidget> BossFrame;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EldenRing HUD|Preview", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", ClampMax = "1.0"))
-	float HealthPercent = 0.82f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EldenRing HUD|Preview", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", ClampMax = "1.0"))
-	float FocusPercent = 0.58f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EldenRing HUD|Preview", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", ClampMax = "1.0"))
-	float StaminaPercent = 0.91f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EldenRing HUD|Preview", meta = (AllowPrivateAccess = "true"))
 	FText LocationText;

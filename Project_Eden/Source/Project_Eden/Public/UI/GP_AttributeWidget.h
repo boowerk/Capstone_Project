@@ -22,10 +22,16 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "GAS|Attributes")
 	FGameplayAttribute MaxAttribute;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "GAS|Attributes")
+	bool bHideWhenFull = false;
 
 	void OnAttributeChange(const TTuple<FGameplayAttribute, FGameplayAttribute>& Pair, UGP_AttributeSet* AttributeSet);
 	bool MatchesAttributes(const TTuple<FGameplayAttribute, FGameplayAttribute>& Pair) const;
 
 	UFUNCTION(BlueprintImplementableEvent, meta = (DisplayName = "On Attribute Change"))
 	void BP_OnAttributeChange(float NewValue, float NewMaxValue);
+	
+protected:
+	virtual void NativeConstruct() override;
 };
