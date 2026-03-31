@@ -16,12 +16,7 @@ class PROJECT_EDEN_API UGP_Primary : public UGP_GameplayAbility
 	GENERATED_BODY()
 public:
 	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
-	
-	UFUNCTION(BlueprintCallable, Category = "GAS|Abilities")
-	TArray<AActor*> HitboxOverlapTest();
-	
-	UFUNCTION(BlueprintCallable, Category = "GAS|Abilities")
-	void SendHitReactEventToActors(const TArray<AActor*>& ActorsHit);
+
 	
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS|Abilities|Attack")
@@ -34,7 +29,6 @@ protected:
 	TSubclassOf<UGameplayEffect> DamageEffectClass;
 	
 private:
-	void DrawDebugsHitBoxOverlap(const TArray<FOverlapResult>& OverlapResults, const FVector& HitBoxLocation) const;
 	
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Abilities")
 	float HitBoxRadius = 100.0f;	
