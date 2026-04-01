@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "CoreMinimal.h"
 #include "UObject/Interface.h"
@@ -30,4 +30,8 @@ public:
 	// 공격 명령
 	UFUNCTION(BlueprintCallable, Category = "Eden|Summon")
 	virtual void CommandAttackTarget() = 0;
+
+	// 위치 기반 이동 명령
+	UFUNCTION(BlueprintCallable, Category = "Eden|Summon")
+	virtual void CommandMoveToLocation(const FVector& TargetLocation, float MoveSpeed) = 0;
 };

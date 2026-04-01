@@ -1,25 +1,26 @@
-﻿#pragma once
+#pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "GameplayEffect.h"
-#include "GameplayTagContainer.h"
 #include "Interfaces/GP_Summonable.h"
 
 #include "GP_WaterPuddle.generated.h"
 
-class USphereComponent;
+class UDecalComponent;
+class UMaterialInterface;
+class UMaterialInstanceDynamic;
 class UProjectileMovementComponent;
+class USphereComponent;
 
 UCLASS()
-class PROJECT_EDEN_API AGP_WaterPuddle : public AActor , public IGP_Summonable
+class PROJECT_EDEN_API AGP_WaterPuddle : public AActor, public IGP_Summonable
 {
 	GENERATED_BODY()
-	
-public:	
-	AGP_WaterPuddle();
 
-	virtual void Tick(float DeltaTime) override;
+public:
+	AGP_WaterPuddle();
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	// 패시브(E 스킬 쿨타임 중) 발동 시 플레이어 쪽으로 당겨오기 위한 함수
 	UFUNCTION(BlueprintCallable, Category = "Eden|Puddle")
@@ -31,6 +32,15 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Eden|Puddle")
+	TObjectPtr<UDecalComponent> PuddleDecal;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Eden|Puddle")
+	TObjectPtr<UMaterialInterface> DecalMaterial;
+
+	UPROPERTY()
+	TObjectPtr<UMaterialInstanceDynamic> DecalDynamicMaterial;
 
 	// 크기 변하는 장판 컬리전
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Eden|Puddle")
@@ -44,37 +54,62 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Eden|GAS")
 	TSubclassOf<UGameplayEffect> PuddleDebuffEffectClass;
 
-	
-	// 장판 최대 크기 
+	// 장판 최대 크기
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Eden|Puddle")
 	float MaxRadius = 350.0f;
 
-	// 장판 최소 크기 
+	// 장판 최소 크기
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Eden|Puddle")
 	float MinRadius = 80.0f;
 
-	// 초당 줄어드는 반지름(나중에 지속시간 비례로 변경할 예정 - 슝민)
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Eden|Puddle")
-	float ShrinkRatePerSecond = 15.0f;
+	// 장판의 기본 유지 시간 스킬 레벨에 따라 스폰 시 덮어씌울 수 있음 - 슝민
+	UPROPERTY(BlueprintReadWrite, Category = "Eden|Puddle", meta = (ExposeOnSpawn = "true"))
+	float BaseDuration = 30.0f;
 
-	UPROPERTY(BlueprintReadOnly, Replicated, Category = "Eden|Puddle")
-	float CurrentRadius;
+	// 목적지 좌표
+	FVector DestinationLoc = FVector::ZeroVector;
+	bool bIsMovingToDestination = false;
 
-	// 흡수당하고 있는지 여부 (동시에 서로 흡수 방지)
+	// 장판 생성 시점
+	float StartTime = 0.0f;
+
+	// 장판 소멸 예정 시점 (클라이언트로 이것만 복제)
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_EndTime, Category = "Eden|Puddle")
+	float EndTime = 0.0f;
+
+	// 시작 시점의 반지름: 병합 처리시 현재 크기로 사용
+	float StartingRadiusForLerp = 0.0f;
+
+	// 현재 반지름: 서버/클라 각자 계산
+	UPROPERTY(BlueprintReadOnly, Category = "Eden|Puddle")
+	float CurrentRadius = 0.0f;
+
+	// 흡수당하고 있는지 여부: 동시에 서로 흡수 방지
 	bool bIsBeingAbsorbed = false;
+
+	FTimerHandle PuddleUpdateTimer;
+
+	// 타이머용 컬리전 업데이트 함수
+	UFUNCTION()
+	void UpdatePuddleState();
 
 	// 충돌 융합 이벤트
 	UFUNCTION()
 	void OnPuddleOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 
-	// 장판이 흡수될 때의 연출용 이벤트
+	// EndTime이 클라이언트에 도달시 사용
+	UFUNCTION()
+	void OnRep_EndTime();
+
 	UFUNCTION(BlueprintImplementableEvent, Category = "Eden|Puddle")
 	void BP_OnAbsorbed();
 
-	// 장판이 최소 크기에 도달해 사라질 때 연출용 이벤트
+	UFUNCTION(BlueprintImplementableEvent, Category = "Eden|Puddle")
+	void BP_OnEndTimeUpdated(float NewDuration);
+
 	UFUNCTION(BlueprintImplementableEvent, Category = "Eden|Puddle")
 	void BP_OnFadeOutAndDestroy();
-	
+
 public: // IGP_Summonable 상속
 	virtual AActor* GetSummonOwner() const override { return GetInstigator(); }
 
@@ -83,4 +118,7 @@ public: // IGP_Summonable 상속
 
 	UFUNCTION(BlueprintCallable, Category = "Eden|Summon")
 	virtual void CommandAttackTarget() override;
+
+	UFUNCTION(BlueprintCallable, Category = "Eden|Summon")
+	virtual void CommandMoveToLocation(const FVector& TargetLocation, float MoveSpeed) override;
 };

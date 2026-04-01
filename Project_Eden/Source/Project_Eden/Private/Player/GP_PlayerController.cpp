@@ -1,4 +1,4 @@
-﻿#include "Player/GP_PlayerController.h"
+#include "Player/GP_PlayerController.h"
 
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
@@ -77,22 +77,57 @@ void AGP_PlayerController::SetupInputComponent()
 
 	UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(InputComponent);
 	if (!IsValid(EnhancedInputComponent)) return;
-	EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &ThisClass::Move);
-	EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ThisClass::Jump);
-	EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ThisClass::StopJump);
-	EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ThisClass::Look);
 
-	EnhancedInputComponent->BindAction(PrimaryAction, ETriggerEvent::Triggered, this, &ThisClass::Primary);
-	EnhancedInputComponent->BindAction(SkillAction, ETriggerEvent::Triggered, this, &ThisClass::Skill);
-	EnhancedInputComponent->BindAction(UltimateAction, ETriggerEvent::Triggered, this, &ThisClass::Ultimate);
-	EnhancedInputComponent->BindAction(TargetingAction, ETriggerEvent::Started, this, &ThisClass::Targeting);
+	if (IsValid(MoveAction))
+	{
+		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &ThisClass::Move);
+	}
+	if (IsValid(JumpAction))
+	{
+		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ThisClass::Jump);
+		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ThisClass::StopJump);
+	}
+	if (IsValid(LookAction))
+	{
+		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ThisClass::Look);
+	}
+	if (IsValid(PrimaryAction))
+	{
+		EnhancedInputComponent->BindAction(PrimaryAction, ETriggerEvent::Triggered, this, &ThisClass::Primary);
+	}
+
+	if (IsValid(Skill_Q_Action))
+	{
+		EnhancedInputComponent->BindAction(Skill_Q_Action, ETriggerEvent::Triggered, this, &ThisClass::Skill_Q);
+	}
+	else if (IsValid(TargetingAction))
+	{
+		EnhancedInputComponent->BindAction(TargetingAction, ETriggerEvent::Started, this, &ThisClass::Targeting);
+	}
+
+	if (IsValid(Skill_E_Action))
+	{
+		EnhancedInputComponent->BindAction(Skill_E_Action, ETriggerEvent::Triggered, this, &ThisClass::Skill_E);
+	}
+	else if (IsValid(SkillAction))
+	{
+		EnhancedInputComponent->BindAction(SkillAction, ETriggerEvent::Triggered, this, &ThisClass::Skill);
+	}
+
+	if (IsValid(Skill_R_Action))
+	{
+		EnhancedInputComponent->BindAction(Skill_R_Action, ETriggerEvent::Triggered, this, &ThisClass::Skill_R);
+	}
+	else if (IsValid(UltimateAction))
+	{
+		EnhancedInputComponent->BindAction(UltimateAction, ETriggerEvent::Triggered, this, &ThisClass::Ultimate);
+	}
 
 	if (IsValid(DashAction))
 	{
 		EnhancedInputComponent->BindAction(DashAction, ETriggerEvent::Started, this, &ThisClass::Dash);
 	}
-
-	if (!IsValid(DashAction) && IsValid(InputComponent))
+	else if (IsValid(InputComponent))
 	{
 		// Fallback roll key until an enhanced input action asset is assigned.
 		InputComponent->BindKey(EKeys::LeftAlt, IE_Pressed, this, &ThisClass::Dash);
@@ -160,14 +195,6 @@ void AGP_PlayerController::Targeting()
 	ActivateAbilityByTag(GPTags::GPAbilities::Targeting);
 }
 
-bool AGP_PlayerController::ActivateAbilityByTag(const FGameplayTag& AbilityTag) const
-{
-	UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn());
-	if (!IsValid(ASC)) return false;
-
-	return ASC->TryActivateAbilitiesByTag(AbilityTag.GetSingleTagContainer());
-}
-
 void AGP_PlayerController::Skill()
 {
 	ActivateAbilityByTag(GPTags::GPAbilities::Skill);
@@ -176,6 +203,30 @@ void AGP_PlayerController::Skill()
 void AGP_PlayerController::Ultimate()
 {
 	ActivateAbilityByTag(GPTags::GPAbilities::Ultimate);
+}
+
+void AGP_PlayerController::Skill_Q()
+{
+	UE_LOG(LogTemp, Warning, TEXT("Targeting"));
+	ActivateAbilityByTag(GPTags::GPAbilities::Skill_Q);
+}
+
+void AGP_PlayerController::Skill_E()
+{
+	ActivateAbilityByTag(GPTags::GPAbilities::Skill_E);
+}
+
+void AGP_PlayerController::Skill_R()
+{
+	ActivateAbilityByTag(GPTags::GPAbilities::Skill_R);
+}
+
+bool AGP_PlayerController::ActivateAbilityByTag(const FGameplayTag& AbilityTag) const
+{
+	UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn());
+	if (!IsValid(ASC)) return false;
+
+	return ASC->TryActivateAbilitiesByTag(AbilityTag.GetSingleTagContainer());
 }
 
 void AGP_PlayerController::Dash()
