@@ -14,6 +14,7 @@ namespace GPTags
         UE_DECLARE_GAMEPLAY_TAG_EXTERN(Skill);     // 스킬 (추가)
         UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ultimate);  // 궁극기 (추가)
         UE_DECLARE_GAMEPLAY_TAG_EXTERN(Dash);      // 대시/회피 (추가)
+        UE_DECLARE_GAMEPLAY_TAG_EXTERN(Rolling);   // 구르기 (추가)
         		
 		UE_DECLARE_GAMEPLAY_TAG_EXTERN(Targeting);
 	}

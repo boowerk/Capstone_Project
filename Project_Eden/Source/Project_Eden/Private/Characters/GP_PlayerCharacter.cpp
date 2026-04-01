@@ -1,5 +1,10 @@
 ﻿#include "Characters/GP_PlayerCharacter.h"
 
+#include "Animation/AnimInstance.h"
+#include "Animation/AnimMontage.h"
+#include "Animation/AnimSequenceBase.h"
+#include "Animation/BlendSpace.h"
+#include "Animation/PDA_CharacterAnimationSet.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -9,7 +14,8 @@
 
 AGP_PlayerCharacter::AGP_PlayerCharacter()
 {
-	PrimaryActorTick.bCanEverTick = false;
+	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bStartWithTickEnabled = false;
 
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
 
@@ -34,6 +40,19 @@ AGP_PlayerCharacter::AGP_PlayerCharacter()
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>("FollowCamera");
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
 	FollowCamera->bUsePawnControlRotation = false;
+}
+
+void AGP_PlayerCharacter::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+
+	if (!bIsRolling)
+	{
+		SetActorTickEnabled(false);
+		return;
+	}
+
+	UpdateRollMovement(DeltaSeconds);
 }
 
 UAbilitySystemComponent* AGP_PlayerCharacter::GetAbilitySystemComponent() const
@@ -71,5 +90,156 @@ void AGP_PlayerCharacter::OnRep_PlayerState()
 
 	GetAbilitySystemComponent()->InitAbilityActorInfo(GetPlayerState(), this);
 	OnASCInitialized.Broadcast(GetAbilitySystemComponent(), GetAttributeSet());
+}
+
+UBlendSpace* AGP_PlayerCharacter::GetLocomotionBlendSpace() const
+{
+	return AnimationSet ? AnimationSet->LocomotionBlendSpace : nullptr;
+}
+
+UAnimSequenceBase* AGP_PlayerCharacter::GetJumpLoopAnimation() const
+{
+	return AnimationSet ? AnimationSet->JumpLoopAnimation : nullptr;
+}
+
+UAnimMontage* AGP_PlayerCharacter::GetRollMontage() const
+{
+	return AnimationSet ? AnimationSet->RollMontage : nullptr;
+}
+
+UAnimMontage* AGP_PlayerCharacter::GetPrimaryAttackMontage() const
+{
+	return AnimationSet ? AnimationSet->PrimaryAttackMontage : nullptr;
+}
+
+bool AGP_PlayerCharacter::TryPerformRoll()
+{
+	if (!GetWorld() || !GetMesh() || !GetCharacterMovement())
+	{
+		return false;
+	}
+
+	if (bIsRolling)
+	{
+		return false;
+	}
+
+	if (GetCharacterMovement()->IsFalling())
+	{
+		return false;
+	}
+
+	const double CurrentTime = GetWorld()->GetTimeSeconds();
+	if (CurrentTime < NextRollAllowedTime)
+	{
+		return false;
+	}
+
+	UAnimMontage* Montage = GetRollMontage();
+	if (!IsValid(Montage))
+	{
+		return false;
+	}
+
+	if (UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance())
+	{
+		if (AnimInstance->Montage_IsPlaying(Montage))
+		{
+			return false;
+		}
+	}
+
+	FVector RollDirection = GetLastMovementInputVector();
+	if (RollDirection.SizeSquared2D() < KINDA_SMALL_NUMBER)
+	{
+		RollDirection = GetVelocity();
+	}
+	if (RollDirection.SizeSquared2D() < KINDA_SMALL_NUMBER)
+	{
+		RollDirection = GetActorForwardVector();
+	}
+
+	RollDirection.Z = 0.0f;
+	RollDirection.Normalize();
+	SetActorRotation(RollDirection.Rotation());
+
+	const float PlayedLength = PlayAnimMontage(Montage, 1.0f);
+	if (PlayedLength <= 0.0f)
+	{
+		return false;
+	}
+
+	GetCharacterMovement()->StopMovementImmediately();
+	GetCharacterMovement()->DisableMovement();
+
+	bIsRolling = true;
+	ActiveRollDirection = RollDirection;
+	ActiveRollDuration = PlayedLength;
+	ActiveRollElapsedTime = 0.0f;
+	ActiveRollDistanceTravelled = 0.0f;
+	ActiveRollMontage = Montage;
+	SetActorTickEnabled(true);
+
+	NextRollAllowedTime = CurrentTime + RollCooldown;
+	return true;
+}
+
+void AGP_PlayerCharacter::UpdateRollMovement(float DeltaSeconds)
+{
+	if (!bIsRolling)
+	{
+		return;
+	}
+
+	if (!GetCharacterMovement())
+	{
+		FinishRoll();
+		return;
+	}
+
+	ActiveRollElapsedTime = FMath::Min(ActiveRollElapsedTime + DeltaSeconds, ActiveRollDuration);
+
+	const float Alpha = ActiveRollDuration > 0.0f ? ActiveRollElapsedTime / ActiveRollDuration : 1.0f;
+	const float TargetDistance = RollDistance * Alpha;
+	const float DeltaDistance = TargetDistance - ActiveRollDistanceTravelled;
+
+	if (DeltaDistance > KINDA_SMALL_NUMBER)
+	{
+		const FVector PreviousLocation = GetActorLocation();
+		FHitResult HitResult;
+		AddActorWorldOffset(ActiveRollDirection * DeltaDistance, true, &HitResult);
+		ActiveRollDistanceTravelled += FVector::Dist2D(PreviousLocation, GetActorLocation());
+
+		if (HitResult.bBlockingHit)
+		{
+			FinishRoll();
+			return;
+		}
+	}
+
+	const UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
+	const bool bMontageStopped = !ActiveRollMontage.IsValid() || !AnimInstance || !AnimInstance->Montage_IsPlaying(ActiveRollMontage.Get());
+	if (ActiveRollElapsedTime >= ActiveRollDuration || bMontageStopped)
+	{
+		FinishRoll();
+	}
+}
+
+void AGP_PlayerCharacter::FinishRoll()
+{
+	bIsRolling = false;
+	ActiveRollDirection = FVector::ZeroVector;
+	ActiveRollDuration = 0.0f;
+	ActiveRollElapsedTime = 0.0f;
+	ActiveRollDistanceTravelled = 0.0f;
+	ActiveRollMontage.Reset();
+
+	if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
+	{
+		MovementComponent->SetMovementMode(MOVE_Walking);
+		MovementComponent->StopMovementImmediately();
+	}
+
+	SetActorTickEnabled(false);
 }
 

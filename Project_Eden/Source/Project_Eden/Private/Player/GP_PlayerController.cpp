@@ -4,10 +4,13 @@
 #include "AbilitySystemComponent.h"
 #include "Blueprint/UserWidget.h"
 #include "Characters/GP_EnemyCharacter.h"
+#include "Characters/GP_PlayerCharacter.h"
+#include "Components/InputComponent.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "GameFramework/Character.h"
 #include "GameplayTags/GP_Tags.h"
+#include "InputCoreTypes.h"
 #include "Kismet/GameplayStatics.h"
 #include "Logging/LogMacros.h"
 #include "UI/GP_PlayerHUDWidget.h"
@@ -82,13 +85,31 @@ void AGP_PlayerController::SetupInputComponent()
 	EnhancedInputComponent->BindAction(PrimaryAction, ETriggerEvent::Triggered, this, &ThisClass::Primary);
 	EnhancedInputComponent->BindAction(SkillAction, ETriggerEvent::Triggered, this, &ThisClass::Skill);
 	EnhancedInputComponent->BindAction(UltimateAction, ETriggerEvent::Triggered, this, &ThisClass::Ultimate);
-	EnhancedInputComponent->BindAction(DashAction, ETriggerEvent::Triggered, this, &ThisClass::Dash);
 	EnhancedInputComponent->BindAction(TargetingAction, ETriggerEvent::Started, this, &ThisClass::Targeting);
+
+	if (IsValid(DashAction))
+	{
+		EnhancedInputComponent->BindAction(DashAction, ETriggerEvent::Started, this, &ThisClass::Dash);
+	}
+
+	if (!IsValid(DashAction) && IsValid(InputComponent))
+	{
+		// Fallback roll key until an enhanced input action asset is assigned.
+		InputComponent->BindKey(EKeys::LeftAlt, IE_Pressed, this, &ThisClass::Dash);
+	}
 }
 
 void AGP_PlayerController::Move(const FInputActionValue& Value)
 {
 	if (!IsValid(GetPawn())) return;
+	if (const AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetCharacter()))
+	{
+		if (PlayerCharacter->IsRolling())
+		{
+			return;
+		}
+	}
+
 	const FVector2D MovementVector = Value.Get<FVector2D>();
 
 	const FRotator YawRotation(0.f, GetControlRotation().Yaw, 0.f);
@@ -111,6 +132,14 @@ void AGP_PlayerController::Look(const FInputActionValue& Value)
 void AGP_PlayerController::Jump()
 {
 	if (!IsValid(GetCharacter())) return;
+	if (const AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetCharacter()))
+	{
+		if (PlayerCharacter->IsRolling())
+		{
+			return;
+		}
+	}
+
 	GetCharacter()->Jump();
 }
 
@@ -131,12 +160,12 @@ void AGP_PlayerController::Targeting()
 	ActivateAbilityByTag(GPTags::GPAbilities::Targeting);
 }
 
-void AGP_PlayerController::ActivateAbilityByTag(const FGameplayTag& AbilityTag) const
+bool AGP_PlayerController::ActivateAbilityByTag(const FGameplayTag& AbilityTag) const
 {
 	UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn());
-	if (!IsValid(ASC)) return;
+	if (!IsValid(ASC)) return false;
 
-	ASC->TryActivateAbilitiesByTag(AbilityTag.GetSingleTagContainer());
+	return ASC->TryActivateAbilitiesByTag(AbilityTag.GetSingleTagContainer());
 }
 
 void AGP_PlayerController::Skill()
@@ -151,6 +180,14 @@ void AGP_PlayerController::Ultimate()
 
 void AGP_PlayerController::Dash()
 {
+	if (AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetCharacter()))
+	{
+		if (PlayerCharacter->TryPerformRoll())
+		{
+			return;
+		}
+	}
+
 	ActivateAbilityByTag(GPTags::GPAbilities::Dash);
 }
 

@@ -12,6 +12,7 @@ namespace GPTags
 		UE_DEFINE_GAMEPLAY_TAG_COMMENT(Skill, "GPTags.GPAbilities.Skill", "Tag for the Skill Ability");
 		UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ultimate, "GPTags.GPAbilities.Ultimate", "Tag for the Ultimate Ability");
 		UE_DEFINE_GAMEPLAY_TAG_COMMENT(Dash, "GPTags.GPAbilities.Dash", "Tag for the Dash Ability");
+		UE_DEFINE_GAMEPLAY_TAG_COMMENT(Rolling, "GPTags.GPAbilities.Rolling", "Tag for the Rolling Ability");
 		
 		UE_DEFINE_GAMEPLAY_TAG_COMMENT(Targeting, "GPTags.GPAbilities.Targeting", "Tag for the Targeting Ability");
 	}

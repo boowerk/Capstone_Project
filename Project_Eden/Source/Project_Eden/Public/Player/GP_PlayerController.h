@@ -78,7 +78,7 @@ private:
 	void StopJump();
 
 	void Primary();
-	void ActivateAbilityByTag(const FGameplayTag& AbilityTag) const;
+	bool ActivateAbilityByTag(const FGameplayTag& AbilityTag) const;
 	void Skill();
 	void Ultimate();
 	void Dash();
