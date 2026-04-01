@@ -119,3 +119,13 @@ void AGP_WaterPuddle::PullTowards(AActor* TargetActor, float PullSpeed)
 	
 	MovementComponent->Velocity = Direction * PullSpeed;
 }
+
+void AGP_WaterPuddle::CommandPullTowards(AActor* TargetActor, float PullSpeed)
+{
+	PullTowards(TargetActor, PullSpeed);
+}
+
+void AGP_WaterPuddle::CommandAttackTarget()
+{
+	// Water puddles do not have an active attack behavior.
+}

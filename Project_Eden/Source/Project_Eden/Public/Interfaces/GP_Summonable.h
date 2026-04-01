@@ -4,7 +4,7 @@
 #include "UObject/Interface.h"
 #include "GP_Summonable.generated.h"
 
-UINTERFACE(MinimalAPI)
+UINTERFACE(MinimalAPI, NotBlueprintable)
 class UGP_Summonable : public UInterface
 {
 	GENERATED_BODY()

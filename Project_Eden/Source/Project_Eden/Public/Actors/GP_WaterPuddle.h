@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "GameplayEffect.h"
 #include "GameplayTagContainer.h"
 #include "Interfaces/GP_Summonable.h"
 
@@ -9,7 +10,6 @@
 
 class USphereComponent;
 class UProjectileMovementComponent;
-class UGameplayEffect;
 
 UCLASS()
 class PROJECT_EDEN_API AGP_WaterPuddle : public AActor , public IGP_Summonable
@@ -77,6 +77,10 @@ protected:
 	
 public: // IGP_Summonable 상속
 	virtual AActor* GetSummonOwner() const override { return GetInstigator(); }
+
+	UFUNCTION(BlueprintCallable, Category = "Eden|Summon")
 	virtual void CommandPullTowards(AActor* TargetActor, float PullSpeed) override;
+
+	UFUNCTION(BlueprintCallable, Category = "Eden|Summon")
 	virtual void CommandAttackTarget() override;
 };
