@@ -42,21 +42,20 @@ private:
 	TObjectPtr<UInputAction> PrimaryAction;
 
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
-	TObjectPtr<UInputAction> TargetingAction;
-
-
+	TObjectPtr<UInputAction> Skill_Q_Action;
+	
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
-	TObjectPtr<UInputAction> SkillAction;
-
+	TObjectPtr<UInputAction> Skill_E_Action;
+	
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
-	TObjectPtr<UInputAction> UltimateAction;
+	TObjectPtr<UInputAction> Skill_R_Action;
 
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Movement")
 	TObjectPtr<UInputAction> DashAction;
 
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
 	TSubclassOf<UUserWidget> HUDWidgetClass;
-
+	
 	UPROPERTY(Transient)
 	TObjectPtr<UGP_PlayerHUDWidget> HUDWidget;
 
@@ -76,14 +75,15 @@ private:
 	void Look(const FInputActionValue& Value);
 	void Jump();
 	void StopJump();
-
-	void Primary();
-	void ActivateAbilityByTag(const FGameplayTag& AbilityTag) const;
-	void Skill();
-	void Ultimate();
 	void Dash();
 
-	void Targeting();
+	void Primary(); 
+	void Skill_Q(); //Targeting
+	void Skill_E(); //Skill
+	void Skill_R(); //Ultimate
+	void ActivateAbilityByTag(const FGameplayTag& AbilityTag) const;
+
+	//void Targeting(); 
 	void RefreshBossHUD();
 	
 };

@@ -4,7 +4,7 @@
 #include "UObject/Interface.h"
 #include "GP_Summonable.generated.h"
 
-UINTERFACE(MinimalAPI)
+UINTERFACE(MinimalAPI, NotBlueprintable)
 class UGP_Summonable : public UInterface
 {
 	GENERATED_BODY()
@@ -30,4 +30,8 @@ public:
 	// 공격 명령
 	UFUNCTION(BlueprintCallable, Category = "Eden|Summon")
 	virtual void CommandAttackTarget() = 0;
+	
+	// 위치 기반 이동 명령
+	UFUNCTION(BlueprintCallable, Category = "Eden|Summon")
+	virtual void CommandMoveToLocation(const FVector& TargetLocation, float MoveSpeed) = 0;
 };

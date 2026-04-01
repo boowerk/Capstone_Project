@@ -11,11 +11,11 @@ namespace GPTags
 		UE_DECLARE_GAMEPLAY_TAG_EXTERN(ActivateOnGiven);
 		
 		UE_DECLARE_GAMEPLAY_TAG_EXTERN(Primary);   // 평타 (기존)
-        UE_DECLARE_GAMEPLAY_TAG_EXTERN(Skill);     // 스킬 (추가)
-        UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ultimate);  // 궁극기 (추가)
-        UE_DECLARE_GAMEPLAY_TAG_EXTERN(Dash);      // 대시/회피 (추가)
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(Skill_Q);
+        UE_DECLARE_GAMEPLAY_TAG_EXTERN(Skill_E);     // 스킬 (추가)
+        UE_DECLARE_GAMEPLAY_TAG_EXTERN(Skill_R);  // 궁극기 (추가)
         		
-		UE_DECLARE_GAMEPLAY_TAG_EXTERN(Targeting);
+        UE_DECLARE_GAMEPLAY_TAG_EXTERN(Dash);      // 대시/회피 (추가)
 	}
 	
 	namespace Events
@@ -24,6 +24,14 @@ namespace GPTags
 		{
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(HitReact);
 			
+		}
+	}
+	
+	namespace Cooldown
+	{
+		namespace Skill
+		{
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(WaterPuddle); // E스킬 물 장판 쿨타임
 		}
 	}
 }

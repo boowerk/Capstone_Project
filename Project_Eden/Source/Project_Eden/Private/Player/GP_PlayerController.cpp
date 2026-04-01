@@ -78,12 +78,12 @@ void AGP_PlayerController::SetupInputComponent()
 	EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ThisClass::Jump);
 	EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ThisClass::StopJump);
 	EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ThisClass::Look);
+	EnhancedInputComponent->BindAction(DashAction, ETriggerEvent::Triggered, this, &ThisClass::Dash);
 
 	EnhancedInputComponent->BindAction(PrimaryAction, ETriggerEvent::Triggered, this, &ThisClass::Primary);
-	EnhancedInputComponent->BindAction(SkillAction, ETriggerEvent::Triggered, this, &ThisClass::Skill);
-	EnhancedInputComponent->BindAction(UltimateAction, ETriggerEvent::Triggered, this, &ThisClass::Ultimate);
-	EnhancedInputComponent->BindAction(DashAction, ETriggerEvent::Triggered, this, &ThisClass::Dash);
-	EnhancedInputComponent->BindAction(TargetingAction, ETriggerEvent::Started, this, &ThisClass::Targeting);
+	EnhancedInputComponent->BindAction(Skill_Q_Action, ETriggerEvent::Triggered, this, &ThisClass::Skill_Q);
+	EnhancedInputComponent->BindAction(Skill_E_Action, ETriggerEvent::Triggered, this, &ThisClass::Skill_E);
+	EnhancedInputComponent->BindAction(Skill_R_Action, ETriggerEvent::Triggered, this, &ThisClass::Skill_R);
 }
 
 void AGP_PlayerController::Move(const FInputActionValue& Value)
@@ -125,10 +125,10 @@ void AGP_PlayerController::Primary()
 	ActivateAbilityByTag(GPTags::GPAbilities::Primary);
 }
 
-void AGP_PlayerController::Targeting()
+void AGP_PlayerController::Skill_Q()
 {
 	UE_LOG(LogTemp, Warning, TEXT("Targeting"));
-	ActivateAbilityByTag(GPTags::GPAbilities::Targeting);
+	ActivateAbilityByTag(GPTags::GPAbilities::Skill_Q);
 }
 
 void AGP_PlayerController::ActivateAbilityByTag(const FGameplayTag& AbilityTag) const
@@ -139,14 +139,15 @@ void AGP_PlayerController::ActivateAbilityByTag(const FGameplayTag& AbilityTag) 
 	ASC->TryActivateAbilitiesByTag(AbilityTag.GetSingleTagContainer());
 }
 
-void AGP_PlayerController::Skill()
+void AGP_PlayerController::Skill_E()
 {
-	ActivateAbilityByTag(GPTags::GPAbilities::Skill);
+	ActivateAbilityByTag(GPTags::GPAbilities::Skill_E);
 }
 
-void AGP_PlayerController::Ultimate()
+
+void AGP_PlayerController::Skill_R()
 {
-	ActivateAbilityByTag(GPTags::GPAbilities::Ultimate);
+	ActivateAbilityByTag(GPTags::GPAbilities::Skill_R);
 }
 
 void AGP_PlayerController::Dash()
