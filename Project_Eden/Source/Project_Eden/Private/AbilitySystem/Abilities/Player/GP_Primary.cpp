@@ -2,6 +2,7 @@
 
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystem/GP_AttributeSet.h"
+#include "Characters/GP_PlayerCharacter.h"
 #include "GameplayTags/GP_Tags.h"
 
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
@@ -35,11 +36,20 @@ void UGP_Primary::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 			}
 		}
 
+		UAnimMontage* MontageToPlay = AttackMontage;
+		if (const AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo()))
+		{
+			if (UAnimMontage* CharacterMontage = PlayerCharacter->GetPrimaryAttackMontage())
+			{
+				MontageToPlay = CharacterMontage;
+			}
+		}
+
 		// Sequence 0: 몽타주 Task 생성
-		if (AttackMontage) // 몽타주가 할당시 CPP 내부에서 자동 재생하고 종료 처리
+		if (MontageToPlay) // 캐릭터 세트 우선, 없으면 어빌리티 기본값 사용
 		{
 			UAbilityTask_PlayMontageAndWait* PlayMontageTask =
-				UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(this, NAME_None, AttackMontage, 1.0f);
+				UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(this, NAME_None, MontageToPlay, 1.0f);
 			if (PlayMontageTask)
 			{
 				// 애니메이션이 끝나거나 취소되면 OnMontageCompleted()

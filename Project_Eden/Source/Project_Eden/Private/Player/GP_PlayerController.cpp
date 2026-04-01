@@ -1,13 +1,16 @@
-﻿#include "Player/GP_PlayerController.h"
+#include "Player/GP_PlayerController.h"
 
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
 #include "Blueprint/UserWidget.h"
 #include "Characters/GP_EnemyCharacter.h"
+#include "Characters/GP_PlayerCharacter.h"
+#include "Components/InputComponent.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "GameFramework/Character.h"
 #include "GameplayTags/GP_Tags.h"
+#include "InputCoreTypes.h"
 #include "Kismet/GameplayStatics.h"
 #include "Logging/LogMacros.h"
 #include "UI/GP_PlayerHUDWidget.h"
@@ -74,21 +77,74 @@ void AGP_PlayerController::SetupInputComponent()
 
 	UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(InputComponent);
 	if (!IsValid(EnhancedInputComponent)) return;
-	EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &ThisClass::Move);
-	EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ThisClass::Jump);
-	EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ThisClass::StopJump);
-	EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ThisClass::Look);
-	EnhancedInputComponent->BindAction(DashAction, ETriggerEvent::Triggered, this, &ThisClass::Dash);
 
-	EnhancedInputComponent->BindAction(PrimaryAction, ETriggerEvent::Triggered, this, &ThisClass::Primary);
-	EnhancedInputComponent->BindAction(Skill_Q_Action, ETriggerEvent::Triggered, this, &ThisClass::Skill_Q);
-	EnhancedInputComponent->BindAction(Skill_E_Action, ETriggerEvent::Triggered, this, &ThisClass::Skill_E);
-	EnhancedInputComponent->BindAction(Skill_R_Action, ETriggerEvent::Triggered, this, &ThisClass::Skill_R);
+	if (IsValid(MoveAction))
+	{
+		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &ThisClass::Move);
+	}
+	if (IsValid(JumpAction))
+	{
+		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ThisClass::Jump);
+		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ThisClass::StopJump);
+	}
+	if (IsValid(LookAction))
+	{
+		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ThisClass::Look);
+	}
+	if (IsValid(PrimaryAction))
+	{
+		EnhancedInputComponent->BindAction(PrimaryAction, ETriggerEvent::Triggered, this, &ThisClass::Primary);
+	}
+
+	if (IsValid(Skill_Q_Action))
+	{
+		EnhancedInputComponent->BindAction(Skill_Q_Action, ETriggerEvent::Triggered, this, &ThisClass::Skill_Q);
+	}
+	else if (IsValid(TargetingAction))
+	{
+		EnhancedInputComponent->BindAction(TargetingAction, ETriggerEvent::Started, this, &ThisClass::Targeting);
+	}
+
+	if (IsValid(Skill_E_Action))
+	{
+		EnhancedInputComponent->BindAction(Skill_E_Action, ETriggerEvent::Triggered, this, &ThisClass::Skill_E);
+	}
+	else if (IsValid(SkillAction))
+	{
+		EnhancedInputComponent->BindAction(SkillAction, ETriggerEvent::Triggered, this, &ThisClass::Skill);
+	}
+
+	if (IsValid(Skill_R_Action))
+	{
+		EnhancedInputComponent->BindAction(Skill_R_Action, ETriggerEvent::Triggered, this, &ThisClass::Skill_R);
+	}
+	else if (IsValid(UltimateAction))
+	{
+		EnhancedInputComponent->BindAction(UltimateAction, ETriggerEvent::Triggered, this, &ThisClass::Ultimate);
+	}
+
+	if (IsValid(DashAction))
+	{
+		EnhancedInputComponent->BindAction(DashAction, ETriggerEvent::Started, this, &ThisClass::Dash);
+	}
+	else if (IsValid(InputComponent))
+	{
+		// Fallback roll key until an enhanced input action asset is assigned.
+		InputComponent->BindKey(EKeys::LeftAlt, IE_Pressed, this, &ThisClass::Dash);
+	}
 }
 
 void AGP_PlayerController::Move(const FInputActionValue& Value)
 {
 	if (!IsValid(GetPawn())) return;
+	if (const AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetCharacter()))
+	{
+		if (PlayerCharacter->IsRolling())
+		{
+			return;
+		}
+	}
+
 	const FVector2D MovementVector = Value.Get<FVector2D>();
 
 	const FRotator YawRotation(0.f, GetControlRotation().Yaw, 0.f);
@@ -111,6 +167,14 @@ void AGP_PlayerController::Look(const FInputActionValue& Value)
 void AGP_PlayerController::Jump()
 {
 	if (!IsValid(GetCharacter())) return;
+	if (const AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetCharacter()))
+	{
+		if (PlayerCharacter->IsRolling())
+		{
+			return;
+		}
+	}
+
 	GetCharacter()->Jump();
 }
 
@@ -125,18 +189,26 @@ void AGP_PlayerController::Primary()
 	ActivateAbilityByTag(GPTags::GPAbilities::Primary);
 }
 
+void AGP_PlayerController::Targeting()
+{
+	UE_LOG(LogTemp, Warning, TEXT("Targeting"));
+	ActivateAbilityByTag(GPTags::GPAbilities::Targeting);
+}
+
+void AGP_PlayerController::Skill()
+{
+	ActivateAbilityByTag(GPTags::GPAbilities::Skill);
+}
+
+void AGP_PlayerController::Ultimate()
+{
+	ActivateAbilityByTag(GPTags::GPAbilities::Ultimate);
+}
+
 void AGP_PlayerController::Skill_Q()
 {
 	UE_LOG(LogTemp, Warning, TEXT("Targeting"));
 	ActivateAbilityByTag(GPTags::GPAbilities::Skill_Q);
-}
-
-void AGP_PlayerController::ActivateAbilityByTag(const FGameplayTag& AbilityTag) const
-{
-	UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn());
-	if (!IsValid(ASC)) return;
-
-	ASC->TryActivateAbilitiesByTag(AbilityTag.GetSingleTagContainer());
 }
 
 void AGP_PlayerController::Skill_E()
@@ -144,14 +216,29 @@ void AGP_PlayerController::Skill_E()
 	ActivateAbilityByTag(GPTags::GPAbilities::Skill_E);
 }
 
-
 void AGP_PlayerController::Skill_R()
 {
 	ActivateAbilityByTag(GPTags::GPAbilities::Skill_R);
 }
 
+bool AGP_PlayerController::ActivateAbilityByTag(const FGameplayTag& AbilityTag) const
+{
+	UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn());
+	if (!IsValid(ASC)) return false;
+
+	return ASC->TryActivateAbilitiesByTag(AbilityTag.GetSingleTagContainer());
+}
+
 void AGP_PlayerController::Dash()
 {
+	if (AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetCharacter()))
+	{
+		if (PlayerCharacter->TryPerformRoll())
+		{
+			return;
+		}
+	}
+
 	ActivateAbilityByTag(GPTags::GPAbilities::Dash);
 }
 

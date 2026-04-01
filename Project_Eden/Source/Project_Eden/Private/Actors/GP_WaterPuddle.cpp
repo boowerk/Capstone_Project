@@ -1,22 +1,22 @@
-﻿#include "Actors/GP_WaterPuddle.h"
+#include "Actors/GP_WaterPuddle.h"
 
-#include "GameplayEffect.h"
-#include "Components/SphereComponent.h"
-#include "GameFramework/ProjectileMovementComponent.h"
-#include "Net/UnrealNetwork.h"
-#include "Utils/GP_BlueprintLibrary.h"
-#include "GameFramework/Pawn.h"
-#include "TimerManager.h"
 #include "Components/DecalComponent.h"
+#include "Components/SphereComponent.h"
+#include "GameFramework/Pawn.h"
+#include "GameFramework/ProjectileMovementComponent.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Net/UnrealNetwork.h"
+#include "TimerManager.h"
+#include "Utils/GP_BlueprintLibrary.h"
 
 AGP_WaterPuddle::AGP_WaterPuddle()
 {
-	PrimaryActorTick.bCanEverTick = false; 
+	PrimaryActorTick.bCanEverTick = false;
 	bReplicates = true;
 
 	PuddleCollision = CreateDefaultSubobject<USphereComponent>(TEXT("PuddleCollision"));
 	SetRootComponent(PuddleCollision);
-	
+
 	// 초기 충돌 채널 세팅 (폰과 장판끼리 겹치도록 설정)
 	PuddleCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 	PuddleCollision->SetCollisionResponseToAllChannels(ECR_Ignore);
@@ -28,13 +28,13 @@ AGP_WaterPuddle::AGP_WaterPuddle()
 	MovementComponent->InitialSpeed = 0.f; // 처음엔 가만히 멈춰있음
 	MovementComponent->MaxSpeed = 2000.f;
 	MovementComponent->ProjectileGravityScale = 0.f; // 바닥에 붙어있도록 중력 무시
-	
+
 	PuddleDecal = CreateDefaultSubobject<UDecalComponent>(TEXT("PuddleDecal"));
 	PuddleDecal->SetupAttachment(RootComponent);
-    
+
 	// 데칼이 바닥 방향(아래)을 향하도록 회전 (Pitch -90도)
 	PuddleDecal->SetRelativeRotation(FRotator(-90.0f, 0.0f, 0.0f));
-    
+
 	// 기본 투사 거리 설정
 	PuddleDecal->DecalSize = FVector(128.0f, MaxRadius, MaxRadius);
 }
@@ -42,8 +42,8 @@ AGP_WaterPuddle::AGP_WaterPuddle()
 void AGP_WaterPuddle::BeginPlay()
 {
 	Super::BeginPlay();
-	
-	if (DecalMaterial)
+
+	if (DecalMaterial && PuddleDecal)
 	{
 		DecalDynamicMaterial = UMaterialInstanceDynamic::Create(DecalMaterial, this);
 		PuddleDecal->SetDecalMaterial(DecalDynamicMaterial);
@@ -51,14 +51,14 @@ void AGP_WaterPuddle::BeginPlay()
 
 	CurrentRadius = MaxRadius;
 	StartingRadiusForLerp = MaxRadius;
-	
+
 	if (PuddleCollision)
 	{
 		PuddleCollision->SetSphereRadius(CurrentRadius);
 		PuddleCollision->OnComponentBeginOverlap.AddDynamic(this, &ThisClass::OnPuddleOverlap);
 	}
-	
-	if (HasAuthority())
+
+	if (HasAuthority() && GetWorld())
 	{
 		StartTime = GetWorld()->GetTimeSeconds();
 		EndTime = StartTime + BaseDuration;
@@ -76,13 +76,16 @@ void AGP_WaterPuddle::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
 
 void AGP_WaterPuddle::UpdatePuddleState()
 {
-	if (bIsBeingAbsorbed) return;
-
-	if (bIsMovingToDestination)
+	if (bIsBeingAbsorbed || !GetWorld() || !PuddleCollision)
 	{
-		FVector CurrentLoc = GetActorLocation();
-		FVector DirToTarget = DestinationLoc - CurrentLoc;
-		
+		return;
+	}
+
+	if (bIsMovingToDestination && IsValid(MovementComponent))
+	{
+		const FVector CurrentLoc = GetActorLocation();
+		const FVector DirToTarget = DestinationLoc - CurrentLoc;
+
 		// 1. 거리가 아주 가깝거나 (50 유닛 이하)
 		// 2. 내적(DotProduct)이 0 이하인 경우 (장판이 목표 지점을 지나쳐서 방향이 뒤집힌 경우 = Overshoot 방지)
 		if (DirToTarget.SizeSquared() <= 2500.f || FVector::DotProduct(DirToTarget, MovementComponent->Velocity) <= 0.f)
@@ -91,13 +94,12 @@ void AGP_WaterPuddle::UpdatePuddleState()
 			bIsMovingToDestination = false;
 		}
 	}
-	
-	float CurrentTime = GetWorld()->GetTimeSeconds();
-	
+
+	const float CurrentTime = GetWorld()->GetTimeSeconds();
+
 	// 남은 시간 비율 계산: 1.0에서 시작해 0.0으로 끝남
-	float TotalTime = EndTime - StartTime;
+	const float TotalTime = EndTime - StartTime;
 	float Alpha = 0.0f;
-	
 	if (TotalTime > 0.0f)
 	{
 		Alpha = FMath::Clamp((EndTime - CurrentTime) / TotalTime, 0.0f, 1.0f);
@@ -106,25 +108,26 @@ void AGP_WaterPuddle::UpdatePuddleState()
 	// 남은 비율 Alpha에 따라 MinRadius ~ StartingRadius 사이의 값을 보간
 	CurrentRadius = FMath::Lerp(MinRadius, StartingRadiusForLerp, Alpha);
 	PuddleCollision->SetSphereRadius(CurrentRadius);
-	
 
-	// 데칼 크기 업데이트 (Y, Z축이 평면상의 크기임)
-	// 데칼의 사이즈는 반지름이 아닌 전체 영역이므로 CurrentRadius를 그대로 사용하거나 보정함
-	PuddleDecal->DecalSize = FVector(128.0f, CurrentRadius, CurrentRadius);
+	if (PuddleDecal)
+	{
+		// 데칼의 사이즈는 반지름이 아닌 전체 영역이므로 CurrentRadius를 그대로 사용하거나 보정함
+		PuddleDecal->DecalSize = FVector(128.0f, CurrentRadius, CurrentRadius);
+	}
 
 	// 시간이 다 되어 사라질 때 페이드 아웃 연출 (머티리얼 파라미터 조절)
-	if (DecalDynamicMaterial && (EndTime - GetWorld()->GetTimeSeconds()) < 1.0f)
+	if (DecalDynamicMaterial && (EndTime - CurrentTime) < 1.0f)
 	{
-		float Opacity = FMath::Clamp(EndTime - GetWorld()->GetTimeSeconds(), 0.0f, 1.0f);
+		const float Opacity = FMath::Clamp(EndTime - CurrentTime, 0.0f, 1.0f);
 		DecalDynamicMaterial->SetScalarParameterValue(TEXT("Opacity"), Opacity);
 	}
-	
+
 	// 시간이 다 되면 파괴 처리
 	if (CurrentTime >= EndTime)
 	{
 		bIsBeingAbsorbed = true;
 		GetWorld()->GetTimerManager().ClearTimer(PuddleUpdateTimer);
-		
+
 		BP_OnFadeOutAndDestroy();
 		SetLifeSpan(1.0f);
 	}
@@ -133,11 +136,17 @@ void AGP_WaterPuddle::UpdatePuddleState()
 // AI가 마음대로 짠 로직 제거하고 다시 짬 - 슝민
 void AGP_WaterPuddle::OnPuddleOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
-	if (!HasAuthority() || !IsValid(OtherActor) || OtherActor == this || bIsBeingAbsorbed) return;
-	
+	if (!HasAuthority() || !IsValid(OtherActor) || OtherActor == this || bIsBeingAbsorbed || !GetWorld())
+	{
+		return;
+	}
+
 	if (AGP_WaterPuddle* OtherPuddle = Cast<AGP_WaterPuddle>(OtherActor))
 	{
-		if (OtherPuddle->bIsBeingAbsorbed) return;
+		if (OtherPuddle->bIsBeingAbsorbed)
+		{
+			return;
+		}
 
 		if (CurrentRadius > OtherPuddle->CurrentRadius || (CurrentRadius == OtherPuddle->CurrentRadius && this > OtherPuddle))
 		{
@@ -145,10 +154,10 @@ void AGP_WaterPuddle::OnPuddleOverlap(UPrimitiveComponent* OverlappedComponent, 
 			OtherPuddle->bIsBeingAbsorbed = true;
 			OtherPuddle->GetWorld()->GetTimerManager().ClearTimer(OtherPuddle->PuddleUpdateTimer);
 			OtherPuddle->PuddleCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-			
+
 			// 흡수할 때 시간을 더해줌 : 흡수되는 쪽의 남은 시간의 50퍼 흡수
-			float OtherRemainingTime = FMath::Max(0.0f, OtherPuddle->EndTime - GetWorld()->GetTimeSeconds());
-			
+			const float OtherRemainingTime = FMath::Max(0.0f, OtherPuddle->EndTime - GetWorld()->GetTimeSeconds());
+
 			// 내 현재 시점부터 다시 보간 시작하기 위한 갱신
 			StartTime = GetWorld()->GetTimeSeconds();
 			StartingRadiusForLerp = FMath::Clamp(CurrentRadius + (OtherPuddle->CurrentRadius * 0.5f), MinRadius, MaxRadius);
@@ -172,21 +181,33 @@ void AGP_WaterPuddle::OnPuddleOverlap(UPrimitiveComponent* OverlappedComponent, 
 
 void AGP_WaterPuddle::OnRep_EndTime()
 {
+	if (!GetWorld())
+	{
+		return;
+	}
+
 	// 클라이언트에서 EndTime(종료 시간)을 서버로부터 받았을 때 블루프린트로 알려줍니다.
-	float RemainingTime = FMath::Max(0.0f, EndTime - GetWorld()->GetTimeSeconds());
+	const float RemainingTime = FMath::Max(0.0f, EndTime - GetWorld()->GetTimeSeconds());
 	BP_OnEndTimeUpdated(RemainingTime);
 }
-void AGP_WaterPuddle::CommandPullTowards(AActor* TargetActor, float PullSpeed)
+
+void AGP_WaterPuddle::PullTowards(AActor* TargetActor, float PullSpeed)
 {
 	if (!IsValid(TargetActor) || !IsValid(MovementComponent)) return;
 
 	// 목표물(플레이어)을 향한 방향 계산 후 속도 적용
 	FVector Direction = (TargetActor->GetActorLocation() - GetActorLocation()).GetSafeNormal();
-	
+
 	// 장판이 바닥을 타고 오도록 Z축은 무시
-	Direction.Z = 0.0f; 
-	
+	Direction.Z = 0.0f;
+
 	MovementComponent->Velocity = Direction * PullSpeed;
+}
+
+void AGP_WaterPuddle::CommandPullTowards(AActor* TargetActor, float PullSpeed)
+{
+	PullTowards(TargetActor, PullSpeed);
+	bIsMovingToDestination = false;
 }
 
 void AGP_WaterPuddle::CommandAttackTarget()
@@ -203,7 +224,7 @@ void AGP_WaterPuddle::CommandMoveToLocation(const FVector& TargetLocation, float
 	bIsMovingToDestination = true;
 
 	// 기존 유도탄 기능이 켜져있을 수 있으니 끄기
-	MovementComponent->bIsHomingProjectile = false; 
+	MovementComponent->bIsHomingProjectile = false;
 	MovementComponent->MaxSpeed = MoveSpeed;
 
 	// 목표를 향한 방향 벡터 계산 및 속도 적용

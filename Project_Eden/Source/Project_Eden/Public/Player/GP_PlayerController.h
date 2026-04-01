@@ -1,16 +1,17 @@
-﻿#pragma once
+#pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
 #include "GP_PlayerController.generated.h"
 
-class UInputMappingContext;
-class UInputAction;
-class UUserWidget;
-class UGP_PlayerHUDWidget;
 class AGP_EnemyCharacter;
-struct FInputActionValue;
+class UGP_PlayerHUDWidget;
+class UInputAction;
+class UInputMappingContext;
+class UUserWidget;
 struct FGameplayTag;
+struct FInputActionValue;
+
 UCLASS()
 class PROJECT_EDEN_API AGP_PlayerController : public APlayerController
 {
@@ -27,7 +28,7 @@ protected:
 private:
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Movement")
 	TArray<TObjectPtr<UInputMappingContext>> InputMappingContexts;
-	
+
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Movement")
 	TObjectPtr<UInputAction> MoveAction;
 
@@ -37,16 +38,26 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Movement")
 	TObjectPtr<UInputAction> JumpAction;
 
-
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
 	TObjectPtr<UInputAction> PrimaryAction;
 
+	// Legacy ability input assets kept for backward compatibility with older controller blueprints.
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
+	TObjectPtr<UInputAction> TargetingAction;
+
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
+	TObjectPtr<UInputAction> SkillAction;
+
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
+	TObjectPtr<UInputAction> UltimateAction;
+
+	// Split Q/E/R actions introduced on the latest main branch.
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
 	TObjectPtr<UInputAction> Skill_Q_Action;
-	
+
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
 	TObjectPtr<UInputAction> Skill_E_Action;
-	
+
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
 	TObjectPtr<UInputAction> Skill_R_Action;
 
@@ -55,7 +66,7 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
 	TSubclassOf<UUserWidget> HUDWidgetClass;
-	
+
 	UPROPERTY(Transient)
 	TObjectPtr<UGP_PlayerHUDWidget> HUDWidget;
 
@@ -70,20 +81,20 @@ private:
 
 	float BossRefreshAccumulator = 0.0f;
 
-	
 	void Move(const FInputActionValue& Value);
 	void Look(const FInputActionValue& Value);
 	void Jump();
 	void StopJump();
+
+	void Primary();
+	void Targeting();
+	void Skill();
+	void Ultimate();
+	void Skill_Q();
+	void Skill_E();
+	void Skill_R();
 	void Dash();
 
-	void Primary(); 
-	void Skill_Q(); //Targeting
-	void Skill_E(); //Skill
-	void Skill_R(); //Ultimate
-	void ActivateAbilityByTag(const FGameplayTag& AbilityTag) const;
-
-	//void Targeting(); 
+	bool ActivateAbilityByTag(const FGameplayTag& AbilityTag) const;
 	void RefreshBossHUD();
-	
 };

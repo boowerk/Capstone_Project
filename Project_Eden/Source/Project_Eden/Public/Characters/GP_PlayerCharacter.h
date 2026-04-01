@@ -9,6 +9,10 @@
 class USpringArmComponent;
 class UCameraComponent;
 class UPDA_WeaponItemCollection;
+class UPDA_CharacterAnimationSet;
+class UAnimMontage;
+class UAnimSequenceBase;
+class UBlendSpace;
 
 UCLASS()
 class PROJECT_EDEN_API AGP_PlayerCharacter : public AGP_BaseCharacter
@@ -17,10 +21,18 @@ class PROJECT_EDEN_API AGP_PlayerCharacter : public AGP_BaseCharacter
 
 public:
 	AGP_PlayerCharacter();
+	virtual void Tick(float DeltaSeconds) override;
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 	virtual UAttributeSet* GetAttributeSet() const override;
 	virtual void PossessedBy(AController* NewController) override;
 	virtual void OnRep_PlayerState() override;
+	bool TryPerformRoll();
+	bool IsRolling() const { return bIsRolling; }
+	UPDA_CharacterAnimationSet* GetAnimationSet() const { return AnimationSet; }
+	UBlendSpace* GetLocomotionBlendSpace() const;
+	UAnimSequenceBase* GetJumpLoopAnimation() const;
+	UAnimMontage* GetRollMontage() const;
+	UAnimMontage* GetPrimaryAttackMontage() const;
 	
 
 private:
@@ -45,6 +57,27 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment|Weapon", meta = (AllowPrivateAccess = "true"))
 	FName DefaultWeaponId = TEXT("WP_Common_Fire_Sword");
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Animation", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UPDA_CharacterAnimationSet> AnimationSet;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Roll", meta = (AllowPrivateAccess = "true"))
+	float RollCooldown = 0.6f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Roll", meta = (AllowPrivateAccess = "true"))
+	float RollDistance = 350.0f;
+
+	double NextRollAllowedTime = 0.0;
+
+	void UpdateRollMovement(float DeltaSeconds);
+	void FinishRoll();
+
+	FVector ActiveRollDirection = FVector::ZeroVector;
+	float ActiveRollDuration = 0.0f;
+	float ActiveRollElapsedTime = 0.0f;
+	float ActiveRollDistanceTravelled = 0.0f;
+	bool bIsRolling = false;
+	TWeakObjectPtr<UAnimMontage> ActiveRollMontage;
 	
 };
 
