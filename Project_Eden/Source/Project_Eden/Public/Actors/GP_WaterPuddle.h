@@ -30,14 +30,28 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Eden|Puddle")
 	float GetCurrentRadius() const { return CurrentRadius; }
 
+	// 스킬 시전 시 스폰 직후 호출하여 이동 방향을 설정하는 함수
+	UFUNCTION(BlueprintCallable, Category = "Eden|Puddle")
+	void InitializeMovement(AActor* Caster);
+
 protected:
 	virtual void BeginPlay() override;
+	virtual void OnConstruction(const FTransform& Transform) override;
+	
+	// FadeIn
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Eden|Puddle|Fade")
+	bool bEnableFadeIn = true;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Eden|Puddle|Fade", meta = (EditCondition = "bEnableFadeIn"))
+	float FadeInDuration = 0.5f;
+
+	// FadeOut
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Eden|Puddle|Fade")
+	bool bEnableFadeOut = true;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Eden|Puddle|Fade", meta = (EditCondition = "bEnableFadeOut"))
+	float FadeOutDuration = 1.0f;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Eden|Puddle")
 	TObjectPtr<UDecalComponent> PuddleDecal;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Eden|Puddle")
-	TObjectPtr<UMaterialInterface> DecalMaterial;
 
 	UPROPERTY()
 	TObjectPtr<UMaterialInstanceDynamic> DecalDynamicMaterial;
@@ -56,15 +70,19 @@ protected:
 
 	// 장판 최대 크기
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Eden|Puddle")
-	float MaxRadius = 350.0f;
+	float StartRadius = 550.0f;
 
 	// 장판 최소 크기
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Eden|Puddle")
-	float MinRadius = 80.0f;
+	float EndRadius = 200.0f;
 
 	// 장판의 기본 유지 시간 스킬 레벨에 따라 스폰 시 덮어씌울 수 있음 - 슝민
 	UPROPERTY(BlueprintReadWrite, Category = "Eden|Puddle", meta = (ExposeOnSpawn = "true"))
-	float BaseDuration = 30.0f;
+	float BaseDuration = 10.0f;
+	
+	// 장판 진행 속력
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Eden|Puddle|Movement")
+	float InitialForwardSpeed = 150.0f;
 
 	// 목적지 좌표
 	FVector DestinationLoc = FVector::ZeroVector;
@@ -88,6 +106,10 @@ protected:
 	bool bIsBeingAbsorbed = false;
 
 	FTimerHandle PuddleUpdateTimer;
+	
+	// 당겨오기 보간
+	float PullStartDistance = 0.0f;
+	float PullMaxSpeed = 0.0f;
 
 	// 타이머용 컬리전 업데이트 함수
 	UFUNCTION()

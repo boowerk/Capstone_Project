@@ -36,22 +36,53 @@ AGP_WaterPuddle::AGP_WaterPuddle()
 	PuddleDecal->SetRelativeRotation(FRotator(-90.0f, 0.0f, 0.0f));
 
 	// 기본 투사 거리 설정
-	PuddleDecal->DecalSize = FVector(128.0f, MaxRadius, MaxRadius);
+	PuddleDecal->DecalSize = FVector(128.0f, StartRadius, StartRadius);
 }
 
+void AGP_WaterPuddle::InitializeMovement(AActor* Caster)
+{
+	if (!Caster || !IsValid(MovementComponent)) return;
+
+	FVector CasterLocation = Caster->GetActorLocation();
+	FVector PuddleLocation = GetActorLocation();
+
+	// Z축 높이를 맞추기
+	CasterLocation.Z = PuddleLocation.Z;
+
+	// 시전자 to 장판 위치 방향
+	FVector MoveDirection = (PuddleLocation - CasterLocation).GetSafeNormal();
+
+	// 장판의 회전과 속도를 해당 방향으로 설정
+	SetActorRotation(MoveDirection.Rotation());
+	MovementComponent->Velocity = MoveDirection * InitialForwardSpeed;
+}
 void AGP_WaterPuddle::BeginPlay()
 {
 	Super::BeginPlay();
-
-	if (DecalMaterial && PuddleDecal)
+	UMaterialInterface* BaseMaterial = PuddleDecal->GetDecalMaterial();
+	if (BaseMaterial && PuddleDecal)
 	{
-		DecalDynamicMaterial = UMaterialInstanceDynamic::Create(DecalMaterial, this);
+		DecalDynamicMaterial = UMaterialInstanceDynamic::Create(BaseMaterial, this);
 		PuddleDecal->SetDecalMaterial(DecalDynamicMaterial);
+
+		float TempValue;
+		if (!DecalDynamicMaterial->GetScalarParameterValue(TEXT("Opacity"), TempValue))
+		{
+			UE_LOG(LogTemp, Error, TEXT("[%s] 머티리얼에 'Opacity' 파라미터가 없습니다! 페이드 연출이 작동하지 않습니다."), *GetName());
+			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, FString::Printf(TEXT("%s: Opacity Parameter Missing!"), *GetName()));
+		}
 	}
 
-	CurrentRadius = MaxRadius;
-	StartingRadiusForLerp = MaxRadius;
+	CurrentRadius = StartRadius;
+	StartingRadiusForLerp = StartRadius;
 
+	// 이동 방향 * 속력
+	if (IsValid(MovementComponent))
+	{
+		MovementComponent->Velocity = GetActorForwardVector() * InitialForwardSpeed;
+	}
+	
+	// 히트박스 구
 	if (PuddleCollision)
 	{
 		PuddleCollision->SetSphereRadius(CurrentRadius);
@@ -68,6 +99,19 @@ void AGP_WaterPuddle::BeginPlay()
 	}
 }
 
+void AGP_WaterPuddle::OnConstruction(const FTransform& Transform)
+{
+	Super::OnConstruction(Transform);
+
+	if (PuddleCollision)
+	{
+		PuddleCollision->SetSphereRadius(StartRadius);
+	}
+	if (PuddleDecal)
+	{
+		PuddleDecal->DecalSize = FVector(128.0f, EndRadius, EndRadius);
+	}
+}
 void AGP_WaterPuddle::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
@@ -76,61 +120,86 @@ void AGP_WaterPuddle::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
 
 void AGP_WaterPuddle::UpdatePuddleState()
 {
-	if (bIsBeingAbsorbed || !GetWorld() || !PuddleCollision)
+    if (bIsBeingAbsorbed || !GetWorld() || !PuddleCollision) return;
+	
+    // 이동 제어 
+	if (IsValid(MovementComponent))
 	{
-		return;
-	}
-
-	if (bIsMovingToDestination && IsValid(MovementComponent))
-	{
-		const FVector CurrentLoc = GetActorLocation();
-		const FVector DirToTarget = DestinationLoc - CurrentLoc;
-
-		// 1. 거리가 아주 가깝거나 (50 유닛 이하)
-		// 2. 내적(DotProduct)이 0 이하인 경우 (장판이 목표 지점을 지나쳐서 방향이 뒤집힌 경우 = Overshoot 방지)
-		if (DirToTarget.SizeSquared() <= 2500.f || FVector::DotProduct(DirToTarget, MovementComponent->Velocity) <= 0.f)
+		if (bIsMovingToDestination)
 		{
-			MovementComponent->Velocity = FVector::ZeroVector; // 브레이크
-			bIsMovingToDestination = false;
+			FVector CurrentLoc = GetActorLocation();
+			FVector DirToTarget = DestinationLoc - CurrentLoc;
+			DirToTarget.Z = 0.f;
+
+			float CurrentDistance = DirToTarget.Size2D();
+			FVector CurrentVel = MovementComponent->Velocity;
+			CurrentVel.Z = 0.f;
+
+			// 목적지 도달하면 상태 해제하고 기본속으로 변경
+			if (CurrentDistance <= 50.f || FVector::DotProduct(DirToTarget, CurrentVel) <= 0.f)
+			{
+				bIsMovingToDestination = false;
+				MovementComponent->Velocity = CurrentVel.GetSafeNormal2D() * InitialForwardSpeed;
+			}
+			else
+			{
+				// Alpha = 1.0 (멀리 있을때, 출발 직후) -> Alpha = 0.0 (도착 직전)
+				float Alpha = PullStartDistance > 0.f ? FMath::Clamp(CurrentDistance / PullStartDistance, 0.0f, 1.0f) : 0.0f;
+                
+				// 도착지에 가까워질수록 PullMaxSpeed에서 InitialForwardSpeed로 감속
+				float LerpSpeed = FMath::Lerp(InitialForwardSpeed, PullMaxSpeed, Alpha);
+				
+				MovementComponent->Velocity = DirToTarget.GetSafeNormal2D() * LerpSpeed; // 방향 * 보간 속력
+			}
 		}
 	}
+    
+    // 반복해서 쓰이는 시간 관련 변수들을 한 번만 계산하여 재사용
+    const float CurrentTime = GetWorld()->GetTimeSeconds();
+    const float TimeSinceStart = CurrentTime - StartTime;
+    const float TimeUntilEnd = EndTime - CurrentTime;
+    const float TotalTime = EndTime - StartTime;
 
-	const float CurrentTime = GetWorld()->GetTimeSeconds();
+    // 반지름 보간
+    const float Alpha = TotalTime > 0.0f ? FMath::Clamp(TimeUntilEnd / TotalTime, 0.0f, 1.0f) : 0.0f;
+    CurrentRadius = FMath::Lerp(EndRadius, StartingRadiusForLerp, Alpha);
 
-	// 남은 시간 비율 계산: 1.0에서 시작해 0.0으로 끝남
-	const float TotalTime = EndTime - StartTime;
-	float Alpha = 0.0f;
-	if (TotalTime > 0.0f)
-	{
-		Alpha = FMath::Clamp((EndTime - CurrentTime) / TotalTime, 0.0f, 1.0f);
-	}
+    PuddleCollision->SetSphereRadius(CurrentRadius);
+    if (PuddleDecal)
+    {
+        PuddleDecal->DecalSize = FVector(128.0f, CurrentRadius, CurrentRadius);
+    }
 
-	// 남은 비율 Alpha에 따라 MinRadius ~ StartingRadius 사이의 값을 보간
-	CurrentRadius = FMath::Lerp(MinRadius, StartingRadiusForLerp, Alpha);
-	PuddleCollision->SetSphereRadius(CurrentRadius);
+    // 통합된 페이드 인아웃 제어
+    if (DecalDynamicMaterial)
+    {
+        float CurrentOpacity = 1.0f;
 
-	if (PuddleDecal)
-	{
-		// 데칼의 사이즈는 반지름이 아닌 전체 영역이므로 CurrentRadius를 그대로 사용하거나 보정함
-		PuddleDecal->DecalSize = FVector(128.0f, CurrentRadius, CurrentRadius);
-	}
+        // 페이드 인 구간
+        if (bEnableFadeIn && TimeSinceStart < FadeInDuration)
+        {
+            CurrentOpacity = FMath::Clamp(TimeSinceStart / FMath::Max(FadeInDuration, 0.001f), 0.0f, 1.0f);
+        }
+        // 페이드 아웃 구간
+        else if (bEnableFadeOut && TimeUntilEnd < FadeOutDuration)
+        {
+            CurrentOpacity = FMath::Clamp(TimeUntilEnd / FMath::Max(FadeOutDuration, 0.001f), 0.0f, 1.0f);
+        }
 
-	// 시간이 다 되어 사라질 때 페이드 아웃 연출 (머티리얼 파라미터 조절)
-	if (DecalDynamicMaterial && (EndTime - CurrentTime) < 1.0f)
-	{
-		const float Opacity = FMath::Clamp(EndTime - CurrentTime, 0.0f, 1.0f);
-		DecalDynamicMaterial->SetScalarParameterValue(TEXT("Opacity"), Opacity);
-	}
+        DecalDynamicMaterial->SetScalarParameterValue(TEXT("Opacity"), CurrentOpacity);
+    }
 
-	// 시간이 다 되면 파괴 처리
-	if (CurrentTime >= EndTime)
-	{
-		bIsBeingAbsorbed = true;
-		GetWorld()->GetTimerManager().ClearTimer(PuddleUpdateTimer);
-
-		BP_OnFadeOutAndDestroy();
-		SetLifeSpan(1.0f);
-	}
+    // 5. 시간이 다 되면 파괴 처리
+    if (CurrentTime >= EndTime)
+    {
+        bIsBeingAbsorbed = true;
+        GetWorld()->GetTimerManager().ClearTimer(PuddleUpdateTimer);
+        
+        BP_OnFadeOutAndDestroy();
+        
+        // 투명해진 껍데기 액터가 남지 않도록 SetLifeSpan(1.0f) 대신 즉시 파괴
+        Destroy(); 
+    }
 }
 
 // AI가 마음대로 짠 로직 제거하고 다시 짬 - 슝민
@@ -160,7 +229,7 @@ void AGP_WaterPuddle::OnPuddleOverlap(UPrimitiveComponent* OverlappedComponent, 
 
 			// 내 현재 시점부터 다시 보간 시작하기 위한 갱신
 			StartTime = GetWorld()->GetTimeSeconds();
-			StartingRadiusForLerp = FMath::Clamp(CurrentRadius + (OtherPuddle->CurrentRadius * 0.5f), MinRadius, MaxRadius);
+			StartingRadiusForLerp = FMath::Clamp(CurrentRadius + (OtherPuddle->CurrentRadius * 0.5f), EndRadius, StartRadius);
 			EndTime = StartTime + FMath::Max(EndTime - StartTime, OtherRemainingTime * 0.5f); // 시간 연장
 
 			// 연출 및 파괴
@@ -222,6 +291,9 @@ void AGP_WaterPuddle::CommandMoveToLocation(const FVector& TargetLocation, float
 	DestinationLoc = TargetLocation;
 	DestinationLoc.Z = GetActorLocation().Z; // 장판이 바닥을 유지하도록 Z축 고정
 	bIsMovingToDestination = true;
+	
+	PullStartDistance = FVector::Dist2D(GetActorLocation(), DestinationLoc);
+	PullMaxSpeed = MoveSpeed;
 
 	// 기존 유도탄 기능이 켜져있을 수 있으니 끄기
 	MovementComponent->bIsHomingProjectile = false;

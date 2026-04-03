@@ -7,108 +7,85 @@
 
 void UGP_Skill_WaterPuddle::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
-	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
+    Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
-	ACharacter* Avatar = Cast<ACharacter>(ActorInfo->AvatarActor.Get());
-	UAbilitySystemComponent* ASC = ActorInfo->AbilitySystemComponent.Get();
-	
-	if (!Avatar || !ASC || !CommitAbility(Handle, ActorInfo, ActivationInfo))
-	{
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-		return;
-	}
+    ACharacter* Avatar = Cast<ACharacter>(ActorInfo->AvatarActor.Get());
+    UAbilitySystemComponent* ASC = ActorInfo->AbilitySystemComponent.Get();
+    
+    // 유효성 및 어빌리티 커밋 확인
+    if (!Avatar || !ASC || !CommitAbility(Handle, ActorInfo, ActivationInfo))
+    {
+       EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+       return;
+    }
 
-	// 1. 카메라 시선을 기준으로 타겟 좌표(TargetLocation) 구하기
-	FVector ViewLocation;
-	FRotator ViewRotation;
-	Avatar->GetController()->GetPlayerViewPoint(ViewLocation, ViewRotation);
+    // 카메라 시선쪽 타겟 위치 계산
+    FVector ViewLoc;
+    FRotator ViewRot;
+    Avatar->GetController()->GetPlayerViewPoint(ViewLoc, ViewRot);
 
-	FVector TraceEnd = ViewLocation + (ViewRotation.Vector() * 10000.f);
-	FVector TargetLocation = TraceEnd;
-	
-	FHitResult HitResult;
-	FCollisionQueryParams Params;
-	Params.AddIgnoredActor(Avatar);
+    FVector TargetLoc = ViewLoc + (ViewRot.Vector() * 10000.f);
+    FHitResult Hit;
+    FCollisionQueryParams Params(SCENE_QUERY_STAT(PuddleTrace), false, Avatar);
 
-	if (GetWorld()->LineTraceSingleByChannel(HitResult, ViewLocation, TraceEnd, ECC_Visibility, Params))
-	{
-		TargetLocation = HitResult.Location;
-	}
+    if (GetWorld()->LineTraceSingleByChannel(Hit, ViewLoc, TargetLoc, ECC_Visibility, Params))
+    {
+       TargetLoc = Hit.Location;
+    }
 
-	// 2. 최대 거리(MaxTargetDistance) 제한 적용
-	FVector ToTarget = TargetLocation - Avatar->GetActorLocation();
-	ToTarget.Z = 0.f; // 평면 거리만 계산
-	
-	if (ToTarget.Size() > MaxTargetDistance)
-	{
-		TargetLocation = Avatar->GetActorLocation() + ToTarget.GetSafeNormal() * MaxTargetDistance;
-	}
+    // 최대 거리 제한: 루트 연산에서 SizeSquared 사용 최적화
+    FVector ToTarget = TargetLoc - Avatar->GetActorLocation();
+    ToTarget.Z = 0.f; 
+    
+    if (ToTarget.SizeSquared() > (MaxTargetDistance * MaxTargetDistance))
+    {
+       TargetLoc = Avatar->GetActorLocation() + ToTarget.GetSafeNormal() * MaxTargetDistance;
+    }
 
-	// 3. (안전 장치) 허공을 찍었을 경우 바닥 좌표로 내리기
-	FVector RayStart = TargetLocation + FVector(0.f, 0.f, 500.f);
-	FVector RayEnd = TargetLocation - FVector(0.f, 0.f, 1000.f);
-	FHitResult GroundHit;
-	if (GetWorld()->LineTraceSingleByChannel(GroundHit, RayStart, RayEnd, ECC_Visibility, Params))
-	{
-		TargetLocation.Z = GroundHit.Location.Z;
-	}
+    // 허공 방지 바닥 스냅: 동일한 Hit, Params 변수 재사용
+    if (GetWorld()->LineTraceSingleByChannel(Hit, TargetLoc + FVector(0.f, 0.f, 500.f), TargetLoc - FVector(0.f, 0.f, 1000.f), ECC_Visibility, Params))
+    {
+       TargetLoc.Z = Hit.Location.Z;
+    }
+    
+    // 쿨타임 여부에 따른 모드 분기
+    if (ASC->HasMatchingGameplayTag(CooldownTag))
+    {
+       // [기존 장판 당겨오기: 패시브] 
+       TArray<AActor*> FoundActors;
+       UGameplayStatics::GetAllActorsOfClass(GetWorld(), AGP_WaterPuddle::StaticClass(), FoundActors);
 
-	// =========================================================
-	// 4. 모드 분기: 내 몸에 쿨타임 태그가 있는가?
-	// =========================================================
-	bool bIsOnCooldown = ASC->HasMatchingGameplayTag(CooldownTag);
+       for (AActor* Actor : FoundActors)
+       {
+          if (IGP_Summonable* Summonable = Cast<IGP_Summonable>(Actor))
+          {
+             if (Summonable->GetSummonOwner() == Avatar) 
+             {
+                Summonable->CommandMoveToLocation(TargetLoc, PullSpeed);
+             }
+          }
+       }
+    }
+    else if (HasAuthority(&CurrentActivationInfo) && PuddleClass)
+    {
+       // [새로운 장판 스폰: 액티브] 
+       FTransform SpawnTM(FRotator::ZeroRotator, TargetLoc);
+       
+       if (AGP_WaterPuddle* NewPuddle = GetWorld()->SpawnActorDeferred<AGP_WaterPuddle>(PuddleClass, SpawnTM, Avatar, Avatar, ESpawnActorCollisionHandlingMethod::AlwaysSpawn))
+       {
+          UGameplayStatics::FinishSpawningActor(NewPuddle, SpawnTM);
+          // 스폰 직후 초기 이동 방향 및 속도 적용
+          NewPuddle->InitializeMovement(Avatar);
+       }
 
-	if (bIsOnCooldown)
-	{
-		// 🌊 [모드 A: 패시브] 기존 장판들을 TargetLocation으로 일제히 당겨오기
-		TArray<AActor*> FoundActors;
-		UGameplayStatics::GetAllActorsOfClass(GetWorld(), AGP_WaterPuddle::StaticClass(), FoundActors);
+       // 수동 쿨타임 이펙트 적용
+       if (ManualCooldownEffectClass)
+       {
+          FGameplayEffectSpecHandle SpecHandle = ASC->MakeOutgoingSpec(ManualCooldownEffectClass, GetAbilityLevel(), ASC->MakeEffectContext());
+          if (SpecHandle.IsValid()) ASC->ApplyGameplayEffectSpecToSelf(*SpecHandle.Data.Get());
+       }
+    }
 
-		for (AActor* Actor : FoundActors)
-		{
-			if (IGP_Summonable* Summonable = Cast<IGP_Summonable>(Actor))
-			{
-				// 내가 소환한 장판만 조종
-				if (Summonable->GetSummonOwner() == Avatar) 
-				{
-					Summonable->CommandMoveToLocation(TargetLocation, PullSpeed);
-				}
-			}
-		}
-
-		// (필요 시 여기서 PullMontage 재생 Task 추가)
-	}
-	else
-	{
-		// 💧 [모드 B: 액티브] 새로운 장판 스폰
-		if (HasAuthority(&CurrentActivationInfo) && PuddleClass)
-		{
-			FTransform SpawnTransform;
-			SpawnTransform.SetLocation(TargetLocation);
-			SpawnTransform.SetRotation(FQuat::Identity);
-			
-			// 장판 생성 (Instigator를 나로 설정하여 내 소유임을 명시)
-			AGP_WaterPuddle* NewPuddle = GetWorld()->SpawnActorDeferred<AGP_WaterPuddle>(
-				PuddleClass, SpawnTransform, Avatar, Avatar, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
-				
-			if (NewPuddle)
-			{
-				// 필요하다면 여기서 NewPuddle의 변수 초기화 가능
-				UGameplayStatics::FinishSpawningActor(NewPuddle, SpawnTransform);
-			}
-
-			// 스폰 성공 시 수동으로 쿨타임 이펙트 적용
-			if (ManualCooldownEffectClass)
-			{
-				FGameplayEffectContextHandle Context = ASC->MakeEffectContext();
-				FGameplayEffectSpecHandle SpecHandle = ASC->MakeOutgoingSpec(ManualCooldownEffectClass, GetAbilityLevel(), Context);
-				ASC->ApplyGameplayEffectSpecToSelf(*SpecHandle.Data.Get());
-			}
-		}
-		
-		// (필요 시 여기서 SpawnMontage 재생 Task 추가)
-	}
-
-	// 5. 어빌리티 종료 (몽타주 비동기 처리를 안 하므로 즉시 종료)
-	EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
+    // 어빌리티 즉시 종료
+    EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
 }
