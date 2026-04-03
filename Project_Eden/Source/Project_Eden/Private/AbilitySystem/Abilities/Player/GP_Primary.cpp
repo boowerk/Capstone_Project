@@ -27,7 +27,7 @@ void UGP_Primary::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 		if (AttackEventTag.IsValid())
 		{
 			UAbilityTask_WaitGameplayEvent* WaitEventTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(
-				this, AttackEventTag, nullptr, false, true);
+				this, AttackEventTag, nullptr, true, true);
 			if (WaitEventTask)
 			{
 				// 이벤트가 들어오면 OnAttackEventReceived()
