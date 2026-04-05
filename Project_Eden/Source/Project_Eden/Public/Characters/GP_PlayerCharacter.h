@@ -22,6 +22,7 @@ class PROJECT_EDEN_API AGP_PlayerCharacter : public AGP_BaseCharacter
 public:
 	AGP_PlayerCharacter();
 	virtual void Tick(float DeltaSeconds) override;
+	virtual void Landed(const FHitResult& Hit) override;
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 	virtual UAttributeSet* GetAttributeSet() const override;
 	virtual void PossessedBy(AController* NewController) override;
@@ -31,6 +32,7 @@ public:
 	UPDA_CharacterAnimationSet* GetAnimationSet() const { return AnimationSet; }
 	UBlendSpace* GetLocomotionBlendSpace() const;
 	UAnimSequenceBase* GetJumpLoopAnimation() const;
+	UAnimMontage* GetLandingMontage() const;
 	UAnimMontage* GetRollMontage() const;
 	UAnimMontage* GetPrimaryAttackMontage() const;
 	
@@ -60,6 +62,9 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Animation", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UPDA_CharacterAnimationSet> AnimationSet;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Animation|Air", meta = (AllowPrivateAccess = "true"))
+	float MinLandingSpeedForMontage = 200.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Roll", meta = (AllowPrivateAccess = "true"))
 	float RollCooldown = 0.6f;

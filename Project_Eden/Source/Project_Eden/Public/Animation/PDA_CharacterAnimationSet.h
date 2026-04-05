@@ -25,6 +25,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Air")
 	TObjectPtr<UAnimSequenceBase> JumpLoopAnimation;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Air")
+	TObjectPtr<UAnimMontage> LandingMontage;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Action")
 	TObjectPtr<UAnimMontage> RollMontage;
 

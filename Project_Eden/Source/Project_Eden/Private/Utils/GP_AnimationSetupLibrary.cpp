@@ -50,6 +50,7 @@ namespace GPFemaleAnimationSetup
 	const FString FemaleSprintPath = TEXT("/Game/Asset/CharacterAction/female/Animations/femaleSprint_Loop");
 	const FString FemaleJumpLoopPath = TEXT("/Game/Asset/CharacterAction/female/Animations/femaleJump_Loop");
 	const FString FemaleSwordAttackPath = TEXT("/Game/Asset/CharacterAction/female/Animations/femaleSword_Attack");
+	const FString FemaleJumpLandMontagePath = TEXT("/Game/Asset/CharacterAction/female/Montages/AM_Female_Jump_Land");
 	const FString FemaleRollMontagePath = TEXT("/Game/Asset/CharacterAction/female/Montages/AM_Female_Roll");
 
 	const FString BlendSpacePackagePath = TEXT("/Game/Asset/CharacterAction/female/BlendSpaces");
@@ -341,7 +342,8 @@ namespace GPFemaleAnimationSetup
 		}
 
 		UAnimMontage* RollMontage = LoadRequiredAsset<UAnimMontage>(*FemaleRollMontagePath);
-		if (!IsValid(RollMontage))
+		UAnimMontage* LandingMontage = LoadRequiredAsset<UAnimMontage>(*FemaleJumpLandMontagePath);
+		if (!IsValid(RollMontage) || !IsValid(LandingMontage))
 		{
 			return nullptr;
 		}
@@ -371,6 +373,7 @@ namespace GPFemaleAnimationSetup
 		AnimationSet->CharacterMesh = SkeletalMesh;
 		AnimationSet->LocomotionBlendSpace = BlendSpace;
 		AnimationSet->JumpLoopAnimation = JumpLoop;
+		AnimationSet->LandingMontage = LandingMontage;
 		AnimationSet->RollMontage = RollMontage;
 		AnimationSet->PrimaryAttackMontage = PrimaryMontage;
 		AnimationSet->MarkPackageDirty();

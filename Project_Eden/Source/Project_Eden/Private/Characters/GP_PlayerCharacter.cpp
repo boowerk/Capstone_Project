@@ -42,6 +42,32 @@ AGP_PlayerCharacter::AGP_PlayerCharacter()
 	FollowCamera->bUsePawnControlRotation = false;
 }
 
+void AGP_PlayerCharacter::Landed(const FHitResult& Hit)
+{
+	const float LandingSpeed = -GetVelocity().Z;
+
+	Super::Landed(Hit);
+
+	if (LandingSpeed < MinLandingSpeedForMontage)
+	{
+		return;
+	}
+
+	UAnimMontage* LandingMontage = GetLandingMontage();
+	if (!IsValid(LandingMontage) || !GetMesh())
+	{
+		return;
+	}
+
+	if (UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance())
+	{
+		if (!AnimInstance->Montage_IsPlaying(LandingMontage))
+		{
+			PlayAnimMontage(LandingMontage, 1.0f);
+		}
+	}
+}
+
 void AGP_PlayerCharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
@@ -100,6 +126,11 @@ UBlendSpace* AGP_PlayerCharacter::GetLocomotionBlendSpace() const
 UAnimSequenceBase* AGP_PlayerCharacter::GetJumpLoopAnimation() const
 {
 	return AnimationSet ? AnimationSet->JumpLoopAnimation : nullptr;
+}
+
+UAnimMontage* AGP_PlayerCharacter::GetLandingMontage() const
+{
+	return AnimationSet ? AnimationSet->LandingMontage : nullptr;
 }
 
 UAnimMontage* AGP_PlayerCharacter::GetRollMontage() const
