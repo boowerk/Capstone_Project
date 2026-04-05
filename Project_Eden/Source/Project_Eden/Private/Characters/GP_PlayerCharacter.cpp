@@ -170,7 +170,7 @@ bool AGP_PlayerCharacter::TryPerformRoll()
 	}
 
 	GetCharacterMovement()->StopMovementImmediately();
-	GetCharacterMovement()->DisableMovement();
+	ConsumeMovementInputVector();
 
 	bIsRolling = true;
 	ActiveRollDirection = RollDirection;
@@ -212,8 +212,7 @@ void AGP_PlayerCharacter::UpdateRollMovement(float DeltaSeconds)
 
 		if (HitResult.bBlockingHit)
 		{
-			FinishRoll();
-			return;
+			ActiveRollDistanceTravelled = RollDistance;
 		}
 	}
 
@@ -233,12 +232,6 @@ void AGP_PlayerCharacter::FinishRoll()
 	ActiveRollElapsedTime = 0.0f;
 	ActiveRollDistanceTravelled = 0.0f;
 	ActiveRollMontage.Reset();
-
-	if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
-	{
-		MovementComponent->SetMovementMode(MOVE_Walking);
-		MovementComponent->StopMovementImmediately();
-	}
 
 	SetActorTickEnabled(false);
 }
