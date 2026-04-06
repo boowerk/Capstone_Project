@@ -139,7 +139,7 @@ void AGP_PlayerController::Move(const FInputActionValue& Value)
 	if (!IsValid(GetPawn())) return;
 	if (const AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetCharacter()))
 	{
-		if (PlayerCharacter->IsRolling())
+		if (PlayerCharacter->IsRolling() || PlayerCharacter->IsPrimaryAttacking())
 		{
 			return;
 		}
@@ -169,7 +169,7 @@ void AGP_PlayerController::Jump()
 	if (!IsValid(GetCharacter())) return;
 	if (const AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetCharacter()))
 	{
-		if (PlayerCharacter->IsRolling())
+		if (PlayerCharacter->IsRolling() || PlayerCharacter->IsPrimaryAttacking())
 		{
 			return;
 		}

@@ -29,6 +29,8 @@ public:
 	virtual void OnRep_PlayerState() override;
 	bool TryPerformRoll();
 	bool IsRolling() const { return bIsRolling; }
+	bool IsPrimaryAttacking() const { return bIsPrimaryAttacking; }
+	void SetPrimaryAttackActive(bool bIsActive);
 	UPDA_CharacterAnimationSet* GetAnimationSet() const { return AnimationSet; }
 	UBlendSpace* GetLocomotionBlendSpace() const;
 	UAnimSequenceBase* GetJumpLoopAnimation() const;
@@ -89,6 +91,7 @@ protected:
 	float ActiveRollElapsedTime = 0.0f;
 	float ActiveRollDistanceTravelled = 0.0f;
 	bool bIsRolling = false;
+	bool bIsPrimaryAttacking = false;
 	float ActiveLandingElapsedTime = 0.0f;
 	TWeakObjectPtr<UAnimMontage> ActiveLandingMontage;
 	TWeakObjectPtr<UAnimMontage> ActiveRollMontage;

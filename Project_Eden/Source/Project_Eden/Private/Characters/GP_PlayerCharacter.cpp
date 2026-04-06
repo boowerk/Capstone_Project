@@ -127,6 +127,23 @@ void AGP_PlayerCharacter::OnRep_PlayerState()
 	OnASCInitialized.Broadcast(GetAbilitySystemComponent(), GetAttributeSet());
 }
 
+void AGP_PlayerCharacter::SetPrimaryAttackActive(bool bIsActive)
+{
+	bIsPrimaryAttacking = bIsActive;
+
+	if (!bIsPrimaryAttacking)
+	{
+		return;
+	}
+
+	if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
+	{
+		MovementComponent->StopMovementImmediately();
+	}
+
+	ConsumeMovementInputVector();
+}
+
 UBlendSpace* AGP_PlayerCharacter::GetLocomotionBlendSpace() const
 {
 	return AnimationSet ? AnimationSet->LocomotionBlendSpace : nullptr;

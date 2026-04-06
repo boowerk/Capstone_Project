@@ -37,7 +37,8 @@ void UGP_Primary::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 		}
 
 		UAnimMontage* MontageToPlay = AttackMontage;
-		if (const AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo()))
+		AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo());
+		if (PlayerCharacter)
 		{
 			if (UAnimMontage* CharacterMontage = PlayerCharacter->GetPrimaryAttackMontage())
 			{
@@ -52,6 +53,11 @@ void UGP_Primary::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 				UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(this, NAME_None, MontageToPlay, 1.0f);
 			if (PlayMontageTask)
 			{
+				if (PlayerCharacter)
+				{
+					PlayerCharacter->SetPrimaryAttackActive(true);
+				}
+
 				// 애니메이션이 끝나거나 취소되면 OnMontageCompleted()
 				PlayMontageTask->OnCompleted.AddDynamic(this, &ThisClass::OnMontageCompleted);
 				PlayMontageTask->OnBlendOut.AddDynamic(this, &ThisClass::OnMontageCompleted);
@@ -74,6 +80,11 @@ void UGP_Primary::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 
 void UGP_Primary::OnMontageCompleted()
 {
+	if (AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo()))
+	{
+		PlayerCharacter->SetPrimaryAttackActive(false);
+	}
+
 	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 }
 
