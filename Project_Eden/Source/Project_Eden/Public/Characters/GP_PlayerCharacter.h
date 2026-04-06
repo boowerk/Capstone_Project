@@ -66,6 +66,12 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Animation|Air", meta = (AllowPrivateAccess = "true"))
 	float MinLandingSpeedForMontage = 200.0f;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Animation|Air", meta = (AllowPrivateAccess = "true"))
+	float MinLandingPlayTimeBeforeBlendOut = 0.12f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Animation|Air", meta = (AllowPrivateAccess = "true"))
+	float LandingMontageBlendOutTime = 0.15f;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Roll", meta = (AllowPrivateAccess = "true"))
 	float RollCooldown = 0.6f;
 
@@ -74,6 +80,7 @@ protected:
 
 	double NextRollAllowedTime = 0.0;
 
+	void UpdateLandingAnimation(float DeltaSeconds);
 	void UpdateRollMovement(float DeltaSeconds);
 	void FinishRoll();
 
@@ -82,6 +89,8 @@ protected:
 	float ActiveRollElapsedTime = 0.0f;
 	float ActiveRollDistanceTravelled = 0.0f;
 	bool bIsRolling = false;
+	float ActiveLandingElapsedTime = 0.0f;
+	TWeakObjectPtr<UAnimMontage> ActiveLandingMontage;
 	TWeakObjectPtr<UAnimMontage> ActiveRollMontage;
 	
 };

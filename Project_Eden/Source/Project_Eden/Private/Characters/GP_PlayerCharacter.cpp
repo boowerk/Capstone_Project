@@ -63,7 +63,12 @@ void AGP_PlayerCharacter::Landed(const FHitResult& Hit)
 	{
 		if (!AnimInstance->Montage_IsPlaying(LandingMontage))
 		{
-			PlayAnimMontage(LandingMontage, 1.0f);
+			if (PlayAnimMontage(LandingMontage, 1.0f) > 0.0f)
+			{
+				ActiveLandingElapsedTime = 0.0f;
+				ActiveLandingMontage = LandingMontage;
+				SetActorTickEnabled(true);
+			}
 		}
 	}
 }
@@ -72,13 +77,17 @@ void AGP_PlayerCharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
-	if (!bIsRolling)
+	UpdateLandingAnimation(DeltaSeconds);
+
+	if (bIsRolling)
 	{
-		SetActorTickEnabled(false);
-		return;
+		UpdateRollMovement(DeltaSeconds);
 	}
 
-	UpdateRollMovement(DeltaSeconds);
+	if (!bIsRolling && !ActiveLandingMontage.IsValid())
+	{
+		SetActorTickEnabled(false);
+	}
 }
 
 UAbilitySystemComponent* AGP_PlayerCharacter::GetAbilitySystemComponent() const
@@ -141,6 +150,40 @@ UAnimMontage* AGP_PlayerCharacter::GetRollMontage() const
 UAnimMontage* AGP_PlayerCharacter::GetPrimaryAttackMontage() const
 {
 	return AnimationSet ? AnimationSet->PrimaryAttackMontage : nullptr;
+}
+
+void AGP_PlayerCharacter::UpdateLandingAnimation(float DeltaSeconds)
+{
+	if (!ActiveLandingMontage.IsValid() || !GetMesh())
+	{
+		ActiveLandingElapsedTime = 0.0f;
+		ActiveLandingMontage.Reset();
+		return;
+	}
+
+	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+	if (!AnimInstance || !AnimInstance->Montage_IsPlaying(ActiveLandingMontage.Get()))
+	{
+		ActiveLandingElapsedTime = 0.0f;
+		ActiveLandingMontage.Reset();
+		return;
+	}
+
+	ActiveLandingElapsedTime += DeltaSeconds;
+
+	if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
+	{
+		if (!MovementComponent->IsFalling() && ActiveLandingElapsedTime >= MinLandingPlayTimeBeforeBlendOut)
+		{
+			const bool bHasMoveInput = MovementComponent->GetCurrentAcceleration().SizeSquared2D() > KINDA_SMALL_NUMBER;
+			if (bHasMoveInput)
+			{
+				AnimInstance->Montage_Stop(LandingMontageBlendOutTime, ActiveLandingMontage.Get());
+				ActiveLandingElapsedTime = 0.0f;
+				ActiveLandingMontage.Reset();
+			}
+		}
+	}
 }
 
 bool AGP_PlayerCharacter::TryPerformRoll()
