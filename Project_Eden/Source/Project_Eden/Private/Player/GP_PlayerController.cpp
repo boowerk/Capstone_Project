@@ -132,6 +132,15 @@ void AGP_PlayerController::SetupInputComponent()
 		// Fallback roll key until an enhanced input action asset is assigned.
 		InputComponent->BindKey(EKeys::LeftAlt, IE_Pressed, this, &ThisClass::Dash);
 	}
+
+	if (IsValid(InputComponent))
+	{
+		// Shift 입력은 별도 액션 에셋 없이도 항상 걷기/달리기 전환이 되도록 직접 바인딩한다.
+		InputComponent->BindKey(EKeys::LeftShift, IE_Pressed, this, &ThisClass::StartSprint);
+		InputComponent->BindKey(EKeys::LeftShift, IE_Released, this, &ThisClass::StopSprint);
+		InputComponent->BindKey(EKeys::RightShift, IE_Pressed, this, &ThisClass::StartSprint);
+		InputComponent->BindKey(EKeys::RightShift, IE_Released, this, &ThisClass::StopSprint);
+	}
 }
 
 void AGP_PlayerController::Move(const FInputActionValue& Value)
@@ -182,6 +191,22 @@ void AGP_PlayerController::StopJump()
 {
 	if (!IsValid(GetCharacter())) return;
 	GetCharacter()->StopJumping();
+}
+
+void AGP_PlayerController::StartSprint()
+{
+	if (AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetCharacter()))
+	{
+		PlayerCharacter->SetSprinting(true);
+	}
+}
+
+void AGP_PlayerController::StopSprint()
+{
+	if (AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetCharacter()))
+	{
+		PlayerCharacter->SetSprinting(false);
+	}
 }
 
 void AGP_PlayerController::Primary()

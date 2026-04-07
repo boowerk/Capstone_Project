@@ -21,6 +21,7 @@ class PROJECT_EDEN_API AGP_PlayerCharacter : public AGP_BaseCharacter
 
 public:
 	AGP_PlayerCharacter();
+	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void Landed(const FHitResult& Hit) override;
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
@@ -30,6 +31,7 @@ public:
 	bool TryPerformRoll();
 	bool IsRolling() const { return bIsRolling; }
 	bool IsPrimaryAttacking() const { return bIsPrimaryAttacking; }
+	void SetSprinting(bool bShouldSprint);
 	void SetPrimaryAttackActive(bool bIsActive);
 	UPDA_CharacterAnimationSet* GetAnimationSet() const { return AnimationSet; }
 	UBlendSpace* GetLocomotionBlendSpace() const;
@@ -80,10 +82,17 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Roll", meta = (AllowPrivateAccess = "true"))
 	float RollDistance = 350.0f;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Speed", meta = (AllowPrivateAccess = "true"))
+	float WalkSpeed = 150.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Speed", meta = (AllowPrivateAccess = "true"))
+	float SprintSpeed = 500.0f;
+
 	double NextRollAllowedTime = 0.0;
 
 	void UpdateLandingAnimation(float DeltaSeconds);
 	void UpdateRollMovement(float DeltaSeconds);
+	void ApplyGroundMovementSpeed();
 	void FinishRoll();
 
 	FVector ActiveRollDirection = FVector::ZeroVector;
@@ -92,6 +101,7 @@ protected:
 	float ActiveRollDistanceTravelled = 0.0f;
 	bool bIsRolling = false;
 	bool bIsPrimaryAttacking = false;
+	bool bIsSprinting = false;
 	float ActiveLandingElapsedTime = 0.0f;
 	TWeakObjectPtr<UAnimMontage> ActiveLandingMontage;
 	TWeakObjectPtr<UAnimMontage> ActiveRollMontage;

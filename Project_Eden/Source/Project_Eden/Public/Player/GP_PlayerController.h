@@ -85,6 +85,8 @@ private:
 	void Look(const FInputActionValue& Value);
 	void Jump();
 	void StopJump();
+	void StartSprint();
+	void StopSprint();
 
 	void Primary();
 	void Targeting();

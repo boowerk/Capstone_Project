@@ -42,6 +42,14 @@ AGP_PlayerCharacter::AGP_PlayerCharacter()
 	FollowCamera->bUsePawnControlRotation = false;
 }
 
+void AGP_PlayerCharacter::BeginPlay()
+{
+	Super::BeginPlay();
+
+	// 블루프린트에서 속도 값을 바꿔도 시작 시점에는 걷기 속도를 다시 적용한다.
+	ApplyGroundMovementSpeed();
+}
+
 void AGP_PlayerCharacter::Landed(const FHitResult& Hit)
 {
 	const float LandingSpeed = -GetVelocity().Z;
@@ -127,6 +135,12 @@ void AGP_PlayerCharacter::OnRep_PlayerState()
 	OnASCInitialized.Broadcast(GetAbilitySystemComponent(), GetAttributeSet());
 }
 
+void AGP_PlayerCharacter::SetSprinting(bool bShouldSprint)
+{
+	bIsSprinting = bShouldSprint;
+	ApplyGroundMovementSpeed();
+}
+
 void AGP_PlayerCharacter::SetPrimaryAttackActive(bool bIsActive)
 {
 	bIsPrimaryAttacking = bIsActive;
@@ -167,6 +181,15 @@ UAnimMontage* AGP_PlayerCharacter::GetRollMontage() const
 UAnimMontage* AGP_PlayerCharacter::GetPrimaryAttackMontage() const
 {
 	return AnimationSet ? AnimationSet->PrimaryAttackMontage : nullptr;
+}
+
+void AGP_PlayerCharacter::ApplyGroundMovementSpeed()
+{
+	if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
+	{
+		// Shift를 누를 때만 달리고, 평소에는 걷기 속도를 유지한다.
+		MovementComponent->MaxWalkSpeed = bIsSprinting ? SprintSpeed : WalkSpeed;
+	}
 }
 
 void AGP_PlayerCharacter::UpdateLandingAnimation(float DeltaSeconds)
