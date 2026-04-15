@@ -6,7 +6,9 @@
 
 class APawn;
 class UBehaviorTree;
+class UBlackboardComponent;
 class UBlackboardData;
+struct FEnemyLLMEvaluation;
 
 UCLASS()
 class PROJECT_EDEN_API AEnemyAIController : public AAIController
@@ -15,6 +17,8 @@ class PROJECT_EDEN_API AEnemyAIController : public AAIController
 
 public:
 	AEnemyAIController();
+
+	bool ApplyEnemyEvaluationToBlackboard(const FEnemyLLMEvaluation& InEvaluation);
 
 protected:
 	virtual void OnPossess(APawn* InPawn) override;
@@ -29,4 +33,6 @@ protected:
 
 	bool InitializeBehaviorTree(APawn* InPawn);
 	virtual void InitializeBlackboardValues(APawn* InPawn);
+
+	UBlackboardComponent* GetEnemyBlackboardComponent();
 };
