@@ -1,7 +1,7 @@
 #pragma once
 
-#include "CoreMinimal.h"
 #include "BehaviorTree/BTTaskNode.h"
+#include "CoreMinimal.h"
 #include "EnvironmentQuery/EnvQueryTypes.h"
 #include "BTT_RunEnemyPositioningEQSQuery.generated.h"
 

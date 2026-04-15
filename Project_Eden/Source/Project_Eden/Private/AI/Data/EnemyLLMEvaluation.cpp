@@ -1,9 +1,19 @@
 #include "AI/Data/EnemyLLMEvaluation.h"
 
+#include "AI/Debug/EnemyAIDebugUtils.h"
 #include "JsonObjectConverter.h"
 
 namespace
 {
+	FString MakeShortJsonPreview(const FString& JsonPayload)
+	{
+		constexpr int32 MaxPreviewLength = 160;
+		const FString TrimmedPayload = JsonPayload.TrimStartAndEnd();
+		return TrimmedPayload.Len() > MaxPreviewLength
+			? FString::Printf(TEXT("%s..."), *TrimmedPayload.Left(MaxPreviewLength))
+			: TrimmedPayload;
+	}
+
 	FString NormalizeEnumToken(const FString& InValue)
 	{
 		FString NormalizedValue;
@@ -55,7 +65,8 @@ bool FEnemyLLMEvaluationParser::ParseFromJson(const FString& JsonPayload, FEnemy
 
 	if (JsonPayload.TrimStartAndEnd().IsEmpty())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[EnemyLLMEvaluation] 빈 JSON 문자열이 들어와 기본값을 사용합니다."));
+		// 빈 응답은 안전하게 실패 처리해 이전 AI 상태를 유지한다.
+		UE_LOG(LogEnemyAI, Warning, TEXT("[JSON] 빈 평가 응답을 무시합니다."));
 		return false;
 	}
 
@@ -63,7 +74,7 @@ bool FEnemyLLMEvaluationParser::ParseFromJson(const FString& JsonPayload, FEnemy
 	const bool bParsed = FJsonObjectConverter::JsonObjectStringToUStruct<FEnemyLLMEvaluationJsonModel>(JsonPayload, &JsonModel, 0, 0);
 	if (!bParsed)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[EnemyLLMEvaluation] JSON 파싱에 실패해 기본값을 사용합니다. Payload: %s"), *JsonPayload);
+		UE_LOG(LogEnemyAI, Warning, TEXT("[JSON] 파싱 실패: %s"), *MakeShortJsonPreview(JsonPayload));
 		return false;
 	}
 
@@ -76,6 +87,7 @@ bool FEnemyLLMEvaluationParser::ParseFromJson(const FString& JsonPayload, FEnemy
 	OutEvaluation.FocusTargetRule = ParseFocusTargetRule(JsonModel.FocusTargetRule, OutEvaluation.FocusTargetRule);
 	OutEvaluation.ValidateAndClamp();
 
+	UE_LOG(LogEnemyAI, Log, TEXT("[JSON] 파싱 성공: %s"), *EnemyAIDebugUtils::DescribeEvaluation(OutEvaluation));
 	return true;
 }
 

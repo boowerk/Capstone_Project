@@ -1,6 +1,7 @@
 #include "AI/Controllers/EnemyAIController.h"
 
 #include "AI/Data/EnemyBlackboardKeys.h"
+#include "AI/Debug/EnemyAIDebugUtils.h"
 #include "BehaviorTree/BehaviorTree.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "BehaviorTree/BlackboardData.h"
@@ -70,6 +71,8 @@ void AEnemyAIController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
 
+	UE_LOG(LogEnemyAI, Log, TEXT("[AI] Possess: Controller=%s Pawn=%s"), *GetName(), *EnemyAIDebugUtils::DescribeActor(InPawn));
+
 	// 에디터에서 바꾼 감지 파라미터를 실제 런타임 설정에 다시 반영한다.
 	ConfigureSightSense();
 	InitializeBehaviorTree(InPawn);
@@ -86,6 +89,8 @@ void AEnemyAIController::OnPossess(APawn* InPawn)
 
 void AEnemyAIController::OnUnPossess()
 {
+	UE_LOG(LogEnemyAI, Log, TEXT("[AI] UnPossess: Controller=%s Pawn=%s"), *GetName(), *EnemyAIDebugUtils::DescribeActor(GetPawn()));
+
 	StopEvaluationRefreshLoop();
 	GetWorldTimerManager().ClearTimer(PendingEnemyEvaluationTimerHandle);
 
@@ -105,6 +110,7 @@ bool AEnemyAIController::SubmitEnemyEvaluation(const FEnemyLLMEvaluation& InEval
 	if (bHasLastAppliedEnemyEvaluation && AreEnemyEvaluationsEffectivelyEqual(LastAppliedEnemyEvaluation, SafeEvaluation))
 	{
 		// 실질적으로 달라진 값이 없으면 Blackboard를 다시 쓰지 않아 분기 흔들림을 줄인다.
+		UE_LOG(LogEnemyAI, Verbose, TEXT("[Eval] 중복 평가값 무시: %s"), *EnemyAIDebugUtils::DescribeEvaluation(SafeEvaluation));
 		return true;
 	}
 
@@ -127,6 +133,13 @@ bool AEnemyAIController::SubmitEnemyEvaluation(const FEnemyLLMEvaluation& InEval
 	bHasPendingEnemyEvaluation = true;
 
 	const float RemainingDelay = FMath::Max(0.0f, MinEnemyEvaluationApplyInterval - TimeSinceLastApply);
+	UE_LOG(
+		LogEnemyAI,
+		Verbose,
+		TEXT("[Eval] 적용 지연 %.2fs: %s"),
+		RemainingDelay,
+		*EnemyAIDebugUtils::DescribeEvaluation(SafeEvaluation));
+
 	GetWorldTimerManager().SetTimer(
 		PendingEnemyEvaluationTimerHandle,
 		this,
@@ -144,7 +157,7 @@ bool AEnemyAIController::SubmitEnemyEvaluationFromJson(const FString& JsonPayloa
 	if (!bParsed)
 	{
 		// 파싱 실패 응답은 현재 Blackboard 값을 덮어쓰지 않고 무시해 행동 불안정을 막는다.
-		UE_LOG(LogTemp, Warning, TEXT("[EnemyAIController] 유효하지 않은 JSON 평가값을 무시합니다: %s"), *GetName());
+		UE_LOG(LogEnemyAI, Warning, TEXT("[Eval] JSON 기반 평가 적용 실패: Controller=%s"), *GetName());
 		return false;
 	}
 
@@ -156,12 +169,28 @@ bool AEnemyAIController::ApplyEnemyEvaluationToBlackboard(const FEnemyLLMEvaluat
 	UBlackboardComponent* BlackboardComponent = GetEnemyBlackboardComponent();
 	if (!IsValid(BlackboardComponent))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[EnemyAIController] Blackboard가 없어 평가 데이터를 적용할 수 없습니다: %s"), *GetName());
+		UE_LOG(LogEnemyAI, Warning, TEXT("[Blackboard] 평가 적용 실패 - Blackboard 없음: %s"), *GetName());
 		return false;
 	}
 
 	FEnemyLLMEvaluation SafeEvaluation = InEvaluation;
 	SafeEvaluation.ValidateAndClamp();
+
+	const bool bModeChanged = !bHasLastAppliedEnemyEvaluation || LastAppliedEnemyEvaluation.EnemyMode != SafeEvaluation.EnemyMode;
+	if (bModeChanged)
+	{
+		const FString PreviousMode = bHasLastAppliedEnemyEvaluation
+			? LastAppliedEnemyEvaluation.GetEnemyModeBlackboardValue().ToString()
+			: TEXT("None");
+
+		UE_LOG(
+			LogEnemyAI,
+			Log,
+			TEXT("[Mode] %s -> %s (%s)"),
+			*PreviousMode,
+			*SafeEvaluation.GetEnemyModeBlackboardValue().ToString(),
+			*EnemyAIDebugUtils::DescribeActor(GetPawn()));
+	}
 
 	// BT를 재구성하지 않고 Blackboard 값만 갱신해 기존 분기들이 자동으로 반응하게 만든다.
 	BlackboardComponent->SetValueAsName(EnemyBlackboardKeys::EnemyMode, SafeEvaluation.GetEnemyModeBlackboardValue());
@@ -172,6 +201,13 @@ bool AEnemyAIController::ApplyEnemyEvaluationToBlackboard(const FEnemyLLMEvaluat
 	BlackboardComponent->SetValueAsFloat(EnemyBlackboardKeys::CoverPreference, SafeEvaluation.CoverPreference);
 	BlackboardComponent->SetValueAsName(EnemyBlackboardKeys::FocusTargetRule, SafeEvaluation.GetFocusTargetRuleBlackboardValue());
 
+	UE_LOG(
+		LogEnemyAI,
+		Log,
+		TEXT("[Blackboard] 적용 완료: Pawn=%s %s"),
+		*EnemyAIDebugUtils::DescribeActor(GetPawn()),
+		*EnemyAIDebugUtils::DescribeEvaluation(SafeEvaluation));
+
 	return true;
 }
 
@@ -179,13 +215,13 @@ bool AEnemyAIController::InitializeBehaviorTree(APawn* InPawn)
 {
 	if (!IsValid(InPawn))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[EnemyAIController] Possess된 Pawn이 유효하지 않습니다."));
+		UE_LOG(LogEnemyAI, Warning, TEXT("[AI] Behavior Tree 초기화 실패 - Pawn이 유효하지 않습니다."));
 		return false;
 	}
 
 	if (!IsValid(DefaultBehaviorTreeAsset))
 	{
-		UE_LOG(LogTemp, Verbose, TEXT("[EnemyAIController] Behavior Tree 에셋이 아직 지정되지 않았습니다: %s"), *GetNameSafe(InPawn));
+		UE_LOG(LogEnemyAI, Verbose, TEXT("[AI] Behavior Tree 에셋이 아직 지정되지 않았습니다: %s"), *GetNameSafe(InPawn));
 		return false;
 	}
 
@@ -197,7 +233,7 @@ bool AEnemyAIController::InitializeBehaviorTree(APawn* InPawn)
 
 	if (!IsValid(BlackboardAssetToUse))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[EnemyAIController] Blackboard 에셋이 없습니다: %s"), *GetNameSafe(DefaultBehaviorTreeAsset));
+		UE_LOG(LogEnemyAI, Warning, TEXT("[AI] Blackboard 에셋이 없습니다: %s"), *GetNameSafe(DefaultBehaviorTreeAsset));
 		return false;
 	}
 
@@ -206,7 +242,7 @@ bool AEnemyAIController::InitializeBehaviorTree(APawn* InPawn)
 	// 공용 Blackboard 에셋이 준비되면 여기서 UseBlackboard를 호출해 키 기본값을 초기화한다.
 	if (!UseBlackboard(BlackboardAssetToUse, BlackboardComponent) || !IsValid(BlackboardComponent))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[EnemyAIController] Blackboard 초기화에 실패했습니다: %s"), *GetNameSafe(InPawn));
+		UE_LOG(LogEnemyAI, Warning, TEXT("[AI] Blackboard 초기화에 실패했습니다: %s"), *GetNameSafe(InPawn));
 		return false;
 	}
 
@@ -215,7 +251,7 @@ bool AEnemyAIController::InitializeBehaviorTree(APawn* InPawn)
 	// 공용 Behavior Tree 에셋이 준비되면 여기서 RunBehaviorTree를 호출해 적 AI 루프를 시작한다.
 	if (!RunBehaviorTree(DefaultBehaviorTreeAsset))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[EnemyAIController] Behavior Tree 실행에 실패했습니다: %s"), *GetNameSafe(InPawn));
+		UE_LOG(LogEnemyAI, Warning, TEXT("[AI] Behavior Tree 실행에 실패했습니다: %s"), *GetNameSafe(InPawn));
 		return false;
 	}
 
@@ -227,7 +263,7 @@ void AEnemyAIController::InitializeBlackboardValues(APawn* InPawn)
 	UBlackboardComponent* BlackboardComponent = GetEnemyBlackboardComponent();
 	if (!IsValid(BlackboardComponent) || !IsValid(InPawn))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[EnemyAIController] Blackboard 초기값 설정을 건너뜁니다. Controller=%s Pawn=%s"), *GetName(), *GetNameSafe(InPawn));
+		UE_LOG(LogEnemyAI, Warning, TEXT("[Blackboard] 초기값 설정을 건너뜁니다. Controller=%s Pawn=%s"), *GetName(), *GetNameSafe(InPawn));
 		return;
 	}
 
@@ -260,6 +296,7 @@ bool AEnemyAIController::ApplyEnemyEvaluationInternal(const FEnemyLLMEvaluation&
 		// Blackboard가 아직 없으면 최신 평가값을 보관해 possess 이후 다시 시도한다.
 		PendingEnemyEvaluation = InEvaluation;
 		bHasPendingEnemyEvaluation = true;
+		UE_LOG(LogEnemyAI, Verbose, TEXT("[Eval] Blackboard 준비 전 평가값을 보관합니다: %s"), *EnemyAIDebugUtils::DescribeEvaluation(InEvaluation));
 		return false;
 	}
 
@@ -279,12 +316,14 @@ void AEnemyAIController::HandlePendingEnemyEvaluationTimerElapsed()
 
 	const FEnemyLLMEvaluation QueuedEvaluation = PendingEnemyEvaluation;
 	bHasPendingEnemyEvaluation = false;
+
+	UE_LOG(LogEnemyAI, Verbose, TEXT("[Eval] 지연된 평가값 적용: %s"), *EnemyAIDebugUtils::DescribeEvaluation(QueuedEvaluation));
 	ApplyEnemyEvaluationInternal(QueuedEvaluation);
 }
 
 void AEnemyAIController::HandleEvaluationRefreshTimerElapsed()
 {
-	// Step 8에서는 실제 네트워크/LLM 요청을 보내지 않는다.
+	// Step 8/9에서는 실제 네트워크/LLM 요청을 보내지 않는다.
 	// 이후에는 여기서 플레이어 상태 요약 생성 -> 비동기 서비스 요청 -> 응답 시 SubmitEnemyEvaluation 호출 흐름을 붙인다.
 }
 
@@ -336,6 +375,14 @@ void AEnemyAIController::ConfigureSightSense()
 
 void AEnemyAIController::HandleTargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
 {
+	UE_LOG(
+		LogEnemyAI,
+		Verbose,
+		TEXT("[Perception] %s Target=%s %s"),
+		*GetName(),
+		*EnemyAIDebugUtils::DescribeActor(Actor),
+		*EnemyAIDebugUtils::DescribeStimulus(Stimulus));
+
 	// 개별 자극 결과에 직접 분기하기보다 현재 시점의 유효 타겟 전체를 다시 평가해 일관성을 유지한다.
 	RefreshTargetActorFromPerception();
 }
@@ -417,6 +464,24 @@ void AEnemyAIController::SetBlackboardTargetActor(AActor* NewTargetActor)
 	if (CurrentTargetActor == NewTargetActor)
 	{
 		return;
+	}
+
+	if (!IsValid(CurrentTargetActor) && IsValid(NewTargetActor))
+	{
+		UE_LOG(LogEnemyAI, Log, TEXT("[Perception] 타겟 획득: %s"), *EnemyAIDebugUtils::DescribeActor(NewTargetActor));
+	}
+	else if (IsValid(CurrentTargetActor) && !IsValid(NewTargetActor))
+	{
+		UE_LOG(LogEnemyAI, Log, TEXT("[Perception] 타겟 상실: %s"), *EnemyAIDebugUtils::DescribeActor(CurrentTargetActor));
+	}
+	else
+	{
+		UE_LOG(
+			LogEnemyAI,
+			Log,
+			TEXT("[Perception] 타겟 변경: %s -> %s"),
+			*EnemyAIDebugUtils::DescribeActor(CurrentTargetActor),
+			*EnemyAIDebugUtils::DescribeActor(NewTargetActor));
 	}
 
 	if (IsValid(NewTargetActor))

@@ -2,6 +2,7 @@
 
 #include "AI/Data/EnemyBlackboardKeys.h"
 #include "AI/Data/EnemyEQSNames.h"
+#include "AI/Debug/EnemyAIDebugUtils.h"
 #include "AI/Tasks/EnemyBTTaskCommon.h"
 #include "AISystem.h"
 #include "BehaviorTree/BehaviorTree.h"
@@ -36,14 +37,22 @@ EBTNodeResult::Type UBTT_RunEnemyPositioningEQSQuery::ExecuteTask(UBehaviorTreeC
 	UBlackboardComponent* BlackboardComponent = nullptr;
 	if (!EnemyBTTaskCommon::TryGetTaskContext(OwnerComp, AIController, ControlledPawn, BlackboardComponent))
 	{
+		UE_LOG(LogEnemyAI, Warning, TEXT("[EQS] 실행 실패 - TaskContext 획득 실패"));
 		return EBTNodeResult::Failed;
 	}
 
 	if (!IsValid(QueryTemplate))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[EnemyAI] EQS QueryTemplate이 지정되지 않았습니다: %s"), *GetNameSafe(this));
+		UE_LOG(LogEnemyAI, Warning, TEXT("[EQS] 실행 실패 - QueryTemplate 미지정: %s"), *GetNameSafe(this));
 		return EBTNodeResult::Failed;
 	}
+
+	UE_LOG(
+		LogEnemyAI,
+		Verbose,
+		TEXT("[EQS] 실행 시작: Query=%s Owner=%s"),
+		*GetNameSafe(QueryTemplate),
+		*EnemyAIDebugUtils::DescribeActor(ControlledPawn));
 
 	FEnemyPositioningEQSQueryTaskMemory* TaskMemory = CastInstanceNodeMemory<FEnemyPositioningEQSQueryTaskMemory>(NodeMemory);
 
@@ -61,7 +70,12 @@ EBTNodeResult::Type UBTT_RunEnemyPositioningEQSQuery::ExecuteTask(UBehaviorTreeC
 		return EBTNodeResult::InProgress;
 	}
 
-	UE_LOG(LogTemp, Warning, TEXT("[EnemyAI] EQS 실행 요청 생성에 실패했습니다: %s"), *GetNameSafe(ControlledPawn));
+	UE_LOG(
+		LogEnemyAI,
+		Warning,
+		TEXT("[EQS] 실행 요청 생성 실패: Query=%s Owner=%s"),
+		*GetNameSafe(QueryTemplate),
+		*EnemyAIDebugUtils::DescribeActor(ControlledPawn));
 	return EBTNodeResult::Failed;
 }
 
@@ -72,6 +86,7 @@ EBTNodeResult::Type UBTT_RunEnemyPositioningEQSQuery::AbortTask(UBehaviorTreeCom
 		const FEnemyPositioningEQSQueryTaskMemory* TaskMemory = CastInstanceNodeMemory<FEnemyPositioningEQSQueryTaskMemory>(NodeMemory);
 		if (TaskMemory->RequestID >= 0)
 		{
+			UE_LOG(LogEnemyAI, Verbose, TEXT("[EQS] 요청 중단: Query=%s RequestID=%d"), *GetNameSafe(QueryTemplate), TaskMemory->RequestID);
 			QueryManager->AbortQuery(TaskMemory->RequestID);
 		}
 	}
@@ -128,8 +143,15 @@ void UBTT_RunEnemyPositioningEQSQuery::ApplyNamedParams(FEnvQueryRequest& QueryR
 
 void UBTT_RunEnemyPositioningEQSQuery::OnQueryFinished(TSharedPtr<FEnvQueryResult> Result)
 {
-	if (!Result.IsValid() || Result->IsAborted())
+	if (!Result.IsValid())
 	{
+		UE_LOG(LogEnemyAI, Warning, TEXT("[EQS] 완료 실패 - Result가 유효하지 않습니다: Query=%s"), *GetNameSafe(QueryTemplate));
+		return;
+	}
+
+	if (Result->IsAborted())
+	{
+		UE_LOG(LogEnemyAI, Verbose, TEXT("[EQS] 요청이 중단되었습니다: Query=%s"), *GetNameSafe(QueryTemplate));
 		return;
 	}
 
@@ -145,21 +167,42 @@ void UBTT_RunEnemyPositioningEQSQuery::OnQueryFinished(TSharedPtr<FEnvQueryResul
 
 	if (!IsValid(BehaviorTreeComponent))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[EnemyAI] EQS 완료 알림을 보낼 BehaviorTreeComponent를 찾지 못했습니다."));
+		UE_LOG(LogEnemyAI, Warning, TEXT("[EQS] 완료 실패 - BehaviorTreeComponent를 찾지 못했습니다: Query=%s"), *GetNameSafe(QueryTemplate));
 		return;
 	}
 
 	UBlackboardComponent* BlackboardComponent = BehaviorTreeComponent->GetBlackboardComponent();
-	bool bSuccess = Result->IsSuccessful() && (Result->Items.Num() > 0) && IsValid(BlackboardComponent);
+	const bool bSuccess = Result->IsSuccessful() && (Result->Items.Num() > 0) && IsValid(BlackboardComponent);
 
 	if (bSuccess)
 	{
+		const FVector ResultLocation = Result->GetItemAsLocation(0);
+
 		// Actor 결과든 Point 결과든 첫 번째 최적 후보의 위치만 MoveToLocation에 기록한다.
-		BlackboardComponent->SetValueAsVector(MoveLocationKey.SelectedKeyName, Result->GetItemAsLocation(0));
+		BlackboardComponent->SetValueAsVector(MoveLocationKey.SelectedKeyName, ResultLocation);
+
+		UE_LOG(
+			LogEnemyAI,
+			Log,
+			TEXT("[EQS] 성공: Query=%s Owner=%s Result=%s"),
+			*GetNameSafe(QueryTemplate),
+			*EnemyAIDebugUtils::DescribeActor(QueryOwner),
+			*EnemyAIDebugUtils::DescribeLocation(ResultLocation));
 	}
-	else if (bClearMoveLocationOnFail && IsValid(BlackboardComponent))
+	else
 	{
-		BlackboardComponent->ClearValue(MoveLocationKey.SelectedKeyName);
+		if (bClearMoveLocationOnFail && IsValid(BlackboardComponent))
+		{
+			BlackboardComponent->ClearValue(MoveLocationKey.SelectedKeyName);
+		}
+
+		UE_LOG(
+			LogEnemyAI,
+			Warning,
+			TEXT("[EQS] 실패: Query=%s Owner=%s ClearOnFail=%s"),
+			*GetNameSafe(QueryTemplate),
+			*EnemyAIDebugUtils::DescribeActor(QueryOwner),
+			bClearMoveLocationOnFail ? TEXT("true") : TEXT("false"));
 	}
 
 	FAIMessage::Send(
