@@ -5,6 +5,7 @@
 #include "BehaviorTree/BehaviorTree.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "BehaviorTree/BlackboardData.h"
+#include "Characters/GP_EnemyCharacter.h"
 #include "GameFramework/Actor.h"
 #include "GameFramework/Pawn.h"
 #include "Perception/AIPerceptionComponent.h"
@@ -131,8 +132,14 @@ void AEnemyAIController::InitializeBlackboardValues(APawn* InPawn)
 	BlackboardComponent->ClearValue(EnemyBlackboardKeys::TargetActor);
 	BlackboardComponent->SetValueAsVector(EnemyBlackboardKeys::MoveToLocation, InPawn->GetActorLocation());
 
-	const FEnemyLLMEvaluation DefaultEvaluation = FEnemyLLMEvaluation::MakeSafeDefault();
-	ApplyEnemyEvaluationToBlackboard(DefaultEvaluation);
+	FEnemyLLMEvaluation InitialEvaluation = FEnemyLLMEvaluation::MakeSafeDefault();
+	if (const AGP_EnemyCharacter* EnemyCharacter = Cast<AGP_EnemyCharacter>(InPawn))
+	{
+		// 적 캐릭터가 가진 설정 에셋/테이블을 읽어 개체별 시작 성향값을 주입한다.
+		EnemyCharacter->BuildInitialEnemyEvaluation(InitialEvaluation);
+	}
+
+	ApplyEnemyEvaluationToBlackboard(InitialEvaluation);
 }
 
 UBlackboardComponent* AEnemyAIController::GetEnemyBlackboardComponent()
