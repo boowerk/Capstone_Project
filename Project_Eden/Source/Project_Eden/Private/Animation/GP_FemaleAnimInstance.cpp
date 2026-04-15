@@ -10,6 +10,9 @@ void UGP_FemaleAnimInstance::NativeInitializeAnimation()
 {
 	Super::NativeInitializeAnimation();
 
+	// 구르기 같은 액션 몽타주의 루트모션만 실제 캐릭터 이동으로 반영한다.
+	RootMotionMode = ERootMotionMode::RootMotionFromMontagesOnly;
+
 	CachedCharacter = Cast<ACharacter>(TryGetPawnOwner());
 	CachedPlayerCharacter = Cast<AGP_PlayerCharacter>(CachedCharacter.Get());
 	RefreshAnimationAssets();

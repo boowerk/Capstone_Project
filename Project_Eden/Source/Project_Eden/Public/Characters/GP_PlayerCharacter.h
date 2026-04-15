@@ -79,9 +79,6 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Roll", meta = (AllowPrivateAccess = "true"))
 	float RollCooldown = 0.6f;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Roll", meta = (AllowPrivateAccess = "true"))
-	float RollDistance = 350.0f;
-
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Speed", meta = (AllowPrivateAccess = "true"))
 	float WalkSpeed = 150.0f;
 
@@ -91,14 +88,10 @@ protected:
 	double NextRollAllowedTime = 0.0;
 
 	void UpdateLandingAnimation(float DeltaSeconds);
-	void UpdateRollMovement(float DeltaSeconds);
+	void UpdateRollState();
 	void ApplyGroundMovementSpeed();
 	void FinishRoll();
 
-	FVector ActiveRollDirection = FVector::ZeroVector;
-	float ActiveRollDuration = 0.0f;
-	float ActiveRollElapsedTime = 0.0f;
-	float ActiveRollDistanceTravelled = 0.0f;
 	bool bIsRolling = false;
 	bool bIsPrimaryAttacking = false;
 	bool bIsSprinting = false;

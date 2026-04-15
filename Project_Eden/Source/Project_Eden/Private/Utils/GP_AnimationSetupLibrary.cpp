@@ -49,9 +49,11 @@ namespace GPFemaleAnimationSetup
 	const FString FemaleJogPath = TEXT("/Game/Asset/CharacterAction/female/Animations/femaleJog_Fwd_Loop");
 	const FString FemaleSprintPath = TEXT("/Game/Asset/CharacterAction/female/Animations/femaleSprint_Loop");
 	const FString FemaleJumpLoopPath = TEXT("/Game/Asset/CharacterAction/female/Animations/femaleJump_Loop");
-	const FString FemaleSwordAttackPath = TEXT("/Game/Asset/CharacterAction/female/Animations/femaleSword_Attack");
+	// 기본 공격도 루트모션 몽타주를 사용한다.
+	const FString FemaleSwordAttackPath = TEXT("/Game/Asset/CharacterAction/female/Animations/femaleSword_Attack_RM");
 	const FString FemaleJumpLandMontagePath = TEXT("/Game/Asset/CharacterAction/female/Montages/AM_Female_Jump_Land");
-	const FString FemaleRollMontagePath = TEXT("/Game/Asset/CharacterAction/female/Montages/AM_Female_Roll");
+	// 구르기는 루트모션 몽타주를 사용해서 애니메이션 전진량으로 이동한다.
+	const FString FemaleRollMontagePath = TEXT("/Game/Asset/CharacterAction/female/Montages/AM_Female_Roll_RM");
 
 	const FString BlendSpacePackagePath = TEXT("/Game/Asset/CharacterAction/female/BlendSpaces");
 	const FString BlendSpaceName = TEXT("BS_Female_Locomotion");
@@ -60,7 +62,7 @@ namespace GPFemaleAnimationSetup
 	const FString AnimationSetPackagePath = TEXT("/Game/Asset/CharacterAction/female/DataAssets");
 	const FString AnimationSetName = TEXT("PDA_FemaleAnimationSet");
 	const FString MontagePackagePath = TEXT("/Game/Asset/CharacterAction/female/Montages");
-	const FString PrimaryMontageName = TEXT("AM_Female_Primary");
+	const FString PrimaryMontageName = TEXT("AM_Female_Primary_RM");
 	const FString PlayerBlueprintPath = TEXT("/Game/Characters/PlayerCharacter/BP_GP_PlayerCharacter");
 	const FString PlayerControllerBlueprintPath = TEXT("/Game/GAS_Pattern/Player/BP_GP_PlayerController");
 	const FString MovementMappingContextPath = TEXT("/Game/GAS_Pattern/Input/IMC_Movement");

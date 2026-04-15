@@ -89,7 +89,7 @@ void AGP_PlayerCharacter::Tick(float DeltaSeconds)
 
 	if (bIsRolling)
 	{
-		UpdateRollMovement(DeltaSeconds);
+		UpdateRollState();
 	}
 
 	if (!bIsRolling && !ActiveLandingMontage.IsValid())
@@ -277,8 +277,7 @@ bool AGP_PlayerCharacter::TryPerformRoll()
 	RollDirection.Normalize();
 	SetActorRotation(RollDirection.Rotation());
 
-	const float PlayedLength = PlayAnimMontage(Montage, 1.0f);
-	if (PlayedLength <= 0.0f)
+	if (PlayAnimMontage(Montage, 1.0f) <= 0.0f)
 	{
 		return false;
 	}
@@ -286,11 +285,8 @@ bool AGP_PlayerCharacter::TryPerformRoll()
 	GetCharacterMovement()->StopMovementImmediately();
 	ConsumeMovementInputVector();
 
+	// 루트모션 롤이 시작되기 전에 진행 방향만 맞춰준다.
 	bIsRolling = true;
-	ActiveRollDirection = RollDirection;
-	ActiveRollDuration = PlayedLength;
-	ActiveRollElapsedTime = 0.0f;
-	ActiveRollDistanceTravelled = 0.0f;
 	ActiveRollMontage = Montage;
 	SetActorTickEnabled(true);
 
@@ -298,41 +294,22 @@ bool AGP_PlayerCharacter::TryPerformRoll()
 	return true;
 }
 
-void AGP_PlayerCharacter::UpdateRollMovement(float DeltaSeconds)
+void AGP_PlayerCharacter::UpdateRollState()
 {
 	if (!bIsRolling)
 	{
 		return;
 	}
 
-	if (!GetCharacterMovement())
+	if (!GetMesh())
 	{
 		FinishRoll();
 		return;
 	}
 
-	ActiveRollElapsedTime = FMath::Min(ActiveRollElapsedTime + DeltaSeconds, ActiveRollDuration);
-
-	const float Alpha = ActiveRollDuration > 0.0f ? ActiveRollElapsedTime / ActiveRollDuration : 1.0f;
-	const float TargetDistance = RollDistance * Alpha;
-	const float DeltaDistance = TargetDistance - ActiveRollDistanceTravelled;
-
-	if (DeltaDistance > KINDA_SMALL_NUMBER)
-	{
-		const FVector PreviousLocation = GetActorLocation();
-		FHitResult HitResult;
-		AddActorWorldOffset(ActiveRollDirection * DeltaDistance, true, &HitResult);
-		ActiveRollDistanceTravelled += FVector::Dist2D(PreviousLocation, GetActorLocation());
-
-		if (HitResult.bBlockingHit)
-		{
-			ActiveRollDistanceTravelled = RollDistance;
-		}
-	}
-
 	const UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
 	const bool bMontageStopped = !ActiveRollMontage.IsValid() || !AnimInstance || !AnimInstance->Montage_IsPlaying(ActiveRollMontage.Get());
-	if (ActiveRollElapsedTime >= ActiveRollDuration || bMontageStopped)
+	if (bMontageStopped)
 	{
 		FinishRoll();
 	}
@@ -341,10 +318,6 @@ void AGP_PlayerCharacter::UpdateRollMovement(float DeltaSeconds)
 void AGP_PlayerCharacter::FinishRoll()
 {
 	bIsRolling = false;
-	ActiveRollDirection = FVector::ZeroVector;
-	ActiveRollDuration = 0.0f;
-	ActiveRollElapsedTime = 0.0f;
-	ActiveRollDistanceTravelled = 0.0f;
 	ActiveRollMontage.Reset();
 
 	SetActorTickEnabled(false);
