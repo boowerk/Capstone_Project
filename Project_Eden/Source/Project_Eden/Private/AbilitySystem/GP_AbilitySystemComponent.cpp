@@ -27,6 +27,17 @@ void UGP_AbilitySystemComponent::OnRep_ActivateAbilities()
 	}
 }
 
+bool UGP_AbilitySystemComponent::TryActivateAbilityByTag(const FGameplayTag& AbilityTag)
+{
+	if (!AbilityTag.IsValid())
+	{
+		return false;
+	}
+
+	// 태그 기반 실행 규약을 컨트롤러와 BT 태스크에서도 재사용한다.
+	return TryActivateAbilitiesByTag(AbilityTag.GetSingleTagContainer());
+}
+
 // 어빌리티의 태그를 검사하여 특정 태그가 있다면 실행시키는 로직
 void UGP_AbilitySystemComponent::HandleAutoActivatedAbility(const FGameplayAbilitySpec& AbilitySpec)
 {

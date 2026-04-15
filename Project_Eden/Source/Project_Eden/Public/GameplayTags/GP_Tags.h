@@ -3,22 +3,28 @@
 #include "CoreMinimal.h"
 #include "NativeGameplayTags.h"
 
-// 파일명만 일관성을 유지하기위해 _를 사용함 - 슝민
+// 프로젝트 전반에서 재사용할 네이티브 게임플레이 태그 모음이다.
 namespace GPTags
 {
 	namespace GPAbilities
 	{
 		UE_DECLARE_GAMEPLAY_TAG_EXTERN(ActivateOnGiven);
 
-		UE_DECLARE_GAMEPLAY_TAG_EXTERN(Primary);    // 평타
-		UE_DECLARE_GAMEPLAY_TAG_EXTERN(Targeting);  // 구 입력 Q/타게팅
-		UE_DECLARE_GAMEPLAY_TAG_EXTERN(Skill);      // 구 입력 E/스킬
-		UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ultimate);   // 구 입력 R/궁극기
-		UE_DECLARE_GAMEPLAY_TAG_EXTERN(Skill_Q);    // 신 입력 Q
-		UE_DECLARE_GAMEPLAY_TAG_EXTERN(Skill_E);    // 신 입력 E
-		UE_DECLARE_GAMEPLAY_TAG_EXTERN(Skill_R);    // 신 입력 R
-		UE_DECLARE_GAMEPLAY_TAG_EXTERN(Dash);       // 대시/회피
-		UE_DECLARE_GAMEPLAY_TAG_EXTERN(Rolling);    // 구르기
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(Primary);
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(Targeting);
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(Skill);
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ultimate);
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(Skill_Q);
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(Skill_E);
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(Skill_R);
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(Dash);
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(Rolling);
+
+		namespace Enemy
+		{
+			// 공유 BT의 공격 태스크가 찾는 적 공격 어빌리티 태그다.
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Attack);
+		}
 	}
 
 	namespace Events
@@ -26,6 +32,9 @@ namespace GPTags
 		namespace Enemy
 		{
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(HitReact);
+
+			// 적 공격 몽타주에서 타격 프레임을 전달할 때 사용하는 이벤트 태그다.
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(AttackHit);
 		}
 	}
 
@@ -33,7 +42,7 @@ namespace GPTags
 	{
 		namespace Skill
 		{
-			UE_DECLARE_GAMEPLAY_TAG_EXTERN(WaterPuddle); // E스킬 물 장판 쿨타임
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(WaterPuddle);
 		}
 	}
 }
