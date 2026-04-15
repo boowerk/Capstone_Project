@@ -40,6 +40,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AI")
 	TObjectPtr<UBehaviorTree> DefaultBehaviorTreeAsset;
 
+	// 테스트 중에는 에디터 지정이 비어 있어도 프로젝트의 공용 BT/Blackboard를 자동으로 찾아 연결한다.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AI|Testing")
+	bool bUseSharedBehaviorAssetFallback = true;
+
 	// AI Perception의 공용 진입점이다. 감지 결과를 모아 타겟 선정에 사용한다.
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI|Perception")
 	TObjectPtr<UAIPerceptionComponent> EnemyPerceptionComponent;
@@ -96,7 +100,15 @@ protected:
 
 	// 이후 단계에서 비동기 평가 요청 루프를 쉽게 켜고 끌 수 있게 남겨둔다.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AI|LLM")
-	bool bEnableEvaluationRefreshLoop = true;
+	bool bEnableEvaluationRefreshLoop = false;
+
+	// 평가 함수가 없어도 테스트가 가능하도록 컨트롤러가 직접 전투 상태 키를 주기적으로 갱신한다.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AI|Testing", meta = (ClampMin = "0.05"))
+	float CombatStateUpdateInterval = 0.25f;
+
+	// 테스트 중에는 BT 서비스가 비어 있어도 이 내장 갱신기로 분기 키를 유지한다.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AI|Testing")
+	bool bEnableBuiltInCombatStateUpdater = true;
 
 	UFUNCTION()
 	void HandleTargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus);
@@ -110,6 +122,13 @@ protected:
 	void HandleEvaluationRefreshTimerElapsed();
 	void StartEvaluationRefreshLoop();
 	void StopEvaluationRefreshLoop();
+	void HandleCombatStateUpdateTimerElapsed();
+	void StartCombatStateUpdateLoop();
+	void StopCombatStateUpdateLoop();
+	void UpdateCombatStateBlackboard();
+	float GetCurrentHealthRatio() const;
+	void ResolveBehaviorAssets(APawn* InPawn, UBehaviorTree*& OutBehaviorTreeAsset, UBlackboardData*& OutBlackboardAsset) const;
+	bool ValidateSharedBlackboardSchema(UBlackboardComponent* BlackboardComponent);
 
 	void ConfigureSightSense();
 	void RefreshTargetActorFromPerception();
@@ -119,9 +138,11 @@ protected:
 
 	FTimerHandle PendingEnemyEvaluationTimerHandle;
 	FTimerHandle EvaluationRefreshTimerHandle;
+	FTimerHandle CombatStateUpdateTimerHandle;
 
 	bool bHasPendingEnemyEvaluation = false;
 	bool bHasLastAppliedEnemyEvaluation = false;
+	bool bHasWarnedAboutMissingBlackboardKeys = false;
 	float LastEnemyEvaluationApplyTime = -1000.0f;
 	FEnemyLLMEvaluation PendingEnemyEvaluation;
 	FEnemyLLMEvaluation LastAppliedEnemyEvaluation;

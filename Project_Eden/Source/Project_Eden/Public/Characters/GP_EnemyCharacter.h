@@ -6,6 +6,8 @@
 
 class UAbilitySystemComponent;
 class UAttributeSet;
+class UBehaviorTree;
+class UBlackboardData;
 class UEnemyArchetypeData;
 struct FDataTableRowHandle;
 struct FEnemyArchetypeTuning;
@@ -30,6 +32,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "AI")
 	FVector GetBehaviorAnchorLocation() const;
 
+	UFUNCTION(BlueprintPure, Category = "AI")
+	UBehaviorTree* GetBehaviorTreeAssetOverride() const { return BehaviorTreeAssetOverride; }
+
+	UFUNCTION(BlueprintPure, Category = "AI")
+	UBlackboardData* GetBlackboardAssetOverride() const { return BlackboardAssetOverride; }
+
 	// 현재 적 인스턴스의 시작 성향값을 계산해 공유 Blackboard에 넣을 준비를 한다.
 	bool BuildInitialEnemyEvaluation(FEnemyLLMEvaluation& OutEvaluation) const;
 
@@ -39,6 +47,13 @@ protected:
 	// 향후 EQS나 복귀 로직에서 사용할 기준 위치를 월드에 배치할 수 있도록 유지한다.
 	UPROPERTY(EditInstanceOnly, Category = "AI", meta = (MakeEditWidget = "true"))
 	FVector BehaviorAnchorOffset = FVector::ZeroVector;
+
+	// 테스트 중에는 적 액터 자체에서 공유 BT/Blackboard를 직접 지정할 수 있게 노출한다.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AI|Assets")
+	TObjectPtr<UBehaviorTree> BehaviorTreeAssetOverride;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AI|Assets")
+	TObjectPtr<UBlackboardData> BlackboardAssetOverride;
 
 	// 가장 권장하는 경로로, 적 아키타입별 기본 성향을 DataAsset으로 정의한다.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AI|Config")
