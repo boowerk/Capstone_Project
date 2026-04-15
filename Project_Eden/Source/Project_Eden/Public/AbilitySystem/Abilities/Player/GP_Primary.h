@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -15,15 +15,20 @@ class PROJECT_EDEN_API UGP_Primary : public UGP_GameplayAbility
 {
 	GENERATED_BODY()
 public:
-	UFUNCTION(BlueprintCallable, Category = "GAS|Abilities")
-	TArray<AActor*> HitboxOverlapTest();
+	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
+
 	
-	UFUNCTION(BlueprintCallable, Category = "GAS|Abilities")
-	void SendHitReactEventToActors(const TArray<AActor*>& ActorsHit);
+protected:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS|Abilities|Attack")
+	TObjectPtr<UAnimMontage> AttackMontage; // 이 변수 세팅시 자동 재생, 비워두면 BP에서 조작
 	
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS|Abilities|Attack")
+	FGameplayTag AttackEventTag;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Effects")
+	TSubclassOf<UGameplayEffect> DamageEffectClass;
 	
 private:
-	void DrawDebugsHitBoxOverlap(const TArray<FOverlapResult>& OverlapResults, const FVector& HitBoxLocation) const;
 	
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Abilities")
 	float HitBoxRadius = 100.0f;	
@@ -33,4 +38,10 @@ private:
 	
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Abilities")
 	float HitBoxElevationOffset = 20.0f;
+	
+	UFUNCTION()
+	void OnMontageCompleted();
+
+	UFUNCTION()
+	void OnAttackEventReceived(FGameplayEventData Payload);
 };

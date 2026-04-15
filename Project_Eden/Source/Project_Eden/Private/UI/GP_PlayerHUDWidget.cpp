@@ -1,8 +1,10 @@
-#include "UI/GP_PlayerHUDWidget.h"
-
+﻿#include "UI/GP_PlayerHUDWidget.h"
 #include "Components/ProgressBar.h"
 #include "Components/TextBlock.h"
 #include "Components/Widget.h"
+#include "AbilitySystemComponent.h"
+#include "AbilitySystem/GP_AttributeSet.h"
+#include "Characters/GP_BaseCharacter.h"
 
 UGP_PlayerHUDWidget::UGP_PlayerHUDWidget(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -15,6 +17,17 @@ void UGP_PlayerHUDWidget::NativePreConstruct()
 {
 	Super::NativePreConstruct();
 	RefreshPreview();
+	if (AGP_BaseCharacter* BaseChar = Cast<AGP_BaseCharacter>(GetOwningPlayerPawn()))
+	{
+		if (UAbilitySystemComponent* ASC = BaseChar->GetAbilitySystemComponent())
+		{
+			BindToASC(ASC);
+		}
+		else
+		{
+			BaseChar->OnASCInitialized.AddDynamic(this, &ThisClass::OnASCInitializedCallback);
+		}
+	}
 }
 
 void UGP_PlayerHUDWidget::NativeConstruct()
@@ -23,12 +36,48 @@ void UGP_PlayerHUDWidget::NativeConstruct()
 	RefreshPreview();
 }
 
-void UGP_PlayerHUDWidget::SetVitals(float InHealthPercent, float InFocusPercent, float InStaminaPercent)
+void UGP_PlayerHUDWidget::BindToASC(UAbilitySystemComponent* InASC)
 {
-	HealthPercent = FMath::Clamp(InHealthPercent, 0.0f, 1.0f);
-	FocusPercent = FMath::Clamp(InFocusPercent, 0.0f, 1.0f);
-	StaminaPercent = FMath::Clamp(InStaminaPercent, 0.0f, 1.0f);
-	RefreshPreview();
+	if (!IsValid(InASC)) return;
+
+	UGP_AttributeSet* AS = const_cast<UGP_AttributeSet*>(Cast<UGP_AttributeSet>(InASC->GetAttributeSet(UGP_AttributeSet::StaticClass())));
+	if (!IsValid(AS)) return;
+
+	auto BindWidgetDelegates = [InASC, AS](UGP_AttributeWidget* Widget)
+	{
+		if (!Widget) return;
+
+		TTuple<FGameplayAttribute, FGameplayAttribute> Pair(Widget->Attribute, Widget->MaxAttribute);
+        
+		// 1. 바인딩 즉시 현재 수치로 1회 강제 업데이트
+		Widget->OnAttributeChange(Pair, AS);
+
+		// 메모리 보호를 위해 약은 포인터 생성
+		TWeakObjectPtr<UGP_AttributeWidget> WeakWidget(Widget);
+		TWeakObjectPtr<UGP_AttributeSet> WeakAS(AS);
+
+		// 2. 현재값 변화 감지
+		InASC->GetGameplayAttributeValueChangeDelegate(Pair.Key).AddLambda([WeakWidget, Pair, WeakAS](const FOnAttributeChangeData& Data)
+		{
+			if (WeakWidget.IsValid() && WeakAS.IsValid())
+			{
+				WeakWidget->OnAttributeChange(Pair, WeakAS.Get());
+			}
+		});
+
+		// 3. 최대값 변화 감지
+		InASC->GetGameplayAttributeValueChangeDelegate(Pair.Value).AddLambda([WeakWidget, Pair, WeakAS](const FOnAttributeChangeData& Data)
+		{
+			if (WeakWidget.IsValid() && WeakAS.IsValid())
+			{
+				WeakWidget->OnAttributeChange(Pair, WeakAS.Get());
+			}
+		});
+	};
+
+	BindWidgetDelegates(HealthBar);
+	BindWidgetDelegates(ManaBar);
+	BindWidgetDelegates(StaminaBar);
 }
 
 void UGP_PlayerHUDWidget::SetLocationText(const FText& InLocationText)
@@ -51,33 +100,12 @@ void UGP_PlayerHUDWidget::SetBossVisible(bool bIsVisible)
 
 void UGP_PlayerHUDWidget::RefreshPreview()
 {
-	if (HealthBar)
-	{
-		HealthBar->SetPercent(HealthPercent);
-	}
+	if (LocationTextBlock) LocationTextBlock->SetText(LocationText);
+	if (BossTextBlock) BossTextBlock->SetText(BossText);
+	if (BossFrame) BossFrame->SetVisibility(bShowBossFrame ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+}
 
-	if (FocusBar)
-	{
-		FocusBar->SetPercent(FocusPercent);
-	}
-
-	if (StaminaBar)
-	{
-		StaminaBar->SetPercent(StaminaPercent);
-	}
-
-	if (LocationTextBlock)
-	{
-		LocationTextBlock->SetText(LocationText);
-	}
-
-	if (BossTextBlock)
-	{
-		BossTextBlock->SetText(BossText);
-	}
-
-	if (BossFrame)
-	{
-		BossFrame->SetVisibility(bShowBossFrame ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
-	}
+void UGP_PlayerHUDWidget::OnASCInitializedCallback(UAbilitySystemComponent* ASC, UAttributeSet* AS)
+{
+	BindToASC(ASC);
 }

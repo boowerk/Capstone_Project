@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
@@ -6,7 +6,7 @@
 #include "PDA_PCGItemGroup.generated.h"
 
 
- // ¾ÆÀÌÅÛµéÀÇ ±×·ìÀ» Á¤ÀÇÇÏ´Â PDA
+ // ì•„ì´í…œë“¤ì˜ ê·¸ë£¹ì„ ì •ì˜í•˜ëŠ” PDA
 UCLASS(BlueprintType)
 class PROJECT_EDEN_API UPDA_PCGItemGroup : public UPrimaryDataAsset
 {

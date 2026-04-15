@@ -4,11 +4,7 @@
 #include "AbilitySystem/GP_AbilitySystemComponent.h"
 #include "BehaviorTree/BehaviorTree.h"
 #include "AI/PlayerBehaviorTreeBuilder.h"
-//#include "AbilitySystemBlueprintLibrary.h"
-//#include "AbilitySystem/GP_AbilitySystemComponent.h"
-//#include "AbilitySystem/GP_AttributeSet.h"
-//#include "GameplayTags/GPTags.h"
-//#include "Net/UnrealNetwork.h"
+#include "AbilitySystem/GP_AttributeSet.h"
 
 
 AGP_EnemyCharacter::AGP_EnemyCharacter()
@@ -18,10 +14,15 @@ AGP_EnemyCharacter::AGP_EnemyCharacter()
 	AbilitySystemComponent = CreateDefaultSubobject<UGP_AbilitySystemComponent>("AbilitySystemComponent");
 	AbilitySystemComponent->SetIsReplicated(true);
 	AbilitySystemComponent->SetReplicationMode(EGameplayEffectReplicationMode::Minimal);
+	
+	AttributeSet = CreateDefaultSubobject<UGP_AttributeSet>("AttributeSet");
 
 }
 
-
+UAttributeSet* AGP_EnemyCharacter::GetAttributeSet() const
+{
+	return AttributeSet;
+}
 
 UAbilitySystemComponent* AGP_EnemyCharacter::GetAbilitySystemComponent() const
 {
@@ -51,14 +52,16 @@ void AGP_EnemyCharacter::BeginPlay()
 	if (!IsValid(GetAbilitySystemComponent())) return;
 
 	GetAbilitySystemComponent()->InitAbilityActorInfo(this, this);
-
+	OnASCInitialized.Broadcast(GetAbilitySystemComponent(), GetAttributeSet());
+	
 	if (!HasAuthority()) return;
 
 	GiveStartupAbilities();
+	InitializeAttributes();
 	
-	// 諛깆???異붽? 
+	// 비헤이비어 트리 추가
 	InitializeRuntimeBehaviorTree();
-	BehaviorAnchorLocation = GetActorTransform().TransformPosition(BehaviorAnchorOffset); // HasAuthority ?먮룆 ?꾨줈 ?대룞, ?대퉴由ы떚??援ъ“瑜?移⑤쾾?섎?濡??쒓굅?덉젙
+	BehaviorAnchorLocation = GetActorTransform().TransformPosition(BehaviorAnchorOffset); // HasAuthority 단독으로 이동하면, 어빌리티의 구조를 침범하므로 제거 예정
 }
 
 void AGP_EnemyCharacter::InitializeRuntimeBehaviorTree()

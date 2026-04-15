@@ -1,65 +1,104 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿#include "AbilitySystem/Abilities/Player/GP_Primary.h"
 
-#include "AbilitySystem/Abilities/Player/GP_Primary.h"
-
-#include "Engine/OverlapResult.h"
 #include "AbilitySystemBlueprintLibrary.h"
+#include "AbilitySystem/GP_AttributeSet.h"
+#include "Characters/GP_PlayerCharacter.h"
 #include "GameplayTags/GP_Tags.h"
 
-TArray<AActor*> UGP_Primary::HitboxOverlapTest()
-{
-	TArray<AActor*> ActorToIgnore;
-	ActorToIgnore.Add(GetAvatarActorFromActorInfo());
-	
-	FCollisionQueryParams CollisionQueryParams;
-	CollisionQueryParams.AddIgnoredActors(ActorToIgnore);
-	
-	FCollisionResponseParams CollisionResponseParams;
-	CollisionResponseParams.CollisionResponse.SetAllChannels(ECR_Ignore);
-	CollisionResponseParams.CollisionResponse.SetResponse(ECC_Pawn,ECR_Block);
-	
-	TArray<FOverlapResult> OverlapResults;
-	FCollisionShape CollisionShapeSphere = FCollisionShape::MakeSphere(HitBoxRadius); 
-	
-	const FVector Forward = GetAvatarActorFromActorInfo()->GetActorForwardVector() * HitBoxForwardOffset;
-	const FVector HitBoxLocation = GetAvatarActorFromActorInfo()->GetActorLocation() + Forward + FVector(0.f,0.f,HitBoxElevationOffset);
-	
-	GetWorld()->OverlapMultiByChannel(OverlapResults, HitBoxLocation, FQuat::Identity, 
-		ECC_Visibility, CollisionShapeSphere, CollisionQueryParams,CollisionResponseParams);
+#include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
+#include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
+#include "Utils/GP_BlueprintLibrary.h"
 
-	TArray<AActor*> ActorsHit;
-	for (const FOverlapResult& Result : OverlapResults)
+// 이 부분은 BP에도 관상용으로 만들어뒀으니 블루프린트 코드로 만들고싶으면 보셈 - 슝민
+void UGP_Primary::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
+                                  const FGameplayAbilityActivationInfo ActivationInfo,
+                                  const FGameplayEventData* TriggerEventData)
+{
+	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
+	
 	{
-		if (!IsValid(Result.GetActor())) continue;
-		ActorsHit.AddUnique(Result.GetActor());		
+		if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
+		{
+			EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+			return;
+		}
+
+		// Sequence 1: Gameplay Event 대기 Task 생성 
+		if (AttackEventTag.IsValid())
+		{
+			UAbilityTask_WaitGameplayEvent* WaitEventTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(
+				this, AttackEventTag, nullptr, true, true);
+			if (WaitEventTask)
+			{
+				// 이벤트가 들어오면 OnAttackEventReceived()
+				WaitEventTask->EventReceived.AddDynamic(this, &ThisClass::OnAttackEventReceived);
+				WaitEventTask->ReadyForActivation();
+			}
+		}
+
+		UAnimMontage* MontageToPlay = AttackMontage;
+		AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo());
+		if (PlayerCharacter)
+		{
+			if (UAnimMontage* CharacterMontage = PlayerCharacter->GetPrimaryAttackMontage())
+			{
+				MontageToPlay = CharacterMontage;
+			}
+		}
+
+		// Sequence 0: 몽타주 Task 생성
+		if (MontageToPlay) // 캐릭터 세트 우선, 없으면 어빌리티 기본값 사용
+		{
+			UAbilityTask_PlayMontageAndWait* PlayMontageTask =
+				UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(this, NAME_None, MontageToPlay, 1.0f);
+			if (PlayMontageTask)
+			{
+				if (PlayerCharacter)
+				{
+					PlayerCharacter->SetPrimaryAttackActive(true);
+				}
+
+				// 애니메이션이 끝나거나 취소되면 OnMontageCompleted()
+				PlayMontageTask->OnCompleted.AddDynamic(this, &ThisClass::OnMontageCompleted);
+				PlayMontageTask->OnBlendOut.AddDynamic(this, &ThisClass::OnMontageCompleted);
+				PlayMontageTask->OnInterrupted.AddDynamic(this, &ThisClass::OnMontageCompleted);
+				PlayMontageTask->OnCancelled.AddDynamic(this, &ThisClass::OnMontageCompleted);
+
+				PlayMontageTask->ReadyForActivation();
+			}
+		}
+		else // 몽타주가 비어있음 블루프린트 몽타주로
+		{
+			if (bDrawDebugs)
+			{
+				UE_LOG(LogTemp, Warning,
+				       TEXT("Primary Attack: C++ Montage is NULL. Waiting for Blueprint to handle Montage."));
+			}
+		}
 	}
-	
-	if (bDrawDebugs)
-	{
-		DrawDebugsHitBoxOverlap(OverlapResults, HitBoxLocation);
-	}
-	
-	return ActorsHit;
-	
 }
 
-void UGP_Primary::SendHitReactEventToActors(const TArray<AActor*>& ActorsHit)
+void UGP_Primary::OnMontageCompleted()
 {
-	for (AActor* HitActor : ActorsHit)
+	if (AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo()))
 	{
-		FGameplayEventData Payload;
-		Payload.Instigator = GetAvatarActorFromActorInfo();
-		UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(HitActor, GPTags::Events::Enemy::HitReact, Payload);
+		PlayerCharacter->SetPrimaryAttackActive(false);
 	}
+
+	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 }
 
-void UGP_Primary::DrawDebugsHitBoxOverlap(const TArray<FOverlapResult>& OverlapResults, const FVector& HitBoxLocation) const
+void UGP_Primary::OnAttackEventReceived(FGameplayEventData Payload)
 {
-	DrawDebugSphere(GetWorld(), HitBoxLocation, HitBoxRadius, 16, FColor::Red, false,  3.f);
-	for (const FOverlapResult& Result : OverlapResults)
+	TArray<AActor*> HitActors = UGP_BlueprintLibrary::SphereMeleeHitBoxOverlap(
+		GetAvatarActorFromActorInfo(), HitBoxRadius, HitBoxForwardOffset, HitBoxElevationOffset, bDrawDebugs);
+
+	UGP_BlueprintLibrary::SendGameplayEventToActors(GetAvatarActorFromActorInfo(), HitActors,
+	                                                GPTags::Events::Enemy::HitReact);
+
+	if (HasAuthority(&CurrentActivationInfo))
 	{
-		FVector DebugLocation = Result.GetActor()->GetActorLocation();
-		DebugLocation.Z += 100.f;
-		DrawDebugSphere(GetWorld(), DebugLocation, 30.f, 10, FColor::Green, false,  3.f);
+		UGP_BlueprintLibrary::ApplyGameplayEffectToActors(GetAvatarActorFromActorInfo(), HitActors, DamageEffectClass,
+		                                                  GetAbilityLevel());
 	}
 }

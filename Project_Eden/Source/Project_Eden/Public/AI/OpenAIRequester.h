@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "CoreMinimal.h"
 #include "Interfaces/IHttpRequest.h"
 #include "UObject/NoExportTypes.h"

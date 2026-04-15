@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+﻿// Copyright Epic Games, Inc. All Rights Reserved.
 
 using UnrealBuildTool;
 
@@ -27,9 +27,21 @@ public class Project_Eden : ModuleRules
 
 		PrivateDependencyModuleNames.AddRange(new string[] { 
 			"Slate", 
-			"SlateCore",
-			"UnrealEd" 
+			"SlateCore"
 		});
+
+		if (Target.bBuildEditor)
+		{
+			PrivateDependencyModuleNames.AddRange(new string[]
+			{
+				"UnrealEd",
+				"AssetTools",
+				"AnimGraph",
+				"BlueprintGraph",
+				"KismetCompiler",
+				"InputEditor",
+			});
+		}
 
 		// To include OnlineSubsystemSteam, add it to the plugins section in your uproject file with the Enabled attribute set to true
 	}
