@@ -49,6 +49,10 @@
 		{
 			"Name": "PCGExtendedToolkit",
 			"Enabled": true
+		},
+		{
+			"Name": "Landmass",
+			"Enabled": true
 		}
 	]
 }
