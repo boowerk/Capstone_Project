@@ -1,7 +1,6 @@
 #include "AI/Controllers/EnemyAIController.h"
 
 #include "AI/Data/EnemyBlackboardKeys.h"
-#include "AI/Data/EnemyLLMEvaluation.h"
 #include "BehaviorTree/BehaviorTree.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "BehaviorTree/BlackboardData.h"
@@ -11,6 +10,42 @@
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISense_Sight.h"
 #include "Perception/AISenseConfig_Sight.h"
+#include "TimerManager.h"
+
+namespace
+{
+	float SanitizeFiniteFloat(float InValue, float FallbackValue, float MinValue, float MaxValue)
+	{
+		return FMath::IsFinite(InValue)
+			? FMath::Clamp(InValue, MinValue, MaxValue)
+			: FMath::Clamp(FallbackValue, MinValue, MaxValue);
+	}
+
+	FEnemyLLMEvaluation SanitizeEnemyEvaluationForRuntime(
+		const FEnemyLLMEvaluation& InEvaluation,
+		const FEnemyLLMEvaluation& FallbackEvaluation)
+	{
+		FEnemyLLMEvaluation SafeEvaluation = InEvaluation;
+		SafeEvaluation.Aggression = SanitizeFiniteFloat(SafeEvaluation.Aggression, FallbackEvaluation.Aggression, 0.0f, 1.0f);
+		SafeEvaluation.PreferredRange = SanitizeFiniteFloat(SafeEvaluation.PreferredRange, FallbackEvaluation.PreferredRange, 0.0f, 3000.0f);
+		SafeEvaluation.RetreatThreshold = SanitizeFiniteFloat(SafeEvaluation.RetreatThreshold, FallbackEvaluation.RetreatThreshold, 0.0f, 1.0f);
+		SafeEvaluation.ChasePersistence = SanitizeFiniteFloat(SafeEvaluation.ChasePersistence, FallbackEvaluation.ChasePersistence, 0.0f, 1.0f);
+		SafeEvaluation.CoverPreference = SanitizeFiniteFloat(SafeEvaluation.CoverPreference, FallbackEvaluation.CoverPreference, 0.0f, 1.0f);
+		SafeEvaluation.ValidateAndClamp();
+		return SafeEvaluation;
+	}
+
+	bool AreEnemyEvaluationsEffectivelyEqual(const FEnemyLLMEvaluation& Left, const FEnemyLLMEvaluation& Right)
+	{
+		return Left.EnemyMode == Right.EnemyMode
+			&& Left.FocusTargetRule == Right.FocusTargetRule
+			&& FMath::IsNearlyEqual(Left.Aggression, Right.Aggression, KINDA_SMALL_NUMBER)
+			&& FMath::IsNearlyEqual(Left.PreferredRange, Right.PreferredRange, KINDA_SMALL_NUMBER)
+			&& FMath::IsNearlyEqual(Left.RetreatThreshold, Right.RetreatThreshold, KINDA_SMALL_NUMBER)
+			&& FMath::IsNearlyEqual(Left.ChasePersistence, Right.ChasePersistence, KINDA_SMALL_NUMBER)
+			&& FMath::IsNearlyEqual(Left.CoverPreference, Right.CoverPreference, KINDA_SMALL_NUMBER);
+	}
+}
 
 AEnemyAIController::AEnemyAIController()
 {
@@ -38,15 +73,82 @@ void AEnemyAIController::OnPossess(APawn* InPawn)
 	// 에디터에서 바꾼 감지 파라미터를 실제 런타임 설정에 다시 반영한다.
 	ConfigureSightSense();
 	InitializeBehaviorTree(InPawn);
+	StartEvaluationRefreshLoop();
+
+	// possess 이전에 도착한 평가값이 있다면 Blackboard가 준비된 직후 안전하게 반영한다.
+	if (bHasPendingEnemyEvaluation)
+	{
+		HandlePendingEnemyEvaluationTimerElapsed();
+	}
+
 	RefreshTargetActorFromPerception();
 }
 
 void AEnemyAIController::OnUnPossess()
 {
+	StopEvaluationRefreshLoop();
+	GetWorldTimerManager().ClearTimer(PendingEnemyEvaluationTimerHandle);
+
 	// 폰을 잃으면 이전 타겟이 남아 있지 않도록 Blackboard를 정리한다.
 	SetBlackboardTargetActor(nullptr);
 
 	Super::OnUnPossess();
+}
+
+bool AEnemyAIController::SubmitEnemyEvaluation(const FEnemyLLMEvaluation& InEvaluation, bool bForceImmediate)
+{
+	const FEnemyLLMEvaluation FallbackEvaluation = bHasLastAppliedEnemyEvaluation
+		? LastAppliedEnemyEvaluation
+		: FEnemyLLMEvaluation::MakeSafeDefault();
+
+	const FEnemyLLMEvaluation SafeEvaluation = SanitizeEnemyEvaluationForRuntime(InEvaluation, FallbackEvaluation);
+	if (bHasLastAppliedEnemyEvaluation && AreEnemyEvaluationsEffectivelyEqual(LastAppliedEnemyEvaluation, SafeEvaluation))
+	{
+		// 실질적으로 달라진 값이 없으면 Blackboard를 다시 쓰지 않아 분기 흔들림을 줄인다.
+		return true;
+	}
+
+	const UWorld* World = GetWorld();
+	const float CurrentTime = World != nullptr ? World->GetTimeSeconds() : 0.0f;
+	const float TimeSinceLastApply = CurrentTime - LastEnemyEvaluationApplyTime;
+	const bool bCanApplyNow = bForceImmediate
+		|| !bHasLastAppliedEnemyEvaluation
+		|| TimeSinceLastApply >= MinEnemyEvaluationApplyInterval;
+
+	if (bCanApplyNow)
+	{
+		GetWorldTimerManager().ClearTimer(PendingEnemyEvaluationTimerHandle);
+		bHasPendingEnemyEvaluation = false;
+		return ApplyEnemyEvaluationInternal(SafeEvaluation);
+	}
+
+	// 너무 빠르게 들어온 최신 평가값은 마지막 것만 보관했다가 최소 간격 후 반영한다.
+	PendingEnemyEvaluation = SafeEvaluation;
+	bHasPendingEnemyEvaluation = true;
+
+	const float RemainingDelay = FMath::Max(0.0f, MinEnemyEvaluationApplyInterval - TimeSinceLastApply);
+	GetWorldTimerManager().SetTimer(
+		PendingEnemyEvaluationTimerHandle,
+		this,
+		&ThisClass::HandlePendingEnemyEvaluationTimerElapsed,
+		RemainingDelay,
+		false);
+
+	return true;
+}
+
+bool AEnemyAIController::SubmitEnemyEvaluationFromJson(const FString& JsonPayload, bool bForceImmediate)
+{
+	FEnemyLLMEvaluation ParsedEvaluation;
+	const bool bParsed = FEnemyLLMEvaluationParser::ParseFromJson(JsonPayload, ParsedEvaluation);
+	if (!bParsed)
+	{
+		// 파싱 실패 응답은 현재 Blackboard 값을 덮어쓰지 않고 무시해 행동 불안정을 막는다.
+		UE_LOG(LogTemp, Warning, TEXT("[EnemyAIController] 유효하지 않은 JSON 평가값을 무시합니다: %s"), *GetName());
+		return false;
+	}
+
+	return SubmitEnemyEvaluation(ParsedEvaluation, bForceImmediate);
 }
 
 bool AEnemyAIController::ApplyEnemyEvaluationToBlackboard(const FEnemyLLMEvaluation& InEvaluation)
@@ -61,6 +163,7 @@ bool AEnemyAIController::ApplyEnemyEvaluationToBlackboard(const FEnemyLLMEvaluat
 	FEnemyLLMEvaluation SafeEvaluation = InEvaluation;
 	SafeEvaluation.ValidateAndClamp();
 
+	// BT를 재구성하지 않고 Blackboard 값만 갱신해 기존 분기들이 자동으로 반응하게 만든다.
 	BlackboardComponent->SetValueAsName(EnemyBlackboardKeys::EnemyMode, SafeEvaluation.GetEnemyModeBlackboardValue());
 	BlackboardComponent->SetValueAsFloat(EnemyBlackboardKeys::Aggression, SafeEvaluation.Aggression);
 	BlackboardComponent->SetValueAsFloat(EnemyBlackboardKeys::PreferredRange, SafeEvaluation.PreferredRange);
@@ -140,11 +243,73 @@ void AEnemyAIController::InitializeBlackboardValues(APawn* InPawn)
 	}
 
 	ApplyEnemyEvaluationToBlackboard(InitialEvaluation);
+	LastAppliedEnemyEvaluation = InitialEvaluation;
+	bHasLastAppliedEnemyEvaluation = true;
+	LastEnemyEvaluationApplyTime = GetWorld() != nullptr ? GetWorld()->GetTimeSeconds() : 0.0f;
 }
 
 UBlackboardComponent* AEnemyAIController::GetEnemyBlackboardComponent()
 {
 	return GetBlackboardComponent();
+}
+
+bool AEnemyAIController::ApplyEnemyEvaluationInternal(const FEnemyLLMEvaluation& InEvaluation)
+{
+	if (!ApplyEnemyEvaluationToBlackboard(InEvaluation))
+	{
+		// Blackboard가 아직 없으면 최신 평가값을 보관해 possess 이후 다시 시도한다.
+		PendingEnemyEvaluation = InEvaluation;
+		bHasPendingEnemyEvaluation = true;
+		return false;
+	}
+
+	LastAppliedEnemyEvaluation = InEvaluation;
+	bHasLastAppliedEnemyEvaluation = true;
+	bHasPendingEnemyEvaluation = false;
+	LastEnemyEvaluationApplyTime = GetWorld() != nullptr ? GetWorld()->GetTimeSeconds() : 0.0f;
+	return true;
+}
+
+void AEnemyAIController::HandlePendingEnemyEvaluationTimerElapsed()
+{
+	if (!bHasPendingEnemyEvaluation)
+	{
+		return;
+	}
+
+	const FEnemyLLMEvaluation QueuedEvaluation = PendingEnemyEvaluation;
+	bHasPendingEnemyEvaluation = false;
+	ApplyEnemyEvaluationInternal(QueuedEvaluation);
+}
+
+void AEnemyAIController::HandleEvaluationRefreshTimerElapsed()
+{
+	// Step 8에서는 실제 네트워크/LLM 요청을 보내지 않는다.
+	// 이후에는 여기서 플레이어 상태 요약 생성 -> 비동기 서비스 요청 -> 응답 시 SubmitEnemyEvaluation 호출 흐름을 붙인다.
+}
+
+void AEnemyAIController::StartEvaluationRefreshLoop()
+{
+	if (!bEnableEvaluationRefreshLoop || EvaluationRefreshInterval <= 0.0f)
+	{
+		return;
+	}
+
+	// 매 프레임이 아니라 고정 간격으로만 평가 요청 루프를 돌려 비용과 분기 흔들림을 줄인다.
+	GetWorldTimerManager().SetTimer(
+		EvaluationRefreshTimerHandle,
+		this,
+		&ThisClass::HandleEvaluationRefreshTimerElapsed,
+		EvaluationRefreshInterval,
+		true);
+}
+
+void AEnemyAIController::StopEvaluationRefreshLoop()
+{
+	if (GetWorld() != nullptr)
+	{
+		GetWorldTimerManager().ClearTimer(EvaluationRefreshTimerHandle);
+	}
 }
 
 void AEnemyAIController::ConfigureSightSense()

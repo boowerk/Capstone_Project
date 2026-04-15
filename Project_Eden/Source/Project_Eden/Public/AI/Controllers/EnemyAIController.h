@@ -1,7 +1,8 @@
 #pragma once
 
-#include "CoreMinimal.h"
+#include "AI/Data/EnemyLLMEvaluation.h"
 #include "AIController.h"
+#include "CoreMinimal.h"
 #include "Perception/AIPerceptionTypes.h"
 #include "EnemyAIController.generated.h"
 
@@ -12,7 +13,6 @@ class UAISenseConfig_Sight;
 class UBehaviorTree;
 class UBlackboardComponent;
 class UBlackboardData;
-struct FEnemyLLMEvaluation;
 
 UCLASS()
 class PROJECT_EDEN_API AEnemyAIController : public AAIController
@@ -22,7 +22,11 @@ class PROJECT_EDEN_API AEnemyAIController : public AAIController
 public:
 	AEnemyAIController();
 
-	bool ApplyEnemyEvaluationToBlackboard(const FEnemyLLMEvaluation& InEvaluation);
+	// 외부 시스템이 계산한 평가값을 안전하게 받아 Blackboard에 반영한다.
+	bool SubmitEnemyEvaluation(const FEnemyLLMEvaluation& InEvaluation, bool bForceImmediate = false);
+
+	// 이후 실제 LLM 응답이 JSON으로 들어오면 이 진입점을 통해 파싱 후 반영할 수 있다.
+	bool SubmitEnemyEvaluationFromJson(const FString& JsonPayload, bool bForceImmediate = false);
 
 protected:
 	virtual void OnPossess(APawn* InPawn) override;
@@ -82,16 +86,43 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AI|Perception|Affiliation")
 	bool bDetectNeutrals = true;
 
+	// 평가값을 너무 자주 덮어쓰지 않도록 적용 최소 간격을 둔다.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AI|LLM", meta = (ClampMin = "0.1"))
+	float MinEnemyEvaluationApplyInterval = 1.0f;
+
+	// 실제 네트워크/LLM 요청을 붙일 때 사용할 권장 갱신 주기다.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AI|LLM", meta = (ClampMin = "0.1"))
+	float EvaluationRefreshInterval = 2.0f;
+
+	// 이후 단계에서 비동기 평가 요청 루프를 쉽게 켜고 끌 수 있게 남겨둔다.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AI|LLM")
+	bool bEnableEvaluationRefreshLoop = true;
+
 	UFUNCTION()
 	void HandleTargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus);
 
 	bool InitializeBehaviorTree(APawn* InPawn);
 	virtual void InitializeBlackboardValues(APawn* InPawn);
 	UBlackboardComponent* GetEnemyBlackboardComponent();
+	bool ApplyEnemyEvaluationToBlackboard(const FEnemyLLMEvaluation& InEvaluation);
+	bool ApplyEnemyEvaluationInternal(const FEnemyLLMEvaluation& InEvaluation);
+	void HandlePendingEnemyEvaluationTimerElapsed();
+	void HandleEvaluationRefreshTimerElapsed();
+	void StartEvaluationRefreshLoop();
+	void StopEvaluationRefreshLoop();
 
 	void ConfigureSightSense();
 	void RefreshTargetActorFromPerception();
 	AActor* SelectBestTargetActorFromPerception() const;
 	bool IsValidPerceptionTarget(AActor* CandidateActor) const;
 	void SetBlackboardTargetActor(AActor* NewTargetActor);
+
+	FTimerHandle PendingEnemyEvaluationTimerHandle;
+	FTimerHandle EvaluationRefreshTimerHandle;
+
+	bool bHasPendingEnemyEvaluation = false;
+	bool bHasLastAppliedEnemyEvaluation = false;
+	float LastEnemyEvaluationApplyTime = -1000.0f;
+	FEnemyLLMEvaluation PendingEnemyEvaluation;
+	FEnemyLLMEvaluation LastAppliedEnemyEvaluation;
 };
