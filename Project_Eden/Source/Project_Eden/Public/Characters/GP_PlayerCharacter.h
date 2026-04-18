@@ -31,6 +31,7 @@ public:
 	bool TryPerformRoll();
 	bool IsRolling() const { return bIsRolling; }
 	bool IsPrimaryAttacking() const { return bIsPrimaryAttacking; }
+	bool IsSprintExitControlLocked() const { return bIsSprintExitControlLocked; }
 	void SetSprinting(bool bShouldSprint);
 	void SetPrimaryAttackActive(bool bIsActive);
 	UPDA_CharacterAnimationSet* GetAnimationSet() const { return AnimationSet; }
@@ -39,6 +40,10 @@ public:
 	UAnimMontage* GetLandingMontage() const;
 	UAnimMontage* GetRollMontage() const;
 	UAnimMontage* GetPrimaryAttackMontage() const;
+	UAnimMontage* GetSprintEnterLeftMontage() const;
+	UAnimMontage* GetSprintEnterRightMontage() const;
+	UAnimMontage* GetSprintExitLeftMontage() const;
+	UAnimMontage* GetSprintExitRightMontage() const;
 	
 
 private:
@@ -85,19 +90,69 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Speed", meta = (AllowPrivateAccess = "true"))
 	float SprintSpeed = 500.0f;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Speed", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", ClampMax = "1.0"))
+	float SprintExitMinSpeedRatio = 0.98f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Speed", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float SprintExitSlideDistance = 80.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Speed", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", ClampMax = "1.0"))
+	float SprintExitControlLockRatio = 0.8f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Speed", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float SprintEnterMarkerWindow = 0.08f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Speed", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float SprintEnterMaxMarkerWaitTime = 0.16f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Speed", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float SprintTransitionInterruptBlendTime = 0.12f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Speed", meta = (AllowPrivateAccess = "true", ClampMin = "0.1", ClampMax = "1.0"))
+	float SprintEnterSpeedRampRatio = 0.8f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Debug", meta = (AllowPrivateAccess = "true"))
+	bool bDebugSprintMarkerPhase = false;
+
 	double NextRollAllowedTime = 0.0;
 
 	void UpdateLandingAnimation(float DeltaSeconds);
 	void UpdateRollState();
+	void UpdatePendingSprintEnter(float DeltaSeconds);
+	void UpdateSprintSpeedTransition(float DeltaSeconds);
+	void StartSprintSpeedTransition(bool bShouldSprint, bool bBypassSprintEnterMarkerGate = false);
+	void FinishSprintSpeedTransition();
+	void StopActiveSprintTransitionMontage();
+	bool HasReachedSprintExitSpeed() const;
+	bool ShouldDelaySprintEnterForMarker() const;
+	bool IsSprintEnterMarkerAligned() const;
+	bool IsIdleSprintStart() const;
+	UAnimMontage* SelectSprintEnterMontage() const;
+	UAnimMontage* SelectSprintExitMontage() const;
+	UAnimMontage* SelectSprintTransitionMontageByPlant(UAnimMontage* LeftMontage, UAnimMontage* RightMontage) const;
+	void ClearPendingSprintEnter();
+	void LogSprintMarkerPhase(UAnimMontage* SelectedMontage) const;
 	void ApplyGroundMovementSpeed();
 	void FinishRoll();
 
 	bool bIsRolling = false;
 	bool bIsPrimaryAttacking = false;
 	bool bIsSprinting = false;
+	bool bIsSprintEnterPending = false;
+	bool bIsSprintSpeedTransitionActive = false;
+	bool bIsSprintExitTransitionActive = false;
+	bool bIsSprintExitControlLocked = false;
+	float SprintEnterPendingElapsedTime = 0.0f;
+	float SprintSpeedTransitionStart = 150.0f;
+	float SprintSpeedTransitionTarget = 150.0f;
+	float SprintSpeedTransitionElapsedTime = 0.0f;
+	float SprintSpeedTransitionDuration = 0.0f;
+	float SprintSpeedRampDuration = 0.0f;
+	FVector SprintExitSlideDirection = FVector::ZeroVector;
 	float ActiveLandingElapsedTime = 0.0f;
 	TWeakObjectPtr<UAnimMontage> ActiveLandingMontage;
 	TWeakObjectPtr<UAnimMontage> ActiveRollMontage;
+	TWeakObjectPtr<UAnimMontage> ActiveSprintTransitionMontage;
 	
 };
 

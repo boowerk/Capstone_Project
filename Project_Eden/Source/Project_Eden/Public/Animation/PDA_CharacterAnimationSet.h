@@ -33,4 +33,16 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Action")
 	TObjectPtr<UAnimMontage> PrimaryAttackMontage;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Locomotion")
+	TObjectPtr<UAnimMontage> SprintEnterLeftMontage;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Locomotion")
+	TObjectPtr<UAnimMontage> SprintEnterRightMontage;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Locomotion")
+	TObjectPtr<UAnimMontage> SprintExitLeftMontage;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Locomotion")
+	TObjectPtr<UAnimMontage> SprintExitRightMontage;
 };

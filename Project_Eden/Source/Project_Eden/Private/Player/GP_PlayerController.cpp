@@ -148,7 +148,7 @@ void AGP_PlayerController::Move(const FInputActionValue& Value)
 	if (!IsValid(GetPawn())) return;
 	if (const AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetCharacter()))
 	{
-		if (PlayerCharacter->IsRolling() || PlayerCharacter->IsPrimaryAttacking())
+		if (PlayerCharacter->IsRolling() || PlayerCharacter->IsPrimaryAttacking() || PlayerCharacter->IsSprintExitControlLocked())
 		{
 			return;
 		}
@@ -178,7 +178,7 @@ void AGP_PlayerController::Jump()
 	if (!IsValid(GetCharacter())) return;
 	if (const AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetCharacter()))
 	{
-		if (PlayerCharacter->IsRolling() || PlayerCharacter->IsPrimaryAttacking())
+		if (PlayerCharacter->IsRolling() || PlayerCharacter->IsPrimaryAttacking() || PlayerCharacter->IsSprintExitControlLocked())
 		{
 			return;
 		}
@@ -197,6 +197,11 @@ void AGP_PlayerController::StartSprint()
 {
 	if (AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetCharacter()))
 	{
+		if (PlayerCharacter->IsSprintExitControlLocked())
+		{
+			return;
+		}
+
 		PlayerCharacter->SetSprinting(true);
 	}
 }
@@ -258,6 +263,11 @@ void AGP_PlayerController::Dash()
 {
 	if (AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetCharacter()))
 	{
+		if (PlayerCharacter->IsSprintExitControlLocked())
+		{
+			return;
+		}
+
 		if (PlayerCharacter->TryPerformRoll())
 		{
 			return;

@@ -18,6 +18,7 @@
 #include "AnimGraphNode_Root.h"
 #include "AnimGraphNode_SequencePlayer.h"
 #include "AnimGraphNode_Slot.h"
+#include "AlphaBlend.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "AssetToolsModule.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -48,6 +49,10 @@ namespace GPFemaleAnimationSetup
 	const FString FemaleWalkPath = TEXT("/Game/Asset/CharacterAction/female/Animations/femaleWalk_Loop");
 	const FString FemaleJogPath = TEXT("/Game/Asset/CharacterAction/female/Animations/femaleJog_Fwd_Loop");
 	const FString FemaleSprintPath = TEXT("/Game/Asset/CharacterAction/female/Animations/femaleSprint_Loop");
+	const FString FemaleSprintEnterLeftPath = TEXT("/Game/Asset/CharacterAction/female/Animations/femaleSprint_Enter_L");
+	const FString FemaleSprintEnterRightPath = TEXT("/Game/Asset/CharacterAction/female/Animations/femaleSprint_Enter_R");
+	const FString FemaleSprintExitLeftPath = TEXT("/Game/Asset/CharacterAction/female/Animations/femaleSprint_Exit_L");
+	const FString FemaleSprintExitRightPath = TEXT("/Game/Asset/CharacterAction/female/Animations/femaleSprint_Exit_R");
 	const FString FemaleJumpLoopPath = TEXT("/Game/Asset/CharacterAction/female/Animations/femaleJump_Loop");
 	// 기본 공격도 루트모션 몽타주를 사용한다.
 	const FString FemaleSwordAttackPath = TEXT("/Game/Asset/CharacterAction/female/Animations/femaleSword_Attack_RM");
@@ -63,6 +68,17 @@ namespace GPFemaleAnimationSetup
 	const FString AnimationSetName = TEXT("PDA_FemaleAnimationSet");
 	const FString MontagePackagePath = TEXT("/Game/Asset/CharacterAction/female/Montages");
 	const FString PrimaryMontageName = TEXT("AM_Female_Primary_RM");
+	const FString SprintEnterLeftMontageName = TEXT("AM_Female_Sprint_Enter_L");
+	const FString SprintEnterRightMontageName = TEXT("AM_Female_Sprint_Enter_R");
+	const FString SprintExitLeftMontageName = TEXT("AM_Female_Sprint_Exit_L");
+	const FString SprintExitRightMontageName = TEXT("AM_Female_Sprint_Exit_R");
+	const FName LocomotionSyncGroupName(TEXT("Locomotion"));
+	const float LocomotionInputSmoothingTime = 0.12f;
+	const float LocomotionSampleWeightSpeed = 8.0f;
+	const float SprintEnterMontageBlendInTime = 0.18f;
+	const float SprintEnterMontageBlendOutTime = 0.28f;
+	const float SprintExitMontageBlendInTime = 0.14f;
+	const float SprintExitMontageBlendOutTime = 0.22f;
 	const FString PlayerBlueprintPath = TEXT("/Game/Characters/PlayerCharacter/BP_GP_PlayerCharacter");
 	const FString PlayerControllerBlueprintPath = TEXT("/Game/GAS_Pattern/Player/BP_GP_PlayerController");
 	const FString MovementMappingContextPath = TEXT("/Game/GAS_Pattern/Input/IMC_Movement");
@@ -254,6 +270,11 @@ namespace GPFemaleAnimationSetup
 			BlendParameters[0].bWrapInput = false;
 		}
 
+		// Walk/Jog/SprintLoop 사이 샘플 전환을 부드럽게 해서 Enter/Exit 몽타지가 얹힐 때 하체가 덜 튄다.
+		BlendSpace->InterpolationParam[0].InterpolationTime = LocomotionInputSmoothingTime;
+		BlendSpace->TargetWeightInterpolationSpeedPerSec = LocomotionSampleWeightSpeed;
+		BlendSpace->bTargetWeightInterpolationEaseInOut = true;
+
 		for (int32 SampleIndex = BlendSpace->GetNumberOfBlendSamples() - 1; SampleIndex >= 0; --SampleIndex)
 		{
 			BlendSpace->DeleteSample(SampleIndex);
@@ -285,32 +306,36 @@ namespace GPFemaleAnimationSetup
 		return BlendSpace;
 	}
 
-	UAnimMontage* CreateOrUpdatePrimaryMontage(USkeleton* Skeleton)
+	UAnimMontage* CreateOrUpdateMontageFromSequence(
+		USkeleton* Skeleton,
+		const FString& SourceAnimationPath,
+		const FString& MontageName,
+		const TCHAR* LogName)
 	{
 		if (!IsValid(Skeleton))
 		{
 			return nullptr;
 		}
 
-		const FString MontageObjectPath = FString::Printf(TEXT("%s/%s.%s"), *MontagePackagePath, *PrimaryMontageName, *PrimaryMontageName);
+		const FString MontageObjectPath = FString::Printf(TEXT("%s/%s.%s"), *MontagePackagePath, *MontageName, *MontageName);
 		UAnimMontage* Montage = LoadObject<UAnimMontage>(nullptr, *MontageObjectPath);
 		if (Montage)
 		{
 			return Montage;
 		}
 
-		UAnimSequence* SwordAttack = LoadRequiredAsset<UAnimSequence>(*FemaleSwordAttackPath);
-		if (!SwordAttack)
+		UAnimSequence* SourceAnimation = LoadRequiredAsset<UAnimSequence>(SourceAnimationPath);
+		if (!SourceAnimation)
 		{
 			return nullptr;
 		}
 
 		UAnimMontageFactory* Factory = NewObject<UAnimMontageFactory>();
 		Factory->TargetSkeleton = Skeleton;
-		Factory->SourceAnimation = SwordAttack;
+		Factory->SourceAnimation = SourceAnimation;
 
 		Montage = Cast<UAnimMontage>(FAssetToolsModule::GetModule().Get().CreateAsset(
-			PrimaryMontageName,
+			MontageName,
 			MontagePackagePath,
 			UAnimMontage::StaticClass(),
 			Factory
@@ -318,14 +343,53 @@ namespace GPFemaleAnimationSetup
 
 		if (!IsValid(Montage))
 		{
-			UE_LOG(LogTemp, Error, TEXT("Failed to create female primary montage"));
+			UE_LOG(LogTemp, Error, TEXT("Failed to create %s montage"), LogName);
 			return nullptr;
 		}
 
 		Montage->MarkPackageDirty();
 		if (!SaveAsset(Montage))
 		{
-			UE_LOG(LogTemp, Error, TEXT("Failed to save female primary montage"));
+			UE_LOG(LogTemp, Error, TEXT("Failed to save %s montage"), LogName);
+			return nullptr;
+		}
+
+		return Montage;
+	}
+
+	UAnimMontage* CreateOrUpdatePrimaryMontage(USkeleton* Skeleton)
+	{
+		return CreateOrUpdateMontageFromSequence(Skeleton, FemaleSwordAttackPath, PrimaryMontageName, TEXT("female primary"));
+	}
+
+	UAnimMontage* CreateOrUpdateSprintTransitionMontage(
+		USkeleton* Skeleton,
+		const FString& SourceAnimationPath,
+		const FString& MontageName,
+		const float BlendInTime,
+		const float BlendOutTime,
+		const TCHAR* LogName)
+	{
+		UAnimMontage* Montage = CreateOrUpdateMontageFromSequence(Skeleton, SourceAnimationPath, MontageName, LogName);
+		if (!IsValid(Montage))
+		{
+			return nullptr;
+		}
+
+		Montage->Modify();
+		// Sprint 전환 몽타지도 Locomotion Sync Group을 사용해야 LeftPlant/RightPlant 기준으로 자연스럽게 맞는다.
+		Montage->BlendIn.SetBlendOption(EAlphaBlendOption::Cubic);
+		Montage->BlendIn.SetBlendTime(BlendInTime);
+		Montage->BlendOut.SetBlendOption(EAlphaBlendOption::Cubic);
+		Montage->BlendOut.SetBlendTime(BlendOutTime);
+		Montage->BlendOutTriggerTime = -1.0f;
+		Montage->SyncGroup = LocomotionSyncGroupName;
+		Montage->SyncSlotIndex = 0;
+		Montage->MarkPackageDirty();
+
+		if (!SaveAsset(Montage))
+		{
+			UE_LOG(LogTemp, Error, TEXT("Failed to save %s sprint transition montage"), LogName);
 			return nullptr;
 		}
 
@@ -336,9 +400,13 @@ namespace GPFemaleAnimationSetup
 		USkeletalMesh* SkeletalMesh,
 		UBlendSpace* BlendSpace,
 		UAnimSequenceBase* JumpLoop,
-		UAnimMontage* PrimaryMontage)
+		UAnimMontage* PrimaryMontage,
+		UAnimMontage* SprintEnterLeftMontage,
+		UAnimMontage* SprintEnterRightMontage,
+		UAnimMontage* SprintExitLeftMontage,
+		UAnimMontage* SprintExitRightMontage)
 	{
-		if (!IsValid(SkeletalMesh) || !IsValid(BlendSpace) || !IsValid(JumpLoop) || !IsValid(PrimaryMontage))
+		if (!IsValid(SkeletalMesh) || !IsValid(BlendSpace) || !IsValid(JumpLoop) || !IsValid(PrimaryMontage) || !IsValid(SprintEnterLeftMontage) || !IsValid(SprintEnterRightMontage) || !IsValid(SprintExitLeftMontage) || !IsValid(SprintExitRightMontage))
 		{
 			return nullptr;
 		}
@@ -378,6 +446,10 @@ namespace GPFemaleAnimationSetup
 		AnimationSet->LandingMontage = LandingMontage;
 		AnimationSet->RollMontage = RollMontage;
 		AnimationSet->PrimaryAttackMontage = PrimaryMontage;
+		AnimationSet->SprintEnterLeftMontage = SprintEnterLeftMontage;
+		AnimationSet->SprintEnterRightMontage = SprintEnterRightMontage;
+		AnimationSet->SprintExitLeftMontage = SprintExitLeftMontage;
+		AnimationSet->SprintExitRightMontage = SprintExitRightMontage;
 		AnimationSet->MarkPackageDirty();
 
 		if (!SaveAsset(AnimationSet))
@@ -481,6 +553,10 @@ namespace GPFemaleAnimationSetup
 		BlendSpaceNode->NodePosX = -650;
 		BlendSpaceNode->NodePosY = 0;
 		BlendSpaceNode->SetAnimationAsset(BlendSpace);
+		// BlendSpace가 LeftPlant/RightPlant Sync Marker를 내보내야 C++ 전환 로직이 같은 발 위상을 읽을 수 있다.
+		BlendSpaceNode->Node.SetGroupName(LocomotionSyncGroupName);
+		BlendSpaceNode->Node.SetGroupRole(EAnimGroupRole::CanBeLeader);
+		BlendSpaceNode->Node.SetGroupMethod(EAnimSyncMethod::SyncGroup);
 		BlendSpaceNodeCreator.Finalize();
 		if (!ShowOptionalInputPin(BlendSpaceNode, TEXT("BlendSpace")))
 		{
@@ -753,7 +829,63 @@ bool UGP_AnimationSetupLibrary::CreateFemalePlayerAnimationSetup()
 		return false;
 	}
 
-	UPDA_CharacterAnimationSet* AnimationSet = GPFemaleAnimationSetup::CreateOrUpdateFemaleAnimationSet(FemaleMesh, BlendSpace, JumpLoop, PrimaryMontage);
+	UAnimMontage* SprintEnterLeftMontage = GPFemaleAnimationSetup::CreateOrUpdateSprintTransitionMontage(
+		FemaleSkeleton,
+		GPFemaleAnimationSetup::FemaleSprintEnterLeftPath,
+		GPFemaleAnimationSetup::SprintEnterLeftMontageName,
+		GPFemaleAnimationSetup::SprintEnterMontageBlendInTime,
+		GPFemaleAnimationSetup::SprintEnterMontageBlendOutTime,
+		TEXT("female sprint enter left"));
+	if (!SprintEnterLeftMontage)
+	{
+		return false;
+	}
+
+	UAnimMontage* SprintEnterRightMontage = GPFemaleAnimationSetup::CreateOrUpdateSprintTransitionMontage(
+		FemaleSkeleton,
+		GPFemaleAnimationSetup::FemaleSprintEnterRightPath,
+		GPFemaleAnimationSetup::SprintEnterRightMontageName,
+		GPFemaleAnimationSetup::SprintEnterMontageBlendInTime,
+		GPFemaleAnimationSetup::SprintEnterMontageBlendOutTime,
+		TEXT("female sprint enter right"));
+	if (!SprintEnterRightMontage)
+	{
+		return false;
+	}
+
+	UAnimMontage* SprintExitLeftMontage = GPFemaleAnimationSetup::CreateOrUpdateSprintTransitionMontage(
+		FemaleSkeleton,
+		GPFemaleAnimationSetup::FemaleSprintExitLeftPath,
+		GPFemaleAnimationSetup::SprintExitLeftMontageName,
+		GPFemaleAnimationSetup::SprintExitMontageBlendInTime,
+		GPFemaleAnimationSetup::SprintExitMontageBlendOutTime,
+		TEXT("female sprint exit left"));
+	if (!SprintExitLeftMontage)
+	{
+		return false;
+	}
+
+	UAnimMontage* SprintExitRightMontage = GPFemaleAnimationSetup::CreateOrUpdateSprintTransitionMontage(
+		FemaleSkeleton,
+		GPFemaleAnimationSetup::FemaleSprintExitRightPath,
+		GPFemaleAnimationSetup::SprintExitRightMontageName,
+		GPFemaleAnimationSetup::SprintExitMontageBlendInTime,
+		GPFemaleAnimationSetup::SprintExitMontageBlendOutTime,
+		TEXT("female sprint exit right"));
+	if (!SprintExitRightMontage)
+	{
+		return false;
+	}
+
+	UPDA_CharacterAnimationSet* AnimationSet = GPFemaleAnimationSetup::CreateOrUpdateFemaleAnimationSet(
+		FemaleMesh,
+		BlendSpace,
+		JumpLoop,
+		PrimaryMontage,
+		SprintEnterLeftMontage,
+		SprintEnterRightMontage,
+		SprintExitLeftMontage,
+		SprintExitRightMontage);
 	if (!AnimationSet)
 	{
 		return false;
