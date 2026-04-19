@@ -34,6 +34,12 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Action")
 	TObjectPtr<UAnimMontage> PrimaryAttackMontage;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Action")
+	TArray<TObjectPtr<UAnimMontage>> LightAttackMontages; // Light combo order: A, B, C, D.
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Action")
+	TArray<TObjectPtr<UAnimMontage>> HeavyAttackMontages; // Heavy combo order: A, B, C, D.
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Locomotion")
 	TObjectPtr<UAnimMontage> SprintEnterLeftMontage;
 

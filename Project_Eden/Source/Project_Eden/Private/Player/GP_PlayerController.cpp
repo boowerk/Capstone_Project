@@ -93,7 +93,8 @@ void AGP_PlayerController::SetupInputComponent()
 	}
 	if (IsValid(PrimaryAction))
 	{
-		EnhancedInputComponent->BindAction(PrimaryAction, ETriggerEvent::Triggered, this, &ThisClass::Primary);
+		// 한 번 누를 때 한 번만 콤보 입력을 보내야 누르고 있기만 해도 A-B-C-D가 자동 진행되지 않는다.
+		EnhancedInputComponent->BindAction(PrimaryAction, ETriggerEvent::Started, this, &ThisClass::Primary);
 	}
 
 	if (IsValid(Skill_Q_Action))
@@ -216,6 +217,12 @@ void AGP_PlayerController::StopSprint()
 
 void AGP_PlayerController::Primary()
 {
+	if (AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetCharacter()))
+	{
+		const bool bUseHeavyAttack = IsInputKeyDown(EKeys::LeftControl) || IsInputKeyDown(EKeys::RightControl);
+		PlayerCharacter->RequestPrimaryAttack(bUseHeavyAttack ? EGPPrimaryAttackType::Heavy : EGPPrimaryAttackType::Light);
+	}
+
 	ActivateAbilityByTag(GPTags::GPAbilities::Primary);
 }
 

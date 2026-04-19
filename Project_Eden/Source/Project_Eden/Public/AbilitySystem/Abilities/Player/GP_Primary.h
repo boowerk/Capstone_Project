@@ -7,6 +7,8 @@
 
 #include "GP_Primary.generated.h"
 
+class UAnimMontage;
+
 /**
  * 
  */
@@ -38,9 +40,14 @@ private:
 	
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Abilities")
 	float HitBoxElevationOffset = 20.0f;
+
+	bool PlayPrimaryAttackMontage(UAnimMontage* MontageToPlay);
 	
 	UFUNCTION()
 	void OnMontageCompleted();
+
+	UFUNCTION()
+	void OnMontageInterrupted();
 
 	UFUNCTION()
 	void OnAttackEventReceived(FGameplayEventData Payload);

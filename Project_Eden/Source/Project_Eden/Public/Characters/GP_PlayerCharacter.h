@@ -14,6 +14,13 @@ class UAnimMontage;
 class UAnimSequenceBase;
 class UBlendSpace;
 
+UENUM(BlueprintType)
+enum class EGPPrimaryAttackType : uint8
+{
+	Light,
+	Heavy
+};
+
 UCLASS()
 class PROJECT_EDEN_API AGP_PlayerCharacter : public AGP_BaseCharacter
 {
@@ -32,6 +39,11 @@ public:
 	bool IsRolling() const { return bIsRolling; }
 	bool IsPrimaryAttacking() const { return bIsPrimaryAttacking; }
 	bool IsSprintExitControlLocked() const { return bIsSprintExitControlLocked; }
+	void RequestPrimaryAttack(EGPPrimaryAttackType AttackType);
+	UAnimMontage* StartPrimaryAttackCombo();
+	UAnimMontage* AdvancePrimaryAttackCombo();
+	void FinishPrimaryAttackCombo();
+	void CancelPrimaryAttackCombo();
 	void SetSprinting(bool bShouldSprint);
 	void SetPrimaryAttackActive(bool bIsActive);
 	UPDA_CharacterAnimationSet* GetAnimationSet() const { return AnimationSet; }
@@ -84,6 +96,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Roll", meta = (AllowPrivateAccess = "true"))
 	float RollCooldown = 0.6f;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Attack", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float PrimaryAttackComboGraceTime = 0.45f;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Speed", meta = (AllowPrivateAccess = "true"))
 	float WalkSpeed = 150.0f;
 
@@ -130,6 +145,7 @@ protected:
 	UAnimMontage* SelectSprintEnterMontage() const;
 	UAnimMontage* SelectSprintExitMontage() const;
 	UAnimMontage* SelectSprintTransitionMontageByPlant(UAnimMontage* LeftMontage, UAnimMontage* RightMontage) const;
+	UAnimMontage* GetPrimaryAttackMontageForStep(EGPPrimaryAttackType AttackType, int32 ComboIndex) const;
 	void ClearPendingSprintEnter();
 	void LogSprintMarkerPhase(UAnimMontage* SelectedMontage) const;
 	void ApplyGroundMovementSpeed();
@@ -137,6 +153,11 @@ protected:
 
 	bool bIsRolling = false;
 	bool bIsPrimaryAttacking = false;
+	bool bHasQueuedPrimaryAttackCombo = false;
+	EGPPrimaryAttackType RequestedPrimaryAttackType = EGPPrimaryAttackType::Light;
+	EGPPrimaryAttackType ActivePrimaryAttackType = EGPPrimaryAttackType::Light;
+	int32 PrimaryAttackComboIndex = INDEX_NONE;
+	double PrimaryAttackComboExpireTime = 0.0;
 	bool bIsSprinting = false;
 	bool bIsSprintEnterPending = false;
 	bool bIsSprintSpeedTransitionActive = false;

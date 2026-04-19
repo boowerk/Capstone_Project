@@ -166,12 +166,111 @@ void AGP_PlayerCharacter::SetSprinting(bool bShouldSprint)
 	StartSprintSpeedTransition(bShouldSprint);
 }
 
+void AGP_PlayerCharacter::RequestPrimaryAttack(EGPPrimaryAttackType AttackType)
+{
+	RequestedPrimaryAttackType = AttackType;
+
+	if (!bIsPrimaryAttacking)
+	{
+		return;
+	}
+
+	if (AttackType != ActivePrimaryAttackType)
+	{
+		// Light와 Heavy가 한 콤보 안에서 섞이면 포즈 연결이 깨지기 쉬워서 현재 타입과 같은 입력만 큐에 넣는다.
+		return;
+	}
+
+	const int32 NextComboIndex = PrimaryAttackComboIndex + 1;
+	if (IsValid(GetPrimaryAttackMontageForStep(AttackType, NextComboIndex)))
+	{
+		// 공격 중 추가 입력은 다음 한 단계만 예약해서 클릭 한 번이 콤보 한 칸으로 대응되게 한다.
+		bHasQueuedPrimaryAttackCombo = true;
+	}
+}
+
+UAnimMontage* AGP_PlayerCharacter::StartPrimaryAttackCombo()
+{
+	if (bIsPrimaryAttacking)
+	{
+		// 이미 공격 중이면 새 콤보를 덮어쓰지 않고 RequestPrimaryAttack()에서 예약한 다음 단계만 사용한다.
+		return nullptr;
+	}
+
+	bHasQueuedPrimaryAttackCombo = false;
+
+	const EGPPrimaryAttackType PreviousAttackType = ActivePrimaryAttackType;
+	const double CurrentTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+	const bool bCanContinueCombo =
+		PrimaryAttackComboIndex != INDEX_NONE &&
+		RequestedPrimaryAttackType == PreviousAttackType &&
+		CurrentTime <= PrimaryAttackComboExpireTime &&
+		IsValid(GetPrimaryAttackMontageForStep(PreviousAttackType, PrimaryAttackComboIndex + 1));
+
+	// 공격이 끝난 직후 유예 시간 안에 다시 누르면 A로 리셋하지 않고 다음 단계로 이어간다.
+	ActivePrimaryAttackType = bCanContinueCombo ? PreviousAttackType : RequestedPrimaryAttackType;
+	PrimaryAttackComboIndex = bCanContinueCombo ? PrimaryAttackComboIndex + 1 : 0;
+	PrimaryAttackComboExpireTime = 0.0;
+
+	UAnimMontage* ComboMontage = GetPrimaryAttackMontageForStep(ActivePrimaryAttackType, PrimaryAttackComboIndex);
+	return IsValid(ComboMontage) ? ComboMontage : GetPrimaryAttackMontage();
+}
+
+UAnimMontage* AGP_PlayerCharacter::AdvancePrimaryAttackCombo()
+{
+	if (!bHasQueuedPrimaryAttackCombo)
+	{
+		return nullptr;
+	}
+
+	bHasQueuedPrimaryAttackCombo = false;
+
+	const int32 NextComboIndex = PrimaryAttackComboIndex + 1;
+	UAnimMontage* NextMontage = GetPrimaryAttackMontageForStep(ActivePrimaryAttackType, NextComboIndex);
+	if (!IsValid(NextMontage))
+	{
+		return nullptr;
+	}
+
+	PrimaryAttackComboIndex = NextComboIndex;
+	PrimaryAttackComboExpireTime = 0.0;
+	return NextMontage;
+}
+
+void AGP_PlayerCharacter::FinishPrimaryAttackCombo()
+{
+	SetPrimaryAttackActive(false);
+	bHasQueuedPrimaryAttackCombo = false;
+
+	const bool bHasNextComboStep = IsValid(GetPrimaryAttackMontageForStep(ActivePrimaryAttackType, PrimaryAttackComboIndex + 1));
+	if (GetWorld() && bHasNextComboStep && PrimaryAttackComboGraceTime > 0.0f)
+	{
+		// 몽타지가 끝난 뒤에도 짧은 입력 유예 시간을 둬서 Light_A처럼 짧은 공격도 다음 단계로 자연스럽게 이어진다.
+		PrimaryAttackComboExpireTime = GetWorld()->GetTimeSeconds() + PrimaryAttackComboGraceTime;
+	}
+	else
+	{
+		PrimaryAttackComboIndex = INDEX_NONE;
+		PrimaryAttackComboExpireTime = 0.0;
+	}
+}
+
+void AGP_PlayerCharacter::CancelPrimaryAttackCombo()
+{
+	// 끊긴 공격은 다음 입력을 새 콤보 A로 시작하도록 현재 콤보 상태를 정리한다.
+	SetPrimaryAttackActive(false);
+	bHasQueuedPrimaryAttackCombo = false;
+	PrimaryAttackComboIndex = INDEX_NONE;
+	PrimaryAttackComboExpireTime = 0.0;
+}
+
 void AGP_PlayerCharacter::SetPrimaryAttackActive(bool bIsActive)
 {
 	bIsPrimaryAttacking = bIsActive;
 
 	if (!bIsPrimaryAttacking)
 	{
+		bHasQueuedPrimaryAttackCombo = false;
 		return;
 	}
 
@@ -205,7 +304,17 @@ UAnimMontage* AGP_PlayerCharacter::GetRollMontage() const
 
 UAnimMontage* AGP_PlayerCharacter::GetPrimaryAttackMontage() const
 {
-	return AnimationSet ? AnimationSet->PrimaryAttackMontage : nullptr;
+	if (!AnimationSet)
+	{
+		return nullptr;
+	}
+
+	if (AnimationSet->LightAttackMontages.IsValidIndex(0) && IsValid(AnimationSet->LightAttackMontages[0]))
+	{
+		return AnimationSet->LightAttackMontages[0];
+	}
+
+	return AnimationSet->PrimaryAttackMontage;
 }
 
 UAnimMontage* AGP_PlayerCharacter::GetSprintEnterLeftMontage() const
@@ -552,6 +661,19 @@ UAnimMontage* AGP_PlayerCharacter::SelectSprintTransitionMontageByPlant(UAnimMon
 	}
 
 	return SelectRight();
+}
+
+UAnimMontage* AGP_PlayerCharacter::GetPrimaryAttackMontageForStep(EGPPrimaryAttackType AttackType, int32 ComboIndex) const
+{
+	if (!AnimationSet || ComboIndex < 0)
+	{
+		return nullptr;
+	}
+
+	const TArray<TObjectPtr<UAnimMontage>>& ComboMontages =
+		AttackType == EGPPrimaryAttackType::Heavy ? AnimationSet->HeavyAttackMontages : AnimationSet->LightAttackMontages;
+
+	return ComboMontages.IsValidIndex(ComboIndex) ? ComboMontages[ComboIndex].Get() : nullptr;
 }
 
 void AGP_PlayerCharacter::ClearPendingSprintEnter()

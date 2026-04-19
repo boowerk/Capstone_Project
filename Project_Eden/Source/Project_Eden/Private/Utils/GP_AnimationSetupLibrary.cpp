@@ -56,6 +56,20 @@ namespace GPFemaleAnimationSetup
 	const FString FemaleJumpLoopPath = TEXT("/Game/Asset/CharacterAction/female/Animations/femaleJump_Loop");
 	// 기본 공격도 루트모션 몽타주를 사용한다.
 	const FString FemaleSwordAttackPath = TEXT("/Game/Asset/CharacterAction/female/Animations/femaleSword_Attack_RM");
+	const TArray<FString> FemaleLightAttackPaths =
+	{
+		TEXT("/Game/Asset/CharacterAction/female/Animations/femaleSword_Light_A"),
+		TEXT("/Game/Asset/CharacterAction/female/Animations/femaleSword_Light_B"),
+		TEXT("/Game/Asset/CharacterAction/female/Animations/femaleSword_Light_C"),
+		TEXT("/Game/Asset/CharacterAction/female/Animations/femaleSword_Light_D")
+	};
+	const TArray<FString> FemaleHeavyAttackPaths =
+	{
+		TEXT("/Game/Asset/CharacterAction/female/Animations/femaleSword_Heavy_A"),
+		TEXT("/Game/Asset/CharacterAction/female/Animations/femaleSword_Heavy_B"),
+		TEXT("/Game/Asset/CharacterAction/female/Animations/femaleSword_Heavy_C"),
+		TEXT("/Game/Asset/CharacterAction/female/Animations/femaleSword_Heavy_D")
+	};
 	const FString FemaleJumpLandMontagePath = TEXT("/Game/Asset/CharacterAction/female/Montages/AM_Female_Jump_Land");
 	// 구르기는 루트모션 몽타주를 사용해서 애니메이션 전진량으로 이동한다.
 	const FString FemaleRollMontagePath = TEXT("/Game/Asset/CharacterAction/female/Montages/AM_Female_Roll_RM");
@@ -68,6 +82,20 @@ namespace GPFemaleAnimationSetup
 	const FString AnimationSetName = TEXT("PDA_FemaleAnimationSet");
 	const FString MontagePackagePath = TEXT("/Game/Asset/CharacterAction/female/Montages");
 	const FString PrimaryMontageName = TEXT("AM_Female_Primary_RM");
+	const TArray<FString> LightAttackMontageNames =
+	{
+		TEXT("AM_Female_Light_A"),
+		TEXT("AM_Female_Light_B"),
+		TEXT("AM_Female_Light_C"),
+		TEXT("AM_Female_Light_D")
+	};
+	const TArray<FString> HeavyAttackMontageNames =
+	{
+		TEXT("AM_Female_Heavy_A"),
+		TEXT("AM_Female_Heavy_B"),
+		TEXT("AM_Female_Heavy_C"),
+		TEXT("AM_Female_Heavy_D")
+	};
 	const FString SprintEnterLeftMontageName = TEXT("AM_Female_Sprint_Enter_L");
 	const FString SprintEnterRightMontageName = TEXT("AM_Female_Sprint_Enter_R");
 	const FString SprintExitLeftMontageName = TEXT("AM_Female_Sprint_Exit_L");
@@ -79,6 +107,8 @@ namespace GPFemaleAnimationSetup
 	const float SprintEnterMontageBlendOutTime = 0.28f;
 	const float SprintExitMontageBlendInTime = 0.14f;
 	const float SprintExitMontageBlendOutTime = 0.22f;
+	const float AttackMontageBlendInTime = 0.08f;
+	const float AttackMontageBlendOutTime = 0.12f;
 	const FString PlayerBlueprintPath = TEXT("/Game/Characters/PlayerCharacter/BP_GP_PlayerCharacter");
 	const FString PlayerControllerBlueprintPath = TEXT("/Game/GAS_Pattern/Player/BP_GP_PlayerController");
 	const FString MovementMappingContextPath = TEXT("/Game/GAS_Pattern/Input/IMC_Movement");
@@ -362,6 +392,54 @@ namespace GPFemaleAnimationSetup
 		return CreateOrUpdateMontageFromSequence(Skeleton, FemaleSwordAttackPath, PrimaryMontageName, TEXT("female primary"));
 	}
 
+	TArray<UAnimMontage*> CreateOrUpdateAttackComboMontages(
+		USkeleton* Skeleton,
+		const TArray<FString>& SourceAnimationPaths,
+		const TArray<FString>& MontageNames,
+		const TCHAR* LogPrefix)
+	{
+		TArray<UAnimMontage*> Montages;
+		if (!IsValid(Skeleton) || SourceAnimationPaths.Num() != MontageNames.Num())
+		{
+			return Montages;
+		}
+
+		for (int32 Index = 0; Index < SourceAnimationPaths.Num(); ++Index)
+		{
+			const FString LogName = FString::Printf(TEXT("%s combo %d"), LogPrefix, Index + 1);
+			UAnimMontage* Montage = CreateOrUpdateMontageFromSequence(
+				Skeleton,
+				SourceAnimationPaths[Index],
+				MontageNames[Index],
+				*LogName);
+			if (!IsValid(Montage))
+			{
+				Montages.Reset();
+				return Montages;
+			}
+
+			Montage->Modify();
+			// Combo montages keep short blends so queued A-B-C-D attacks connect without feeling like one long clip.
+			Montage->BlendIn.SetBlendOption(EAlphaBlendOption::Cubic);
+			Montage->BlendIn.SetBlendTime(AttackMontageBlendInTime);
+			Montage->BlendOut.SetBlendOption(EAlphaBlendOption::Cubic);
+			Montage->BlendOut.SetBlendTime(AttackMontageBlendOutTime);
+			Montage->BlendOutTriggerTime = -1.0f;
+			Montage->MarkPackageDirty();
+
+			if (!SaveAsset(Montage))
+			{
+				UE_LOG(LogTemp, Error, TEXT("Failed to save %s attack combo montage"), *LogName);
+				Montages.Reset();
+				return Montages;
+			}
+
+			Montages.Add(Montage);
+		}
+
+		return Montages;
+	}
+
 	UAnimMontage* CreateOrUpdateSprintTransitionMontage(
 		USkeleton* Skeleton,
 		const FString& SourceAnimationPath,
@@ -401,14 +479,32 @@ namespace GPFemaleAnimationSetup
 		UBlendSpace* BlendSpace,
 		UAnimSequenceBase* JumpLoop,
 		UAnimMontage* PrimaryMontage,
+		const TArray<UAnimMontage*>& LightAttackMontages,
+		const TArray<UAnimMontage*>& HeavyAttackMontages,
 		UAnimMontage* SprintEnterLeftMontage,
 		UAnimMontage* SprintEnterRightMontage,
 		UAnimMontage* SprintExitLeftMontage,
 		UAnimMontage* SprintExitRightMontage)
 	{
-		if (!IsValid(SkeletalMesh) || !IsValid(BlendSpace) || !IsValid(JumpLoop) || !IsValid(PrimaryMontage) || !IsValid(SprintEnterLeftMontage) || !IsValid(SprintEnterRightMontage) || !IsValid(SprintExitLeftMontage) || !IsValid(SprintExitRightMontage))
+		if (!IsValid(SkeletalMesh) || !IsValid(BlendSpace) || !IsValid(JumpLoop) || !IsValid(PrimaryMontage) || LightAttackMontages.Num() == 0 || HeavyAttackMontages.Num() == 0 || !IsValid(SprintEnterLeftMontage) || !IsValid(SprintEnterRightMontage) || !IsValid(SprintExitLeftMontage) || !IsValid(SprintExitRightMontage))
 		{
 			return nullptr;
+		}
+
+		for (UAnimMontage* AttackMontage : LightAttackMontages)
+		{
+			if (!IsValid(AttackMontage))
+			{
+				return nullptr;
+			}
+		}
+
+		for (UAnimMontage* AttackMontage : HeavyAttackMontages)
+		{
+			if (!IsValid(AttackMontage))
+			{
+				return nullptr;
+			}
 		}
 
 		UAnimMontage* RollMontage = LoadRequiredAsset<UAnimMontage>(*FemaleRollMontagePath);
@@ -446,6 +542,16 @@ namespace GPFemaleAnimationSetup
 		AnimationSet->LandingMontage = LandingMontage;
 		AnimationSet->RollMontage = RollMontage;
 		AnimationSet->PrimaryAttackMontage = PrimaryMontage;
+		AnimationSet->LightAttackMontages.Reset();
+		for (UAnimMontage* AttackMontage : LightAttackMontages)
+		{
+			AnimationSet->LightAttackMontages.Add(AttackMontage);
+		}
+		AnimationSet->HeavyAttackMontages.Reset();
+		for (UAnimMontage* AttackMontage : HeavyAttackMontages)
+		{
+			AnimationSet->HeavyAttackMontages.Add(AttackMontage);
+		}
 		AnimationSet->SprintEnterLeftMontage = SprintEnterLeftMontage;
 		AnimationSet->SprintEnterRightMontage = SprintEnterRightMontage;
 		AnimationSet->SprintExitLeftMontage = SprintExitLeftMontage;
@@ -829,6 +935,26 @@ bool UGP_AnimationSetupLibrary::CreateFemalePlayerAnimationSetup()
 		return false;
 	}
 
+	TArray<UAnimMontage*> LightAttackMontages = GPFemaleAnimationSetup::CreateOrUpdateAttackComboMontages(
+		FemaleSkeleton,
+		GPFemaleAnimationSetup::FemaleLightAttackPaths,
+		GPFemaleAnimationSetup::LightAttackMontageNames,
+		TEXT("female light attack"));
+	if (LightAttackMontages.Num() != GPFemaleAnimationSetup::LightAttackMontageNames.Num())
+	{
+		return false;
+	}
+
+	TArray<UAnimMontage*> HeavyAttackMontages = GPFemaleAnimationSetup::CreateOrUpdateAttackComboMontages(
+		FemaleSkeleton,
+		GPFemaleAnimationSetup::FemaleHeavyAttackPaths,
+		GPFemaleAnimationSetup::HeavyAttackMontageNames,
+		TEXT("female heavy attack"));
+	if (HeavyAttackMontages.Num() != GPFemaleAnimationSetup::HeavyAttackMontageNames.Num())
+	{
+		return false;
+	}
+
 	UAnimMontage* SprintEnterLeftMontage = GPFemaleAnimationSetup::CreateOrUpdateSprintTransitionMontage(
 		FemaleSkeleton,
 		GPFemaleAnimationSetup::FemaleSprintEnterLeftPath,
@@ -882,6 +1008,8 @@ bool UGP_AnimationSetupLibrary::CreateFemalePlayerAnimationSetup()
 		BlendSpace,
 		JumpLoop,
 		PrimaryMontage,
+		LightAttackMontages,
+		HeavyAttackMontages,
 		SprintEnterLeftMontage,
 		SprintEnterRightMontage,
 		SprintExitLeftMontage,
