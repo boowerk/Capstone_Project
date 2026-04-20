@@ -1,78 +1,34 @@
 #include "Animation/GP_FemaleAnimInstance.h"
 
-#include "Animation/AnimSequenceBase.h"
-#include "Animation/BlendSpace.h"
 #include "Characters/GP_PlayerCharacter.h"
-#include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 
 void UGP_FemaleAnimInstance::NativeInitializeAnimation()
 {
 	Super::NativeInitializeAnimation();
 
-	// 구르기 같은 액션 몽타주의 루트모션만 실제 캐릭터 이동으로 반영한다.
-	RootMotionMode = ERootMotionMode::RootMotionFromMontagesOnly;
-
-	CachedCharacter = Cast<ACharacter>(TryGetPawnOwner());
-	CachedPlayerCharacter = Cast<AGP_PlayerCharacter>(CachedCharacter.Get());
-	RefreshAnimationAssets();
+	Character = Cast<AGP_PlayerCharacter>(TryGetPawnOwner());
+	if (Character)
+	{
+		MovementComponent = Character->GetCharacterMovement();
+	}
 }
 
 void UGP_FemaleAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 {
 	Super::NativeUpdateAnimation(DeltaSeconds);
 
-	ACharacter* Character = CachedCharacter.Get();
-	if (!IsValid(Character))
+	if (!Character || !MovementComponent)
 	{
-		Character = Cast<ACharacter>(TryGetPawnOwner());
-		CachedCharacter = Character;
-		CachedPlayerCharacter = Cast<AGP_PlayerCharacter>(Character);
-		RefreshAnimationAssets();
-	}
-
-	if (!IsValid(Character))
-	{
-		LocomotionBlendSpaceAsset = nullptr;
-		JumpLoopAnimationAsset = nullptr;
-		GroundSpeed = 0.0f;
-		bIsFalling = false;
 		return;
 	}
 
-	if (!LocomotionBlendSpaceAsset || !JumpLoopAnimationAsset)
-	{
-		RefreshAnimationAssets();
-	}
-
+	// 1. 기본 이동 데이터 갱신
 	GroundSpeed = Character->GetVelocity().Size2D();
+	bHasAcceleration = MovementComponent->GetCurrentAcceleration().SizeSquared2D() > KINDA_SMALL_NUMBER;
+	bIsFalling = MovementComponent->IsFalling();
 
-	if (const UCharacterMovementComponent* MovementComponent = Character->GetCharacterMovement())
-	{
-		bIsFalling = MovementComponent->IsFalling();
-	}
-	else
-	{
-		bIsFalling = false;
-	}
-}
-
-void UGP_FemaleAnimInstance::RefreshAnimationAssets()
-{
-	AGP_PlayerCharacter* PlayerCharacter = CachedPlayerCharacter.Get();
-	if (!IsValid(PlayerCharacter))
-	{
-		PlayerCharacter = Cast<AGP_PlayerCharacter>(TryGetPawnOwner());
-		CachedPlayerCharacter = PlayerCharacter;
-	}
-
-	if (!IsValid(PlayerCharacter))
-	{
-		LocomotionBlendSpaceAsset = nullptr;
-		JumpLoopAnimationAsset = nullptr;
-		return;
-	}
-
-	LocomotionBlendSpaceAsset = PlayerCharacter->GetLocomotionBlendSpace();
-	JumpLoopAnimationAsset = PlayerCharacter->GetJumpLoopAnimation();
+	// 2. 미끄러짐(Sprint Stop) 진입 조건 계산 (가장 중요)
+	// 달리기 속도(300 이상)로 이동하다가 손가락을 뗐을 때(가속도 0) 발동
+	bShouldSprintStop = (GroundSpeed > 300.f) && (!bHasAcceleration) && (!bIsFalling);
 }

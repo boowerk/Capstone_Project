@@ -1,16 +1,14 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "Animation/AnimInstance.h"
 
 #include "GP_FemaleAnimInstance.generated.h"
 
-class ACharacter;
 class AGP_PlayerCharacter;
-class UAnimSequenceBase;
-class UBlendSpace;
+class UCharacterMovementComponent;
 
-UCLASS(Blueprintable)
+UCLASS()
 class PROJECT_EDEN_API UGP_FemaleAnimInstance : public UAnimInstance
 {
 	GENERATED_BODY()
@@ -20,21 +18,22 @@ public:
 	virtual void NativeUpdateAnimation(float DeltaSeconds) override;
 
 protected:
-	UPROPERTY(BlueprintReadOnly, Category = "Animation")
-	TObjectPtr<UBlendSpace> LocomotionBlendSpaceAsset = nullptr;
+	UPROPERTY(BlueprintReadOnly, Category = "Character")
+	TObjectPtr<AGP_PlayerCharacter> Character;
 
-	UPROPERTY(BlueprintReadOnly, Category = "Animation")
-	TObjectPtr<UAnimSequenceBase> JumpLoopAnimationAsset = nullptr;
+	UPROPERTY(BlueprintReadOnly, Category = "Character")
+	TObjectPtr<UCharacterMovementComponent> MovementComponent;
 
-	UPROPERTY(BlueprintReadOnly, Category = "Movement")
-	float GroundSpeed = 0.0f;
+	// === Locomotion Data ===
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Locomotion")
+	float GroundSpeed;
 
-	UPROPERTY(BlueprintReadOnly, Category = "Movement")
-	bool bIsFalling = false;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Locomotion")
+	bool bHasAcceleration;
 
-private:
-	void RefreshAnimationAssets();
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Locomotion")
+	bool bIsFalling;
 
-	TWeakObjectPtr<ACharacter> CachedCharacter;
-	TWeakObjectPtr<AGP_PlayerCharacter> CachedPlayerCharacter;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Locomotion")
+	bool bShouldSprintStop;
 };
