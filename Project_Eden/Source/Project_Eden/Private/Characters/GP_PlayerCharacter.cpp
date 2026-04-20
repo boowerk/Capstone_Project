@@ -14,7 +14,7 @@
 AGP_PlayerCharacter::AGP_PlayerCharacter()
 {
 	PrimaryActorTick.bCanEverTick = true;
-	PrimaryActorTick.bStartWithTickEnabled = false; // 이제 Tick은 사실상 돌지 않습니다.
+	PrimaryActorTick.bStartWithTickEnabled = true; // 이제 Tick은 사실상 돌지 않습니다.
 
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
 
@@ -105,6 +105,16 @@ void AGP_PlayerCharacter::OnRep_PlayerState()
 	GetAbilitySystemComponent()->InitAbilityActorInfo(GetPlayerState(), this);
 	OnASCInitialized.Broadcast(GetAbilitySystemComponent(), GetAttributeSet());
 }
+
+void AGP_PlayerCharacter::AddMovementInput(FVector WorldDirection, float ScaleValue, bool bForce)
+{
+	if (!bForce && GetWorld() && GetWorld()->GetTimeSeconds() < SprintExitLockExpireTime)
+	{
+		return; 
+	}
+	Super::AddMovementInput(WorldDirection, ScaleValue, bForce);
+}
+
 
 // ==========================================
 // 핵심 이동 로직 (완전 리팩토링)
@@ -249,6 +259,15 @@ UAnimMontage* AGP_PlayerCharacter::GetPrimaryAttackMontage() const
 	if (AnimationSet->LightAttackMontages.IsValidIndex(0) && IsValid(AnimationSet->LightAttackMontages[0])) return AnimationSet->LightAttackMontages[0];
 	return AnimationSet->PrimaryAttackMontage;
 }
+
+void AGP_PlayerCharacter::ApplySprintStopLock(float LockTime)
+{
+	if (GetWorld())
+	{
+		SprintExitLockExpireTime = GetWorld()->GetTimeSeconds() + LockTime;
+	}
+}
+
 UAnimMontage* AGP_PlayerCharacter::GetPrimaryAttackMontageForStep(EGPPrimaryAttackType AttackType, int32 ComboIndex) const
 {
 	if (!AnimationSet || ComboIndex < 0) return nullptr;

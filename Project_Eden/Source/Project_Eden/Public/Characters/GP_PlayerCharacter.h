@@ -31,10 +31,13 @@ public:
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void Landed(const FHitResult& Hit) override;
 	
+	
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 	virtual UAttributeSet* GetAttributeSet() const override;
 	virtual void PossessedBy(AController* NewController) override;
 	virtual void OnRep_PlayerState() override;
+	virtual void AddMovementInput(FVector WorldDirection, float ScaleValue, bool bForce = false) override;
+	
 
 	// === Locomotion ===
 	void SetSprinting(bool bShouldSprint);
@@ -63,6 +66,10 @@ public:
 	UAnimMontage* GetLandingMontage() const;
 	UAnimMontage* GetRollMontage() const;
 	UAnimMontage* GetPrimaryAttackMontage() const;
+	
+	UFUNCTION(BlueprintCallable, Category = "Movement")
+	void ApplySprintStopLock(float LockTime = 0.2f);
+	
 
 private:
 	UPROPERTY(VisibleAnywhere, Category = "Camera")
@@ -92,10 +99,10 @@ protected:
 
 	// === Movement Settings ===
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Speed")
-	float WalkSpeed = 150.0f;
+	float WalkSpeed = 210.0f; 
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Speed")
-	float SprintSpeed = 500.0f;
+	float SprintSpeed = 420.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Roll")
 	float RollCooldown = 0.6f;
@@ -110,6 +117,7 @@ protected:
 	bool bIsRolling = false;
 	bool bIsPrimaryAttacking = false;
 	bool bIsSprinting = false;
+	double SprintExitLockExpireTime = 0.0;
 
 	bool bHasQueuedPrimaryAttackCombo = false;
 	EGPPrimaryAttackType RequestedPrimaryAttackType = EGPPrimaryAttackType::Light;

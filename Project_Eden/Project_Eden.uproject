@@ -1,4 +1,4 @@
-﻿{
+{
 	"FileVersion": 3,
 	"EngineAssociation": "ProjectEden_Engine",
 	"Category": "",
@@ -52,6 +52,10 @@
 		},
 		{
 			"Name": "Landmass",
+			"Enabled": true
+		},
+		{
+			"Name": "AnimationWarping",
 			"Enabled": true
 		}
 	]
