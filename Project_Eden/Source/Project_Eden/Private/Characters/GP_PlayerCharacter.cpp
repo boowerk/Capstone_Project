@@ -10,6 +10,7 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "Player/GP_PlayerState.h"
 #include "AbilitySystemComponent.h"
+#include "GameplayTags/GP_Tags.h"
 
 AGP_PlayerCharacter::AGP_PlayerCharacter()
 {
@@ -116,69 +117,49 @@ void AGP_PlayerCharacter::AddMovementInput(FVector WorldDirection, float ScaleVa
 }
 
 
-// ==========================================
-// 핵심 이동 로직 (완전 리팩토링)
-// ==========================================
+// [Rule: Input-Logic Decoupling] - 의도만 전달
 void AGP_PlayerCharacter::SetSprinting(bool bShouldSprint)
 {
-	if (bIsSprinting == bShouldSprint) return;
-	
+	// 현재 GP_Tags.h에 Sprinting 태그가 없으므로 
+	// 로직상 필요하다면 내부 bool을 사용하되, 가속도는 보간 처리합니다.
 	bIsSprinting = bShouldSprint;
 	ApplyGroundMovementSpeed();
 }
 
+// [Rule: Frame-Independent Interpolation]
 void AGP_PlayerCharacter::ApplyGroundMovementSpeed()
 {
-	if (UCharacterMovementComponent* MovementComp = GetCharacterMovement())
-	{
-		// 입력 즉시 딜레이 없이 최고 속도 갱신
-		MovementComp->MaxWalkSpeed = bIsSprinting ? SprintSpeed : WalkSpeed;
-	}
+	UCharacterMovementComponent* MoveComp = GetCharacterMovement();
+	if (!MoveComp) return;
+
+	const float TargetSpeed = bIsSprinting ? SprintSpeed : WalkSpeed;
+	const float DeltaTime = GetWorld() ? GetWorld()->GetDeltaSeconds() : 0.f;
+
+	// 즉시 대입 대신 보간을 통해 부드러운 속도 변화 구현
+	MoveComp->MaxWalkSpeed = FMath::FInterpTo(MoveComp->MaxWalkSpeed, TargetSpeed, DeltaTime, 10.0f);
 }
 
-// ==========================================
-// 전투 및 롤 로직 (1차 유지, 2차 때 GAS로 이관)
-// ==========================================
+// [Rule: State-Driven over Bool-Check] - 구르기 실행
 bool AGP_PlayerCharacter::TryPerformRoll()
 {
-	if (!GetWorld() || !GetMesh() || !GetCharacterMovement() || bIsRolling || GetCharacterMovement()->IsFalling()) return false;
-	
-	const double CurrentTime = GetWorld()->GetTimeSeconds();
-	if (CurrentTime < NextRollAllowedTime) return false;
+	if (!GetAbilitySystemComponent()) return false;
+    
+	// Early Return 적용
+	if (GetCharacterMovement()->IsFalling()) return false;
 
-	UAnimMontage* Montage = GetRollMontage();
-	if (!IsValid(Montage)) return false;
-
-	FVector RollDirection = GetLastMovementInputVector();
-	if (RollDirection.IsNearlyZero()) RollDirection = GetVelocity();
-	if (RollDirection.IsNearlyZero()) RollDirection = GetActorForwardVector();
-	
-	RollDirection.Z = 0.0f;
-	RollDirection.Normalize();
-	SetActorRotation(RollDirection.Rotation());
-
-	if (PlayAnimMontage(Montage, 1.0f) > 0.0f)
-	{
-		GetCharacterMovement()->StopMovementImmediately();
-		ConsumeMovementInputVector();
-		bIsRolling = true;
-		SetActorTickEnabled(true);
-		NextRollAllowedTime = CurrentTime + RollCooldown;
-		return true;
-	}
-	return false;
+	// 정의된 네이티브 태그 GPTags::GPAbilities::Dash 사용
+	FGameplayTagContainer DashTag;
+	DashTag.AddTag(GPTags::GPAbilities::Dash);
+    
+	return GetAbilitySystemComponent()->TryActivateAbilitiesByTag(DashTag);
 }
 
-void AGP_PlayerCharacter::RequestPrimaryAttack(EGPPrimaryAttackType AttackType)
+void AGP_PlayerCharacter::RequestPrimaryAttack()
 {
-	RequestedPrimaryAttackType = AttackType;
-	if (!bIsPrimaryAttacking) return;
-	if (AttackType != ActivePrimaryAttackType) return;
-	const int32 NextComboIndex = PrimaryAttackComboIndex + 1;
-	if (IsValid(GetPrimaryAttackMontageForStep(AttackType, NextComboIndex)))
-	{
-		bHasQueuedPrimaryAttackCombo = true;
-	}
+	FGameplayTagContainer TargetTags;
+	TargetTags.AddTag(GPTags::GPAbilities::Primary);
+    
+	GetAbilitySystemComponent()->TryActivateAbilitiesByTag(TargetTags);
 }
 
 UAnimMontage* AGP_PlayerCharacter::StartPrimaryAttackCombo()

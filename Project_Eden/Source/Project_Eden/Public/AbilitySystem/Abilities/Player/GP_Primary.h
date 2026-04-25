@@ -32,6 +32,13 @@ protected:
 	
 private:
 	
+	int32 CurrentComboIndex = 0;
+    
+	UPROPERTY(EditDefaultsOnly, Category = "Combo")
+	float ComboInputWindow = 0.5f;
+
+	bool CanAdvanceCombo() const;
+	
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Abilities")
 	float HitBoxRadius = 100.0f;	
 	

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
@@ -41,7 +41,6 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
 	TObjectPtr<UInputAction> PrimaryAction;
 
-	// Legacy ability input assets kept for backward compatibility with older controller blueprints.
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
 	TObjectPtr<UInputAction> TargetingAction;
 
@@ -51,7 +50,6 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
 	TObjectPtr<UInputAction> UltimateAction;
 
-	// Split Q/E/R actions introduced on the latest main branch.
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
 	TObjectPtr<UInputAction> Skill_Q_Action;
 
@@ -87,8 +85,10 @@ private:
 	void StopJump();
 	void StartSprint();
 	void StopSprint();
-
+	
+	UFUNCTION(BlueprintCallable, Category = "GP|Input")
 	void Primary();
+	
 	void Targeting();
 	void Skill();
 	void Ultimate();

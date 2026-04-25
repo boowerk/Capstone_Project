@@ -1,4 +1,4 @@
-#include "GameplayTags/GP_Tags.h"
+﻿#include "GameplayTags/GP_Tags.h"
 
 namespace GPTags
 {
@@ -20,6 +20,13 @@ namespace GPTags
 		{
 			UE_DEFINE_GAMEPLAY_TAG_COMMENT(Attack, "GPTags.GPAbilities.Enemy.Attack", "Tag for the enemy attack ability");
 		}
+	}
+	
+	namespace Status
+	{
+		UE_DEFINE_GAMEPLAY_TAG_COMMENT(Fixed, "GPTags.Status.Fixed", "Tag for blocking movement and rotation");
+		UE_DEFINE_GAMEPLAY_TAG_COMMENT(Invincible, "GPTags.Status.Invincible", "Tag for invincibility frames");
+		UE_DEFINE_GAMEPLAY_TAG_COMMENT(Unstoppable, "GPTags.Status.Unstoppable", "Tag for ignoring hit reactions");
 	}
 
 	namespace Events

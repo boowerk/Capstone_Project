@@ -26,6 +26,13 @@ namespace GPTags
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Attack);
 		}
 	}
+	
+	namespace Status
+	{
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(Fixed);			// 이동 불가 상태
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(Unstoppable);	// 피격 무시 상태
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(Invincible);		// 무적 상태
+	}
 
 	namespace Events
 	{

@@ -11,91 +11,50 @@
 #include "Utils/GP_BlueprintLibrary.h"
 
 // 이 부분은 BP에도 관상용으로 만들어뒀으니 블루프린트 코드로 만들고싶으면 보셈 - 슝민
-void UGP_Primary::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
-                                  const FGameplayAbilityActivationInfo ActivationInfo,
-                                  const FGameplayEventData* TriggerEventData)
+void UGP_Primary::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
-	
+
+	// [Rule: Early Return]
+	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
 	{
-		if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
-		{
-			EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-			return;
-		}
+		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+		return;
+	}
 
-		// Sequence 1: Gameplay Event 대기 Task 생성 
-		if (AttackEventTag.IsValid())
+	// 캐릭터의 하드코딩된 로직 대신 어빌리티의 DataAsset 몽타주 우선 활용
+	UAnimMontage* MontageToPlay = AttackMontage;
+    
+	// 캐릭터에 설정된 애니메이션 세트가 있다면 가져오되, 실행 제어는 GA가 담당
+	if (AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo()))
+	{
+		if (UAnimMontage* ComboMontage = PC->GetPrimaryAttackMontage())
 		{
-			UAbilityTask_WaitGameplayEvent* WaitEventTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(
-				this, AttackEventTag, nullptr, false, true);
-			if (WaitEventTask)
-			{
-				// 콤보 한 번의 어빌리티 안에서 여러 공격 판정 Notify를 받을 수 있게 반복 이벤트로 둔다.
-				WaitEventTask->EventReceived.AddDynamic(this, &ThisClass::OnAttackEventReceived);
-				WaitEventTask->ReadyForActivation();
-			}
+			MontageToPlay = ComboMontage;
 		}
+	}
 
-		UAnimMontage* MontageToPlay = AttackMontage;
-		AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo());
-		if (PlayerCharacter)
-		{
-			if (UAnimMontage* CharacterMontage = PlayerCharacter->StartPrimaryAttackCombo())
-			{
-				MontageToPlay = CharacterMontage;
-			}
-		}
-
-		// Sequence 0: 몽타주 Task 생성
-		if (MontageToPlay) // 캐릭터 세트 우선, 없으면 어빌리티 기본값 사용
-		{
-			if (!PlayPrimaryAttackMontage(MontageToPlay))
-			{
-				if (PlayerCharacter)
-				{
-					PlayerCharacter->CancelPrimaryAttackCombo();
-				}
-
-				EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-			}
-		}
-		else // 몽타주가 비어있음 블루프린트 몽타주로
-		{
-			if (bDrawDebugs)
-			{
-				UE_LOG(LogTemp, Warning,
-				       TEXT("Primary Attack: C++ Montage is NULL. Waiting for Blueprint to handle Montage."));
-			}
-		}
+	if (!PlayPrimaryAttackMontage(MontageToPlay))
+	{
+		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 	}
 }
 
 bool UGP_Primary::PlayPrimaryAttackMontage(UAnimMontage* MontageToPlay)
 {
-	if (!IsValid(MontageToPlay))
-	{
-		return false;
-	}
+	if (!IsValid(MontageToPlay)) return false;
 
-	UAbilityTask_PlayMontageAndWait* PlayMontageTask =
-		UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(this, NAME_None, MontageToPlay, 1.0f);
-	if (!PlayMontageTask)
-	{
-		return false;
-	}
+	// Task를 사용하여 몽타주 재생 및 완료 대기 (Tick 제거)
+	UAbilityTask_PlayMontageAndWait* PlayTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
+		this, NAME_None, MontageToPlay, 1.0f);
+    
+	if (!PlayTask) return false;
 
-	if (AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo()))
-	{
-		PlayerCharacter->SetPrimaryAttackActive(true);
-	}
-
-	// BlendOut이 아니라 실제 완료 시점에 콤보 유예 시간을 열어 애니메이션이 중간에 잘려 보이지 않게 한다.
-	PlayMontageTask->OnCompleted.AddDynamic(this, &ThisClass::OnMontageCompleted);
-	PlayMontageTask->OnInterrupted.AddDynamic(this, &ThisClass::OnMontageInterrupted);
-	PlayMontageTask->OnCancelled.AddDynamic(this, &ThisClass::OnMontageInterrupted);
-
-	PlayMontageTask->ReadyForActivation();
+	// 완료/중단 시 후속 처리 바인딩
+	PlayTask->OnCompleted.AddDynamic(this, &ThisClass::OnMontageCompleted);
+	PlayTask->OnInterrupted.AddDynamic(this, &ThisClass::OnMontageInterrupted);
+    
+	PlayTask->ReadyForActivation();
 	return true;
 }
 

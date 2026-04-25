@@ -217,13 +217,17 @@ void AGP_PlayerController::StopSprint()
 
 void AGP_PlayerController::Primary()
 {
-	if (AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetCharacter()))
-	{
-		const bool bUseHeavyAttack = IsInputKeyDown(EKeys::LeftControl) || IsInputKeyDown(EKeys::RightControl);
-		PlayerCharacter->RequestPrimaryAttack(bUseHeavyAttack ? EGPPrimaryAttackType::Heavy : EGPPrimaryAttackType::Light);
-	}
+	// [Rule: Early Return]
+	APawn* ControlledPawn = GetPawn();
+	if (!IsValid(ControlledPawn)) return;
 
-	ActivateAbilityByTag(GPTags::GPAbilities::Primary);
+	IAbilitySystemInterface* ASI = Cast<IAbilitySystemInterface>(ControlledPawn);
+	if (!ASI || !ASI->GetAbilitySystemComponent()) return;
+	
+	FGameplayTag PrimaryTag = GPTags::GPAbilities::Primary;
+    
+	// ASC를 통해 어빌리티 실행 (캐릭터의 멤버 함수 직접 호출 금지)
+	ASI->GetAbilitySystemComponent()->TryActivateAbilitiesByTag(FGameplayTagContainer(PrimaryTag));
 }
 
 void AGP_PlayerController::Targeting()

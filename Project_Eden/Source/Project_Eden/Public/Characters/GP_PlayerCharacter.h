@@ -51,7 +51,7 @@ public:
 	UAnimMontage* GetSprintExitRightMontage() const { return nullptr; }
 
 	// === Combat ===
-	void RequestPrimaryAttack(EGPPrimaryAttackType AttackType);
+	void RequestPrimaryAttack();
 	UAnimMontage* StartPrimaryAttackCombo();
 	UAnimMontage* AdvancePrimaryAttackCombo();
 	void FinishPrimaryAttackCombo();
@@ -113,6 +113,8 @@ protected:
 	// 내부 상태 변수 (대폭 다이어트 됨)
 	void ApplyGroundMovementSpeed();
 	UAnimMontage* GetPrimaryAttackMontageForStep(EGPPrimaryAttackType AttackType, int32 ComboIndex) const;
+	bool HasMatchingTag(FGameplayTag TagToCheck) const;
+	static constexpr float MovementInterpSpeed = 10.0f;
 
 	bool bIsRolling = false;
 	bool bIsPrimaryAttacking = false;
