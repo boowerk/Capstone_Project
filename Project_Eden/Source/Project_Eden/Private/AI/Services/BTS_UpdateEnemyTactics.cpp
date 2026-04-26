@@ -1,8 +1,10 @@
 #include "AI/Services/BTS_UpdateEnemyTactics.h"
 
+#include "AI/Controllers/EnemyAIController.h"
 #include "AI/Data/EnemyBlackboardKeys.h"
 #include "AI/Data/EnemyLLMEvaluation.h"
 #include "AI/Debug/EnemyAIDebugUtils.h"
+#include "AI/Tasks/EnemyBTTaskCommon.h"
 #include "AIController.h"
 #include "AbilitySystem/GP_AttributeSet.h"
 #include "BehaviorTree/BehaviorTreeComponent.h"
@@ -20,6 +22,40 @@ namespace
 		}
 
 		return FMath::Clamp(BlackboardComponent->GetValueAsFloat(KeyName), MinValue, MaxValue);
+	}
+
+	bool HasBlackboardKey(const UBlackboardComponent* BlackboardComponent, const FName& KeyName)
+	{
+		return IsValid(BlackboardComponent) && BlackboardComponent->GetKeyID(KeyName) != FBlackboard::InvalidKey;
+	}
+
+	bool GetOptionalBlackboardBool(const UBlackboardComponent* BlackboardComponent, const FName& KeyName)
+	{
+		return HasBlackboardKey(BlackboardComponent, KeyName) && BlackboardComponent->GetValueAsBool(KeyName);
+	}
+
+	void SetOptionalBlackboardBool(UBlackboardComponent* BlackboardComponent, const FName& KeyName, bool bValue)
+	{
+		if (HasBlackboardKey(BlackboardComponent, KeyName))
+		{
+			BlackboardComponent->SetValueAsBool(KeyName, bValue);
+		}
+	}
+
+	void SetOptionalBlackboardFloat(UBlackboardComponent* BlackboardComponent, const FName& KeyName, float Value)
+	{
+		if (HasBlackboardKey(BlackboardComponent, KeyName))
+		{
+			BlackboardComponent->SetValueAsFloat(KeyName, Value);
+		}
+	}
+
+	void SetOptionalBlackboardVector(UBlackboardComponent* BlackboardComponent, const FName& KeyName, const FVector& Value)
+	{
+		if (HasBlackboardKey(BlackboardComponent, KeyName))
+		{
+			BlackboardComponent->SetValueAsVector(KeyName, Value);
+		}
 	}
 
 	float GetControlledPawnHealthRatio(const APawn* ControlledPawn)
@@ -94,11 +130,60 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 	const bool bPreviousCanAttack = BlackboardComponent->GetValueAsBool(EnemyBlackboardKeys::bCanAttack);
 	const bool bPreviousShouldReposition = BlackboardComponent->GetValueAsBool(EnemyBlackboardKeys::bShouldReposition);
 	const bool bPreviousShouldChase = BlackboardComponent->GetValueAsBool(EnemyBlackboardKeys::bShouldChase);
+	const bool bPreviousShouldReturnHome = GetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldReturnHome);
 
 	const float HealthRatio = GetControlledPawnHealthRatio(ControlledPawn);
 	BlackboardComponent->SetValueAsFloat(EnemyBlackboardKeys::HealthRatio, HealthRatio);
 
+	AEnemyAIController* EnemyAIController = Cast<AEnemyAIController>(AIController);
+	const FVector HomeLocation = EnemyBTTaskCommon::GetBehaviorAnchorLocation(ControlledPawn);
+	const float DistanceFromHome = FVector::Dist2D(ControlledPawn->GetActorLocation(), HomeLocation);
+	SetOptionalBlackboardVector(BlackboardComponent, EnemyBlackboardKeys::HomeLocation, HomeLocation);
+	SetOptionalBlackboardFloat(BlackboardComponent, EnemyBlackboardKeys::DistanceFromHome, DistanceFromHome);
+
 	AActor* TargetActor = Cast<AActor>(BlackboardComponent->GetValueAsObject(EnemyBlackboardKeys::TargetActor));
+	bool bShouldReturnHome = bEnableLeashReturnHome
+		&& IsValid(EnemyAIController)
+		&& EnemyAIController->IsLeashReturnHomeActive()
+		&& DistanceFromHome > ReturnHomeAcceptanceRadius;
+
+	if (bEnableLeashReturnHome && IsValid(EnemyAIController) && IsValid(TargetActor) && DistanceFromHome > MaxChaseDistanceFromHome)
+	{
+		// The leash is an AI rule, but movement remains a Behavior Tree MoveTo driven by MoveToLocation.
+		bShouldReturnHome = true;
+	}
+
+	if (IsValid(EnemyAIController))
+	{
+		EnemyAIController->SetLeashReturnHomeActive(bShouldReturnHome);
+	}
+
+	SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldReturnHome, bShouldReturnHome);
+
+	if (bShouldReturnHome)
+	{
+		BlackboardComponent->SetValueAsVector(EnemyBlackboardKeys::MoveToLocation, HomeLocation);
+		BlackboardComponent->SetValueAsFloat(EnemyBlackboardKeys::DistanceToTarget, 0.0f);
+		BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bHasLineOfSight, false);
+		BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldRetreat, false);
+		BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bCanAttack, false);
+		BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldReposition, false);
+		BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldChase, false);
+
+		if (!bPreviousShouldReturnHome)
+		{
+			UE_LOG(
+				LogEnemyAI,
+				Log,
+				TEXT("[Leash] ReturnHome=1 DistFromHome=%.0f Home=%s Pawn=%s"),
+				DistanceFromHome,
+				*EnemyAIDebugUtils::DescribeLocation(HomeLocation),
+				*EnemyAIDebugUtils::DescribeActor(ControlledPawn));
+		}
+
+		return;
+	}
+
 	if (!IsValid(TargetActor))
 	{
 		// No target means all combat branch keys collapse to false; decorators can abort immediately.
@@ -108,8 +193,9 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 		BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bCanAttack, false);
 		BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldReposition, false);
 		BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldChase, false);
+		SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldReturnHome, false);
 
-		if (bPreviousShouldRetreat || bPreviousCanAttack || bPreviousShouldReposition || bPreviousShouldChase)
+		if (bPreviousShouldRetreat || bPreviousCanAttack || bPreviousShouldReposition || bPreviousShouldChase || bPreviousShouldReturnHome)
 		{
 			UE_LOG(LogEnemyAI, Verbose, TEXT("[State] No target -> combat branches off (%s)"), *EnemyAIDebugUtils::DescribeActor(ControlledPawn));
 		}
@@ -134,8 +220,8 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 	const float AttackWindow = FMath::Max(AttackWindowFloor, FMath::Lerp(MinAttackWindow, MaxAttackWindow, Aggression));
 	const float MinAttackRange = FMath::Max(0.0f, PreferredRange - AttackWindow);
 	const float MaxAttackRange = PreferredRange + AttackWindow;
-	const bool bInsideAttackBand = DistanceToTarget >= MinAttackRange && DistanceToTarget <= MaxAttackRange;
-	const bool bTooClose = DistanceToTarget < MinAttackRange;
+	const bool bInsideAttackBand = DistanceToTarget <= MaxAttackRange && (bAllowAttacksInsidePreferredRange || DistanceToTarget >= MinAttackRange);
+	const bool bTooClose = !bAllowAttacksInsidePreferredRange && DistanceToTarget < MinAttackRange;
 	const bool bTooFar = DistanceToTarget > MaxAttackRange;
 
 	bool bShouldRetreat = bModeForcesRetreat || (HealthRatio <= RetreatThreshold);
@@ -165,27 +251,36 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 		}
 	}
 
+	// When the AI still has a live target, patrol should be the "no target" fallback, not the "I saw the player" fallback.
+	if (bFallbackToChaseWhenTargetExists && !bShouldRetreat && !bCanAttack && !bShouldReposition)
+	{
+		bShouldChase = true;
+	}
+
 	BlackboardComponent->SetValueAsFloat(EnemyBlackboardKeys::DistanceToTarget, DistanceToTarget);
 	BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bHasLineOfSight, bHasLineOfSight);
 	BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldRetreat, bShouldRetreat);
 	BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bCanAttack, bCanAttack);
 	BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldReposition, bShouldReposition);
 	BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldChase, bShouldChase);
+	SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldReturnHome, false);
 
 	if (bPreviousShouldRetreat != bShouldRetreat
 		|| bPreviousCanAttack != bCanAttack
 		|| bPreviousShouldReposition != bShouldReposition
-		|| bPreviousShouldChase != bShouldChase)
+		|| bPreviousShouldChase != bShouldChase
+		|| bPreviousShouldReturnHome)
 	{
 		UE_LOG(
 			LogEnemyAI,
 			Verbose,
-			TEXT("[State] Retreat=%d Attack=%d Reposition=%d Chase=%d Dist=%.0f Health=%.2f LOS=%d Pawn=%s"),
+			TEXT("[State] Retreat=%d Attack=%d Reposition=%d Chase=%d ReturnHome=0 Dist=%.0f HomeDist=%.0f Health=%.2f LOS=%d Pawn=%s"),
 			bShouldRetreat ? 1 : 0,
 			bCanAttack ? 1 : 0,
 			bShouldReposition ? 1 : 0,
 			bShouldChase ? 1 : 0,
 			DistanceToTarget,
+			DistanceFromHome,
 			HealthRatio,
 			bHasLineOfSight ? 1 : 0,
 			*EnemyAIDebugUtils::DescribeActor(ControlledPawn));

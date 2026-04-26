@@ -28,6 +28,10 @@ public:
 	// Keeps the JSON entry point narrow: JSON may change tuning values, not direct branch decisions.
 	bool SubmitEnemyEvaluationFromJson(const FString& JsonPayload, bool bForceImmediate = false);
 
+	// BT services use this leash state to pause target reacquisition until the pawn has returned home.
+	void SetLeashReturnHomeActive(bool bActive);
+	bool IsLeashReturnHomeActive() const { return bLeashReturnHomeActive; }
+
 protected:
 	virtual void OnPossess(APawn* InPawn) override;
 	virtual void OnUnPossess() override;
@@ -70,6 +74,14 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AI|Perception")
 	bool bTargetOnlyPlayerControlledPawns = true;
 
+	// Prefer remembered sight targets so BT does not thrash when sight flickers for a frame.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AI|Perception")
+	bool bUseKnownSightTargetsForSelection = true;
+
+	// When both visible and remembered candidates exist, visible ones should win unless designers disable it.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AI|Perception")
+	bool bPreferCurrentlyVisibleTargets = true;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AI|Perception")
 	TSubclassOf<AActor> TargetActorClass;
 
@@ -109,6 +121,7 @@ protected:
 	void ConfigureSightSense();
 	void RequestTargetActorReevaluation();
 	void RefreshTargetActorFromPerception();
+	void GatherPerceptionTargetCandidates(TArray<AActor*>& OutVisibleCandidates, TArray<AActor*>& OutKnownCandidates) const;
 	AActor* SelectBestTargetActorFromPerception() const;
 	bool IsValidPerceptionTarget(AActor* CandidateActor) const;
 	float GetCandidateHealthRatio(AActor* CandidateActor) const;
@@ -120,6 +133,7 @@ protected:
 	bool bHasPendingEnemyEvaluation = false;
 	bool bHasLastAppliedEnemyEvaluation = false;
 	bool bHasWarnedAboutMissingBlackboardKeys = false;
+	bool bLeashReturnHomeActive = false;
 	float LastEnemyEvaluationApplyTime = -1000.0f;
 	FEnemyLLMEvaluation PendingEnemyEvaluation;
 	FEnemyLLMEvaluation LastAppliedEnemyEvaluation;

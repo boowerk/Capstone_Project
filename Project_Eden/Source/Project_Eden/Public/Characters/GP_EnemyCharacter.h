@@ -84,6 +84,7 @@ private:
 	TObjectPtr<UAttributeSet> AttributeSet;
 
 	FVector BehaviorAnchorLocation = FVector::ZeroVector;
+	bool bHasBehaviorAnchorLocation = false;
 
 	const FEnemyArchetypeTuning* ResolveEnemyArchetypeTuning() const;
 	int32 ResolvePersonalitySeed() const;

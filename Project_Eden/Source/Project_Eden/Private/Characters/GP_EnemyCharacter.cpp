@@ -34,7 +34,8 @@ UAbilitySystemComponent* AGP_EnemyCharacter::GetAbilitySystemComponent() const
 
 FVector AGP_EnemyCharacter::GetBehaviorAnchorLocation() const
 {
-	return BehaviorAnchorLocation.IsNearlyZero() ? GetActorLocation() : BehaviorAnchorLocation;
+	// AI possession can ask for the anchor before BeginPlay, so compute the editor-authored point on demand.
+	return bHasBehaviorAnchorLocation ? BehaviorAnchorLocation : GetActorTransform().TransformPosition(BehaviorAnchorOffset);
 }
 
 bool AGP_EnemyCharacter::BuildInitialEnemyEvaluation(FEnemyLLMEvaluation& OutEvaluation) const
@@ -82,6 +83,7 @@ void AGP_EnemyCharacter::BeginPlay()
 
 	// 기준 위치는 캐릭터가 저장하고, 실제 Blackboard/Behavior Tree 시작은 AEnemyAIController::OnPossess에서 담당한다.
 	BehaviorAnchorLocation = GetActorTransform().TransformPosition(BehaviorAnchorOffset);
+	bHasBehaviorAnchorLocation = true;
 }
 
 const FEnemyArchetypeTuning* AGP_EnemyCharacter::ResolveEnemyArchetypeTuning() const

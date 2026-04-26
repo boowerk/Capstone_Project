@@ -60,6 +60,58 @@ namespace
 	{
 		return TEXT("/Game/Characters/EnemyCharacter/BT/BB_EnemyCommon.BB_EnemyCommon");
 	}
+
+	AActor* SelectNearestTargetCandidate(const APawn* ControlledPawn, const TArray<AActor*>& Candidates)
+	{
+		if (!IsValid(ControlledPawn))
+		{
+			return nullptr;
+		}
+
+		AActor* BestTargetActor = nullptr;
+		float BestDistanceSquared = TNumericLimits<float>::Max();
+
+		for (AActor* CandidateActor : Candidates)
+		{
+			const float DistanceSquared = FVector::DistSquared(ControlledPawn->GetActorLocation(), CandidateActor->GetActorLocation());
+			if (DistanceSquared < BestDistanceSquared)
+			{
+				BestDistanceSquared = DistanceSquared;
+				BestTargetActor = CandidateActor;
+			}
+		}
+
+		return BestTargetActor;
+	}
+
+	AActor* SelectPlayerFirstTargetCandidate(const APawn* ControlledPawn, const TArray<AActor*>& Candidates)
+	{
+		if (!IsValid(ControlledPawn))
+		{
+			return nullptr;
+		}
+
+		AActor* BestPlayerActor = nullptr;
+		float BestDistanceSquared = TNumericLimits<float>::Max();
+
+		for (AActor* CandidateActor : Candidates)
+		{
+			const APawn* CandidatePawn = Cast<APawn>(CandidateActor);
+			if (!IsValid(CandidatePawn) || !CandidatePawn->IsPlayerControlled())
+			{
+				continue;
+			}
+
+			const float DistanceSquared = FVector::DistSquared(ControlledPawn->GetActorLocation(), CandidateActor->GetActorLocation());
+			if (DistanceSquared < BestDistanceSquared)
+			{
+				BestDistanceSquared = DistanceSquared;
+				BestPlayerActor = CandidateActor;
+			}
+		}
+
+		return BestPlayerActor;
+	}
 }
 
 AEnemyAIController::AEnemyAIController()
@@ -104,6 +156,7 @@ void AEnemyAIController::OnUnPossess()
 
 	StopEvaluationRefreshLoop();
 	GetWorldTimerManager().ClearTimer(PendingEnemyEvaluationTimerHandle);
+	bLeashReturnHomeActive = false;
 
 	// TargetActor belongs to perception selection, so clear it when the controller releases the pawn.
 	SetBlackboardTargetActor(nullptr);
@@ -277,7 +330,12 @@ void AEnemyAIController::InitializeBlackboardValues(APawn* InPawn)
 
 	// Initial non-tactical values are safe here; live tactical keys are written by BTS_UpdateEnemyTactics.
 	BlackboardComponent->ClearValue(EnemyBlackboardKeys::TargetActor);
-	BlackboardComponent->SetValueAsVector(EnemyBlackboardKeys::MoveToLocation, InPawn->GetActorLocation());
+	const AGP_EnemyCharacter* EnemyPawnCharacter = Cast<AGP_EnemyCharacter>(InPawn);
+	const FVector HomeLocation = IsValid(EnemyPawnCharacter) ? EnemyPawnCharacter->GetBehaviorAnchorLocation() : InPawn->GetActorLocation();
+	BlackboardComponent->SetValueAsVector(EnemyBlackboardKeys::HomeLocation, HomeLocation);
+	BlackboardComponent->SetValueAsVector(EnemyBlackboardKeys::MoveToLocation, HomeLocation);
+	BlackboardComponent->SetValueAsFloat(EnemyBlackboardKeys::DistanceFromHome, 0.0f);
+	BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldReturnHome, false);
 
 	FEnemyLLMEvaluation InitialEvaluation = FEnemyLLMEvaluation::MakeSafeDefault();
 	if (const AGP_EnemyCharacter* EnemyCharacter = Cast<AGP_EnemyCharacter>(InPawn))
@@ -417,14 +475,17 @@ bool AEnemyAIController::ValidateSharedBlackboardSchema(UBlackboardComponent* Bl
 		EnemyBlackboardKeys::RetreatThreshold,
 		EnemyBlackboardKeys::ChasePersistence,
 		EnemyBlackboardKeys::CoverPreference,
+		EnemyBlackboardKeys::HomeLocation,
 		EnemyBlackboardKeys::MoveToLocation,
 		EnemyBlackboardKeys::FocusTargetRule,
 		EnemyBlackboardKeys::bShouldRetreat,
 		EnemyBlackboardKeys::bCanAttack,
 		EnemyBlackboardKeys::bShouldReposition,
 		EnemyBlackboardKeys::bShouldChase,
+		EnemyBlackboardKeys::bShouldReturnHome,
 		EnemyBlackboardKeys::bHasLineOfSight,
 		EnemyBlackboardKeys::DistanceToTarget,
+		EnemyBlackboardKeys::DistanceFromHome,
 		EnemyBlackboardKeys::HealthRatio,
 	};
 
@@ -493,12 +554,19 @@ void AEnemyAIController::HandleTargetPerceptionUpdated(AActor* Actor, FAIStimulu
 
 void AEnemyAIController::RequestTargetActorReevaluation()
 {
-	// Both perception events and tuning changes use this path to re-score currently perceived candidates.
+	// Both perception events and tuning changes use this path to re-score visible or remembered sight candidates.
 	RefreshTargetActorFromPerception();
 }
 
 void AEnemyAIController::RefreshTargetActorFromPerception()
 {
+	if (bLeashReturnHomeActive)
+	{
+		// While returning home, perception can keep seeing the player but should not restart chase.
+		SetBlackboardTargetActor(nullptr);
+		return;
+	}
+
 	SetBlackboardTargetActor(SelectBestTargetActorFromPerception());
 }
 
@@ -509,19 +577,11 @@ AActor* AEnemyAIController::SelectBestTargetActorFromPerception() const
 		return nullptr;
 	}
 
-	TArray<AActor*> PerceivedActors;
-	EnemyPerceptionComponent->GetCurrentlyPerceivedActors(UAISense_Sight::StaticClass(), PerceivedActors);
+	TArray<AActor*> VisibleCandidates;
+	TArray<AActor*> KnownCandidates;
+	GatherPerceptionTargetCandidates(VisibleCandidates, KnownCandidates);
 
-	TArray<AActor*> Candidates;
-	for (AActor* CandidateActor : PerceivedActors)
-	{
-		if (IsValidPerceptionTarget(CandidateActor))
-		{
-			Candidates.Add(CandidateActor);
-		}
-	}
-
-	if (Candidates.IsEmpty())
+	if (KnownCandidates.IsEmpty())
 	{
 		return nullptr;
 	}
@@ -531,28 +591,14 @@ AActor* AEnemyAIController::SelectBestTargetActorFromPerception() const
 		? BlackboardComponent->GetValueAsName(EnemyBlackboardKeys::FocusTargetRule)
 		: FEnemyLLMEvaluationParser::ToBlackboardName(EEnemyFocusTargetRule::CurrentThreat);
 
-	const auto SelectNearestCandidate = [this, &Candidates]() -> AActor*
-	{
-		AActor* BestTargetActor = nullptr;
-		float BestDistanceSquared = TNumericLimits<float>::Max();
-
-		for (AActor* CandidateActor : Candidates)
-		{
-			const float DistanceSquared = FVector::DistSquared(GetPawn()->GetActorLocation(), CandidateActor->GetActorLocation());
-			if (DistanceSquared < BestDistanceSquared)
-			{
-				BestDistanceSquared = DistanceSquared;
-				BestTargetActor = CandidateActor;
-			}
-		}
-
-		return BestTargetActor;
-	};
+	// Prefer visible targets for snap responsiveness, but keep remembered targets available so TargetActor does not blink away.
+	const bool bUseVisibleCandidatesFirst = bPreferCurrentlyVisibleTargets && !VisibleCandidates.IsEmpty();
+	const TArray<AActor*>& PreferredCandidates = bUseVisibleCandidatesFirst ? VisibleCandidates : KnownCandidates;
 
 	if (FocusTargetRule == FEnemyLLMEvaluationParser::ToBlackboardName(EEnemyFocusTargetRule::CurrentThreat) && IsValid(BlackboardComponent))
 	{
 		AActor* CurrentTargetActor = Cast<AActor>(BlackboardComponent->GetValueAsObject(EnemyBlackboardKeys::TargetActor));
-		if (Candidates.Contains(CurrentTargetActor))
+		if (KnownCandidates.Contains(CurrentTargetActor))
 		{
 			return CurrentTargetActor;
 		}
@@ -560,26 +606,20 @@ AActor* AEnemyAIController::SelectBestTargetActorFromPerception() const
 
 	if (FocusTargetRule == FEnemyLLMEvaluationParser::ToBlackboardName(EEnemyFocusTargetRule::PlayerFirst))
 	{
-		AActor* BestPlayerActor = nullptr;
-		float BestDistanceSquared = TNumericLimits<float>::Max();
-
-		for (AActor* CandidateActor : Candidates)
+		if (AActor* PlayerFirstTarget = SelectPlayerFirstTargetCandidate(GetPawn(), PreferredCandidates))
 		{
-			const APawn* CandidatePawn = Cast<APawn>(CandidateActor);
-			if (!IsValid(CandidatePawn) || !CandidatePawn->IsPlayerControlled())
-			{
-				continue;
-			}
+			return PlayerFirstTarget;
+		}
 
-			const float DistanceSquared = FVector::DistSquared(GetPawn()->GetActorLocation(), CandidateActor->GetActorLocation());
-			if (DistanceSquared < BestDistanceSquared)
+		if (bUseVisibleCandidatesFirst)
+		{
+			if (AActor* RememberedPlayerTarget = SelectPlayerFirstTargetCandidate(GetPawn(), KnownCandidates))
 			{
-				BestDistanceSquared = DistanceSquared;
-				BestPlayerActor = CandidateActor;
+				return RememberedPlayerTarget;
 			}
 		}
 
-		return IsValid(BestPlayerActor) ? BestPlayerActor : SelectNearestCandidate();
+		return SelectNearestTargetCandidate(GetPawn(), PreferredCandidates);
 	}
 
 	if (FocusTargetRule == FEnemyLLMEvaluationParser::ToBlackboardName(EEnemyFocusTargetRule::Weakest))
@@ -588,7 +628,7 @@ AActor* AEnemyAIController::SelectBestTargetActorFromPerception() const
 		float BestHealthRatio = TNumericLimits<float>::Max();
 		float BestDistanceSquared = TNumericLimits<float>::Max();
 
-		for (AActor* CandidateActor : Candidates)
+		for (AActor* CandidateActor : PreferredCandidates)
 		{
 			const float CandidateHealthRatio = GetCandidateHealthRatio(CandidateActor);
 			const float DistanceSquared = FVector::DistSquared(GetPawn()->GetActorLocation(), CandidateActor->GetActorLocation());
@@ -600,10 +640,51 @@ AActor* AEnemyAIController::SelectBestTargetActorFromPerception() const
 			}
 		}
 
-		return IsValid(WeakestTargetActor) ? WeakestTargetActor : SelectNearestCandidate();
+		return IsValid(WeakestTargetActor) ? WeakestTargetActor : SelectNearestTargetCandidate(GetPawn(), PreferredCandidates);
 	}
 
-	return SelectNearestCandidate();
+	return SelectNearestTargetCandidate(GetPawn(), PreferredCandidates);
+}
+
+void AEnemyAIController::GatherPerceptionTargetCandidates(TArray<AActor*>& OutVisibleCandidates, TArray<AActor*>& OutKnownCandidates) const
+{
+	OutVisibleCandidates.Reset();
+	OutKnownCandidates.Reset();
+
+	if (!IsValid(EnemyPerceptionComponent))
+	{
+		return;
+	}
+
+	TArray<AActor*> VisibleActors;
+	EnemyPerceptionComponent->GetCurrentlyPerceivedActors(UAISense_Sight::StaticClass(), VisibleActors);
+
+	for (AActor* CandidateActor : VisibleActors)
+	{
+		if (!IsValidPerceptionTarget(CandidateActor))
+		{
+			continue;
+		}
+
+		OutVisibleCandidates.AddUnique(CandidateActor);
+		OutKnownCandidates.AddUnique(CandidateActor);
+	}
+
+	if (!bUseKnownSightTargetsForSelection)
+	{
+		return;
+	}
+
+	TArray<AActor*> KnownActors;
+	EnemyPerceptionComponent->GetKnownPerceivedActors(UAISense_Sight::StaticClass(), KnownActors);
+
+	for (AActor* CandidateActor : KnownActors)
+	{
+		if (IsValidPerceptionTarget(CandidateActor))
+		{
+			OutKnownCandidates.AddUnique(CandidateActor);
+		}
+	}
 }
 
 bool AEnemyAIController::IsValidPerceptionTarget(AActor* CandidateActor) const
@@ -698,4 +779,26 @@ void AEnemyAIController::SetBlackboardTargetActor(AActor* NewTargetActor)
 	{
 		BlackboardComponent->ClearValue(EnemyBlackboardKeys::TargetActor);
 	}
+}
+
+void AEnemyAIController::SetLeashReturnHomeActive(bool bActive)
+{
+	if (bLeashReturnHomeActive == bActive)
+	{
+		return;
+	}
+
+	bLeashReturnHomeActive = bActive;
+
+	if (bLeashReturnHomeActive)
+	{
+		// Stop the current chase immediately; the BT return-home branch will own the next MoveTo.
+		StopMovement();
+		SetBlackboardTargetActor(nullptr);
+		UE_LOG(LogEnemyAI, Log, TEXT("[Leash] Return home started: %s"), *EnemyAIDebugUtils::DescribeActor(GetPawn()));
+		return;
+	}
+
+	UE_LOG(LogEnemyAI, Log, TEXT("[Leash] Return home finished: %s"), *EnemyAIDebugUtils::DescribeActor(GetPawn()));
+	RequestTargetActorReevaluation();
 }
