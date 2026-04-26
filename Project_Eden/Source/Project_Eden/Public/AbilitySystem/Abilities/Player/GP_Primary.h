@@ -33,6 +33,13 @@ protected:
 private:
 	
 	int32 CurrentComboIndex = 0;
+	bool bHasQueuedNextAttack = false;
+
+	void StartComboSequence();
+
+	UFUNCTION()
+	void OnInputPressedDuringCombo(float TimeWaited);
+	
     
 	UPROPERTY(EditDefaultsOnly, Category = "Combo")
 	float ComboInputWindow = 0.5f;

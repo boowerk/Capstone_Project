@@ -38,6 +38,10 @@ public:
 	virtual void OnRep_PlayerState() override;
 	virtual void AddMovementInput(FVector WorldDirection, float ScaleValue, bool bForce = false) override;
 	
+	UFUNCTION(BlueprintCallable, Category = "GP|Animation")
+	UAnimMontage* GetPrimaryAttackMontageForStep(EGPPrimaryAttackType AttackType, int32 ComboIndex) const;
+	
+	
 
 	// === Locomotion ===
 	void SetSprinting(bool bShouldSprint);
@@ -112,7 +116,6 @@ protected:
 
 	// 내부 상태 변수 (대폭 다이어트 됨)
 	void ApplyGroundMovementSpeed();
-	UAnimMontage* GetPrimaryAttackMontageForStep(EGPPrimaryAttackType AttackType, int32 ComboIndex) const;
 	bool HasMatchingTag(FGameplayTag TagToCheck) const;
 	static constexpr float MovementInterpSpeed = 10.0f;
 

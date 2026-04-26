@@ -7,7 +7,7 @@
 #include "GameplayTags/GP_Tags.h"
 
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
-#include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
+#include "Abilities/Tasks/AbilityTask_WaitInputPress.h"
 #include "Utils/GP_BlueprintLibrary.h"
 
 // 이 부분은 BP에도 관상용으로 만들어뒀으니 블루프린트 코드로 만들고싶으면 보셈 - 슝민
@@ -15,29 +15,52 @@ void UGP_Primary::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 {
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
-	// [Rule: Early Return]
 	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
 	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
 
-	// 캐릭터의 하드코딩된 로직 대신 어빌리티의 DataAsset 몽타주 우선 활용
-	UAnimMontage* MontageToPlay = AttackMontage;
-    
-	// 캐릭터에 설정된 애니메이션 세트가 있다면 가져오되, 실행 제어는 GA가 담당
-	if (AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo()))
+	CurrentComboIndex = 0;
+	StartComboSequence();
+}
+
+void UGP_Primary::StartComboSequence()
+{
+	bHasQueuedNextAttack = false;
+
+	AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo());
+	if (!IsValid(PC))
 	{
-		if (UAnimMontage* ComboMontage = PC->GetPrimaryAttackMontage())
-		{
-			MontageToPlay = ComboMontage;
-		}
+		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+		return;
 	}
 
-	if (!PlayPrimaryAttackMontage(MontageToPlay))
+	// 캐릭터의 PDA(DataAsset) 등에서 현재 인덱스에 맞는 콤보 몽타주를 가져옴
+	UAnimMontage* MontageToPlay = PC->GetPrimaryAttackMontageForStep(EGPPrimaryAttackType::Light, CurrentComboIndex);
+	if (!IsValid(MontageToPlay))
 	{
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+		return;
 	}
+
+	// 1. 몽타주 재생 태스크
+	UAbilityTask_PlayMontageAndWait* PlayTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
+		this, NAME_None, MontageToPlay, 1.0f);
+	PlayTask->OnCompleted.AddDynamic(this, &ThisClass::OnMontageCompleted);
+	PlayTask->OnInterrupted.AddDynamic(this, &ThisClass::OnMontageInterrupted);
+	PlayTask->ReadyForActivation();
+
+	// 2. 선입력 버퍼링 태스크 (몽타주 재생 중 추가 공격 키 입력 감지)
+	UAbilityTask_WaitInputPress* InputTask = UAbilityTask_WaitInputPress::WaitInputPress(this, false);
+	InputTask->OnPress.AddDynamic(this, &ThisClass::OnInputPressedDuringCombo);
+	InputTask->ReadyForActivation();
+}
+
+void UGP_Primary::OnInputPressedDuringCombo(float TimeWaited)
+{
+	// 애니메이션 재생 중 공격 키가 다시 눌리면 다음 콤보 시퀀스를 예약
+	bHasQueuedNextAttack = true;
 }
 
 bool UGP_Primary::PlayPrimaryAttackMontage(UAnimMontage* MontageToPlay)
@@ -60,29 +83,23 @@ bool UGP_Primary::PlayPrimaryAttackMontage(UAnimMontage* MontageToPlay)
 
 void UGP_Primary::OnMontageCompleted()
 {
-	if (AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo()))
+	if (bHasQueuedNextAttack)
 	{
-		if (UAnimMontage* NextMontage = PlayerCharacter->AdvancePrimaryAttackCombo())
-		{
-			if (PlayPrimaryAttackMontage(NextMontage))
-			{
-				return;
-			}
-		}
-
-		PlayerCharacter->FinishPrimaryAttackCombo();
+		// 예약된 공격이 있다면 인덱스를 올리고 콤보를 이어나감
+		CurrentComboIndex++;
+		StartComboSequence();
 	}
-
-	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+	else
+	{
+		// 추가 입력이 없었다면 콤보 인덱스를 초기화하고 어빌리티 종료
+		CurrentComboIndex = 0;
+		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+	}
 }
 
 void UGP_Primary::OnMontageInterrupted()
 {
-	if (AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo()))
-	{
-		PlayerCharacter->CancelPrimaryAttackCombo();
-	}
-
+	CurrentComboIndex = 0;
 	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 }
 
