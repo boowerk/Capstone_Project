@@ -101,32 +101,20 @@ void AGP_PlayerController::SetupInputComponent()
 	{
 		EnhancedInputComponent->BindAction(Skill_Q_Action, ETriggerEvent::Triggered, this, &ThisClass::Skill_Q);
 	}
-	else if (IsValid(TargetingAction))
-	{
-		EnhancedInputComponent->BindAction(TargetingAction, ETriggerEvent::Started, this, &ThisClass::Targeting);
-	}
 
 	if (IsValid(Skill_E_Action))
 	{
 		EnhancedInputComponent->BindAction(Skill_E_Action, ETriggerEvent::Triggered, this, &ThisClass::Skill_E);
-	}
-	else if (IsValid(SkillAction))
-	{
-		EnhancedInputComponent->BindAction(SkillAction, ETriggerEvent::Triggered, this, &ThisClass::Skill);
 	}
 
 	if (IsValid(Skill_R_Action))
 	{
 		EnhancedInputComponent->BindAction(Skill_R_Action, ETriggerEvent::Triggered, this, &ThisClass::Skill_R);
 	}
-	else if (IsValid(UltimateAction))
-	{
-		EnhancedInputComponent->BindAction(UltimateAction, ETriggerEvent::Triggered, this, &ThisClass::Ultimate);
-	}
 
-	if (IsValid(DashAction))
+	if (IsValid(Dash_Shift_Action))
 	{
-		EnhancedInputComponent->BindAction(DashAction, ETriggerEvent::Started, this, &ThisClass::Dash);
+		EnhancedInputComponent->BindAction(Dash_Shift_Action, ETriggerEvent::Started, this, &ThisClass::Dash);
 	}
 	else if (IsValid(InputComponent))
 	{
@@ -228,22 +216,6 @@ void AGP_PlayerController::Primary()
     
 	// ASC를 통해 어빌리티 실행 (캐릭터의 멤버 함수 직접 호출 금지)
 	ASI->GetAbilitySystemComponent()->TryActivateAbilitiesByTag(FGameplayTagContainer(PrimaryTag));
-}
-
-void AGP_PlayerController::Targeting()
-{
-	UE_LOG(LogTemp, Warning, TEXT("Targeting"));
-	ActivateAbilityByTag(GPTags::GPAbilities::Targeting);
-}
-
-void AGP_PlayerController::Skill()
-{
-	ActivateAbilityByTag(GPTags::GPAbilities::Skill);
-}
-
-void AGP_PlayerController::Ultimate()
-{
-	ActivateAbilityByTag(GPTags::GPAbilities::Ultimate);
 }
 
 void AGP_PlayerController::Skill_Q()

@@ -42,15 +42,6 @@ private:
 	TObjectPtr<UInputAction> PrimaryAction;
 
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
-	TObjectPtr<UInputAction> TargetingAction;
-
-	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
-	TObjectPtr<UInputAction> SkillAction;
-
-	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
-	TObjectPtr<UInputAction> UltimateAction;
-
-	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
 	TObjectPtr<UInputAction> Skill_Q_Action;
 
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
@@ -59,8 +50,8 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
 	TObjectPtr<UInputAction> Skill_R_Action;
 
-	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Movement")
-	TObjectPtr<UInputAction> DashAction;
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
+	TObjectPtr<UInputAction> Dash_Shift_Action;
 
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
 	TSubclassOf<UUserWidget> HUDWidgetClass;
@@ -89,9 +80,6 @@ private:
 	UFUNCTION(BlueprintCallable, Category = "GP|Input")
 	void Primary();
 	
-	void Targeting();
-	void Skill();
-	void Ultimate();
 	void Skill_Q();
 	void Skill_E();
 	void Skill_R();
