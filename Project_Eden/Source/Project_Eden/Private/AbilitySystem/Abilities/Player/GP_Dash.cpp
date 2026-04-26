@@ -2,11 +2,18 @@
 
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 #include "Characters/GP_PlayerCharacter.h"
-
+#include "GameplayTags/GP_Tags.h"
+#include "Animation/PDA_CharacterAnimationSet.h"
 
 UGP_Dash::UGP_Dash()
 {
-	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
+	// 어빌리티 고유 식별 태그
+	AbilityTags.AddTag(GPTags::Ability::Movement::Dash);
+    
+	// 대시 어빌리티가 실행 중(Active)일 때 캐릭터에게 부여되는 상태 태그들
+	ActivationOwnedTags.AddTag(GPTags::State::Movement::Dash);       // 대시 상태 적용
+	ActivationOwnedTags.AddTag(GPTags::State::Status::Unstoppable);  // 필요시 저지불가 적용
+	// ActivationOwnedTags.AddTag(GPTags::State::Status::Invincible); // 필요시 무적 판정 적용
 }
 
 void UGP_Dash::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
@@ -27,14 +34,20 @@ void UGP_Dash::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FG
 		return;
 	}
 
-	UAnimMontage* RollMontage = PC->GetRollMontage();
+	// 변경점: GetAnimationSet()을 통해 몽타주 접근
+	UAnimMontage* RollMontage = nullptr;
+	if (UPDA_CharacterAnimationSet* AnimSet = PC->GetAnimationSet())
+	{
+		RollMontage = AnimSet->RollMontage;
+	}
+
 	if (!IsValid(RollMontage))
 	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
 
-	// 캐릭터 회전 로직 유지 (추후 별도 보간 로직으로 분리 가능)
+	// 캐릭터 회전 로직 유지
 	FVector RollDirection = PC->GetLastMovementInputVector();
 	if (RollDirection.IsNearlyZero())
 	{

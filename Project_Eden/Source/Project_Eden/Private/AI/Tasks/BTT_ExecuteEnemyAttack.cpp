@@ -10,7 +10,7 @@
 UBTT_ExecuteEnemyAttack::UBTT_ExecuteEnemyAttack()
 {
 	NodeName = TEXT("Execute Enemy Attack");
-	AttackAbilityTag = GPTags::GPAbilities::Enemy::Attack;
+	AttackAbilityTag = GPTags::Ability::Enemy::Attack_Melee;
 }
 
 EBTNodeResult::Type UBTT_ExecuteEnemyAttack::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)

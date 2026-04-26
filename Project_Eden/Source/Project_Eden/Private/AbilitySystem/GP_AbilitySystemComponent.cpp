@@ -44,7 +44,7 @@ void UGP_AbilitySystemComponent::HandleAutoActivatedAbility(const FGameplayAbili
 	if (!IsValid(AbilitySpec.Ability)) return;
 	for (const FGameplayTag& Tag : AbilitySpec.Ability->GetAssetTags()) 
 	{
-		if (Tag.MatchesTagExact(GPTags::GPAbilities::ActivateOnGiven))
+		if (Tag.MatchesTagExact(GPTags::Ability::System::ActivateOnGiven))
 		{
 			TryActivateAbility(AbilitySpec.Handle);
 		} 

@@ -29,6 +29,7 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Movement")
 	TArray<TObjectPtr<UInputMappingContext>> InputMappingContexts;
 
+	// --- Movement 관련 ---
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Movement")
 	TObjectPtr<UInputAction> MoveAction;
 
@@ -38,21 +39,26 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Movement")
 	TObjectPtr<UInputAction> JumpAction;
 
+	// --- Abilities 관련 ---
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
-	TObjectPtr<UInputAction> PrimaryAction;
+	TObjectPtr<UInputAction> PrimaryAttackAction;
 
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
-	TObjectPtr<UInputAction> Skill_Q_Action;
+	TObjectPtr<UInputAction> SprintAction;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
+	TObjectPtr<UInputAction> DashAction;
+
+	// 스킬류 슬롯 변수명에 키 이름 넣으면 안된다함
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
+	TObjectPtr<UInputAction> SkillSlot1Action;
 
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
-	TObjectPtr<UInputAction> Skill_E_Action;
+	TObjectPtr<UInputAction> SkillSlot2Action;
 
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
-	TObjectPtr<UInputAction> Skill_R_Action;
-
-	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
-	TObjectPtr<UInputAction> Dash_Shift_Action;
-
+	TObjectPtr<UInputAction> UltimateAction;
+	
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
 	TSubclassOf<UUserWidget> HUDWidgetClass;
 
@@ -70,20 +76,20 @@ private:
 
 	float BossRefreshAccumulator = 0.0f;
 
-	void Move(const FInputActionValue& Value);
-	void Look(const FInputActionValue& Value);
-	void Jump();
-	void StopJump();
-	void StartSprint();
-	void StopSprint();
-	
-	UFUNCTION(BlueprintCallable, Category = "GP|Input")
-	void Primary();
-	
-	void Skill_Q();
-	void Skill_E();
-	void Skill_R();
-	void Dash();
+	void Input_Move(const FInputActionValue& Value);
+	void Input_Look(const FInputActionValue& Value);
+	void Input_Jump();
+	void Input_StopJump();
+
+	// --- 상태 제어 (State) ---
+	void Input_ToggleSprint();
+	void Input_Dash();
+
+	// --- 전투 및 스킬 (Combat) ---
+	void Input_PrimaryAttack();
+	void Input_SkillSlot1();
+	void Input_SkillSlot2();
+	void Input_UltimateSkill();
 
 	bool ActivateAbilityByTag(const FGameplayTag& AbilityTag) const;
 	void RefreshBossHUD();

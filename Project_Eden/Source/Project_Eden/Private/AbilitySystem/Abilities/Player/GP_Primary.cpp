@@ -6,6 +6,7 @@
 #include "Characters/GP_PlayerCharacter.h"
 #include "GameplayTags/GP_Tags.h"
 
+#include "Animation/PDA_CharacterAnimationSet.h"
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 #include "Abilities/Tasks/AbilityTask_WaitInputPress.h"
 #include "Utils/GP_BlueprintLibrary.h"
@@ -36,8 +37,16 @@ void UGP_Primary::StartComboSequence()
 		return;
 	}
 
-	// 캐릭터의 PDA(DataAsset) 등에서 현재 인덱스에 맞는 콤보 몽타주를 가져옴
-	UAnimMontage* MontageToPlay = PC->GetPrimaryAttackMontageForStep(EGPPrimaryAttackType::Light, CurrentComboIndex);
+	// 변경점: GetAnimationSet()을 통해 직접 몽타주 배열 접근
+	UAnimMontage* MontageToPlay = nullptr;
+	if (UPDA_CharacterAnimationSet* AnimSet = PC->GetAnimationSet())
+	{
+		if (AnimSet->LightAttackMontages.IsValidIndex(CurrentComboIndex))
+		{
+			MontageToPlay = AnimSet->LightAttackMontages[CurrentComboIndex];
+		}
+	}
+
 	if (!IsValid(MontageToPlay))
 	{
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
@@ -108,12 +117,13 @@ void UGP_Primary::OnAttackEventReceived(FGameplayEventData Payload)
 	TArray<AActor*> HitActors = UGP_BlueprintLibrary::SphereMeleeHitBoxOverlap(
 		GetAvatarActorFromActorInfo(), HitBoxRadius, HitBoxForwardOffset, HitBoxElevationOffset, bDrawDebugs);
 
+	// 변경점: Events -> Event 로 태그 네임스페이스 업데이트
 	UGP_BlueprintLibrary::SendGameplayEventToActors(GetAvatarActorFromActorInfo(), HitActors,
-	                                                GPTags::Events::Enemy::HitReact);
+													GPTags::Event::Enemy::HitReact);
 
 	if (HasAuthority(&CurrentActivationInfo))
 	{
 		UGP_BlueprintLibrary::ApplyGameplayEffectToActors(GetAvatarActorFromActorInfo(), HitActors, DamageEffectClass,
-		                                                  GetAbilityLevel());
+														  GetAbilityLevel());
 	}
 }
