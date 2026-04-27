@@ -7,6 +7,8 @@
 
 UGP_Dash::UGP_Dash()
 {
+	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
+	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
 	// 어빌리티 고유 식별 태그
 	AbilityTags.AddTag(GPTags::Ability::Movement::Dash);
 	ActivationOwnedTags.AddTag(GPTags::State::Movement::Dash);       // 대시 상태 

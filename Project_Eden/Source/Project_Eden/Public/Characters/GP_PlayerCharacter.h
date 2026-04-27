@@ -30,6 +30,8 @@ public:
 	virtual void AddMovementInput(FVector WorldDirection, float ScaleValue, bool bForce = false) override;
 	
 	void ToggleSprinting(); 
+	void StartSprinting();
+	void StopSprinting();
 	bool IsSprinting() const; 
 	
 	bool TryPerformDash();

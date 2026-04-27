@@ -46,10 +46,12 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
 	TObjectPtr<UInputAction> SprintAction;
 	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "GAS|Input|Settings", meta = (AllowPrivateAccess = "true"))
+	bool bIsSprintToggle = false;
+	
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
 	TObjectPtr<UInputAction> DashAction;
-
-	// 스킬류 슬롯 변수명에 키 이름 넣으면 안된다함
+	
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
 	TObjectPtr<UInputAction> SkillSlot1Action;
 
@@ -83,6 +85,8 @@ private:
 
 	// --- 상태 제어 (State) ---
 	void Input_ToggleSprint();
+	void Input_SprintPressed();
+	void Input_SprintReleased();
 	void Input_Dash();
 
 	// --- 전투 및 스킬 (Combat) ---

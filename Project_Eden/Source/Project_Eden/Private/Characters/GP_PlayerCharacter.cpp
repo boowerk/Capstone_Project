@@ -113,6 +113,7 @@ void AGP_PlayerCharacter::AddMovementInput(FVector WorldDirection, float ScaleVa
 	if (!bForce && IsSprintExitControlLocked())return; 
 	Super::AddMovementInput(WorldDirection, ScaleValue, bForce);
 }
+
 void AGP_PlayerCharacter::ToggleSprinting()
 {
 	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
@@ -132,6 +133,26 @@ void AGP_PlayerCharacter::ToggleSprinting()
 		// 걷기 중이라면 달리기 활성화 시도
 		ASC->TryActivateAbilitiesByTag(SprintTag);
 	}
+}
+
+void AGP_PlayerCharacter::StartSprinting()
+{
+	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+	if (!ASC || IsSprinting()) return;
+
+	FGameplayTagContainer SprintTag;
+	SprintTag.AddTag(GPTags::State::Movement::Sprinting); 
+	ASC->TryActivateAbilitiesByTag(SprintTag);
+}
+
+void AGP_PlayerCharacter::StopSprinting()
+{
+	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+	if (!ASC || !IsSprinting()) return;
+
+	FGameplayTagContainer SprintTag;
+	SprintTag.AddTag(GPTags::State::Movement::Sprinting); 
+	ASC->CancelAbilities(&SprintTag);
 }
 
 bool AGP_PlayerCharacter::IsSprinting() const
