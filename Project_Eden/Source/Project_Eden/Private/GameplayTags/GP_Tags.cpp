@@ -27,6 +27,7 @@ namespace GPTags
         }
         namespace Movement
         {
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Sprinting, "GPTags.Ability.Movement.Sprinting", "달리기 이동기");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Dash, "GPTags.Ability.Movement.Dash", "대시 이동기");
         }
         namespace Skill

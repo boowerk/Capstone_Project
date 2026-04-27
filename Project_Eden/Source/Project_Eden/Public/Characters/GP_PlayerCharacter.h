@@ -28,7 +28,6 @@ public:
 	virtual void PossessedBy(AController* NewController) override;
 	virtual void OnRep_PlayerState() override;
 	virtual void AddMovementInput(FVector WorldDirection, float ScaleValue, bool bForce = false) override;
-	void EquipSkill(FGameplayTag SlotTag, TSubclassOf<UGameplayAbility> NewAbilityClass);
 	
 	void ToggleSprinting(); 
 	bool IsSprinting() const; 
@@ -42,6 +41,9 @@ public:
 	UPDA_CharacterAnimationSet* GetAnimationSet() const { return AnimationSet; }
 	UBlendSpace* GetLocomotionBlendSpace() const;
 	UAnimSequenceBase* GetJumpLoopAnimation() const;
+	
+	UFUNCTION(BlueprintCallable, Category = "GAS|Combat")
+	void EquipSkill(FGameplayTag SlotTag, TSubclassOf<UGameplayAbility> NewAbilityClass);
 	
 	UFUNCTION(BlueprintCallable, Category = "Movement")
 	void ApplySprintStopLock(float LockTime = 0.2f);

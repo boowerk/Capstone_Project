@@ -11,13 +11,13 @@ class PROJECT_EDEN_API UGP_Dash : public UGP_GameplayAbility
 	
 public:
 	UGP_Dash();
+	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 
 protected:
+
 	UFUNCTION()
 	void OnMontageCompleted();
 
 	UFUNCTION()
 	void OnMontageInterrupted();
-	
-	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 };

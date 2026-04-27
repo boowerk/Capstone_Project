@@ -29,7 +29,7 @@ public:
 	TObjectPtr<UAnimMontage> LandingMontage;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Action")
-	TObjectPtr<UAnimMontage> RollMontage;
+	TObjectPtr<UAnimMontage> DashMontage;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Action")
 	TObjectPtr<UAnimMontage> PrimaryAttackMontage;

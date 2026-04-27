@@ -31,7 +31,8 @@ namespace GPTags
 		}
 		namespace Movement
 		{
-			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Dash);      // 대시
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Sprinting);	// 달리기
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Dash);		// 대시
 		}
 		namespace Skill
 		{

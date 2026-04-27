@@ -165,7 +165,7 @@ bool AGP_PlayerCharacter::TryPerformDash()
 	if (GetCharacterMovement()->IsFalling()) return false;
 
 	FGameplayTagContainer DashTag;
-	DashTag.AddTag(GPTags::State::Movement::Dash);
+	DashTag.AddTag(GPTags::Ability::Movement::Dash);
     
 	return GetAbilitySystemComponent()->TryActivateAbilitiesByTag(DashTag);
 }
