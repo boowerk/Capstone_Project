@@ -65,4 +65,7 @@ private:
 
 	UFUNCTION()
 	void OnAttackEventReceived(FGameplayEventData Payload);
+	
+	UFUNCTION()
+	void OnActionEndEventReceived(FGameplayEventData Payload);
 };

@@ -1,6 +1,7 @@
 ﻿#include "AbilitySystem/Abilities/Player/GP_Dash.h"
 
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
+#include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
 #include "Characters/GP_PlayerCharacter.h"
 #include "GameplayTags/GP_Tags.h"
 #include "Animation/PDA_CharacterAnimationSet.h"
@@ -12,9 +13,10 @@ UGP_Dash::UGP_Dash()
 	// 어빌리티 고유 식별 태그
 	AbilityTags.AddTag(GPTags::Ability::Movement::Dash);
 	ActivationOwnedTags.AddTag(GPTags::State::Movement::Dash);       // 대시 상태 
+	ActivationOwnedTags.AddTag(GPTags::State::Status::Fixed);		// 이동 및 회전 입력 차단
 	// ActivationOwnedTags.AddTag(GPTags::State::Status::Unstoppable);	// 저지불가 상태
 	// ActivationOwnedTags.AddTag(GPTags::State::Status::Invincible);	// 무적 상태
-
+	BlockAbilitiesWithTag.AddTag(FGameplayTag::RequestGameplayTag(FName("Ability.Skill")));
 	CancelAbilitiesWithTag.AddTag(GPTags::Ability::Skill::Primary);
 }
 
@@ -54,9 +56,9 @@ void UGP_Dash::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FG
 	{
 		DashDirection = PC->GetActorForwardVector();
 	}
-	
-	DashDirection.Z = 0.0f; // Z축(위아래) 회전 방지
-	
+    
+	DashDirection.Z = 0.0f;
+    
 	if (!DashDirection.IsNearlyZero())
 	{
 		DashDirection.Normalize();
@@ -72,14 +74,26 @@ void UGP_Dash::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FG
 		PlayTask->OnCompleted.AddDynamic(this, &ThisClass::OnMontageCompleted);
 		PlayTask->OnInterrupted.AddDynamic(this, &ThisClass::OnMontageInterrupted);
 		PlayTask->OnCancelled.AddDynamic(this, &ThisClass::OnMontageInterrupted);
-
-		// 이제 빨간줄 없이 깔끔하게 인식됩니다.
 		PlayTask->ReadyForActivation();
 	}
 	else
 	{
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 	}
+	
+	UAbilityTask_WaitGameplayEvent* WaitEventTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(
+       this, GPTags::Event::Player::ActionEnd);
+
+    if (WaitEventTask)
+    {
+       WaitEventTask->EventReceived.AddDynamic(this, &ThisClass::OnDashActionEnd);
+       WaitEventTask->ReadyForActivation();
+    }
+}
+
+void UGP_Dash::OnDashActionEnd(FGameplayEventData Payload)
+{
+	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 }
 
 void UGP_Dash::OnMontageCompleted()

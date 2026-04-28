@@ -35,10 +35,7 @@ public:
 	bool IsSprinting() const; 
 	
 	bool TryPerformDash();
-	bool IsDashing() const; 
-	
-	bool IsPrimaryAttacking() const;
-	bool IsSprintExitControlLocked() const;
+	bool IsDashing() const;
 
 	UPDA_CharacterAnimationSet* GetAnimationSet() const { return AnimationSet; }
 	UBlendSpace* GetLocomotionBlendSpace() const;
@@ -46,9 +43,7 @@ public:
 	
 	UFUNCTION(BlueprintCallable, Category = "GAS|Combat")
 	void EquipSkill(FGameplayTag SlotTag, TSubclassOf<UGameplayAbility> NewAbilityClass);
-	
-	UFUNCTION(BlueprintCallable, Category = "Movement")
-	void ApplySprintStopLock(float LockTime = 0.2f);
+
 
 private:
 	UPROPERTY(VisibleAnywhere, Category = "Camera")

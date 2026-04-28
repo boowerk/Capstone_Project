@@ -124,10 +124,18 @@ namespace GPTags
 	// [6] Event : 일회성 이벤트 트리거
 	namespace Event
 	{
+		namespace Player
+		{
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(HitReact);	// Player 피격 프레임
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(AttackHit);	// Player 공격 타격 프레임
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(ActionEnd);	// Player 액션 종료 프레임
+		}
+		
 		namespace Enemy
 		{
-			UE_DECLARE_GAMEPLAY_TAG_EXTERN(HitReact);
-			UE_DECLARE_GAMEPLAY_TAG_EXTERN(AttackHit);
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(HitReact);	// Enemy 피격 프레임
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(AttackHit);	// Enemy 공격 타격 프레임
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(ActionEnd);	// Enemy 액션 종료 프레임
 		}
 	}
 

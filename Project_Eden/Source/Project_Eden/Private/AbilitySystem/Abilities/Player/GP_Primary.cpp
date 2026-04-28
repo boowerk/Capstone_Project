@@ -9,6 +9,7 @@
 #include "Animation/PDA_CharacterAnimationSet.h"
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 #include "Abilities/Tasks/AbilityTask_WaitInputPress.h"
+#include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
 #include "Utils/GP_BlueprintLibrary.h"
 #include "GameplayTask.h"
 
@@ -55,6 +56,16 @@ void UGP_Primary::StartComboSequence()
 		return;
 	}
 
+	// 3. 타격 이벤트(AttackHit) 대기 태스크 (버그 원인 해결!)
+	UAbilityTask_WaitGameplayEvent* WaitHitEventTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(this, GPTags::Event::Player::AttackHit);
+	WaitHitEventTask->EventReceived.AddDynamic(this, &ThisClass::OnAttackEventReceived);
+	WaitHitEventTask->ReadyForActivation();
+
+	// 4. 후딜레이 캔슬 및 다음 콤보 이행(ActionEnd) 대기 태스크
+	UAbilityTask_WaitGameplayEvent* WaitEndEventTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(this, GPTags::Event::Player::ActionEnd);
+	WaitEndEventTask->EventReceived.AddDynamic(this, &ThisClass::OnActionEndEventReceived);
+	WaitEndEventTask->ReadyForActivation();
+	
 	// 1. 몽타주 재생 태스크
 	UAbilityTask_PlayMontageAndWait* PlayTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
 		this, NAME_None, MontageToPlay, 1.0f);
@@ -117,15 +128,29 @@ void UGP_Primary::OnMontageInterrupted()
 void UGP_Primary::OnAttackEventReceived(FGameplayEventData Payload)
 {
 	TArray<AActor*> HitActors = UGP_BlueprintLibrary::SphereMeleeHitBoxOverlap(
-		GetAvatarActorFromActorInfo(), HitBoxRadius, HitBoxForwardOffset, HitBoxElevationOffset, bDrawDebugs);
+	   GetAvatarActorFromActorInfo(), HitBoxRadius, HitBoxForwardOffset, HitBoxElevationOffset, bDrawDebugs);
 
-	// 변경점: Events -> Event 로 태그 네임스페이스 업데이트
 	UGP_BlueprintLibrary::SendGameplayEventToActors(GetAvatarActorFromActorInfo(), HitActors,
-													GPTags::Event::Enemy::HitReact);
+										GPTags::Event::Enemy::HitReact);
 
 	if (HasAuthority(&CurrentActivationInfo))
 	{
 		UGP_BlueprintLibrary::ApplyGameplayEffectToActors(GetAvatarActorFromActorInfo(), HitActors, DamageEffectClass,
-														  GetAbilityLevel());
+											  GetAbilityLevel());
+	}
+}
+
+// 액션 종료
+void UGP_Primary::OnActionEndEventReceived(FGameplayEventData Payload)
+{
+	if (bHasQueuedNextAttack)
+	{
+		CurrentComboIndex++;
+		StartComboSequence();
+	}
+	else
+	{
+		CurrentComboIndex = 0;
+		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 	}
 }

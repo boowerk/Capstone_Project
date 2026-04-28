@@ -110,7 +110,14 @@ void AGP_PlayerCharacter::OnRep_PlayerState()
 
 void AGP_PlayerCharacter::AddMovementInput(FVector WorldDirection, float ScaleValue, bool bForce)
 {
-	if (!bForce && IsSprintExitControlLocked())return; 
+	// 기존 IsSprintExitControlLocked() 대신, ASC에서 직접 Fixed 태그만 검사
+	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+	
+	if (!bForce && ASC && ASC->HasMatchingGameplayTag(GPTags::State::Status::Fixed))
+	{
+		return; 
+	}
+	
 	Super::AddMovementInput(WorldDirection, ScaleValue, bForce);
 }
 
@@ -167,18 +174,6 @@ bool AGP_PlayerCharacter::IsDashing() const
 	return ASC ? ASC->HasMatchingGameplayTag(GPTags::State::Movement::Dash) : false;
 }
 
-bool AGP_PlayerCharacter::IsPrimaryAttacking() const
-{
-	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
-	return ASC ? ASC->HasMatchingGameplayTag(GPTags::Ability::Skill::Primary) : false;
-}
-
-bool AGP_PlayerCharacter::IsSprintExitControlLocked() const
-{
-	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
-	return ASC ? ASC->HasMatchingGameplayTag(GPTags::State::Status::Fixed) : false; 
-}
-
 bool AGP_PlayerCharacter::TryPerformDash()
 {
 	if (!GetAbilitySystemComponent()) return false;
@@ -195,10 +190,6 @@ bool AGP_PlayerCharacter::TryPerformDash()
 UBlendSpace* AGP_PlayerCharacter::GetLocomotionBlendSpace() const { return AnimationSet ? AnimationSet->LocomotionBlendSpace : nullptr; }
 UAnimSequenceBase* AGP_PlayerCharacter::GetJumpLoopAnimation() const { return AnimationSet ? AnimationSet->JumpLoopAnimation : nullptr; }
 
-void AGP_PlayerCharacter::ApplySprintStopLock(float LockTime)
-{
-	// TODO (GAS): GPTags::Status::Fixed 태그를 LockTime 만큼 부여하는 Gameplay Effect(GE_SprintStopLock)를 여기에 적용해야 함
-}
 
 void AGP_PlayerCharacter::OnSprintingTagChanged(const FGameplayTag CallbackTag, int32 NewCount)
 {
