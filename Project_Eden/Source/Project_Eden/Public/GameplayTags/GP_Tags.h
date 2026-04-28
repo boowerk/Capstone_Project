@@ -129,6 +129,8 @@ namespace GPTags
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(HitReact);	// Player 피격 프레임
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(AttackHit);	// Player 공격 타격 프레임
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(ActionEnd);	// Player 액션 종료 프레임
+			
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(ComboEnable);	// Player 콤보 액션
 		}
 		
 		namespace Enemy

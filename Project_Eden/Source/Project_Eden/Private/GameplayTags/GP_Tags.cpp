@@ -125,6 +125,8 @@ namespace GPTags
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(HitReact, "GPTags.Event.Player.HitReact", "Player 피격 리액션 이벤트");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(AttackHit, "GPTags.Event.Player.AttackHit", "Player 공격 타격 판정 프레임 이벤트");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(ActionEnd, "GPTags.Event.Player.ActionEnd", "Player 액션 종료 프레임 이벤트");
+            
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(ComboEnable, "GPTags.Event.Player.ComboEnable", "Player 콤보 액션 이벤트");
         }
         namespace Enemy
         {

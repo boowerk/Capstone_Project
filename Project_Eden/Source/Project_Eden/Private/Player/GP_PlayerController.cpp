@@ -179,17 +179,38 @@ void AGP_PlayerController::Input_Dash()
 
 void AGP_PlayerController::Input_PrimaryAttack()
 {
-	// [Rule: Early Return]
 	APawn* ControlledPawn = GetPawn();
 	if (!IsValid(ControlledPawn)) return;
 
 	IAbilitySystemInterface* ASI = Cast<IAbilitySystemInterface>(ControlledPawn);
 	if (!ASI || !ASI->GetAbilitySystemComponent()) return;
-	
+
+	UAbilitySystemComponent* ASC = ASI->GetAbilitySystemComponent();
 	FGameplayTag PrimaryTag = GPTags::Ability::Skill::Primary;
-    
-	// ASC를 통해 어빌리티 실행 (캐릭터의 멤버 함수 직접 호출 금지)
-	ASI->GetAbilitySystemComponent()->TryActivateAbilitiesByTag(FGameplayTagContainer(PrimaryTag));
+
+	bool bInputHandled = false;
+
+	for (FGameplayAbilitySpec& Spec : ASC->GetActivatableAbilities())
+	{
+		// 부여된 동적 태그나 어빌리티 기본 태그 중 PrimaryTag가 있는지 검사
+		if (Spec.GetDynamicSpecSourceTags().HasTagExact(PrimaryTag) || 
+		   (Spec.Ability && Spec.Ability->AbilityTags.HasTagExact(PrimaryTag)))
+		{
+			if (Spec.IsActive())
+			{
+				UE_LOG(LogTemp, Warning, TEXT("Controller: Active Primary Ability Found. Sending Input."));
+				ASC->AbilitySpecInputPressed(Spec);
+				bInputHandled = true;
+				break;
+			}
+		}
+	}
+
+	if (!bInputHandled)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Controller: Activating Primary Ability for the first time."));
+		ASC->TryActivateAbilitiesByTag(FGameplayTagContainer(PrimaryTag));
+	}
 }
 
 void AGP_PlayerController::Input_SkillSlot1()

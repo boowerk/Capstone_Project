@@ -1,20 +1,18 @@
 ﻿#include "AbilitySystem/Abilities/Player/GP_Primary.h"
-
 #include "AbilitySystemBlueprintLibrary.h"
-#include "AbilitySystem/GP_AttributeSet.h"
-#include "Animation/AnimMontage.h"
 #include "Characters/GP_PlayerCharacter.h"
 #include "GameplayTags/GP_Tags.h"
-
 #include "Animation/PDA_CharacterAnimationSet.h"
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 #include "Abilities/Tasks/AbilityTask_WaitInputPress.h"
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
 #include "Utils/GP_BlueprintLibrary.h"
-#include "GameplayTask.h"
 
+UGP_Primary::UGP_Primary()
+{
+	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
+}
 
-// 이 부분은 BP에도 관상용으로 만들어뒀으니 블루프린트 코드로 만들고싶으면 보셈 - 슝민
 void UGP_Primary::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
@@ -29,9 +27,18 @@ void UGP_Primary::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 	StartComboSequence();
 }
 
+void UGP_Primary::InputPressed(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo)
+{
+	Super::InputPressed(Handle, ActorInfo, ActivationInfo);
+
+	// 선입력 허용: 애니메이션 도중 언제 클릭하든 다음 공격을 예약합니다.
+	UE_LOG(LogTemp, Warning, TEXT("UGP_Primary : InputPressed Called - Next Attack Queued!"));
+	bHasQueuedNextAttack = true;
+}
 void UGP_Primary::StartComboSequence()
 {
 	bHasQueuedNextAttack = false;
+	bIsComboWindowOpen = false;
 
 	AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo());
 	if (!IsValid(PC))
@@ -40,14 +47,17 @@ void UGP_Primary::StartComboSequence()
 		return;
 	}
 
-	// 변경점: GetAnimationSet()을 통해 직접 몽타주 배열 접근
-	UAnimMontage* MontageToPlay = nullptr;
-	if (UPDA_CharacterAnimationSet* AnimSet = PC->GetAnimationSet())
+	UPDA_CharacterAnimationSet* AnimSet = PC->GetAnimationSet();
+	if (!IsValid(AnimSet) || AnimSet->LightAttackMontages.IsEmpty())
 	{
-		if (AnimSet->LightAttackMontages.IsValidIndex(CurrentComboIndex))
-		{
-			MontageToPlay = AnimSet->LightAttackMontages[CurrentComboIndex];
-		}
+		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+		return;
+	}
+
+	UAnimMontage* MontageToPlay = nullptr;
+	if (AnimSet->LightAttackMontages.IsValidIndex(CurrentComboIndex))
+	{
+		MontageToPlay = AnimSet->LightAttackMontages[CurrentComboIndex];
 	}
 
 	if (!IsValid(MontageToPlay))
@@ -56,76 +66,89 @@ void UGP_Primary::StartComboSequence()
 		return;
 	}
 
-	// 3. 타격 이벤트(AttackHit) 대기 태스크 (버그 원인 해결!)
-	UAbilityTask_WaitGameplayEvent* WaitHitEventTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(this, GPTags::Event::Player::AttackHit);
-	WaitHitEventTask->EventReceived.AddDynamic(this, &ThisClass::OnAttackEventReceived);
-	WaitHitEventTask->ReadyForActivation();
+	ClearExistingTasks();
 
-	// 4. 후딜레이 캔슬 및 다음 콤보 이행(ActionEnd) 대기 태스크
-	UAbilityTask_WaitGameplayEvent* WaitEndEventTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(this, GPTags::Event::Player::ActionEnd);
-	WaitEndEventTask->EventReceived.AddDynamic(this, &ThisClass::OnActionEndEventReceived);
-	WaitEndEventTask->ReadyForActivation();
-	
-	// 1. 몽타주 재생 태스크
-	UAbilityTask_PlayMontageAndWait* PlayTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
-		this, NAME_None, MontageToPlay, 1.0f);
-	PlayTask->OnCompleted.AddDynamic(this, &ThisClass::OnMontageCompleted);
-	PlayTask->OnInterrupted.AddDynamic(this, &ThisClass::OnMontageInterrupted);
-	PlayTask->ReadyForActivation();
+	WaitHitTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(this, GPTags::Event::Player::AttackHit);
+	WaitHitTask->EventReceived.AddDynamic(this, &ThisClass::OnAttackHitEventReceived);
+	WaitHitTask->ReadyForActivation();
 
-	// 2. 선입력 버퍼링 태스크 (몽타주 재생 중 추가 공격 키 입력 감지)
-	UAbilityTask_WaitInputPress* InputTask = UAbilityTask_WaitInputPress::WaitInputPress(this, false);
-	InputTask->OnPress.AddDynamic(this, &ThisClass::OnInputPressedDuringCombo);
-	InputTask->ReadyForActivation();
+	WaitComboTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(this, GPTags::Event::Player::ComboEnable);
+	WaitComboTask->EventReceived.AddDynamic(this, &ThisClass::OnComboEnableEventReceived);
+	WaitComboTask->ReadyForActivation();
+
+	WaitEndTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(this, GPTags::Event::Player::ActionEnd);
+	WaitEndTask->EventReceived.AddDynamic(this, &ThisClass::OnActionEndEventReceived);
+	WaitEndTask->ReadyForActivation();
+
+	MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(this, NAME_None, MontageToPlay, 1.0f);
+	MontageTask->OnCompleted.AddDynamic(this, &ThisClass::OnMontageCompleted);
+	MontageTask->OnInterrupted.AddDynamic(this, &ThisClass::OnMontageInterrupted);
+	MontageTask->ReadyForActivation();
 }
 
-void UGP_Primary::OnInputPressedDuringCombo(float TimeWaited)
+void UGP_Primary::ClearExistingTasks()
 {
-	// 애니메이션 재생 중 공격 키가 다시 눌리면 다음 콤보 시퀀스를 예약
-	bHasQueuedNextAttack = true;
+	if (MontageTask) { MontageTask->EndTask(); MontageTask = nullptr; }
+	if (WaitHitTask) { WaitHitTask->EndTask(); WaitHitTask = nullptr; }
+	if (WaitComboTask) { WaitComboTask->EndTask(); WaitComboTask = nullptr; }
+	if (WaitEndTask) { WaitEndTask->EndTask(); WaitEndTask = nullptr; }
 }
 
-bool UGP_Primary::PlayPrimaryAttackMontage(UAnimMontage* MontageToPlay)
+int32 UGP_Primary::GetNextComboIndex(int32 MaxComboCount)
 {
-	if (!IsValid(MontageToPlay)) return false;
-
-	// Task를 사용하여 몽타주 재생 및 완료 대기 (Tick 제거)
-	UAbilityTask_PlayMontageAndWait* PlayTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
-		this, NAME_None, MontageToPlay, 1.0f);
-    
-	if (!PlayTask) return false;
-
-	// 완료/중단 시 후속 처리 바인딩
-	PlayTask->OnCompleted.AddDynamic(this, &ThisClass::OnMontageCompleted);
-	PlayTask->OnInterrupted.AddDynamic(this, &ThisClass::OnMontageInterrupted);
-    
-	PlayTask->ReadyForActivation();
-	return true;
+	if (bUseRandomCombo) return FMath::RandRange(0, MaxComboCount - 1);
+	return (CurrentComboIndex + 1) % MaxComboCount;
 }
 
-void UGP_Primary::OnMontageCompleted()
+
+void UGP_Primary::OnComboEnableEventReceived(FGameplayEventData Payload)
 {
+	UE_LOG(LogTemp, Warning, TEXT("UGP_Primary : OnComboEnableEventReceived Called - Combo Window Open"));
+	bIsComboWindowOpen = true;
+}
+
+void UGP_Primary::OnActionEndEventReceived(FGameplayEventData Payload)
+{
+	UE_LOG(LogTemp, Warning, TEXT("UGP_Primary : OnActionEndEventReceived Called - bHasQueuedNextAttack : %s"), bHasQueuedNextAttack ? TEXT("True") : TEXT("False"));
+	AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo());
+	if (!IsValid(PC) || !IsValid(PC->GetAnimationSet()))
+	{
+		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+		return;
+	}
+
+	int32 MaxCombo = PC->GetAnimationSet()->LightAttackMontages.Num();
+
 	if (bHasQueuedNextAttack)
 	{
-		// 예약된 공격이 있다면 인덱스를 올리고 콤보를 이어나감
-		CurrentComboIndex++;
-		StartComboSequence();
+		CurrentComboIndex = GetNextComboIndex(MaxCombo);
+
+		if (!bUseRandomCombo && CurrentComboIndex == 0)
+		{
+			EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+		}
+		else
+		{
+			StartComboSequence();
+		}
 	}
 	else
 	{
-		// 추가 입력이 없었다면 콤보 인덱스를 초기화하고 어빌리티 종료
-		CurrentComboIndex = 0;
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 	}
 }
 
+void UGP_Primary::OnMontageCompleted()
+{
+	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+}
+
 void UGP_Primary::OnMontageInterrupted()
 {
-	CurrentComboIndex = 0;
 	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 }
 
-void UGP_Primary::OnAttackEventReceived(FGameplayEventData Payload)
+void UGP_Primary::OnAttackHitEventReceived(FGameplayEventData Payload)
 {
 	TArray<AActor*> HitActors = UGP_BlueprintLibrary::SphereMeleeHitBoxOverlap(
 	   GetAvatarActorFromActorInfo(), HitBoxRadius, HitBoxForwardOffset, HitBoxElevationOffset, bDrawDebugs);
@@ -137,20 +160,5 @@ void UGP_Primary::OnAttackEventReceived(FGameplayEventData Payload)
 	{
 		UGP_BlueprintLibrary::ApplyGameplayEffectToActors(GetAvatarActorFromActorInfo(), HitActors, DamageEffectClass,
 											  GetAbilityLevel());
-	}
-}
-
-// 액션 종료
-void UGP_Primary::OnActionEndEventReceived(FGameplayEventData Payload)
-{
-	if (bHasQueuedNextAttack)
-	{
-		CurrentComboIndex++;
-		StartComboSequence();
-	}
-	else
-	{
-		CurrentComboIndex = 0;
-		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 	}
 }
