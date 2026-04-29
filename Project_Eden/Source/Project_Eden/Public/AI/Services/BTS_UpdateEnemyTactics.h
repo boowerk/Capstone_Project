@@ -45,6 +45,10 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "AI|Tactics")
 	bool bFallbackToChaseWhenTargetExists = true;
 
+	// Re-evaluate the BT after this service flips branch keys, so patrol MoveTo/Wait cannot trap combat.
+	UPROPERTY(EditAnywhere, Category = "AI|Tactics")
+	bool bRestartTreeOnTacticalStateChange = true;
+
 	// When a chase pulls the enemy too far from its anchor, pause target selection and return home.
 	UPROPERTY(EditAnywhere, Category = "AI|Leash")
 	bool bEnableLeashReturnHome = true;
@@ -57,4 +61,16 @@ protected:
 
 private:
 	void UpdateTactics(UBehaviorTreeComponent& OwnerComp) const;
+	void RestartTreeIfTacticalStateChanged(
+		UBehaviorTreeComponent& OwnerComp,
+		bool bPreviousShouldRetreat,
+		bool bPreviousCanAttack,
+		bool bPreviousShouldReposition,
+		bool bPreviousShouldChase,
+		bool bPreviousShouldReturnHome,
+		bool bShouldRetreat,
+		bool bCanAttack,
+		bool bShouldReposition,
+		bool bShouldChase,
+		bool bShouldReturnHome) const;
 };

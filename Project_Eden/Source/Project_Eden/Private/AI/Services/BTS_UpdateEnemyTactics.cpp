@@ -11,6 +11,7 @@
 #include "BehaviorTree/BehaviorTreeTypes.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "Characters/GP_EnemyCharacter.h"
+#include "Navigation/PathFollowingComponent.h"
 
 namespace
 {
@@ -136,19 +137,33 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 	BlackboardComponent->SetValueAsFloat(EnemyBlackboardKeys::HealthRatio, HealthRatio);
 
 	AEnemyAIController* EnemyAIController = Cast<AEnemyAIController>(AIController);
+	const AGP_EnemyCharacter* EnemyCharacter = Cast<AGP_EnemyCharacter>(ControlledPawn);
+	const float EffectiveMaxChaseDistanceFromHome = IsValid(EnemyCharacter) ? EnemyCharacter->GetReturnHomeDistance() : MaxChaseDistanceFromHome;
+	const float EffectiveReturnHomeAcceptanceRadius = IsValid(EnemyCharacter) ? EnemyCharacter->GetReturnHomeAcceptanceRadius() : ReturnHomeAcceptanceRadius;
 	const FVector HomeLocation = EnemyBTTaskCommon::GetBehaviorAnchorLocation(ControlledPawn);
 	const float DistanceFromHome = FVector::Dist2D(ControlledPawn->GetActorLocation(), HomeLocation);
 	SetOptionalBlackboardVector(BlackboardComponent, EnemyBlackboardKeys::HomeLocation, HomeLocation);
 	SetOptionalBlackboardFloat(BlackboardComponent, EnemyBlackboardKeys::DistanceFromHome, DistanceFromHome);
 
 	AActor* TargetActor = Cast<AActor>(BlackboardComponent->GetValueAsObject(EnemyBlackboardKeys::TargetActor));
+	// If MoveTo stops slightly outside the authored radius, unlock near home instead of trapping the enemy in ReturnHome.
+	const float FailSafeReturnHomeAcceptanceRadius = FMath::Max(
+		EffectiveReturnHomeAcceptanceRadius,
+		FMath::Min(EffectiveMaxChaseDistanceFromHome * 0.25f, 600.0f));
+	const bool bReturnMoveStoppedNearHome =
+		IsValid(EnemyAIController)
+		&& EnemyAIController->IsLeashReturnHomeActive()
+		&& AIController->GetMoveStatus() != EPathFollowingStatus::Moving
+		&& DistanceFromHome <= FailSafeReturnHomeAcceptanceRadius;
 	bool bShouldReturnHome = bEnableLeashReturnHome
 		&& IsValid(EnemyAIController)
 		&& EnemyAIController->IsLeashReturnHomeActive()
-		&& DistanceFromHome > ReturnHomeAcceptanceRadius;
+		&& DistanceFromHome > EffectiveReturnHomeAcceptanceRadius
+		&& !bReturnMoveStoppedNearHome;
 
-	if (bEnableLeashReturnHome && IsValid(EnemyAIController) && IsValid(TargetActor) && DistanceFromHome > MaxChaseDistanceFromHome)
+	if (bEnableLeashReturnHome && IsValid(EnemyAIController) && IsValid(TargetActor) && DistanceFromHome > EffectiveMaxChaseDistanceFromHome)
 	{
+		// Enemy Character range settings define the actual leash distance used by this service.
 		// The leash is an AI rule, but movement remains a Behavior Tree MoveTo driven by MoveToLocation.
 		bShouldReturnHome = true;
 	}
@@ -159,6 +174,12 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 	}
 
 	SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldReturnHome, bShouldReturnHome);
+	if (!bShouldReturnHome && !IsValid(TargetActor) && IsValid(EnemyAIController))
+	{
+		// After returning home, perception may need an explicit rescore before the player can become TargetActor again.
+		EnemyAIController->RequestTargetActorReevaluation();
+		TargetActor = Cast<AActor>(BlackboardComponent->GetValueAsObject(EnemyBlackboardKeys::TargetActor));
+	}
 
 	if (bShouldReturnHome)
 	{
@@ -181,6 +202,18 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 				*EnemyAIDebugUtils::DescribeActor(ControlledPawn));
 		}
 
+		RestartTreeIfTacticalStateChanged(
+			OwnerComp,
+			bPreviousShouldRetreat,
+			bPreviousCanAttack,
+			bPreviousShouldReposition,
+			bPreviousShouldChase,
+			bPreviousShouldReturnHome,
+			false,
+			false,
+			false,
+			false,
+			true);
 		return;
 	}
 
@@ -200,6 +233,18 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 			UE_LOG(LogEnemyAI, Verbose, TEXT("[State] No target -> combat branches off (%s)"), *EnemyAIDebugUtils::DescribeActor(ControlledPawn));
 		}
 
+		RestartTreeIfTacticalStateChanged(
+			OwnerComp,
+			bPreviousShouldRetreat,
+			bPreviousCanAttack,
+			bPreviousShouldReposition,
+			bPreviousShouldChase,
+			bPreviousShouldReturnHome,
+			false,
+			false,
+			false,
+			false,
+			false);
 		return;
 	}
 
@@ -285,4 +330,57 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 			bHasLineOfSight ? 1 : 0,
 			*EnemyAIDebugUtils::DescribeActor(ControlledPawn));
 	}
+
+	RestartTreeIfTacticalStateChanged(
+		OwnerComp,
+		bPreviousShouldRetreat,
+		bPreviousCanAttack,
+		bPreviousShouldReposition,
+		bPreviousShouldChase,
+		bPreviousShouldReturnHome,
+		bShouldRetreat,
+		bCanAttack,
+		bShouldReposition,
+		bShouldChase,
+		false);
+}
+
+void UBTS_UpdateEnemyTactics::RestartTreeIfTacticalStateChanged(
+	UBehaviorTreeComponent& OwnerComp,
+	bool bPreviousShouldRetreat,
+	bool bPreviousCanAttack,
+	bool bPreviousShouldReposition,
+	bool bPreviousShouldChase,
+	bool bPreviousShouldReturnHome,
+	bool bShouldRetreat,
+	bool bCanAttack,
+	bool bShouldReposition,
+	bool bShouldChase,
+	bool bShouldReturnHome) const
+{
+	if (!bRestartTreeOnTacticalStateChange)
+	{
+		return;
+	}
+
+	const bool bTacticalStateChanged =
+		bPreviousShouldRetreat != bShouldRetreat
+		|| bPreviousCanAttack != bCanAttack
+		|| bPreviousShouldReposition != bShouldReposition
+		|| bPreviousShouldChase != bShouldChase
+		|| bPreviousShouldReturnHome != bShouldReturnHome;
+
+	if (!bTacticalStateChanged || !OwnerComp.IsRunning() || OwnerComp.IsRestartPending() || OwnerComp.IsAbortPending())
+	{
+		return;
+	}
+
+	AEnemyAIController* EnemyAIController = Cast<AEnemyAIController>(OwnerComp.GetAIOwner());
+	if (!IsValid(EnemyAIController))
+	{
+		return;
+	}
+
+	// Services run inside BehaviorTreeComponent tick, so defer the restart through the controller to avoid BT priority ensures.
+	EnemyAIController->RequestBehaviorTreeRootReevaluation();
 }

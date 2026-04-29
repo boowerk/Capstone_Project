@@ -32,6 +32,12 @@ public:
 	void SetLeashReturnHomeActive(bool bActive);
 	bool IsLeashReturnHomeActive() const { return bLeashReturnHomeActive; }
 
+	// BT services can ask perception to rescore targets after a leash state or tactical state change.
+	void RequestTargetActorReevaluation();
+
+	// Schedules a safe root re-evaluation outside BehaviorTreeComponent tick.
+	void RequestBehaviorTreeRootReevaluation();
+
 protected:
 	virtual void OnPossess(APawn* InPawn) override;
 	virtual void OnUnPossess() override;
@@ -119,10 +125,10 @@ protected:
 	bool ValidateSharedBlackboardSchema(UBlackboardComponent* BlackboardComponent);
 
 	void ConfigureSightSense();
-	void RequestTargetActorReevaluation();
 	void RefreshTargetActorFromPerception();
 	void GatherPerceptionTargetCandidates(TArray<AActor*>& OutVisibleCandidates, TArray<AActor*>& OutKnownCandidates) const;
 	AActor* SelectBestTargetActorFromPerception() const;
+	AActor* SelectFallbackPlayerTargetByDistance() const;
 	bool IsValidPerceptionTarget(AActor* CandidateActor) const;
 	float GetCandidateHealthRatio(AActor* CandidateActor) const;
 	void SetBlackboardTargetActor(AActor* NewTargetActor);
@@ -134,6 +140,8 @@ protected:
 	bool bHasLastAppliedEnemyEvaluation = false;
 	bool bHasWarnedAboutMissingBlackboardKeys = false;
 	bool bLeashReturnHomeActive = false;
+	bool bHasPendingBehaviorTreeRootReevaluation = false;
+	int32 PendingBehaviorTreeRootReevaluationRetryCount = 0;
 	float LastEnemyEvaluationApplyTime = -1000.0f;
 	FEnemyLLMEvaluation PendingEnemyEvaluation;
 	FEnemyLLMEvaluation LastAppliedEnemyEvaluation;

@@ -8,6 +8,7 @@
 #include "BehaviorTree/BehaviorTree.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "BrainComponent.h"
+#include "Characters/GP_EnemyCharacter.h"
 #include "EnvironmentQuery/EnvQuery.h"
 #include "EnvironmentQuery/EnvQueryManager.h"
 
@@ -60,7 +61,7 @@ EBTNodeResult::Type UBTT_RunEnemyPositioningEQSQuery::ExecuteTask(UBehaviorTreeC
 	FEnvQueryRequest QueryRequest(QueryTemplate, ControlledPawn);
 	if (bInjectBlackboardParameters)
 	{
-		ApplyNamedParams(QueryRequest, BlackboardComponent);
+		ApplyNamedParams(QueryRequest, BlackboardComponent, ControlledPawn);
 	}
 
 	TaskMemory->RequestID = QueryRequest.Execute(RunMode, QueryFinishedDelegate);
@@ -118,12 +119,15 @@ FString UBTT_RunEnemyPositioningEQSQuery::GetStaticDescription() const
 		*MoveLocationKey.SelectedKeyName.ToString());
 }
 
-void UBTT_RunEnemyPositioningEQSQuery::ApplyNamedParams(FEnvQueryRequest& QueryRequest, const UBlackboardComponent* BlackboardComponent) const
+void UBTT_RunEnemyPositioningEQSQuery::ApplyNamedParams(FEnvQueryRequest& QueryRequest, const UBlackboardComponent* BlackboardComponent, const APawn* ControlledPawn) const
 {
 	if (!IsValid(BlackboardComponent))
 	{
 		return;
 	}
+
+	const AGP_EnemyCharacter* EnemyCharacter = Cast<AGP_EnemyCharacter>(ControlledPawn);
+	const float PatrolRadius = IsValid(EnemyCharacter) ? EnemyCharacter->GetPatrolRadius() : 1200.0f;
 
 	// 공용 Blackboard 값을 named param으로 넘겨 같은 EQS 에셋을 여러 적이 재사용하게 만든다.
 	QueryRequest
@@ -138,7 +142,9 @@ void UBTT_RunEnemyPositioningEQSQuery::ApplyNamedParams(FEnvQueryRequest& QueryR
 			EnemyBTTaskCommon::GetClampedBlackboardFloat(BlackboardComponent, EnemyBlackboardKeys::Aggression, 0.5f, 0.0f, 1.0f))
 		.SetFloatParam(
 			EnemyEQSNames::RetreatThresholdParam,
-			EnemyBTTaskCommon::GetClampedBlackboardFloat(BlackboardComponent, EnemyBlackboardKeys::RetreatThreshold, 0.35f, 0.0f, 1.0f));
+			EnemyBTTaskCommon::GetClampedBlackboardFloat(BlackboardComponent, EnemyBlackboardKeys::RetreatThreshold, 0.35f, 0.0f, 1.0f))
+		// Patrol EQS_PatrolLocation should bind GridHalfSize or CircleRadius to this named param.
+		.SetFloatParam(EnemyEQSNames::PatrolRadiusParam, PatrolRadius);
 }
 
 void UBTT_RunEnemyPositioningEQSQuery::OnQueryFinished(TSharedPtr<FEnvQueryResult> Result)

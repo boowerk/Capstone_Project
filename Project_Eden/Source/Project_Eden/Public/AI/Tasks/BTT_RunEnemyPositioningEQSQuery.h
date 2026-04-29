@@ -8,6 +8,7 @@
 class UBlackboardComponent;
 class UEnvQuery;
 class UBehaviorTree;
+class APawn;
 struct FEnvQueryRequest;
 struct FEnvQueryResult;
 
@@ -56,6 +57,6 @@ protected:
 
 	FQueryFinishedSignature QueryFinishedDelegate;
 
-	void ApplyNamedParams(FEnvQueryRequest& QueryRequest, const UBlackboardComponent* BlackboardComponent) const;
+	void ApplyNamedParams(FEnvQueryRequest& QueryRequest, const UBlackboardComponent* BlackboardComponent, const APawn* ControlledPawn) const;
 	void OnQueryFinished(TSharedPtr<FEnvQueryResult> Result);
 };

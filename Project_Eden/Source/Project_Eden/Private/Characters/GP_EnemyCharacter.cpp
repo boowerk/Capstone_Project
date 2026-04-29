@@ -5,6 +5,7 @@
 #include "AI/Data/EnemyLLMEvaluation.h"
 #include "AbilitySystem/GP_AbilitySystemComponent.h"
 #include "AbilitySystem/GP_AttributeSet.h"
+#include "Components/DrawSphereComponent.h"
 #include "Engine/DataTable.h"
 
 AGP_EnemyCharacter::AGP_EnemyCharacter()
@@ -20,6 +21,28 @@ AGP_EnemyCharacter::AGP_EnemyCharacter()
 	// 적은 배치/스폰 시 공용 AIController를 자동 점유해 BT/Blackboard 초기화를 컨트롤러에 위임한다.
 	AIControllerClass = AEnemyAIController::StaticClass();
 	AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
+
+#if WITH_EDITORONLY_DATA
+	ReturnHomeRangeVisualizer = CreateEditorOnlyDefaultSubobject<UDrawSphereComponent>(TEXT("ReturnHomeRangeVisualizer"));
+	PatrolRangeVisualizer = CreateEditorOnlyDefaultSubobject<UDrawSphereComponent>(TEXT("PatrolRangeVisualizer"));
+	SightRangeVisualizer = CreateEditorOnlyDefaultSubobject<UDrawSphereComponent>(TEXT("SightRangeVisualizer"));
+
+	if (ReturnHomeRangeVisualizer != nullptr)
+	{
+		ReturnHomeRangeVisualizer->SetupAttachment(GetRootComponent());
+	}
+	if (PatrolRangeVisualizer != nullptr)
+	{
+		PatrolRangeVisualizer->SetupAttachment(GetRootComponent());
+	}
+	if (SightRangeVisualizer != nullptr)
+	{
+		SightRangeVisualizer->SetupAttachment(GetRootComponent());
+	}
+
+	// Editor-only shapes make the gameplay ranges visible without adding runtime collision.
+	RefreshAIRangeVisualizers();
+#endif
 }
 
 UAttributeSet* AGP_EnemyCharacter::GetAttributeSet() const
@@ -36,6 +59,14 @@ FVector AGP_EnemyCharacter::GetBehaviorAnchorLocation() const
 {
 	// AI possession can ask for the anchor before BeginPlay, so compute the editor-authored point on demand.
 	return bHasBehaviorAnchorLocation ? BehaviorAnchorLocation : GetActorTransform().TransformPosition(BehaviorAnchorOffset);
+}
+
+void AGP_EnemyCharacter::OnConstruction(const FTransform& Transform)
+{
+	Super::OnConstruction(Transform);
+
+	// Keep editor range rings in sync when designers move the anchor or change range values.
+	RefreshAIRangeVisualizers();
 }
 
 bool AGP_EnemyCharacter::BuildInitialEnemyEvaluation(FEnemyLLMEvaluation& OutEvaluation) const
@@ -114,4 +145,34 @@ int32 AGP_EnemyCharacter::ResolvePersonalitySeed() const
 		HashCombineFast(
 			GetTypeHash(GetFName()),
 			HashCombineFast(GetTypeHash(GetActorLocation()), GetUniqueID())));
+}
+
+void AGP_EnemyCharacter::RefreshAIRangeVisualizers()
+{
+#if WITH_EDITORONLY_DATA
+	auto ConfigureRangeVisualizer = [this](UDrawSphereComponent* Visualizer, float Radius, const FColor& ShapeColor)
+	{
+		if (Visualizer == nullptr)
+		{
+			return;
+		}
+
+		// The anchor offset is the same local point used by HomeLocation, so the rings preview runtime behavior.
+		Visualizer->SetRelativeLocation(BehaviorAnchorOffset);
+		Visualizer->SetSphereRadius(FMath::Max(0.0f, Radius), false);
+		Visualizer->ShapeColor = ShapeColor;
+		Visualizer->bDrawOnlyIfSelected = bDrawAIRangesOnlyWhenSelected;
+		Visualizer->SetLineThickness(2.0f);
+		Visualizer->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Visualizer->SetGenerateOverlapEvents(false);
+		Visualizer->SetCanEverAffectNavigation(false);
+		Visualizer->SetHiddenInGame(true);
+		Visualizer->SetVisibility(bShowAIRangesInEditor);
+		Visualizer->MarkRenderStateDirty();
+	};
+
+	ConfigureRangeVisualizer(ReturnHomeRangeVisualizer, GetReturnHomeDistance(), FColor(255, 96, 96));
+	ConfigureRangeVisualizer(PatrolRangeVisualizer, GetPatrolRadius(), FColor(96, 180, 255));
+	ConfigureRangeVisualizer(SightRangeVisualizer, GetSightRadius(), FColor(96, 255, 160));
+#endif
 }

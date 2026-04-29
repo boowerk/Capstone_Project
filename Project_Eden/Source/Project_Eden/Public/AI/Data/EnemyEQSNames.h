@@ -15,4 +15,7 @@ namespace EnemyEQSNames
 
 	// EQS 쿼리 에셋에서 후퇴 임계값을 받는 named param 이름이다.
 	PROJECT_EDEN_API extern const FName RetreatThresholdParam;
+
+	// Patrol EQS can bind this named param so placed enemy PatrolRadius controls the query size.
+	PROJECT_EDEN_API extern const FName PatrolRadiusParam;
 }

@@ -6,11 +6,13 @@
 #include "AI/Data/EnemyBlackboardKeys.h"
 #include "AI/Debug/EnemyAIDebugUtils.h"
 #include "BehaviorTree/BehaviorTree.h"
+#include "BehaviorTree/BehaviorTreeComponent.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "BehaviorTree/BlackboardData.h"
 #include "Characters/GP_EnemyCharacter.h"
 #include "GameFramework/Actor.h"
 #include "GameFramework/Pawn.h"
+#include "Kismet/GameplayStatics.h"
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISense_Sight.h"
 #include "Perception/AISenseConfig_Sight.h"
@@ -157,6 +159,8 @@ void AEnemyAIController::OnUnPossess()
 	StopEvaluationRefreshLoop();
 	GetWorldTimerManager().ClearTimer(PendingEnemyEvaluationTimerHandle);
 	bLeashReturnHomeActive = false;
+	bHasPendingBehaviorTreeRootReevaluation = false;
+	PendingBehaviorTreeRootReevaluationRetryCount = 0;
 
 	// TargetActor belongs to perception selection, so clear it when the controller releases the pawn.
 	SetBlackboardTargetActor(nullptr);
@@ -524,9 +528,20 @@ void AEnemyAIController::ConfigureSightSense()
 		return;
 	}
 
-	SightSenseConfig->SightRadius = SightRadius;
-	SightSenseConfig->LoseSightRadius = FMath::Max(LoseSightRadius, SightRadius);
-	SightSenseConfig->PeripheralVisionAngleDegrees = PeripheralVisionAngleDegrees;
+	float EffectiveSightRadius = SightRadius;
+	float EffectiveLoseSightRadius = LoseSightRadius;
+	float EffectivePeripheralVisionAngleDegrees = PeripheralVisionAngleDegrees;
+	if (const AGP_EnemyCharacter* EnemyCharacter = Cast<AGP_EnemyCharacter>(GetPawn()))
+	{
+		// Placed enemy settings win over controller defaults so designers can tune each enemy in the level.
+		EffectiveSightRadius = EnemyCharacter->GetSightRadius();
+		EffectiveLoseSightRadius = EnemyCharacter->GetLoseSightRadius();
+		EffectivePeripheralVisionAngleDegrees = EnemyCharacter->GetPeripheralVisionAngleDegrees();
+	}
+
+	SightSenseConfig->SightRadius = EffectiveSightRadius;
+	SightSenseConfig->LoseSightRadius = FMath::Max(EffectiveLoseSightRadius, EffectiveSightRadius);
+	SightSenseConfig->PeripheralVisionAngleDegrees = EffectivePeripheralVisionAngleDegrees;
 	SightSenseConfig->SetMaxAge(SightMaxAge);
 	SightSenseConfig->AutoSuccessRangeFromLastSeenLocation = AutoSuccessRangeFromLastSeenLocation;
 	SightSenseConfig->DetectionByAffiliation.bDetectEnemies = bDetectEnemies;
@@ -583,7 +598,8 @@ AActor* AEnemyAIController::SelectBestTargetActorFromPerception() const
 
 	if (KnownCandidates.IsEmpty())
 	{
-		return nullptr;
+		// Perception events can be consumed while the leash is active; distance fallback prevents a dead idle after returning home.
+		return SelectFallbackPlayerTargetByDistance();
 	}
 
 	const UBlackboardComponent* BlackboardComponent = GetBlackboardComponent();
@@ -644,6 +660,30 @@ AActor* AEnemyAIController::SelectBestTargetActorFromPerception() const
 	}
 
 	return SelectNearestTargetCandidate(GetPawn(), PreferredCandidates);
+}
+
+AActor* AEnemyAIController::SelectFallbackPlayerTargetByDistance() const
+{
+	const APawn* ControlledPawn = GetPawn();
+	if (!IsValid(ControlledPawn))
+	{
+		return nullptr;
+	}
+
+	APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(this, 0);
+	if (!IsValid(PlayerPawn) || !IsValidPerceptionTarget(PlayerPawn))
+	{
+		return nullptr;
+	}
+
+	const float EffectiveSightRadius = IsValid(SightSenseConfig) ? SightSenseConfig->SightRadius : SightRadius;
+	if (FVector::DistSquared2D(ControlledPawn->GetActorLocation(), PlayerPawn->GetActorLocation()) > FMath::Square(EffectiveSightRadius))
+	{
+		return nullptr;
+	}
+
+	// Keep AI Perception as the source of truth, but allow a fresh LOS check to recover after the leash suppresses perception callbacks.
+	return LineOfSightTo(PlayerPawn) ? PlayerPawn : nullptr;
 }
 
 void AEnemyAIController::GatherPerceptionTargetCandidates(TArray<AActor*>& OutVisibleCandidates, TArray<AActor*>& OutKnownCandidates) const
@@ -779,6 +819,9 @@ void AEnemyAIController::SetBlackboardTargetActor(AActor* NewTargetActor)
 	{
 		BlackboardComponent->ClearValue(EnemyBlackboardKeys::TargetActor);
 	}
+
+	// Target changes should interrupt Patrol/Idle without asking BT services to restart themselves mid-tick.
+	RequestBehaviorTreeRootReevaluation();
 }
 
 void AEnemyAIController::SetLeashReturnHomeActive(bool bActive)
@@ -795,10 +838,74 @@ void AEnemyAIController::SetLeashReturnHomeActive(bool bActive)
 		// Stop the current chase immediately; the BT return-home branch will own the next MoveTo.
 		StopMovement();
 		SetBlackboardTargetActor(nullptr);
+		RequestBehaviorTreeRootReevaluation();
 		UE_LOG(LogEnemyAI, Log, TEXT("[Leash] Return home started: %s"), *EnemyAIDebugUtils::DescribeActor(GetPawn()));
 		return;
 	}
 
 	UE_LOG(LogEnemyAI, Log, TEXT("[Leash] Return home finished: %s"), *EnemyAIDebugUtils::DescribeActor(GetPawn()));
+	if (IsValid(EnemyPerceptionComponent))
+	{
+		// A player may already be inside sight when the leash unlocks, so request a fresh stimuli pass before rescoring.
+		EnemyPerceptionComponent->RequestStimuliListenerUpdate();
+	}
+
 	RequestTargetActorReevaluation();
+	RequestBehaviorTreeRootReevaluation();
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().SetTimerForNextTick(FTimerDelegate::CreateWeakLambda(this, [this]()
+		{
+			// The next tick catches perception updates that arrive just after the leash flag is cleared.
+			RequestTargetActorReevaluation();
+			RequestBehaviorTreeRootReevaluation();
+		}));
+	}
+}
+
+void AEnemyAIController::RequestBehaviorTreeRootReevaluation()
+{
+	if (bHasPendingBehaviorTreeRootReevaluation)
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (!IsValid(World))
+	{
+		return;
+	}
+
+	bHasPendingBehaviorTreeRootReevaluation = true;
+	World->GetTimerManager().SetTimerForNextTick(FTimerDelegate::CreateWeakLambda(this, [this]()
+	{
+		bHasPendingBehaviorTreeRootReevaluation = false;
+
+		UBehaviorTreeComponent* BehaviorTreeComponent = Cast<UBehaviorTreeComponent>(GetBrainComponent());
+		if (!IsValid(BehaviorTreeComponent) || !BehaviorTreeComponent->IsRunning())
+		{
+			PendingBehaviorTreeRootReevaluationRetryCount = 0;
+			return;
+		}
+
+		if (BehaviorTreeComponent->IsAbortPending() || BehaviorTreeComponent->IsRestartPending())
+		{
+			// ReturnHome often flips state while BT is aborting MoveTo; retry instead of dropping the wake-up.
+			if (++PendingBehaviorTreeRootReevaluationRetryCount <= 3)
+			{
+				RequestBehaviorTreeRootReevaluation();
+			}
+			else
+			{
+				PendingBehaviorTreeRootReevaluationRetryCount = 0;
+			}
+			return;
+		}
+
+		PendingBehaviorTreeRootReevaluationRetryCount = 0;
+
+		// Restart on the next world tick so MoveTo/Wait can be replaced by the highest-priority valid branch.
+		BehaviorTreeComponent->RestartTree(EBTRestartMode::ForceReevaluateRootNode);
+	}));
 }

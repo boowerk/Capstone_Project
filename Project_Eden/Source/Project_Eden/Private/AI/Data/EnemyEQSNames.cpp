@@ -6,4 +6,5 @@ namespace EnemyEQSNames
 	const FName CoverPreferenceParam(TEXT("CoverPreference"));
 	const FName AggressionParam(TEXT("Aggression"));
 	const FName RetreatThresholdParam(TEXT("RetreatThreshold"));
+	const FName PatrolRadiusParam(TEXT("PatrolRadius"));
 }
