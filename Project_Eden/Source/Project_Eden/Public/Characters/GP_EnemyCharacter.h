@@ -8,7 +8,7 @@ class UAbilitySystemComponent;
 class UAttributeSet;
 class UBehaviorTree;
 class UBlackboardData;
-class UDrawSphereComponent;
+class UEnemyAIRangeVisualizationComponent;
 class UEnemyArchetypeData;
 struct FDataTableRowHandle;
 struct FEnemyArchetypeTuning;
@@ -124,13 +124,7 @@ protected:
 private:
 #if WITH_EDITORONLY_DATA
 	UPROPERTY(VisibleAnywhere, Category = "AI|Debug", meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UDrawSphereComponent> ReturnHomeRangeVisualizer;
-
-	UPROPERTY(VisibleAnywhere, Category = "AI|Debug", meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UDrawSphereComponent> PatrolRangeVisualizer;
-
-	UPROPERTY(VisibleAnywhere, Category = "AI|Debug", meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UDrawSphereComponent> SightRangeVisualizer;
+	TObjectPtr<UEnemyAIRangeVisualizationComponent> AIRangeVisualizer;
 #endif
 
 	UPROPERTY(VisibleAnywhere)

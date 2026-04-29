@@ -3,9 +3,9 @@
 #include "AI/Controllers/EnemyAIController.h"
 #include "AI/Data/EnemyArchetypeData.h"
 #include "AI/Data/EnemyLLMEvaluation.h"
+#include "AI/Debug/EnemyAIRangeVisualizationComponent.h"
 #include "AbilitySystem/GP_AbilitySystemComponent.h"
 #include "AbilitySystem/GP_AttributeSet.h"
-#include "Components/DrawSphereComponent.h"
 #include "Engine/DataTable.h"
 
 AGP_EnemyCharacter::AGP_EnemyCharacter()
@@ -23,21 +23,10 @@ AGP_EnemyCharacter::AGP_EnemyCharacter()
 	AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
 
 #if WITH_EDITORONLY_DATA
-	ReturnHomeRangeVisualizer = CreateEditorOnlyDefaultSubobject<UDrawSphereComponent>(TEXT("ReturnHomeRangeVisualizer"));
-	PatrolRangeVisualizer = CreateEditorOnlyDefaultSubobject<UDrawSphereComponent>(TEXT("PatrolRangeVisualizer"));
-	SightRangeVisualizer = CreateEditorOnlyDefaultSubobject<UDrawSphereComponent>(TEXT("SightRangeVisualizer"));
-
-	if (ReturnHomeRangeVisualizer != nullptr)
+	AIRangeVisualizer = CreateEditorOnlyDefaultSubobject<UEnemyAIRangeVisualizationComponent>(TEXT("AIRangeVisualizer"));
+	if (AIRangeVisualizer != nullptr)
 	{
-		ReturnHomeRangeVisualizer->SetupAttachment(GetRootComponent());
-	}
-	if (PatrolRangeVisualizer != nullptr)
-	{
-		PatrolRangeVisualizer->SetupAttachment(GetRootComponent());
-	}
-	if (SightRangeVisualizer != nullptr)
-	{
-		SightRangeVisualizer->SetupAttachment(GetRootComponent());
+		AIRangeVisualizer->SetupAttachment(GetRootComponent());
 	}
 
 	// Editor-only shapes make the gameplay ranges visible without adding runtime collision.
@@ -150,29 +139,17 @@ int32 AGP_EnemyCharacter::ResolvePersonalitySeed() const
 void AGP_EnemyCharacter::RefreshAIRangeVisualizers()
 {
 #if WITH_EDITORONLY_DATA
-	auto ConfigureRangeVisualizer = [this](UDrawSphereComponent* Visualizer, float Radius, const FColor& ShapeColor)
+	if (AIRangeVisualizer != nullptr)
 	{
-		if (Visualizer == nullptr)
-		{
-			return;
-		}
-
 		// The anchor offset is the same local point used by HomeLocation, so the rings preview runtime behavior.
-		Visualizer->SetRelativeLocation(BehaviorAnchorOffset);
-		Visualizer->SetSphereRadius(FMath::Max(0.0f, Radius), false);
-		Visualizer->ShapeColor = ShapeColor;
-		Visualizer->bDrawOnlyIfSelected = bDrawAIRangesOnlyWhenSelected;
-		Visualizer->SetLineThickness(2.0f);
-		Visualizer->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-		Visualizer->SetGenerateOverlapEvents(false);
-		Visualizer->SetCanEverAffectNavigation(false);
-		Visualizer->SetHiddenInGame(true);
-		Visualizer->SetVisibility(bShowAIRangesInEditor);
-		Visualizer->MarkRenderStateDirty();
-	};
-
-	ConfigureRangeVisualizer(ReturnHomeRangeVisualizer, GetReturnHomeDistance(), FColor(255, 96, 96));
-	ConfigureRangeVisualizer(PatrolRangeVisualizer, GetPatrolRadius(), FColor(96, 180, 255));
-	ConfigureRangeVisualizer(SightRangeVisualizer, GetSightRadius(), FColor(96, 255, 160));
+		AIRangeVisualizer->SetRelativeLocation(BehaviorAnchorOffset);
+		AIRangeVisualizer->ConfigureRanges(
+			GetReturnHomeDistance(),
+			GetPatrolRadius(),
+			GetSightRadius(),
+			GetLoseSightRadius(),
+			GetPeripheralVisionAngleDegrees());
+		AIRangeVisualizer->ConfigureVisibility(bShowAIRangesInEditor, bDrawAIRangesOnlyWhenSelected);
+	}
 #endif
 }
