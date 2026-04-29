@@ -55,8 +55,18 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "EQS")
 	bool bInjectBlackboardParameters = true;
 
+	// If EQS cannot produce a useful patrol point, use NavigationSystem so Patrol does not stall in place.
+	UPROPERTY(EditAnywhere, Category = "EQS|Fallback")
+	bool bUseNavigationFallbackOnFail = true;
+
+	UPROPERTY(EditAnywhere, Category = "EQS|Fallback", meta = (ClampMin = "0.0"))
+	float MinimumMoveDistance = 250.0f;
+
 	FQueryFinishedSignature QueryFinishedDelegate;
 
 	void ApplyNamedParams(FEnvQueryRequest& QueryRequest, const UBlackboardComponent* BlackboardComponent, const APawn* ControlledPawn) const;
+	FName GetMoveLocationKeyName() const;
+	bool TrySetNavigationFallbackLocation(UBlackboardComponent* BlackboardComponent, const APawn* ControlledPawn) const;
+	bool IsMoveLocationFarEnough(const APawn* ControlledPawn, const FVector& MoveLocation) const;
 	void OnQueryFinished(TSharedPtr<FEnvQueryResult> Result);
 };

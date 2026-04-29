@@ -11,6 +11,7 @@
 #include "Characters/GP_EnemyCharacter.h"
 #include "EnvironmentQuery/EnvQuery.h"
 #include "EnvironmentQuery/EnvQueryManager.h"
+#include "NavigationSystem.h"
 
 UBTT_RunEnemyPositioningEQSQuery::UBTT_RunEnemyPositioningEQSQuery()
 {
@@ -18,6 +19,8 @@ UBTT_RunEnemyPositioningEQSQuery::UBTT_RunEnemyPositioningEQSQuery()
 
 	// EQS 위치 결과는 Vector Blackboard 키에만 기록되도록 제한한다.
 	MoveLocationKey.AddVectorFilter(this, GET_MEMBER_NAME_CHECKED(ThisClass, MoveLocationKey));
+	// Default to the shared movement key so patrol can still work if a BT node is added before designers set details.
+	MoveLocationKey.SelectedKeyName = EnemyBlackboardKeys::MoveToLocation;
 	QueryFinishedDelegate = FQueryFinishedSignature::CreateUObject(this, &ThisClass::OnQueryFinished);
 }
 
@@ -44,6 +47,12 @@ EBTNodeResult::Type UBTT_RunEnemyPositioningEQSQuery::ExecuteTask(UBehaviorTreeC
 
 	if (!IsValid(QueryTemplate))
 	{
+		if (TrySetNavigationFallbackLocation(BlackboardComponent, ControlledPawn))
+		{
+			// Missing patrol EQS should not leave an idle enemy frozen at its spawn point.
+			return EBTNodeResult::Succeeded;
+		}
+
 		UE_LOG(LogEnemyAI, Warning, TEXT("[EQS] 실행 실패 - QueryTemplate 미지정: %s"), *GetNameSafe(this));
 		return EBTNodeResult::Failed;
 	}
@@ -77,6 +86,13 @@ EBTNodeResult::Type UBTT_RunEnemyPositioningEQSQuery::ExecuteTask(UBehaviorTreeC
 		TEXT("[EQS] 실행 요청 생성 실패: Query=%s Owner=%s"),
 		*GetNameSafe(QueryTemplate),
 		*EnemyAIDebugUtils::DescribeActor(ControlledPawn));
+
+	if (TrySetNavigationFallbackLocation(BlackboardComponent, ControlledPawn))
+	{
+		// A failed request creation is recoverable for patrol movement when NavMesh can provide a point.
+		return EBTNodeResult::Succeeded;
+	}
+
 	return EBTNodeResult::Failed;
 }
 
@@ -147,6 +163,71 @@ void UBTT_RunEnemyPositioningEQSQuery::ApplyNamedParams(FEnvQueryRequest& QueryR
 		.SetFloatParam(EnemyEQSNames::PatrolRadiusParam, PatrolRadius);
 }
 
+FName UBTT_RunEnemyPositioningEQSQuery::GetMoveLocationKeyName() const
+{
+	return MoveLocationKey.SelectedKeyName != NAME_None
+		? MoveLocationKey.SelectedKeyName
+		: EnemyBlackboardKeys::MoveToLocation;
+}
+
+bool UBTT_RunEnemyPositioningEQSQuery::TrySetNavigationFallbackLocation(UBlackboardComponent* BlackboardComponent, const APawn* ControlledPawn) const
+{
+	if (!bUseNavigationFallbackOnFail || !IsValid(BlackboardComponent) || !IsValid(ControlledPawn))
+	{
+		return false;
+	}
+
+	UWorld* World = ControlledPawn->GetWorld();
+	UNavigationSystemV1* NavSystem = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
+	if (!IsValid(NavSystem))
+	{
+		return false;
+	}
+
+	const AGP_EnemyCharacter* EnemyCharacter = Cast<AGP_EnemyCharacter>(ControlledPawn);
+	const FVector HomeLocation = EnemyBTTaskCommon::GetBehaviorAnchorLocation(ControlledPawn);
+	const float PatrolRadius = IsValid(EnemyCharacter) ? EnemyCharacter->GetPatrolRadius() : 1200.0f;
+	const float RequiredMoveDistance = FMath::Clamp(MinimumMoveDistance, 0.0f, PatrolRadius);
+
+	FNavLocation CandidateLocation;
+	for (int32 AttemptIndex = 0; AttemptIndex < 8; ++AttemptIndex)
+	{
+		if (NavSystem->GetRandomReachablePointInRadius(HomeLocation, PatrolRadius, CandidateLocation)
+			&& FVector::DistSquared2D(ControlledPawn->GetActorLocation(), CandidateLocation.Location) >= FMath::Square(RequiredMoveDistance))
+		{
+			BlackboardComponent->SetValueAsVector(GetMoveLocationKeyName(), CandidateLocation.Location);
+			UE_LOG(
+				LogEnemyAI,
+				Log,
+				TEXT("[Patrol] Fallback move location selected: Pawn=%s Location=%s"),
+				*EnemyAIDebugUtils::DescribeActor(ControlledPawn),
+				*EnemyAIDebugUtils::DescribeLocation(CandidateLocation.Location));
+			return true;
+		}
+	}
+
+	if (NavSystem->ProjectPointToNavigation(HomeLocation, CandidateLocation))
+	{
+		// Last resort keeps MoveToLocation valid; designers should still ensure PatrolRadius covers enough NavMesh.
+		BlackboardComponent->SetValueAsVector(GetMoveLocationKeyName(), CandidateLocation.Location);
+		UE_LOG(
+			LogEnemyAI,
+			Warning,
+			TEXT("[Patrol] Fallback used home location because no distant patrol point was reachable: Pawn=%s Location=%s"),
+			*EnemyAIDebugUtils::DescribeActor(ControlledPawn),
+			*EnemyAIDebugUtils::DescribeLocation(CandidateLocation.Location));
+		return true;
+	}
+
+	return false;
+}
+
+bool UBTT_RunEnemyPositioningEQSQuery::IsMoveLocationFarEnough(const APawn* ControlledPawn, const FVector& MoveLocation) const
+{
+	return IsValid(ControlledPawn)
+		&& FVector::DistSquared2D(ControlledPawn->GetActorLocation(), MoveLocation) >= FMath::Square(MinimumMoveDistance);
+}
+
 void UBTT_RunEnemyPositioningEQSQuery::OnQueryFinished(TSharedPtr<FEnvQueryResult> Result)
 {
 	if (!Result.IsValid())
@@ -162,7 +243,8 @@ void UBTT_RunEnemyPositioningEQSQuery::OnQueryFinished(TSharedPtr<FEnvQueryResul
 	}
 
 	AActor* QueryOwner = Cast<AActor>(Result->Owner.Get());
-	if (APawn* QueryOwnerPawn = Cast<APawn>(QueryOwner))
+	APawn* QueryOwnerPawn = Cast<APawn>(QueryOwner);
+	if (QueryOwnerPawn != nullptr)
 	{
 		QueryOwner = QueryOwnerPawn->GetController();
 	}
@@ -183,9 +265,17 @@ void UBTT_RunEnemyPositioningEQSQuery::OnQueryFinished(TSharedPtr<FEnvQueryResul
 	if (bSuccess)
 	{
 		const FVector ResultLocation = Result->GetItemAsLocation(0);
+		if (!IsMoveLocationFarEnough(QueryOwnerPawn, ResultLocation) && TrySetNavigationFallbackLocation(BlackboardComponent, QueryOwnerPawn))
+		{
+			// Near-zero EQS results look like no patrol, so replace them with a reachable point farther away.
+			FAIMessage::Send(
+				BehaviorTreeComponent,
+				FAIMessage(UBrainComponent::AIMessage_QueryFinished, this, Result->QueryID, true));
+			return;
+		}
 
 		// Actor 결과든 Point 결과든 첫 번째 최적 후보의 위치만 MoveToLocation에 기록한다.
-		BlackboardComponent->SetValueAsVector(MoveLocationKey.SelectedKeyName, ResultLocation);
+		BlackboardComponent->SetValueAsVector(GetMoveLocationKeyName(), ResultLocation);
 
 		UE_LOG(
 			LogEnemyAI,
@@ -197,9 +287,17 @@ void UBTT_RunEnemyPositioningEQSQuery::OnQueryFinished(TSharedPtr<FEnvQueryResul
 	}
 	else
 	{
+		if (TrySetNavigationFallbackLocation(BlackboardComponent, QueryOwnerPawn))
+		{
+			FAIMessage::Send(
+				BehaviorTreeComponent,
+				FAIMessage(UBrainComponent::AIMessage_QueryFinished, this, Result->QueryID, true));
+			return;
+		}
+
 		if (bClearMoveLocationOnFail && IsValid(BlackboardComponent))
 		{
-			BlackboardComponent->ClearValue(MoveLocationKey.SelectedKeyName);
+			BlackboardComponent->ClearValue(GetMoveLocationKeyName());
 		}
 
 		UE_LOG(
