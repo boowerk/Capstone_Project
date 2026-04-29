@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
@@ -29,6 +29,7 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Movement")
 	TArray<TObjectPtr<UInputMappingContext>> InputMappingContexts;
 
+	// --- Movement 관련 ---
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Movement")
 	TObjectPtr<UInputAction> MoveAction;
 
@@ -38,32 +39,28 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Movement")
 	TObjectPtr<UInputAction> JumpAction;
 
+	// --- Abilities 관련 ---
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
-	TObjectPtr<UInputAction> PrimaryAction;
-
-	// Legacy ability input assets kept for backward compatibility with older controller blueprints.
-	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
-	TObjectPtr<UInputAction> TargetingAction;
+	TObjectPtr<UInputAction> PrimaryAttackAction;
 
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
-	TObjectPtr<UInputAction> SkillAction;
+	TObjectPtr<UInputAction> SprintAction;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "GAS|Input|Settings", meta = (AllowPrivateAccess = "true"))
+	bool bIsSprintToggle = false;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
+	TObjectPtr<UInputAction> DashAction;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
+	TObjectPtr<UInputAction> SkillSlot1Action;
+
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
+	TObjectPtr<UInputAction> SkillSlot2Action;
 
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
 	TObjectPtr<UInputAction> UltimateAction;
-
-	// Split Q/E/R actions introduced on the latest main branch.
-	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
-	TObjectPtr<UInputAction> Skill_Q_Action;
-
-	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
-	TObjectPtr<UInputAction> Skill_E_Action;
-
-	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
-	TObjectPtr<UInputAction> Skill_R_Action;
-
-	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Movement")
-	TObjectPtr<UInputAction> DashAction;
-
+	
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
 	TSubclassOf<UUserWidget> HUDWidgetClass;
 
@@ -81,21 +78,22 @@ private:
 
 	float BossRefreshAccumulator = 0.0f;
 
-	void Move(const FInputActionValue& Value);
-	void Look(const FInputActionValue& Value);
-	void Jump();
-	void StopJump();
-	void StartSprint();
-	void StopSprint();
+	void Input_Move(const FInputActionValue& Value);
+	void Input_Look(const FInputActionValue& Value);
+	void Input_Jump();
+	void Input_StopJump();
 
-	void Primary();
-	void Targeting();
-	void Skill();
-	void Ultimate();
-	void Skill_Q();
-	void Skill_E();
-	void Skill_R();
-	void Dash();
+	// --- 상태 제어 (State) ---
+	void Input_ToggleSprint();
+	void Input_SprintPressed();
+	void Input_SprintReleased();
+	void Input_Dash();
+
+	// --- 전투 및 스킬 (Combat) ---
+	void Input_PrimaryAttack();
+	void Input_SkillSlot1();
+	void Input_SkillSlot2();
+	void Input_UltimateSkill();
 
 	bool ActivateAbilityByTag(const FGameplayTag& AbilityTag) const;
 	void RefreshBossHUD();

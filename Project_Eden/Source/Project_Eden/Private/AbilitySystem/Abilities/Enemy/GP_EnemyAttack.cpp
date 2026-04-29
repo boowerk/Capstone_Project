@@ -11,8 +11,8 @@
 UGP_EnemyAttack::UGP_EnemyAttack()
 {
 	// 공유 BT 공격 태스크는 이 태그를 기준으로 적 공격 어빌리티를 찾는다.
-	AbilityTags.AddTag(GPTags::GPAbilities::Enemy::Attack);
-	AttackEventTag = GPTags::Events::Enemy::AttackHit;
+	AbilityTags.AddTag(GPTags::Ability::Enemy::Attack_Melee);
+	AttackEventTag = GPTags::Event::Enemy::AttackHit;
 }
 
 void UGP_EnemyAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
@@ -125,7 +125,7 @@ void UGP_EnemyAttack::PerformAttackHit()
 		bDrawDebugs);
 
 	// 타격 대상이 적이라면 기존 피격 반응 태그를 그대로 재사용한다.
-	UGP_BlueprintLibrary::SendGameplayEventToActors(AvatarActor, HitActors, GPTags::Events::Enemy::HitReact);
+	UGP_BlueprintLibrary::SendGameplayEventToActors(AvatarActor, HitActors, GPTags::Event::Enemy::HitReact);
 
 	if (HasAuthority(&CurrentActivationInfo) && DamageEffectClass)
 	{

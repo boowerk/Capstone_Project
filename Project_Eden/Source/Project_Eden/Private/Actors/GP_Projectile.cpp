@@ -23,7 +23,7 @@ AGP_Projectile::AGP_Projectile()
 	ProjectileMovement->ProjectileGravityScale = 0.0f;
 	ProjectileMovement->bRotationFollowsVelocity = true;
 
-	HitEventTag = GPTags::Events::Enemy::HitReact;
+	HitEventTag = GPTags::Event::Enemy::HitReact;
 }
 
 void AGP_Projectile::BeginPlay()

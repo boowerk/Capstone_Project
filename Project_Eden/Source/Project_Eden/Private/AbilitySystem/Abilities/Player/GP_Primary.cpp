@@ -1,143 +1,164 @@
 ﻿#include "AbilitySystem/Abilities/Player/GP_Primary.h"
-
 #include "AbilitySystemBlueprintLibrary.h"
-#include "AbilitySystem/GP_AttributeSet.h"
-#include "Animation/AnimMontage.h"
 #include "Characters/GP_PlayerCharacter.h"
 #include "GameplayTags/GP_Tags.h"
-
+#include "Animation/PDA_CharacterAnimationSet.h"
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
+#include "Abilities/Tasks/AbilityTask_WaitInputPress.h"
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
 #include "Utils/GP_BlueprintLibrary.h"
 
-// 이 부분은 BP에도 관상용으로 만들어뒀으니 블루프린트 코드로 만들고싶으면 보셈 - 슝민
-void UGP_Primary::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
-                                  const FGameplayAbilityActivationInfo ActivationInfo,
-                                  const FGameplayEventData* TriggerEventData)
+UGP_Primary::UGP_Primary()
 {
-	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
-	
-	{
-		if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
-		{
-			EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-			return;
-		}
-
-		// Sequence 1: Gameplay Event 대기 Task 생성 
-		if (AttackEventTag.IsValid())
-		{
-			UAbilityTask_WaitGameplayEvent* WaitEventTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(
-				this, AttackEventTag, nullptr, false, true);
-			if (WaitEventTask)
-			{
-				// 콤보 한 번의 어빌리티 안에서 여러 공격 판정 Notify를 받을 수 있게 반복 이벤트로 둔다.
-				WaitEventTask->EventReceived.AddDynamic(this, &ThisClass::OnAttackEventReceived);
-				WaitEventTask->ReadyForActivation();
-			}
-		}
-
-		UAnimMontage* MontageToPlay = AttackMontage;
-		AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo());
-		if (PlayerCharacter)
-		{
-			if (UAnimMontage* CharacterMontage = PlayerCharacter->StartPrimaryAttackCombo())
-			{
-				MontageToPlay = CharacterMontage;
-			}
-		}
-
-		// Sequence 0: 몽타주 Task 생성
-		if (MontageToPlay) // 캐릭터 세트 우선, 없으면 어빌리티 기본값 사용
-		{
-			if (!PlayPrimaryAttackMontage(MontageToPlay))
-			{
-				if (PlayerCharacter)
-				{
-					PlayerCharacter->CancelPrimaryAttackCombo();
-				}
-
-				EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-			}
-		}
-		else // 몽타주가 비어있음 블루프린트 몽타주로
-		{
-			if (bDrawDebugs)
-			{
-				UE_LOG(LogTemp, Warning,
-				       TEXT("Primary Attack: C++ Montage is NULL. Waiting for Blueprint to handle Montage."));
-			}
-		}
-	}
+	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
 }
 
-bool UGP_Primary::PlayPrimaryAttackMontage(UAnimMontage* MontageToPlay)
+void UGP_Primary::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
+	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
+
+	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
+	{
+		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+		return;
+	}
+
+	CurrentComboIndex = 0;
+	StartComboSequence();
+}
+
+void UGP_Primary::InputPressed(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo)
+{
+	Super::InputPressed(Handle, ActorInfo, ActivationInfo);
+
+	// 선입력 허용: 애니메이션 도중 언제 클릭하든 다음 공격을 예약합니다.
+	UE_LOG(LogTemp, Warning, TEXT("UGP_Primary : InputPressed Called - Next Attack Queued!"));
+	bHasQueuedNextAttack = true;
+}
+void UGP_Primary::StartComboSequence()
+{
+	bHasQueuedNextAttack = false;
+	bIsComboWindowOpen = false;
+
+	AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo());
+	if (!IsValid(PC))
+	{
+		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+		return;
+	}
+
+	UPDA_CharacterAnimationSet* AnimSet = PC->GetAnimationSet();
+	if (!IsValid(AnimSet) || AnimSet->LightAttackMontages.IsEmpty())
+	{
+		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+		return;
+	}
+
+	UAnimMontage* MontageToPlay = nullptr;
+	if (AnimSet->LightAttackMontages.IsValidIndex(CurrentComboIndex))
+	{
+		MontageToPlay = AnimSet->LightAttackMontages[CurrentComboIndex];
+	}
+
 	if (!IsValid(MontageToPlay))
 	{
-		return false;
+		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+		return;
 	}
 
-	UAbilityTask_PlayMontageAndWait* PlayMontageTask =
-		UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(this, NAME_None, MontageToPlay, 1.0f);
-	if (!PlayMontageTask)
+	ClearExistingTasks();
+
+	WaitHitTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(this, GPTags::Event::Player::AttackHit);
+	WaitHitTask->EventReceived.AddDynamic(this, &ThisClass::OnAttackHitEventReceived);
+	WaitHitTask->ReadyForActivation();
+
+	WaitComboTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(this, GPTags::Event::Player::ComboEnable);
+	WaitComboTask->EventReceived.AddDynamic(this, &ThisClass::OnComboEnableEventReceived);
+	WaitComboTask->ReadyForActivation();
+
+	WaitEndTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(this, GPTags::Event::Player::ActionEnd);
+	WaitEndTask->EventReceived.AddDynamic(this, &ThisClass::OnActionEndEventReceived);
+	WaitEndTask->ReadyForActivation();
+
+	MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(this, NAME_None, MontageToPlay, 1.0f);
+	MontageTask->OnCompleted.AddDynamic(this, &ThisClass::OnMontageCompleted);
+	MontageTask->OnInterrupted.AddDynamic(this, &ThisClass::OnMontageInterrupted);
+	MontageTask->ReadyForActivation();
+}
+
+void UGP_Primary::ClearExistingTasks()
+{
+	if (MontageTask) { MontageTask->EndTask(); MontageTask = nullptr; }
+	if (WaitHitTask) { WaitHitTask->EndTask(); WaitHitTask = nullptr; }
+	if (WaitComboTask) { WaitComboTask->EndTask(); WaitComboTask = nullptr; }
+	if (WaitEndTask) { WaitEndTask->EndTask(); WaitEndTask = nullptr; }
+}
+
+int32 UGP_Primary::GetNextComboIndex(int32 MaxComboCount)
+{
+	if (bUseRandomCombo) return FMath::RandRange(0, MaxComboCount - 1);
+	return (CurrentComboIndex + 1) % MaxComboCount;
+}
+
+
+void UGP_Primary::OnComboEnableEventReceived(FGameplayEventData Payload)
+{
+	UE_LOG(LogTemp, Warning, TEXT("UGP_Primary : OnComboEnableEventReceived Called - Combo Window Open"));
+	bIsComboWindowOpen = true;
+}
+
+void UGP_Primary::OnActionEndEventReceived(FGameplayEventData Payload)
+{
+	UE_LOG(LogTemp, Warning, TEXT("UGP_Primary : OnActionEndEventReceived Called - bHasQueuedNextAttack : %s"), bHasQueuedNextAttack ? TEXT("True") : TEXT("False"));
+	AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo());
+	if (!IsValid(PC) || !IsValid(PC->GetAnimationSet()))
 	{
-		return false;
+		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+		return;
 	}
 
-	if (AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo()))
+	int32 MaxCombo = PC->GetAnimationSet()->LightAttackMontages.Num();
+
+	if (bHasQueuedNextAttack)
 	{
-		PlayerCharacter->SetPrimaryAttackActive(true);
+		CurrentComboIndex = GetNextComboIndex(MaxCombo);
+
+		if (!bUseRandomCombo && CurrentComboIndex == 0)
+		{
+			EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+		}
+		else
+		{
+			StartComboSequence();
+		}
 	}
-
-	// BlendOut이 아니라 실제 완료 시점에 콤보 유예 시간을 열어 애니메이션이 중간에 잘려 보이지 않게 한다.
-	PlayMontageTask->OnCompleted.AddDynamic(this, &ThisClass::OnMontageCompleted);
-	PlayMontageTask->OnInterrupted.AddDynamic(this, &ThisClass::OnMontageInterrupted);
-	PlayMontageTask->OnCancelled.AddDynamic(this, &ThisClass::OnMontageInterrupted);
-
-	PlayMontageTask->ReadyForActivation();
-	return true;
+	else
+	{
+		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+	}
 }
 
 void UGP_Primary::OnMontageCompleted()
 {
-	if (AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo()))
-	{
-		if (UAnimMontage* NextMontage = PlayerCharacter->AdvancePrimaryAttackCombo())
-		{
-			if (PlayPrimaryAttackMontage(NextMontage))
-			{
-				return;
-			}
-		}
-
-		PlayerCharacter->FinishPrimaryAttackCombo();
-	}
-
 	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 }
 
 void UGP_Primary::OnMontageInterrupted()
 {
-	if (AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo()))
-	{
-		PlayerCharacter->CancelPrimaryAttackCombo();
-	}
-
 	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 }
 
-void UGP_Primary::OnAttackEventReceived(FGameplayEventData Payload)
+void UGP_Primary::OnAttackHitEventReceived(FGameplayEventData Payload)
 {
 	TArray<AActor*> HitActors = UGP_BlueprintLibrary::SphereMeleeHitBoxOverlap(
-		GetAvatarActorFromActorInfo(), HitBoxRadius, HitBoxForwardOffset, HitBoxElevationOffset, bDrawDebugs);
+	   GetAvatarActorFromActorInfo(), HitBoxRadius, HitBoxForwardOffset, HitBoxElevationOffset, bDrawDebugs);
 
 	UGP_BlueprintLibrary::SendGameplayEventToActors(GetAvatarActorFromActorInfo(), HitActors,
-	                                                GPTags::Events::Enemy::HitReact);
+										GPTags::Event::Enemy::HitReact);
 
 	if (HasAuthority(&CurrentActivationInfo))
 	{
 		UGP_BlueprintLibrary::ApplyGameplayEffectToActors(GetAvatarActorFromActorInfo(), HitActors, DamageEffectClass,
-		                                                  GetAbilityLevel());
+											  GetAbilityLevel());
 	}
 }

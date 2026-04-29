@@ -72,7 +72,7 @@ namespace GPFemaleAnimationSetup
 	};
 	const FString FemaleJumpLandMontagePath = TEXT("/Game/Asset/CharacterAction/female/Montages/AM_Female_Jump_Land");
 	// 구르기는 루트모션 몽타주를 사용해서 애니메이션 전진량으로 이동한다.
-	const FString FemaleRollMontagePath = TEXT("/Game/Asset/CharacterAction/female/Montages/AM_Female_Roll_RM");
+	const FString FemaleDashMontagePath = TEXT("/Game/Asset/CharacterAction/female/Montages/AM_Female_Roll_RM");
 
 	const FString BlendSpacePackagePath = TEXT("/Game/Asset/CharacterAction/female/BlendSpaces");
 	const FString BlendSpaceName = TEXT("BS_Female_Locomotion");
@@ -507,9 +507,9 @@ namespace GPFemaleAnimationSetup
 			}
 		}
 
-		UAnimMontage* RollMontage = LoadRequiredAsset<UAnimMontage>(*FemaleRollMontagePath);
+		UAnimMontage* DashMontage = LoadRequiredAsset<UAnimMontage>(*FemaleDashMontagePath);
 		UAnimMontage* LandingMontage = LoadRequiredAsset<UAnimMontage>(*FemaleJumpLandMontagePath);
-		if (!IsValid(RollMontage) || !IsValid(LandingMontage))
+		if (!IsValid(DashMontage) || !IsValid(LandingMontage))
 		{
 			return nullptr;
 		}
@@ -540,7 +540,7 @@ namespace GPFemaleAnimationSetup
 		AnimationSet->LocomotionBlendSpace = BlendSpace;
 		AnimationSet->JumpLoopAnimation = JumpLoop;
 		AnimationSet->LandingMontage = LandingMontage;
-		AnimationSet->RollMontage = RollMontage;
+		AnimationSet->DashMontage = DashMontage;
 		AnimationSet->PrimaryAttackMontage = PrimaryMontage;
 		AnimationSet->LightAttackMontages.Reset();
 		for (UAnimMontage* AttackMontage : LightAttackMontages)
