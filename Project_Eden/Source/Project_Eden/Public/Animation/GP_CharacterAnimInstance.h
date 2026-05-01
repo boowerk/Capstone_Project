@@ -7,6 +7,8 @@
 
 class ACharacter;
 class UCharacterMovementComponent;
+class UBlendSpace;
+class UAnimSequenceBase;
 
 /**
  * 프로젝트의 모든 캐릭터 애니메이션 블루프린트를 위한 공통 베이스 클래스.
@@ -19,6 +21,10 @@ class PROJECT_EDEN_API UGP_CharacterAnimInstance : public UAnimInstance
 public:
 	virtual void NativeInitializeAnimation() override;
 	virtual void NativeUpdateAnimation(float DeltaSeconds) override;
+
+	/** 외부(캐릭터 등)에서 애니메이션 세트를 동적으로 주입하기 위한 함수 */
+	UFUNCTION(BlueprintCallable, Category = "AnimationData")
+	void SetAnimationSet(UPDA_CharacterAnimationSet* NewSet);
 
 protected:
 	/** 캐릭터별 애니메이션 세트 에셋 */

@@ -2,6 +2,8 @@
 #include "CoreMinimal.h"
 #include "AbilitySystemInterface.h"
 #include "GameFramework/Character.h"
+#include "Engine/EngineTypes.h"
+#include "UObject/ObjectPtr.h"
 
 #include "GP_BaseCharacter.generated.h"
 
@@ -9,6 +11,7 @@ class UAttributeSet;
 class UGameplayAbility;
 class UGameplayEffect;
 class AGP_DamageNumberActor;
+class UPDA_CharacterAnimationSet;
 enum class EWeaponElement : uint8;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FASCInitialized, UAbilitySystemComponent*, ASC, UAttributeSet*, AS);
@@ -20,10 +23,19 @@ class PROJECT_EDEN_API AGP_BaseCharacter : public ACharacter, public IAbilitySys
 
 public:
 	AGP_BaseCharacter();
+	virtual void PostInitializeComponents() override;
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 	virtual UAttributeSet* GetAttributeSet() const { return nullptr; }
 	
 	void ShowDamageNumber(int32 DamageAmount, EWeaponElement Element);
+
+	/** 캐릭터의 외형과 애니메이션을 결정하는 데이터 에셋 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation")
+	TObjectPtr<UPDA_CharacterAnimationSet> AnimationSet;
+
+	/** 데이터 에셋을 바탕으로 메시와 애니메이션 인스턴스를 업데이트합니다. */
+	UFUNCTION(BlueprintCallable, Category = "Animation")
+	void UpdateAnimationSet();
 	
 	UPROPERTY(BlueprintAssignable)
 	FASCInitialized OnASCInitialized;

@@ -49,3 +49,16 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	bIsFalling = MovementComponent->IsFalling();
 	bIsAnyMontagePlaying = Montage_IsPlaying(nullptr);
 }
+
+void UGP_CharacterAnimInstance::SetAnimationSet(UPDA_CharacterAnimationSet* NewSet)
+{
+	if (NewSet)
+	{
+		AnimationSet = NewSet;
+		
+		// 캐시 즉시 갱신
+		LocomotionBlendSpace = AnimationSet->LocomotionBlendSpace;
+		JumpLoopAnimation = AnimationSet->JumpLoopAnimation;
+		SprintStopAnimation = AnimationSet->SprintStopAnimation;
+	}
+}

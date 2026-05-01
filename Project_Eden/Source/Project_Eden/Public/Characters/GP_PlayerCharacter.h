@@ -68,12 +68,6 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment|Weapon")
 	FName DefaultWeaponId = TEXT("WP_Common_Fire_Sword");
-
-	
-	// 어빌리티들용 애니메이션 통합 데이터 에셋
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Animation")
-	TObjectPtr<UPDA_CharacterAnimationSet> AnimationSet;
-
 	
 	// 이동 속도
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Speed")
