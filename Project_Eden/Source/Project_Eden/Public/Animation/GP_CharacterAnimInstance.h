@@ -19,6 +19,7 @@ class PROJECT_EDEN_API UGP_CharacterAnimInstance : public UAnimInstance
 	GENERATED_BODY()
 
 public:
+	UGP_CharacterAnimInstance();
 	virtual void NativeInitializeAnimation() override;
 	virtual void NativeUpdateAnimation(float DeltaSeconds) override;
 

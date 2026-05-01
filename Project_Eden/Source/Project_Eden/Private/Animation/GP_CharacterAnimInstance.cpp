@@ -2,6 +2,12 @@
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 
+UGP_CharacterAnimInstance::UGP_CharacterAnimInstance()
+{
+	// 스테이트 머신의 시퀀스에서도 루트 모션이 작동하도록 설정
+	RootMotionMode = ERootMotionMode::RootMotionFromEverything;
+}
+
 void UGP_CharacterAnimInstance::NativeInitializeAnimation()
 {
 	Super::NativeInitializeAnimation();
