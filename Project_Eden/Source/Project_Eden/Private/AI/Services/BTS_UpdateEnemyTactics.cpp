@@ -11,6 +11,7 @@
 #include "BehaviorTree/BehaviorTreeTypes.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "Characters/GP_EnemyCharacter.h"
+#include "GameplayTags/GP_Tags.h"
 #include "Navigation/PathFollowingComponent.h"
 
 namespace
@@ -41,6 +42,20 @@ namespace
 		{
 			BlackboardComponent->SetValueAsBool(KeyName, bValue);
 		}
+	}
+
+	void SetOptionalBlackboardName(UBlackboardComponent* BlackboardComponent, const FName& KeyName, const FName& Value)
+	{
+		if (HasBlackboardKey(BlackboardComponent, KeyName))
+		{
+			BlackboardComponent->SetValueAsName(KeyName, Value);
+		}
+	}
+
+	void SetCombatStateTag(UBlackboardComponent* BlackboardComponent, const FGameplayTag& StateTag)
+	{
+		// Blackboard의 Name 키에는 GameplayTag 전체 경로를 넣어 BT 데코레이터가 새 태그 체계를 그대로 비교하게 한다.
+		SetOptionalBlackboardName(BlackboardComponent, EnemyBlackboardKeys::CombatState, FName(*StateTag.ToString()));
 	}
 
 	void SetOptionalBlackboardFloat(UBlackboardComponent* BlackboardComponent, const FName& KeyName, float Value)
@@ -183,6 +198,7 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 
 	if (bShouldReturnHome)
 	{
+		SetCombatStateTag(BlackboardComponent, GPTags::AI::State::Patrol);
 		BlackboardComponent->SetValueAsVector(EnemyBlackboardKeys::MoveToLocation, HomeLocation);
 		BlackboardComponent->SetValueAsFloat(EnemyBlackboardKeys::DistanceToTarget, 0.0f);
 		BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bHasLineOfSight, false);
@@ -220,6 +236,10 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 	if (!IsValid(TargetActor))
 	{
 		// No target means all combat branch keys collapse to false; decorators can abort immediately.
+		// 이동 중이 아니면 Idle, 순찰 MoveTo가 진행 중이면 Patrol 태그로 BT 논리 상태를 나눈다.
+		SetCombatStateTag(
+			BlackboardComponent,
+			AIController->GetMoveStatus() == EPathFollowingStatus::Moving ? GPTags::AI::State::Patrol : GPTags::AI::State::Idle);
 		BlackboardComponent->SetValueAsFloat(EnemyBlackboardKeys::DistanceToTarget, 0.0f);
 		BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bHasLineOfSight, false);
 		BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldRetreat, false);
@@ -301,6 +321,12 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 	{
 		bShouldChase = true;
 	}
+
+	// 추격만 별도 상태로 분리하고, 공격/후퇴/재배치는 모두 교전 상태로 BT에 전달한다.
+	const FGameplayTag CombatStateTag = bShouldChase
+		? GPTags::AI::State::Chasing
+		: GPTags::AI::State::Combat;
+	SetCombatStateTag(BlackboardComponent, CombatStateTag);
 
 	BlackboardComponent->SetValueAsFloat(EnemyBlackboardKeys::DistanceToTarget, DistanceToTarget);
 	BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bHasLineOfSight, bHasLineOfSight);

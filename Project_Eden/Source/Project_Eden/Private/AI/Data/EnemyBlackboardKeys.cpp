@@ -3,6 +3,7 @@
 namespace EnemyBlackboardKeys
 {
 	const FName TargetActor(TEXT("TargetActor"));
+	const FName CombatState(TEXT("CombatState"));
 	const FName EnemyMode(TEXT("EnemyMode"));
 	const FName Aggression(TEXT("Aggression"));
 	const FName PreferredRange(TEXT("PreferredRange"));
