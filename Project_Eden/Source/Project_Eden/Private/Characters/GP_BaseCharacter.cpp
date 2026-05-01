@@ -36,7 +36,13 @@ void AGP_BaseCharacter::UpdateAnimationSet()
 		GetMesh()->SetSkeletalMeshAsset(AnimationSet->CharacterMesh);
 	}
 
-	// 2. 애니메이션 블루프린트 데이터 주입
+	// 2. 애니메이션 블루프린트 클래스 교체 (스켈레톤 불일치 해결)
+	if (AnimationSet->AnimBlueprintClass)
+	{
+		GetMesh()->SetAnimInstanceClass(AnimationSet->AnimBlueprintClass);
+	}
+
+	// 3. 애니메이션 데이터 주입
 	if (UGP_CharacterAnimInstance* AnimInst = Cast<UGP_CharacterAnimInstance>(GetMesh()->GetAnimInstance()))
 	{
 		AnimInst->SetAnimationSet(AnimationSet);
