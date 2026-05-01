@@ -22,6 +22,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Locomotion")
 	TObjectPtr<UBlendSpace> LocomotionBlendSpace;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Locomotion")
+	TObjectPtr<UAnimSequenceBase> SprintStopAnimation;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Air")
 	TObjectPtr<UAnimSequenceBase> JumpLoopAnimation;
 
