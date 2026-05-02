@@ -12,6 +12,9 @@
 UGP_Primary::UGP_Primary()
 {
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
+
+	// 어빌리티 활성화 동안 이동 입력을 막기 위해 Fixed 태그 부여
+	ActivationOwnedTags.AddTag(GPTags::State::Status::Fixed);
 }
 
 void UGP_Primary::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)

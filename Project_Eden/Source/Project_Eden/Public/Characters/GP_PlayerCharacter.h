@@ -78,6 +78,7 @@ protected:
 
 	
 	// GAS 태그 이벤트 콜백
-	virtual void OnSprintingTagChanged(const FGameplayTag CallbackTag, int32 NewCount);
+	void OnSprintingTagChanged(const FGameplayTag CallbackTag, int32 NewCount);
+	void OnFixedTagChanged(const FGameplayTag CallbackTag, int32 NewCount);
 	
 };

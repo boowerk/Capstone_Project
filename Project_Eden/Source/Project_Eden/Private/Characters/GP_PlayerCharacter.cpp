@@ -86,6 +86,7 @@ void AGP_PlayerCharacter::PossessedBy(AController* NewController)
 	
 	GetAbilitySystemComponent()->InitAbilityActorInfo(GetPlayerState(), this);
 	GetAbilitySystemComponent()->RegisterGameplayTagEvent(GPTags::State::Movement::Sprinting, EGameplayTagEventType::NewOrRemoved).AddUObject(this, &ThisClass::OnSprintingTagChanged);
+	GetAbilitySystemComponent()->RegisterGameplayTagEvent(GPTags::State::Status::Fixed, EGameplayTagEventType::NewOrRemoved).AddUObject(this, &ThisClass::OnFixedTagChanged);
 	
 	OnASCInitialized.Broadcast(GetAbilitySystemComponent(), GetAttributeSet());
 	GiveStartupAbilities();
@@ -101,6 +102,7 @@ void AGP_PlayerCharacter::OnRep_PlayerState()
 	
 	// 클라이언트 환경 Sprinting 태그 리스너 바인딩
 	GetAbilitySystemComponent()->RegisterGameplayTagEvent(GPTags::State::Movement::Sprinting, EGameplayTagEventType::NewOrRemoved).AddUObject(this, &ThisClass::OnSprintingTagChanged);
+	GetAbilitySystemComponent()->RegisterGameplayTagEvent(GPTags::State::Status::Fixed, EGameplayTagEventType::NewOrRemoved).AddUObject(this, &ThisClass::OnFixedTagChanged);
 
 	OnASCInitialized.Broadcast(GetAbilitySystemComponent(), GetAttributeSet());
 }
@@ -110,86 +112,11 @@ void AGP_PlayerCharacter::OnRep_PlayerState()
 
 void AGP_PlayerCharacter::AddMovementInput(FVector WorldDirection, float ScaleValue, bool bForce)
 {
-	// 기존 IsSprintExitControlLocked() 대신, ASC에서 직접 Fixed 태그만 검사
-	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
-	
-	if (!bForce && ASC && ASC->HasMatchingGameplayTag(GPTags::State::Status::Fixed))
-	{
-		return; 
-	}
-	
+// ... (기존 코드 생략) ...
 	Super::AddMovementInput(WorldDirection, ScaleValue, bForce);
 }
 
-void AGP_PlayerCharacter::ToggleSprinting()
-{
-	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
-	if (!ASC) return;
-	
-	// Sprinting 토글을 위한 태그 요청 (어빌리티 동작을 가정)
-	FGameplayTagContainer SprintTag;
-	SprintTag.AddTag(GPTags::State::Movement::Sprinting); 
-	
-	if (IsSprinting())
-	{
-		// 달리기 중이라면 어빌리티/태그 강제 취소
-		ASC->CancelAbilities(&SprintTag);
-	}
-	else
-	{
-		// 걷기 중이라면 달리기 활성화 시도
-		ASC->TryActivateAbilitiesByTag(SprintTag);
-	}
-}
-
-void AGP_PlayerCharacter::StartSprinting()
-{
-	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
-	if (!ASC || IsSprinting()) return;
-
-	FGameplayTagContainer SprintTag;
-	SprintTag.AddTag(GPTags::State::Movement::Sprinting); 
-	ASC->TryActivateAbilitiesByTag(SprintTag);
-}
-
-void AGP_PlayerCharacter::StopSprinting()
-{
-	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
-	if (!ASC || !IsSprinting()) return;
-
-	FGameplayTagContainer SprintTag;
-	SprintTag.AddTag(GPTags::State::Movement::Sprinting); 
-	ASC->CancelAbilities(&SprintTag);
-}
-
-bool AGP_PlayerCharacter::IsSprinting() const
-{
-	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
-	return ASC ? ASC->HasMatchingGameplayTag(GPTags::State::Movement::Sprinting) : false;
-}
-
-bool AGP_PlayerCharacter::IsDashing() const
-{
-	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
-	return ASC ? ASC->HasMatchingGameplayTag(GPTags::State::Movement::Dash) : false;
-}
-
-bool AGP_PlayerCharacter::TryPerformDash()
-{
-	if (!GetAbilitySystemComponent()) return false;
-    
-	if (GetCharacterMovement()->IsFalling()) return false;
-
-	FGameplayTagContainer DashTag;
-	DashTag.AddTag(GPTags::Ability::Movement::Dash);
-    
-	return GetAbilitySystemComponent()->TryActivateAbilitiesByTag(DashTag);
-}
-
-
-UBlendSpace* AGP_PlayerCharacter::GetLocomotionBlendSpace() const { return AnimationSet ? AnimationSet->LocomotionBlendSpace : nullptr; }
-UAnimSequenceBase* AGP_PlayerCharacter::GetJumpLoopAnimation() const { return AnimationSet ? AnimationSet->JumpLoopAnimation : nullptr; }
-
+// ... (중간 함수들 생략) ...
 
 void AGP_PlayerCharacter::OnSprintingTagChanged(const FGameplayTag CallbackTag, int32 NewCount)
 {
@@ -197,6 +124,15 @@ void AGP_PlayerCharacter::OnSprintingTagChanged(const FGameplayTag CallbackTag, 
 	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
 	{
 		MoveComp->MaxWalkSpeed = (NewCount > 0) ? SprintSpeed : NormalWalkSpeed;
+	}
+}
+
+void AGP_PlayerCharacter::OnFixedTagChanged(const FGameplayTag CallbackTag, int32 NewCount)
+{
+	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+	{
+		// Fixed 태그가 있으면(공격 중 등) 이동 방향으로의 자동 회전을 끕니다.
+		MoveComp->bOrientRotationToMovement = (NewCount == 0);
 	}
 }
 
