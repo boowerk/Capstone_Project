@@ -68,12 +68,6 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment|Weapon")
 	FName DefaultWeaponId = TEXT("WP_Common_Fire_Sword");
-
-	
-	// 어빌리티들용 애니메이션 통합 데이터 에셋
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Animation")
-	TObjectPtr<UPDA_CharacterAnimationSet> AnimationSet;
-
 	
 	// 이동 속도
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Speed")
@@ -84,6 +78,7 @@ protected:
 
 	
 	// GAS 태그 이벤트 콜백
-	virtual void OnSprintingTagChanged(const FGameplayTag CallbackTag, int32 NewCount);
+	void OnSprintingTagChanged(const FGameplayTag CallbackTag, int32 NewCount);
+	void OnFixedTagChanged(const FGameplayTag CallbackTag, int32 NewCount);
 	
 };

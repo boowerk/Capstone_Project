@@ -80,8 +80,8 @@ void AGP_PlayerController::SetupInputComponent()
 	check(MoveAction);
 	check(LookAction);
 	EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &ThisClass::Input_Move);
+	EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Completed, this, &ThisClass::Input_Move);
 	EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ThisClass::Input_Look);
-	
 	if (JumpAction)
 	{
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ThisClass::Input_Jump);
@@ -107,7 +107,10 @@ void AGP_PlayerController::Input_Move(const FInputActionValue& Value)
 	if (!IsValid(GetPawn())) return;
 
 	const FVector2D MovementVector = Value.Get<FVector2D>();
-
+	CurrentMoveInput = MovementVector;
+	
+	if (MovementVector.IsNearlyZero()) return;
+	
 	const FRotator YawRotation(0.f, GetControlRotation().Yaw, 0.f);
 	const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
 	const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);

@@ -1,4 +1,4 @@
-﻿#include "Characters/GP_PlayerCharacter.h"
+#include "Characters/GP_PlayerCharacter.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
 #include "Animation/AnimSequenceBase.h"
@@ -86,6 +86,7 @@ void AGP_PlayerCharacter::PossessedBy(AController* NewController)
 	
 	GetAbilitySystemComponent()->InitAbilityActorInfo(GetPlayerState(), this);
 	GetAbilitySystemComponent()->RegisterGameplayTagEvent(GPTags::State::Movement::Sprinting, EGameplayTagEventType::NewOrRemoved).AddUObject(this, &ThisClass::OnSprintingTagChanged);
+	GetAbilitySystemComponent()->RegisterGameplayTagEvent(GPTags::State::Status::Fixed, EGameplayTagEventType::NewOrRemoved).AddUObject(this, &ThisClass::OnFixedTagChanged);
 	
 	OnASCInitialized.Broadcast(GetAbilitySystemComponent(), GetAttributeSet());
 	GiveStartupAbilities();
@@ -101,6 +102,7 @@ void AGP_PlayerCharacter::OnRep_PlayerState()
 	
 	// 클라이언트 환경 Sprinting 태그 리스너 바인딩
 	GetAbilitySystemComponent()->RegisterGameplayTagEvent(GPTags::State::Movement::Sprinting, EGameplayTagEventType::NewOrRemoved).AddUObject(this, &ThisClass::OnSprintingTagChanged);
+	GetAbilitySystemComponent()->RegisterGameplayTagEvent(GPTags::State::Status::Fixed, EGameplayTagEventType::NewOrRemoved).AddUObject(this, &ThisClass::OnFixedTagChanged);
 
 	OnASCInitialized.Broadcast(GetAbilitySystemComponent(), GetAttributeSet());
 }
@@ -197,6 +199,15 @@ void AGP_PlayerCharacter::OnSprintingTagChanged(const FGameplayTag CallbackTag, 
 	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
 	{
 		MoveComp->MaxWalkSpeed = (NewCount > 0) ? SprintSpeed : NormalWalkSpeed;
+	}
+}
+
+void AGP_PlayerCharacter::OnFixedTagChanged(const FGameplayTag CallbackTag, int32 NewCount)
+{
+	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+	{
+		// Fixed 태그가 있으면(공격 중 등) 이동 방향으로의 자동 회전을 끕니다.
+		MoveComp->bOrientRotationToMovement = (NewCount == 0);
 	}
 }
 
