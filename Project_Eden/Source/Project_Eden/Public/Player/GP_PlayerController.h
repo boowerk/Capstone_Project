@@ -19,6 +19,7 @@ class PROJECT_EDEN_API AGP_PlayerController : public APlayerController
 
 public:
 	AGP_PlayerController();
+	FVector2D GetCurrentMoveInput() const { return CurrentMoveInput; }
 
 protected:
 	virtual void BeginPlay() override;
@@ -26,6 +27,8 @@ protected:
 	virtual void SetupInputComponent() override;
 
 private:
+	FVector2D CurrentMoveInput = FVector2D::ZeroVector;
+	
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Movement")
 	TArray<TObjectPtr<UInputMappingContext>> InputMappingContexts;
 

@@ -3,7 +3,9 @@
 #include "AbilitySystem/GP_AttributeSet.h"
 #include "Items/WeaponItemTypes.h"
 #include "UI/GP_DamageNumberActor.h"
-
+#include "Animation/PDA_CharacterAnimationSet.h"
+#include "Animation/GP_CharacterAnimInstance.h"
+#include "Components/SkeletalMeshComponent.h"
 
 AGP_BaseCharacter::AGP_BaseCharacter()
 {
@@ -14,6 +16,37 @@ AGP_BaseCharacter::AGP_BaseCharacter()
 	DamageNumberActorClass = AGP_DamageNumberActor::StaticClass();
 
 	OnASCInitialized.AddDynamic(this, &ThisClass::BindAttributeDelegates);
+}
+
+void AGP_BaseCharacter::PostInitializeComponents()
+{
+	Super::PostInitializeComponents();
+
+	// 데이터 에셋 기반 자동 초기화
+	UpdateAnimationSet();
+}
+
+void AGP_BaseCharacter::UpdateAnimationSet()
+{
+	if (!IsValid(AnimationSet)) return;
+
+	// 1. 스켈레탈 메시 업데이트
+	if (AnimationSet->CharacterMesh)
+	{
+		GetMesh()->SetSkeletalMeshAsset(AnimationSet->CharacterMesh);
+	}
+
+	// 2. 애니메이션 블루프린트 클래스 교체 (스켈레톤 불일치 해결)
+	if (AnimationSet->AnimBlueprintClass)
+	{
+		GetMesh()->SetAnimInstanceClass(AnimationSet->AnimBlueprintClass);
+	}
+
+	// 3. 애니메이션 데이터 주입
+	if (UGP_CharacterAnimInstance* AnimInst = Cast<UGP_CharacterAnimInstance>(GetMesh()->GetAnimInstance()))
+	{
+		AnimInst->SetAnimationSet(AnimationSet);
+	}
 }
 
 UAbilitySystemComponent* AGP_BaseCharacter::GetAbilitySystemComponent() const

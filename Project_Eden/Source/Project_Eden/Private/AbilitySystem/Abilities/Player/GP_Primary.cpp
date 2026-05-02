@@ -6,11 +6,15 @@
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 #include "Abilities/Tasks/AbilityTask_WaitInputPress.h"
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
+#include "Player/GP_PlayerController.h"
 #include "Utils/GP_BlueprintLibrary.h"
 
 UGP_Primary::UGP_Primary()
 {
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
+
+	// 어빌리티 활성화 동안 이동 입력을 막기 위해 Fixed 태그 부여
+	ActivationOwnedTags.AddTag(GPTags::State::Status::Fixed);
 }
 
 void UGP_Primary::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
@@ -64,6 +68,25 @@ void UGP_Primary::StartComboSequence()
 	{
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 		return;
+	}
+	
+	if (AGP_PlayerController* PCtrl = Cast<AGP_PlayerController>(PC->GetController()))
+	{
+		FVector2D MoveInput = PCtrl->GetCurrentMoveInput();
+		if (!MoveInput.IsNearlyZero())
+		{
+			const FRotator YawRotation(0.f, PCtrl->GetControlRotation().Yaw, 0.f);
+			const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
+			const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
+
+			// 2D 입력 벡터를 3D 월드 방향 벡터로 변환
+			FVector DesiredDirection = (ForwardDirection * MoveInput.Y) + (RightDirection * MoveInput.X);
+			DesiredDirection.Z = 0.0f; 
+			DesiredDirection.Normalize();
+
+			// 캐릭터의 방향을 즉시 변경
+			PC->SetActorRotation(DesiredDirection.Rotation());
+		}
 	}
 
 	ClearExistingTasks();
