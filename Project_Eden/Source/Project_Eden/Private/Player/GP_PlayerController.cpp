@@ -47,6 +47,15 @@ void AGP_PlayerController::BeginPlay()
 	if (HUDWidget)
 	{
 		HUDWidget->SetBossVisible(false);
+
+		// HUD 생성 시점에 이미 Pawn이 준비되어 있다면 즉시 바인딩 시도
+		if (AGP_BaseCharacter* BaseChar = Cast<AGP_BaseCharacter>(GetPawn()))
+		{
+			if (UAbilitySystemComponent* ASC = BaseChar->GetAbilitySystemComponent())
+			{
+				HUDWidget->BindToASC(ASC);
+			}
+		}
 	}
 }
 
@@ -197,7 +206,7 @@ void AGP_PlayerController::Input_PrimaryAttack()
 	{
 		// 부여된 동적 태그나 어빌리티 기본 태그 중 PrimaryTag가 있는지 검사
 		if (Spec.GetDynamicSpecSourceTags().HasTagExact(PrimaryTag) || 
-		   (Spec.Ability && Spec.Ability->AbilityTags.HasTagExact(PrimaryTag)))
+		   (Spec.Ability && Spec.Ability->GetAssetTags().HasTagExact(PrimaryTag)))
 		{
 			if (Spec.IsActive())
 			{

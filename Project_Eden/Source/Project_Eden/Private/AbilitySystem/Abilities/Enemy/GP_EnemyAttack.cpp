@@ -11,7 +11,10 @@
 UGP_EnemyAttack::UGP_EnemyAttack()
 {
 	// 공유 BT 공격 태스크는 이 태그를 기준으로 적 공격 어빌리티를 찾는다.
-	AbilityTags.AddTag(GPTags::Ability::Enemy::Attack_Melee);
+	FGameplayTagContainer AbilityAssetTags;
+	AbilityAssetTags.AddTag(GPTags::Ability::Enemy::Attack_Melee);
+	SetAssetTags(AbilityAssetTags);
+
 	AttackEventTag = GPTags::Event::Enemy::AttackHit;
 }
 

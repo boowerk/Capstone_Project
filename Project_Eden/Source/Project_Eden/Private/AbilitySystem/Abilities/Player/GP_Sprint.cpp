@@ -8,7 +8,10 @@ UGP_Sprint::UGP_Sprint()
 	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
 
 	// 어빌리티의 식별 태그 GP_PlayerCharacter::ToggleSprinting
-	AbilityTags.AddTag(GPTags::State::Movement::Sprinting);
+	FGameplayTagContainer AbilityAssetTags;
+	AbilityAssetTags.AddTag(GPTags::State::Movement::Sprinting);
+	SetAssetTags(AbilityAssetTags);
+
 	// 어빌리티 활성기간 캐릭터에게 부여할 태그 GP_PlayerCharacter::OnSprintingTagChanged가 반응
 	ActivationOwnedTags.AddTag(GPTags::State::Movement::Sprinting);
 }

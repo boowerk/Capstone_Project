@@ -17,23 +17,31 @@ void UGP_PlayerHUDWidget::NativePreConstruct()
 {
 	Super::NativePreConstruct();
 	RefreshPreview();
-	if (AGP_BaseCharacter* BaseChar = Cast<AGP_BaseCharacter>(GetOwningPlayerPawn()))
-	{
-		if (UAbilitySystemComponent* ASC = BaseChar->GetAbilitySystemComponent())
-		{
-			BindToASC(ASC);
-		}
-		else
-		{
-			BaseChar->OnASCInitialized.AddDynamic(this, &ThisClass::OnASCInitializedCallback);
-		}
-	}
 }
 
 void UGP_PlayerHUDWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 	RefreshPreview();
+
+	// 1. 즉시 시도
+	APawn* OwningPawn = GetOwningPlayerPawn();
+	if (AGP_BaseCharacter* BaseChar = Cast<AGP_BaseCharacter>(OwningPawn))
+	{
+		if (UAbilitySystemComponent* ASC = BaseChar->GetAbilitySystemComponent())
+		{
+			BindToASC(ASC);
+		}
+		BaseChar->OnASCInitialized.RemoveAll(this);
+		BaseChar->OnASCInitialized.AddDynamic(this, &ThisClass::OnASCInitializedCallback);
+	}
+	else
+	{
+		// 2. 아직 Pawn이 없다면, 타이머로 잠시 후 다시 시도 (클라이언트 초기화 지연 대응)
+		GetWorld()->GetTimerManager().SetTimerForNextTick([this]() {
+			NativeConstruct();
+		});
+	}
 }
 
 void UGP_PlayerHUDWidget::BindToASC(UAbilitySystemComponent* InASC)
