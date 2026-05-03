@@ -1,11 +1,59 @@
 #include "AI/Tasks/BTT_ExecuteEnemyAttack.h"
 
+#include "AI/Data/EnemyBlackboardKeys.h"
 #include "AI/Tasks/EnemyBTTaskCommon.h"
 #include "AbilitySystem/GP_AbilitySystemComponent.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
 #include "AIController.h"
+#include "BehaviorTree/BlackboardComponent.h"
+#include "Characters/GP_EnemyCharacter.h"
 #include "GameplayTags/GP_Tags.h"
+
+namespace
+{
+	bool GetOptionalBlackboardBool(const UBlackboardComponent* BlackboardComponent, const FName& KeyName)
+	{
+		return IsValid(BlackboardComponent)
+			&& BlackboardComponent->GetKeyID(KeyName) != FBlackboard::InvalidKey
+			&& BlackboardComponent->GetValueAsBool(KeyName);
+	}
+
+	FGameplayTag ResolveAttackAbilityTagForContext(
+		const APawn* ControlledPawn,
+		const UBlackboardComponent* BlackboardComponent,
+		const FGameplayTag& DefaultAttackAbilityTag)
+	{
+		const AGP_EnemyCharacter* EnemyCharacter = Cast<AGP_EnemyCharacter>(ControlledPawn);
+		if (!IsValid(EnemyCharacter) || !EnemyCharacter->IsBossEnemy())
+		{
+			return DefaultAttackAbilityTag;
+		}
+
+		// 보스 공용 BT는 기존 공격 태스크를 재사용하고, 서비스가 켜둔 패턴 키로 실행 태그만 교체한다.
+		if (GetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldBossPhaseTransition))
+		{
+			return GPTags::Ability::Enemy::Utility_BossPhaseShift;
+		}
+
+		if (GetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanSummonAdds))
+		{
+			return GPTags::Ability::Enemy::Utility_BossSummon;
+		}
+
+		if (GetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossAreaAttack))
+		{
+			return GPTags::Ability::Enemy::Attack_BossArea;
+		}
+
+		if (GetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossHeavyAttack))
+		{
+			return GPTags::Ability::Enemy::Attack_BossHeavy;
+		}
+
+		return DefaultAttackAbilityTag;
+	}
+}
 
 UBTT_ExecuteEnemyAttack::UBTT_ExecuteEnemyAttack()
 {
@@ -23,7 +71,8 @@ EBTNodeResult::Type UBTT_ExecuteEnemyAttack::ExecuteTask(UBehaviorTreeComponent&
 		return EBTNodeResult::Failed;
 	}
 
-	if (!AttackAbilityTag.IsValid())
+	const FGameplayTag EffectiveAttackAbilityTag = ResolveAttackAbilityTagForContext(ControlledPawn, BlackboardComponent, AttackAbilityTag);
+	if (!EffectiveAttackAbilityTag.IsValid())
 	{
 		return EBTNodeResult::Failed;
 	}
@@ -55,12 +104,12 @@ EBTNodeResult::Type UBTT_ExecuteEnemyAttack::ExecuteTask(UBehaviorTreeComponent&
 
 	if (UGP_AbilitySystemComponent* GPASC = Cast<UGP_AbilitySystemComponent>(ASC))
 	{
-		bActivated = GPASC->TryActivateAbilityByTag(AttackAbilityTag);
+		bActivated = GPASC->TryActivateAbilityByTag(EffectiveAttackAbilityTag);
 	}
 	else
 	{
 		// 프로젝트 ASC가 아니더라도 태그 계약만 맞으면 실행 가능하도록 폴백을 둔다.
-		bActivated = ASC->TryActivateAbilitiesByTag(AttackAbilityTag.GetSingleTagContainer());
+		bActivated = ASC->TryActivateAbilitiesByTag(EffectiveAttackAbilityTag.GetSingleTagContainer());
 	}
 
 	return bActivated ? EBTNodeResult::Succeeded : EBTNodeResult::Failed;

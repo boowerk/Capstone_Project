@@ -22,4 +22,9 @@ namespace EnemyBlackboardKeys
 	const FName DistanceToTarget(TEXT("DistanceToTarget"));
 	const FName DistanceFromHome(TEXT("DistanceFromHome"));
 	const FName HealthRatio(TEXT("HealthRatio"));
+	const FName BossPhase(TEXT("BossPhase"));
+	const FName bShouldBossPhaseTransition(TEXT("bShouldBossPhaseTransition"));
+	const FName bCanUseBossHeavyAttack(TEXT("bCanUseBossHeavyAttack"));
+	const FName bCanUseBossAreaAttack(TEXT("bCanUseBossAreaAttack"));
+	const FName bCanSummonAdds(TEXT("bCanSummonAdds"));
 }

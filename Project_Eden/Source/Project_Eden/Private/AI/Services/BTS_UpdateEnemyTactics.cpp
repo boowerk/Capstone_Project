@@ -52,6 +52,14 @@ namespace
 		}
 	}
 
+	void SetOptionalBlackboardInt(UBlackboardComponent* BlackboardComponent, const FName& KeyName, int32 Value)
+	{
+		if (HasBlackboardKey(BlackboardComponent, KeyName))
+		{
+			BlackboardComponent->SetValueAsInt(KeyName, Value);
+		}
+	}
+
 	void SetCombatStateTag(UBlackboardComponent* BlackboardComponent, const FGameplayTag& StateTag)
 	{
 		// Blackboard의 Name 키에는 GameplayTag 전체 경로를 넣어 BT 데코레이터가 새 태그 체계를 그대로 비교하게 한다.
@@ -72,6 +80,16 @@ namespace
 		{
 			BlackboardComponent->SetValueAsVector(KeyName, Value);
 		}
+	}
+
+	bool IsPatternWindowOpen(float WorldTimeSeconds, float Interval, float Window)
+	{
+		if (Interval <= KINDA_SMALL_NUMBER)
+		{
+			return true;
+		}
+
+		return FMath::Fmod(FMath::Max(0.0f, WorldTimeSeconds), Interval) <= FMath::Max(0.0f, Window);
 	}
 
 	float GetControlledPawnHealthRatio(const APawn* ControlledPawn)
@@ -147,6 +165,9 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 	const bool bPreviousShouldReposition = BlackboardComponent->GetValueAsBool(EnemyBlackboardKeys::bShouldReposition);
 	const bool bPreviousShouldChase = BlackboardComponent->GetValueAsBool(EnemyBlackboardKeys::bShouldChase);
 	const bool bPreviousShouldReturnHome = GetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldReturnHome);
+	const int32 PreviousBossPhase = HasBlackboardKey(BlackboardComponent, EnemyBlackboardKeys::BossPhase)
+		? BlackboardComponent->GetValueAsInt(EnemyBlackboardKeys::BossPhase)
+		: 0;
 
 	const float HealthRatio = GetControlledPawnHealthRatio(ControlledPawn);
 	BlackboardComponent->SetValueAsFloat(EnemyBlackboardKeys::HealthRatio, HealthRatio);
@@ -206,6 +227,11 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 		BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bCanAttack, false);
 		BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldReposition, false);
 		BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldChase, false);
+		// 귀환 중에는 보스 패턴 키를 내려서 공용 공격 태스크가 특수 패턴을 이어 실행하지 않게 한다.
+		SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldBossPhaseTransition, false);
+		SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossHeavyAttack, false);
+		SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossAreaAttack, false);
+		SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanSummonAdds, false);
 
 		if (!bPreviousShouldReturnHome)
 		{
@@ -247,6 +273,11 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 		BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldReposition, false);
 		BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldChase, false);
 		SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldReturnHome, false);
+		// 타깃을 잃으면 보스 특수 패턴도 닫아 다음 감지 때 새 상태로 다시 평가하게 한다.
+		SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldBossPhaseTransition, false);
+		SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossHeavyAttack, false);
+		SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossAreaAttack, false);
+		SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanSummonAdds, false);
 
 		if (bPreviousShouldRetreat || bPreviousCanAttack || bPreviousShouldReposition || bPreviousShouldChase || bPreviousShouldReturnHome)
 		{
@@ -335,6 +366,52 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 	BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldReposition, bShouldReposition);
 	BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldChase, bShouldChase);
 	SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldReturnHome, false);
+
+	if (IsValid(EnemyCharacter) && EnemyCharacter->IsBossEnemy() && HasBlackboardKey(BlackboardComponent, EnemyBlackboardKeys::BossPhase))
+	{
+		constexpr float BossPhaseTwoHealthRatio = 0.66f;
+		constexpr float BossPhaseThreeHealthRatio = 0.33f;
+		constexpr float BossHeavyAttackRange = 650.0f;
+		constexpr float BossAreaAttackRange = 1400.0f;
+		constexpr float BossAreaAttackInterval = 8.0f;
+		constexpr float BossAreaAttackWindow = 1.2f;
+		constexpr float BossSummonInterval = 18.0f;
+		constexpr float BossSummonWindow = 1.5f;
+
+		const int32 BossPhase = HealthRatio <= BossPhaseThreeHealthRatio ? 3 : (HealthRatio <= BossPhaseTwoHealthRatio ? 2 : 1);
+		SetOptionalBlackboardInt(BlackboardComponent, EnemyBlackboardKeys::BossPhase, BossPhase);
+
+		const float WorldTimeSeconds = OwnerComp.GetWorld() != nullptr ? OwnerComp.GetWorld()->GetTimeSeconds() : 0.0f;
+		const bool bShouldBossPhaseTransition = PreviousBossPhase > 0 && PreviousBossPhase != BossPhase;
+		const bool bCanUseBossHeavyAttack = !bShouldBossPhaseTransition && bCanAttack && DistanceToTarget <= BossHeavyAttackRange;
+		const bool bCanUseBossAreaAttack = !bShouldBossPhaseTransition
+			&& BossPhase >= 2
+			&& bHasLineOfSight
+			&& DistanceToTarget <= BossAreaAttackRange
+			&& IsPatternWindowOpen(WorldTimeSeconds, BossAreaAttackInterval, BossAreaAttackWindow);
+		const bool bCanSummonAdds = !bShouldBossPhaseTransition
+			&& BossPhase >= 3
+			&& IsPatternWindowOpen(WorldTimeSeconds, BossSummonInterval, BossSummonWindow);
+		const bool bBossPatternRequestsAttack = bShouldBossPhaseTransition || bCanSummonAdds || bCanUseBossAreaAttack || bCanUseBossHeavyAttack;
+
+		SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldBossPhaseTransition, bShouldBossPhaseTransition);
+		SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossHeavyAttack, bCanUseBossHeavyAttack);
+		SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossAreaAttack, bCanUseBossAreaAttack);
+		SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanSummonAdds, bCanSummonAdds);
+
+		if (bBossPatternRequestsAttack)
+		{
+			// 기존 공용 BT의 공격 분기만으로도 보스 전용 Ability 태그가 실행되도록 전술 분기 값을 정리한다.
+			bCanAttack = true;
+			bShouldRetreat = false;
+			bShouldReposition = false;
+			bShouldChase = false;
+			BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bCanAttack, true);
+			BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldRetreat, false);
+			BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldReposition, false);
+			BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldChase, false);
+		}
+	}
 
 	if (bPreviousShouldRetreat != bShouldRetreat
 		|| bPreviousCanAttack != bCanAttack

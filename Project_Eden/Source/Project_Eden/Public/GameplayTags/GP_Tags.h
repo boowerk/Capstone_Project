@@ -47,11 +47,15 @@ namespace GPTags
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Attack_Melee);   // 근접 공격
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Attack_Ranged);  // 원거리 공격 
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Attack_AoE);     // 광역 공격
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Attack_BossHeavy); // 보스 강공격
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Attack_BossArea);  // 보스 광역 공격
             
 			// 유틸리티 및 특수 계열
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Utility_Dash);   // 이동기 돌진기 등
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Utility_Summon); // 쫄몹 소환
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Utility_Buff);   // 자버프
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Utility_BossSummon);     // 보스 소환 패턴
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Utility_BossPhaseShift); // 보스 페이즈 전환 패턴
             
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Death);          // 뒤져요
 		}

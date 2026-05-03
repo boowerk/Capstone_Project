@@ -43,11 +43,15 @@ namespace GPTags
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Attack_Melee, "GPTags.Ability.Enemy.Attack_Melee", "적 근접 공격");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Attack_Ranged, "GPTags.Ability.Enemy.Attack_Ranged", "적 원거리 공격");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Attack_AoE, "GPTags.Ability.Enemy.Attack_AoE", "적 광역 공격");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Attack_BossHeavy, "GPTags.Ability.Enemy.Attack_BossHeavy", "보스 강공격");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Attack_BossArea, "GPTags.Ability.Enemy.Attack_BossArea", "보스 광역 공격");
             
             // 유틸리티 및 특수 계열
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Utility_Dash, "GPTags.Ability.Enemy.Utility_Dash", "적 이동/돌진기");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Utility_Summon, "GPTags.Ability.Enemy.Utility_Summon", "적 쫄몹 소환");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Utility_Buff, "GPTags.Ability.Enemy.Utility_Buff", "적 자가 버프");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Utility_BossSummon, "GPTags.Ability.Enemy.Utility_BossSummon", "보스 소환 패턴");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Utility_BossPhaseShift, "GPTags.Ability.Enemy.Utility_BossPhaseShift", "보스 페이즈 전환 패턴");
             
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Death, "GPTags.Ability.Enemy.Death", "적 사망 처리");
         }

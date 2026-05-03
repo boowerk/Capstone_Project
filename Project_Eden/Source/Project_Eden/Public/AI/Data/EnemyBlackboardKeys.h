@@ -25,4 +25,10 @@ namespace EnemyBlackboardKeys
 	PROJECT_EDEN_API extern const FName DistanceToTarget;
 	PROJECT_EDEN_API extern const FName DistanceFromHome;
 	PROJECT_EDEN_API extern const FName HealthRatio;
+	// 보스 BT가 페이즈 전환과 특수 패턴 분기를 판단할 때 사용하는 키들이다.
+	PROJECT_EDEN_API extern const FName BossPhase;
+	PROJECT_EDEN_API extern const FName bShouldBossPhaseTransition;
+	PROJECT_EDEN_API extern const FName bCanUseBossHeavyAttack;
+	PROJECT_EDEN_API extern const FName bCanUseBossAreaAttack;
+	PROJECT_EDEN_API extern const FName bCanSummonAdds;
 }
