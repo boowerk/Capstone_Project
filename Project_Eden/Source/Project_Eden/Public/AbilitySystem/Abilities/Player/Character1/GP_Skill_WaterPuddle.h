@@ -19,6 +19,10 @@ class PROJECT_EDEN_API UGP_Skill_WaterPuddle : public UGP_SkillBase
 public:
 	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 
+	/** 동일한 스킬이 여러 슬롯에 있을 때 쿨타임을 공유할지 여부 (false면 슬롯별로 독립 작동) */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS|Skill|Settings")
+	bool bShareAcrossSlots = false;
+
 protected:
 	// --- 수치 및 설정 (Values) ---
 

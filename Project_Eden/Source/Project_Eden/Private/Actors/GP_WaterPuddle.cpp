@@ -5,6 +5,7 @@
 #include "GameFramework/Pawn.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "AbilitySystemComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "TimerManager.h"
 #include "Utils/GP_BlueprintLibrary.h"
@@ -56,6 +57,13 @@ void AGP_WaterPuddle::InitializeMovement(AActor* Caster)
 	SetActorRotation(MoveDirection.Rotation());
 	MovementComponent->Velocity = MoveDirection * InitialForwardSpeed;
 }
+
+void AGP_WaterPuddle::SetupTagCleanup(UAbilitySystemComponent* InASC, FGameplayTag InTag)
+{
+	OwningASC = InASC;
+	PresenceTag = InTag;
+}
+
 void AGP_WaterPuddle::BeginPlay()
 {
 	Super::BeginPlay();
@@ -112,10 +120,22 @@ void AGP_WaterPuddle::OnConstruction(const FTransform& Transform)
 		PuddleDecal->DecalSize = FVector(128.0f, EndRadius, EndRadius);
 	}
 }
+
+void AGP_WaterPuddle::Destroyed()
+{
+	if (HasAuthority() && OwningASC.IsValid() && PresenceTag.IsValid())
+	{
+		OwningASC->RemoveLooseGameplayTag(PresenceTag);
+	}
+
+	Super::Destroyed();
+}
+
 void AGP_WaterPuddle::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AGP_WaterPuddle, EndTime);
+	DOREPLIFETIME(AGP_WaterPuddle, AssignedSlotTags);
 }
 
 void AGP_WaterPuddle::UpdatePuddleState()
@@ -226,6 +246,9 @@ void AGP_WaterPuddle::OnPuddleOverlap(UPrimitiveComponent* OverlappedComponent, 
 
 			// 흡수할 때 시간을 더해줌 : 흡수되는 쪽의 남은 시간의 50퍼 흡수
 			const float OtherRemainingTime = FMath::Max(0.0f, OtherPuddle->EndTime - GetWorld()->GetTimeSeconds());
+
+			// 태그(소유권) 전이 : 흡수당하는 쪽의 모든 슬롯 정보를 내가 가져옴
+			AddAssignedSlotTags(OtherPuddle->GetAssignedSlotTags());
 
 			// 내 현재 시점부터 다시 보간 시작하기 위한 갱신
 			StartTime = GetWorld()->GetTimeSeconds();
