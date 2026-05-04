@@ -211,28 +211,38 @@ void AGP_PlayerCharacter::OnFixedTagChanged(const FGameplayTag CallbackTag, int3
 	}
 }
 
-void AGP_PlayerCharacter::EquipSkill(FGameplayTag SlotTag, TSubclassOf<UGameplayAbility> NewAbilityClass)
+#include "AbilitySystem/Abilities/GP_SkillData.h"
+
+void AGP_PlayerCharacter::EquipSkill(UGP_SkillData* NewSkillData, FGameplayTag SlotTag)
+{
+	if (!NewSkillData || !NewSkillData->AbilityClass) return;
+
+	EquipSkillByClass(SlotTag, NewSkillData->AbilityClass);
+
+	// 교환 성공 알림 방송 (UI 연동용)
+	if (OnSkillEquipped.IsBound())
+	{
+		OnSkillEquipped.Broadcast(SlotTag, NewSkillData);
+	}
+}
+
+void AGP_PlayerCharacter::EquipSkillByClass(FGameplayTag SlotTag, TSubclassOf<UGameplayAbility> NewAbilityClass)
 {
 	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
-	if (!ASC || !NewAbilityClass) return;
+	if (!ASC || !NewAbilityClass || !HasAuthority()) return;
 
 	// 1. 기존 해당 슬롯에 있던 어빌리티 제거 (중복 방지)
-	// 반환 타입 변경 적용 (const TArray)
 	const TArray<FGameplayAbilitySpec>& Specs = ASC->GetActivatableAbilities();
-	
-	// 순회 중에 배열의 요소를 삭제(ClearAbility)하면 에러가 날 수 있으므로 Handle을 먼저 수집합니다.
 	TArray<FGameplayAbilitySpecHandle> HandlesToRemove;
 	
 	for (const FGameplayAbilitySpec& Spec : Specs)
 	{
-		// Deprecated 경고 해결: DynamicAbilityTags 대신 GetDynamicSpecSourceTags() 사용
 		if (Spec.GetDynamicSpecSourceTags().HasTagExact(SlotTag))
 		{
 			HandlesToRemove.Add(Spec.Handle);
 		}
 	}
 
-	// 수집된 Handle들을 일괄 삭제
 	for (const FGameplayAbilitySpecHandle& Handle : HandlesToRemove)
 	{
 		ASC->ClearAbility(Handle);
@@ -240,8 +250,6 @@ void AGP_PlayerCharacter::EquipSkill(FGameplayTag SlotTag, TSubclassOf<UGameplay
 
 	// 2. 새 어빌리티 부여
 	FGameplayAbilitySpec NewSpec(NewAbilityClass);
-	
-	// Deprecated 경고 해결: 여기도 최신 API 적용
 	NewSpec.GetDynamicSpecSourceTags().AddTag(SlotTag); 
     
 	ASC->GiveAbility(NewSpec);
