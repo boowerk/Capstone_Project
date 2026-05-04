@@ -107,7 +107,7 @@ void AGP_PlayerController::SetupInputComponent()
 	if (SkillSlot1Action) EnhancedInputComponent->BindAction(SkillSlot1Action, ETriggerEvent::Triggered, this, &ThisClass::Input_SkillSlot1);
 	if (SkillSlot2Action) EnhancedInputComponent->BindAction(SkillSlot2Action, ETriggerEvent::Triggered, this, &ThisClass::Input_SkillSlot2);
 	if (UltimateAction) EnhancedInputComponent->BindAction(UltimateAction, ETriggerEvent::Triggered, this, &ThisClass::Input_UltimateSkill);
-	
+	if (TestToggleSkillAction) EnhancedInputComponent->BindAction(TestToggleSkillAction, ETriggerEvent::Started, this, &ThisClass::Input_TestToggleSkill);
 }
 
 
@@ -247,6 +247,15 @@ bool AGP_PlayerController::ActivateAbilityByTag(const FGameplayTag& AbilityTag) 
 	UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn());
 	if (!IsValid(ASC)) return false;
 
+	// 동적 태그(슬롯)를 가진 어빌리티를 먼저 활성화 시도
+	for (FGameplayAbilitySpec& Spec : ASC->GetActivatableAbilities())
+	{
+		if (Spec.GetDynamicSpecSourceTags().HasTagExact(AbilityTag))
+		{
+			return ASC->TryActivateAbility(Spec.Handle);
+		}
+	}
+
 	return ASC->TryActivateAbilitiesByTag(AbilityTag.GetSingleTagContainer());
 }
 
@@ -290,4 +299,63 @@ void AGP_PlayerController::RefreshBossHUD()
 	CurrentBossEnemy = ClosestBoss;
 	HUDWidget->SetBossText(CurrentBossEnemy->GetBossDisplayName());
 	HUDWidget->SetBossVisible(true);
+}
+
+void AGP_PlayerController::Input_TestToggleSkill()
+{
+	Server_TestToggleSkill();
+}
+
+bool AGP_PlayerController::Server_TestToggleSkill_Validate()
+{
+	return true;
+}
+
+void AGP_PlayerController::Server_TestToggleSkill_Implementation()
+{
+	AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetPawn());
+	if (!PC) return;
+
+	UAbilitySystemComponent* ASC = PC->GetAbilitySystemComponent();
+	if (!ASC) return;
+
+	if (!bSkillsEquipped)
+	{
+		// 장착 로직
+		if (WaterPuddleAbilityClass)
+		{
+			PC->EquipSkillByClass(GPTags::Ability::Skill::Slot01, WaterPuddleAbilityClass);
+			PC->EquipSkillByClass(GPTags::Ability::Skill::Slot02, WaterPuddleAbilityClass);
+			bSkillsEquipped = true;
+			
+			if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Cyan, TEXT("Skills Equipped to Slot 1 & 2!"));
+			UE_LOG(LogTemp, Warning, TEXT("Server: WaterPuddle equipped to Slot 1 & 2"));
+		}
+	}
+	else
+	{
+		// 해제 로직
+		TArray<FGameplayTag> SlotTags = { GPTags::Ability::Skill::Slot01, GPTags::Ability::Skill::Slot02 };
+		TArray<FGameplayAbilitySpecHandle> HandlesToRemove;
+		
+		for (const FGameplayAbilitySpec& Spec : ASC->GetActivatableAbilities())
+		{
+			for (const FGameplayTag& SlotTag : SlotTags)
+			{
+				if (Spec.GetDynamicSpecSourceTags().HasTagExact(SlotTag))
+				{
+					HandlesToRemove.Add(Spec.Handle);
+				}
+			}
+		}
+
+		for (const FGameplayAbilitySpecHandle& Handle : HandlesToRemove)
+		{
+			ASC->ClearAbility(Handle);
+		}
+
+		bSkillsEquipped = false;
+		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Orange, TEXT("Skills Unequipped!"));
+		UE_LOG(LogTemp, Warning, TEXT("Server: WaterPuddle unequipped from Slot 1 & 2"));
+	}
 }

@@ -32,6 +32,7 @@ namespace GPTags
         }
         namespace Skill
         {
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(SkillRoot, "GPTags.Ability.Skill", "스킬 전체 부모 태그");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Primary, "GPTags.Ability.Skill.Primary", "평타");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Slot01, "GPTags.Ability.Skill.Slot01", "스킬 슬롯 1");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Slot02, "GPTags.Ability.Skill.Slot02", "스킬 슬롯 2");

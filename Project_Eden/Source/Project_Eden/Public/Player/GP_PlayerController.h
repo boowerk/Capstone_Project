@@ -63,6 +63,12 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
 	TObjectPtr<UInputAction> UltimateAction;
+
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Tests")
+	TObjectPtr<UInputAction> TestToggleSkillAction;
+
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Tests")
+	TSubclassOf<class UGameplayAbility> WaterPuddleAbilityClass;
 	
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
 	TSubclassOf<UUserWidget> HUDWidgetClass;
@@ -97,7 +103,13 @@ private:
 	void Input_SkillSlot1();
 	void Input_SkillSlot2();
 	void Input_UltimateSkill();
+	void Input_TestToggleSkill();
+
+	UFUNCTION(Server, Reliable, WithValidation)
+	void Server_TestToggleSkill();
 
 	bool ActivateAbilityByTag(const FGameplayTag& AbilityTag) const;
 	void RefreshBossHUD();
+
+	bool bSkillsEquipped = false;
 };

@@ -36,6 +36,7 @@ namespace GPTags
 		}
 		namespace Skill
 		{
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(SkillRoot); // 부모 태그용
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Primary); // 평타
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Slot01);  // 스킬 1
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Slot02);  // 스킬 2
