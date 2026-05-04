@@ -21,24 +21,24 @@ public:
 protected:
 	// --- 블루프린트에서 설정할 수치들 (Data Driven) ---
 	
-	UPROPERTY(EditDefaultsOnly, Category = "Skill|Visuals")
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Skill|Visuals")
 	TObjectPtr<UAnimMontage> SkillMontage;
 
-	UPROPERTY(EditDefaultsOnly, Category = "Skill|Values")
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Skill|Values")
 	TSubclassOf<UGameplayEffect> DamageEffectClass;
 
 	/** 공격 반경 */
-	UPROPERTY(EditDefaultsOnly, Category = "Skill|Values")
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Skill|Values")
 	float AttackRadius = 200.f;
 
 	/** 전방 오프셋 (캐릭터 앞쪽 어디서 판정을 시작할지) */
-	UPROPERTY(EditDefaultsOnly, Category = "Skill|Values")
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Skill|Values")
 	float ForwardOffset = 100.f;
 
 	// --- C++ 공통 메커니즘 (Mechanics) ---
 
 	/** 범위 내 적들을 찾아 데미지를 입히는 공통 유틸리티 */
-	UFUNCTION(BlueprintCallable, Category = "Skill|Mechanics")
+	UFUNCTION(BlueprintCallable, Category = "GAS|Skill|Mechanics")
 	void PerformAreaAttack();
 
 	/** 어빌리티 종료 시 호출할 정리 함수 */

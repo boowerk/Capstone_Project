@@ -27,7 +27,11 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill")
 	TSubclassOf<UGameplayAbility> AbilityClass;
 
-	/** 이 스킬이 장착될 수 있는 슬롯 태그 (예: Ability.Skill.Slot01) */
+	/** 이 스킬이 장착될 수 있는 기본 권장 슬롯 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill")
 	FGameplayTag DefaultSlotTag;
+
+	/** 이 스킬이 장착 가능한 모든 슬롯 리스트 (비어있으면 어디든 가능) */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Restriction")
+	FGameplayTagContainer SupportedSlotTags;
 };

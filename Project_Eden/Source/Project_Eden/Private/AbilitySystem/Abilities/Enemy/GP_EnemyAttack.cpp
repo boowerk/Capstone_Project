@@ -1,5 +1,4 @@
 #include "AbilitySystem/Abilities/Enemy/GP_EnemyAttack.h"
-
 #include "AIController.h"
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
@@ -16,6 +15,10 @@ UGP_EnemyAttack::UGP_EnemyAttack()
 	SetAssetTags(AbilityAssetTags);
 
 	AttackEventTag = GPTags::Event::Enemy::AttackHit;
+
+	// 부모 클래스 수치 기본값 설정
+	AttackRadius = 120.0f;
+	ForwardOffset = 140.0f;
 }
 
 void UGP_EnemyAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
@@ -48,7 +51,10 @@ void UGP_EnemyAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 		}
 	}
 
-	if (AttackMontage)
+	// 부모의 SkillMontage 변수를 공격 몽타주로 사용
+	UAnimMontage* MontageToPlay = SkillMontage;
+
+	if (MontageToPlay)
 	{
 		if (bUseGameplayEventForHitTiming && AttackEventTag.IsValid())
 		{
@@ -62,7 +68,7 @@ void UGP_EnemyAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 		}
 
 		UAbilityTask_PlayMontageAndWait* PlayMontageTask =
-			UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(this, NAME_None, AttackMontage, 1.0f);
+			UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(this, NAME_None, MontageToPlay, 1.0f);
 		if (PlayMontageTask)
 		{
 			PlayMontageTask->OnCompleted.AddDynamic(this, &ThisClass::OnMontageCompleted);
@@ -72,28 +78,23 @@ void UGP_EnemyAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 			PlayMontageTask->ReadyForActivation();
 		}
 
-		// 이벤트 타이밍을 쓰지 않는 기본 설정에서는 어빌리티 시작 즉시 판정을 수행한다.
+		// 이벤트 타이밍을 쓰지 않는 경우 어빌리티 시작 즉시 판정을 수행
 		if (!bUseGameplayEventForHitTiming || !AttackEventTag.IsValid())
 		{
 			PerformAttackHit();
-		}
-		else if (!PlayMontageTask)
-		{
-			// 몽타주 태스크 생성에 실패하면 공격이 완전히 사라지지 않도록 즉시 판정 후 종료한다.
-			PerformAttackHit();
-			EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		}
 
 		return;
 	}
 
+	// 몽타주가 없으면 즉시 판정 후 종료
 	PerformAttackHit();
 	EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
 }
 
 void UGP_EnemyAttack::OnMontageCompleted()
 {
-	// 이벤트 노티파이를 빠뜨린 경우에도 최소한의 공격 판정은 보장한다.
+	// 이벤트 노티파이를 빠뜨린 경우에도 최소한의 공격 판정은 보장
 	if (!bHasAppliedAttackHit)
 	{
 		PerformAttackHit();
@@ -109,35 +110,10 @@ void UGP_EnemyAttack::OnAttackEventReceived(FGameplayEventData Payload)
 
 void UGP_EnemyAttack::PerformAttackHit()
 {
-	if (bHasAppliedAttackHit)
-	{
-		return;
-	}
+	if (bHasAppliedAttackHit) return;
 
-	AActor* AvatarActor = GetAvatarActorFromActorInfo();
-	if (!IsValid(AvatarActor))
-	{
-		return;
-	}
-
-	TArray<AActor*> HitActors = UGP_BlueprintLibrary::SphereMeleeHitBoxOverlap(
-		AvatarActor,
-		HitBoxRadius,
-		HitBoxForwardOffset,
-		HitBoxElevationOffset,
-		bDrawDebugs);
-
-	// 타격 대상이 적이라면 기존 피격 반응 태그를 그대로 재사용한다.
-	UGP_BlueprintLibrary::SendGameplayEventToActors(AvatarActor, HitActors, GPTags::Event::Enemy::HitReact);
-
-	if (HasAuthority(&CurrentActivationInfo) && DamageEffectClass)
-	{
-		UGP_BlueprintLibrary::ApplyGameplayEffectToActors(
-			AvatarActor,
-			HitActors,
-			DamageEffectClass,
-			GetAbilityLevel());
-	}
+	// 메커니즘: 부모 클래스의 공통 공격 판정 실행 (HitBoxElevationOffset은 현재 Enemy에서만 특수하게 사용)
+	PerformAreaAttack();
 
 	bHasAppliedAttackHit = true;
 }

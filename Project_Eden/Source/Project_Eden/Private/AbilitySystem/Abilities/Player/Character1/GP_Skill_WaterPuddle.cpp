@@ -1,4 +1,5 @@
 ﻿#include "AbilitySystem/Abilities/Player/Character1/GP_Skill_WaterPuddle.h"
+#include "AbilitySystem/Abilities/GP_SkillBase.h"
 #include "Actors/GP_WaterPuddle.h"
 #include "Interfaces/GP_Summonable.h"
 #include "AbilitySystemComponent.h"

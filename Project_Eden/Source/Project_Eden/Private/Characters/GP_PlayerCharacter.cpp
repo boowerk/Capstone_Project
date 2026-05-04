@@ -213,9 +213,20 @@ void AGP_PlayerCharacter::OnFixedTagChanged(const FGameplayTag CallbackTag, int3
 
 #include "AbilitySystem/Abilities/GP_SkillData.h"
 
-void AGP_PlayerCharacter::EquipSkill(UGP_SkillData* NewSkillData, FGameplayTag SlotTag)
+void AGP_PlayerCharacter::EquipSkill(UGP_SkillData* NewSkillData, FGameplayTag SlotTag, bool bIgnoreRestrictions)
 {
 	if (!NewSkillData || !NewSkillData->AbilityClass) return;
+
+	// 1. 슬롯 제한 체크 (로그라이크 예외 지원)
+	if (!bIgnoreRestrictions)
+	{
+		// 데이터 에셋에 허용 슬롯이 정의되어 있는데, 현재 요청한 슬롯이 그 안에 없다면 거부
+		if (!NewSkillData->SupportedSlotTags.IsEmpty() && !NewSkillData->SupportedSlotTags.HasTag(SlotTag))
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Skill '%s' is not compatible with slot %s"), *NewSkillData->SkillName.ToString(), *SlotTag.ToString());
+			return;
+		}
+	}
 
 	EquipSkillByClass(SlotTag, NewSkillData->AbilityClass);
 
