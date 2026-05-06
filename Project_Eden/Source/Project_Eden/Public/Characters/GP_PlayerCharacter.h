@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Characters/GP_BaseCharacter.h"
 #include "AbilitySystemInterface.h"
+#include "GameplayTagContainer.h"
 #include "GP_PlayerCharacter.generated.h"
 
 class USpringArmComponent;
@@ -11,6 +12,10 @@ class UPDA_WeaponItemCollection;
 class UPDA_CharacterAnimationSet;
 class UAnimSequenceBase;
 class UBlendSpace;
+
+class UGP_SkillData;
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnSkillEquipped, FGameplayTag, SlotTag, UGP_SkillData*, SkillData);
 
 UCLASS()
 class PROJECT_EDEN_API AGP_PlayerCharacter : public AGP_BaseCharacter
@@ -41,8 +46,16 @@ public:
 	UBlendSpace* GetLocomotionBlendSpace() const;
 	UAnimSequenceBase* GetJumpLoopAnimation() const;
 	
+	/** [데이터 에셋 기반] 런타임 스킬 교체 함수 (bIgnoreRestrictions로 로그라이크식 예외 지원) */
 	UFUNCTION(BlueprintCallable, Category = "GAS|Combat")
-	void EquipSkill(FGameplayTag SlotTag, TSubclassOf<UGameplayAbility> NewAbilityClass);
+	void EquipSkill(UGP_SkillData* NewSkillData, FGameplayTag SlotTag, bool bIgnoreRestrictions = false);
+
+	/** 구형 호환용 (클래스 직접 교체) */
+	UFUNCTION(BlueprintCallable, Category = "GAS|Combat", meta = (DeprecatedFunction, DeprecationMessage = "Use DataAsset version instead"))
+	void EquipSkillByClass(FGameplayTag SlotTag, TSubclassOf<UGameplayAbility> NewAbilityClass);
+
+	UPROPERTY(BlueprintAssignable, Category = "GAS|Events")
+	FOnSkillEquipped OnSkillEquipped;
 
 
 private:

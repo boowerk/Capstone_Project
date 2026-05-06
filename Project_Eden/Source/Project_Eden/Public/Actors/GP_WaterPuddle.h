@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "GameplayTagContainer.h"
 #include "GameplayEffect.h"
 #include "Interfaces/GP_Summonable.h"
 
@@ -34,8 +35,24 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Eden|Puddle")
 	void InitializeMovement(AActor* Caster);
 
+	UFUNCTION(BlueprintPure, Category = "Eden|Puddle")
+	FGameplayTagContainer GetAssignedSlotTags() const { return AssignedSlotTags; }
+
+	UFUNCTION(BlueprintPure, Category = "Eden|Puddle")
+	FGameplayTag GetAssignedSlotTag() const { return AssignedSlotTags.First(); }
+
+	UFUNCTION(BlueprintCallable, Category = "Eden|Puddle")
+	void SetAssignedSlotTag(FGameplayTag Tag) { AssignedSlotTags.AddTag(Tag); }
+
+	UFUNCTION(BlueprintCallable, Category = "Eden|Puddle")
+	void AddAssignedSlotTags(const FGameplayTagContainer& InTags) { AssignedSlotTags.AppendTags(InTags); }
+
+	/** 소환 시 전달받은 ASC와 태그 (파괴 시 제거용) */
+	void SetupTagCleanup(class UAbilitySystemComponent* InASC, FGameplayTag InTag);
+
 protected:
 	virtual void BeginPlay() override;
+	virtual void Destroyed() override;
 	virtual void OnConstruction(const FTransform& Transform) override;
 	
 	// FadeIn
@@ -104,6 +121,14 @@ protected:
 
 	// 흡수당하고 있는지 여부: 동시에 서로 흡수 방지
 	bool bIsBeingAbsorbed = false;
+
+	UPROPERTY(BlueprintReadOnly, Replicated, Category = "Eden|Puddle")
+	FGameplayTagContainer AssignedSlotTags;
+
+	UPROPERTY()
+	TWeakObjectPtr<class UAbilitySystemComponent> OwningASC;
+	
+	FGameplayTag PresenceTag;
 
 	FTimerHandle PuddleUpdateTimer;
 	

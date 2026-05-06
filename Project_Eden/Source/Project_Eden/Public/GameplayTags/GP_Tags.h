@@ -36,6 +36,7 @@ namespace GPTags
 		}
 		namespace Skill
 		{
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(SkillRoot); // 부모 태그용
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Primary); // 평타
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Slot01);  // 스킬 1
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Slot02);  // 스킬 2
@@ -74,7 +75,10 @@ namespace GPTags
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Fire);			// 화염 속성
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Water);			// 물 속성
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Lightning);		// 전격 속성
-			
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Electricity);	// 전기 속성
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ice);			// 얼음 속성
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Poison);			// 독 속성
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Light);			// 빛 속성
 		}
 	}
 

@@ -32,6 +32,7 @@ namespace GPTags
         }
         namespace Skill
         {
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(SkillRoot, "GPTags.Ability.Skill", "스킬 전체 부모 태그");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Primary, "GPTags.Ability.Skill.Primary", "평타");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Slot01, "GPTags.Ability.Skill.Slot01", "스킬 슬롯 1");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Slot02, "GPTags.Ability.Skill.Slot02", "스킬 슬롯 2");
@@ -70,6 +71,10 @@ namespace GPTags
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Fire, "GPTags.Damage.Element.Fire", "화염 속성 피해");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Water, "GPTags.Damage.Element.Water", "물 속성 피해");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Lightning, "GPTags.Damage.Element.Lightning", "전격 속성 피해");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Electricity, "GPTags.Damage.Element.Electricity", "전기 속성 피해");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ice, "GPTags.Damage.Element.Ice", "얼음 속성 피해");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Poison, "GPTags.Damage.Element.Poison", "독 속성 피해");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Light, "GPTags.Damage.Element.Light", "빛 속성 피해");
         }
     }
 

@@ -15,6 +15,10 @@ UGP_Primary::UGP_Primary()
 
 	// 어빌리티 활성화 동안 이동 입력을 막기 위해 Fixed 태그 부여
 	ActivationOwnedTags.AddTag(GPTags::State::Status::Fixed);
+
+	// 부모 클래스 수치 기본값 설정
+	AttackRadius = 100.0f;
+	ForwardOffset = 200.0f;
 }
 
 void UGP_Primary::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
@@ -36,7 +40,6 @@ void UGP_Primary::InputPressed(const FGameplayAbilitySpecHandle Handle, const FG
 	Super::InputPressed(Handle, ActorInfo, ActivationInfo);
 
 	// 선입력 허용: 애니메이션 도중 언제 클릭하든 다음 공격을 예약합니다.
-	UE_LOG(LogTemp, Warning, TEXT("UGP_Primary : InputPressed Called - Next Attack Queued!"));
 	bHasQueuedNextAttack = true;
 }
 void UGP_Primary::StartComboSequence()
@@ -126,13 +129,11 @@ int32 UGP_Primary::GetNextComboIndex(int32 MaxComboCount)
 
 void UGP_Primary::OnComboEnableEventReceived(FGameplayEventData Payload)
 {
-	UE_LOG(LogTemp, Warning, TEXT("UGP_Primary : OnComboEnableEventReceived Called - Combo Window Open"));
 	bIsComboWindowOpen = true;
 }
 
 void UGP_Primary::OnActionEndEventReceived(FGameplayEventData Payload)
 {
-	UE_LOG(LogTemp, Warning, TEXT("UGP_Primary : OnActionEndEventReceived Called - bHasQueuedNextAttack : %s"), bHasQueuedNextAttack ? TEXT("True") : TEXT("False"));
 	AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo());
 	if (!IsValid(PC) || !IsValid(PC->GetAnimationSet()))
 	{
@@ -173,15 +174,6 @@ void UGP_Primary::OnMontageInterrupted()
 
 void UGP_Primary::OnAttackHitEventReceived(FGameplayEventData Payload)
 {
-	TArray<AActor*> HitActors = UGP_BlueprintLibrary::SphereMeleeHitBoxOverlap(
-	   GetAvatarActorFromActorInfo(), HitBoxRadius, HitBoxForwardOffset, HitBoxElevationOffset, bDrawDebugs);
-
-	UGP_BlueprintLibrary::SendGameplayEventToActors(GetAvatarActorFromActorInfo(), HitActors,
-										GPTags::Event::Enemy::HitReact);
-
-	if (HasAuthority(&CurrentActivationInfo))
-	{
-		UGP_BlueprintLibrary::ApplyGameplayEffectToActors(GetAvatarActorFromActorInfo(), HitActors, DamageEffectClass,
-											  GetAbilityLevel());
-	}
+	// 메커니즘: 부모 클래스의 공통 공격 판정 실행
+	PerformAreaAttack();
 }

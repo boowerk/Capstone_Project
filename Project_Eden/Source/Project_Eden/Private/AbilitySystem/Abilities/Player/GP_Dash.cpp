@@ -11,12 +11,15 @@ UGP_Dash::UGP_Dash()
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
 	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
 	// 어빌리티 고유 식별 태그
-	AbilityTags.AddTag(GPTags::Ability::Movement::Dash);
+	FGameplayTagContainer AbilityAssetTags;
+	AbilityAssetTags.AddTag(GPTags::Ability::Movement::Dash);
+	SetAssetTags(AbilityAssetTags);
+
 	ActivationOwnedTags.AddTag(GPTags::State::Movement::Dash);       // 대시 상태 
 	ActivationOwnedTags.AddTag(GPTags::State::Status::Fixed);		// 이동 및 회전 입력 차단
 	// ActivationOwnedTags.AddTag(GPTags::State::Status::Unstoppable);	// 저지불가 상태
 	// ActivationOwnedTags.AddTag(GPTags::State::Status::Invincible);	// 무적 상태
-	BlockAbilitiesWithTag.AddTag(FGameplayTag::RequestGameplayTag(FName("Ability.Skill")));
+	BlockAbilitiesWithTag.AddTag(GPTags::Ability::Skill::SkillRoot);
 	CancelAbilitiesWithTag.AddTag(GPTags::Ability::Skill::Primary);
 }
 
