@@ -68,13 +68,13 @@ namespace GPTags
         }
         namespace Element
         {
-            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Fire, "GPTags.Damage.Element.Fire", "화염 속성 피해");
-            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Water, "GPTags.Damage.Element.Water", "물 속성 피해");
-            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Lightning, "GPTags.Damage.Element.Lightning", "전격 속성 피해");
-            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Electricity, "GPTags.Damage.Element.Electricity", "전기 속성 피해");
-            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ice, "GPTags.Damage.Element.Ice", "얼음 속성 피해");
-            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Poison, "GPTags.Damage.Element.Poison", "독 속성 피해");
-            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Light, "GPTags.Damage.Element.Light", "빛 속성 피해");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Pyros, "GPTags.Damage.Element.Pyros", "화염 속성 (Pyros)");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Hydro, "GPTags.Damage.Element.Hydro", "물 속성 (Hydro)");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Volt, "GPTags.Damage.Element.Volt", "전격 속성 (Volt)");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Aero, "GPTags.Damage.Element.Aero", "바람 속성 (Aero)");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Lux, "GPTags.Damage.Element.Lux", "빛 속성 (Lux)");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Chaos, "GPTags.Damage.Element.Chaos", "혼돈 속성 (Chaos)");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Brute, "GPTags.Damage.Element.Brute", "물리/강타 속성 (Brute)");
         }
     }
 

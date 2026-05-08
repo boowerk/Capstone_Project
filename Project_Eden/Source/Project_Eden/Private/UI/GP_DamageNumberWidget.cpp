@@ -91,12 +91,20 @@ FLinearColor UGP_DamageNumberWidget::GetElementColor(EWeaponElement InElement) c
     // 무기 원소 속성에 맞춰 데미지 숫자 색을 고정 매핑한다.
     switch (InElement)
     {
-    case EWeaponElement::Fire:
-        return FLinearColor(1.0f, 0.47f, 0.20f, 1.0f);
-    case EWeaponElement::Water:
-        return FLinearColor(0.34f, 0.80f, 1.0f, 1.0f);
-    case EWeaponElement::Lightning:
-        return FLinearColor(1.0f, 0.87f, 0.35f, 1.0f);
+    case EWeaponElement::Pyros:
+        return FLinearColor(1.0f, 0.47f, 0.20f, 1.0f); // 주황색
+    case EWeaponElement::Hydro:
+        return FLinearColor(0.34f, 0.80f, 1.0f, 1.0f); // 하늘색
+    case EWeaponElement::Volt:
+        return FLinearColor(1.0f, 0.87f, 0.35f, 1.0f); // 노란색
+    case EWeaponElement::Aero:
+        return FLinearColor(0.40f, 1.0f, 0.70f, 1.0f); // 청록색
+    case EWeaponElement::Lux:
+        return FLinearColor(1.0f, 0.95f, 0.80f, 1.0f); // 연한 황금색
+    case EWeaponElement::Chaos:
+        return FLinearColor(0.60f, 0.20f, 1.0f, 1.0f); // 보라색
+    case EWeaponElement::Brute:
+        return FLinearColor(0.85f, 0.85f, 0.85f, 1.0f); // 회색
     default:
         return FLinearColor::White;
     }

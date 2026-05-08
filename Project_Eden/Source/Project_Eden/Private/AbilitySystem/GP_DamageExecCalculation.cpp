@@ -15,12 +15,13 @@ struct FGP_DamageStatics
     DECLARE_ATTRIBUTE_CAPTUREDEF(Armor);
     DECLARE_ATTRIBUTE_CAPTUREDEF(MaxHealth);
     
-    DECLARE_ATTRIBUTE_CAPTUREDEF(FireResistance);
-    DECLARE_ATTRIBUTE_CAPTUREDEF(WaterResistance);
-    DECLARE_ATTRIBUTE_CAPTUREDEF(ElectricityResistance);
-    DECLARE_ATTRIBUTE_CAPTUREDEF(IceResistance);
-    DECLARE_ATTRIBUTE_CAPTUREDEF(PoisonResistance);
-    DECLARE_ATTRIBUTE_CAPTUREDEF(LightResistance);
+    DECLARE_ATTRIBUTE_CAPTUREDEF(PyrosResistance);
+    DECLARE_ATTRIBUTE_CAPTUREDEF(HydroResistance);
+    DECLARE_ATTRIBUTE_CAPTUREDEF(VoltResistance);
+    DECLARE_ATTRIBUTE_CAPTUREDEF(AeroResistance);
+    DECLARE_ATTRIBUTE_CAPTUREDEF(LuxResistance);
+    DECLARE_ATTRIBUTE_CAPTUREDEF(ChaosResistance);
+    DECLARE_ATTRIBUTE_CAPTUREDEF(BruteResistance);
 
     FGP_DamageStatics()
     {
@@ -35,12 +36,13 @@ struct FGP_DamageStatics
         DEFINE_ATTRIBUTE_CAPTUREDEF(UGP_AttributeSet, Armor, Target, false);
         DEFINE_ATTRIBUTE_CAPTUREDEF(UGP_AttributeSet, MaxHealth, Target, false);
         
-        DEFINE_ATTRIBUTE_CAPTUREDEF(UGP_AttributeSet, FireResistance, Target, false);
-        DEFINE_ATTRIBUTE_CAPTUREDEF(UGP_AttributeSet, WaterResistance, Target, false);
-        DEFINE_ATTRIBUTE_CAPTUREDEF(UGP_AttributeSet, ElectricityResistance, Target, false);
-        DEFINE_ATTRIBUTE_CAPTUREDEF(UGP_AttributeSet, IceResistance, Target, false);
-        DEFINE_ATTRIBUTE_CAPTUREDEF(UGP_AttributeSet, PoisonResistance, Target, false);
-        DEFINE_ATTRIBUTE_CAPTUREDEF(UGP_AttributeSet, LightResistance, Target, false);
+        DEFINE_ATTRIBUTE_CAPTUREDEF(UGP_AttributeSet, PyrosResistance, Target, false);
+        DEFINE_ATTRIBUTE_CAPTUREDEF(UGP_AttributeSet, HydroResistance, Target, false);
+        DEFINE_ATTRIBUTE_CAPTUREDEF(UGP_AttributeSet, VoltResistance, Target, false);
+        DEFINE_ATTRIBUTE_CAPTUREDEF(UGP_AttributeSet, AeroResistance, Target, false);
+        DEFINE_ATTRIBUTE_CAPTUREDEF(UGP_AttributeSet, LuxResistance, Target, false);
+        DEFINE_ATTRIBUTE_CAPTUREDEF(UGP_AttributeSet, ChaosResistance, Target, false);
+        DEFINE_ATTRIBUTE_CAPTUREDEF(UGP_AttributeSet, BruteResistance, Target, false);
     }
 };
 
@@ -61,12 +63,13 @@ UGP_DamageExecCalculation::UGP_DamageExecCalculation()
     RelevantAttributesToCapture.Add(DamageStatics().ArmorDef);
     RelevantAttributesToCapture.Add(DamageStatics().MaxHealthDef);
 
-    RelevantAttributesToCapture.Add(DamageStatics().FireResistanceDef);
-    RelevantAttributesToCapture.Add(DamageStatics().WaterResistanceDef);
-    RelevantAttributesToCapture.Add(DamageStatics().ElectricityResistanceDef);
-    RelevantAttributesToCapture.Add(DamageStatics().IceResistanceDef);
-    RelevantAttributesToCapture.Add(DamageStatics().PoisonResistanceDef);
-    RelevantAttributesToCapture.Add(DamageStatics().LightResistanceDef);
+    RelevantAttributesToCapture.Add(DamageStatics().PyrosResistanceDef);
+    RelevantAttributesToCapture.Add(DamageStatics().HydroResistanceDef);
+    RelevantAttributesToCapture.Add(DamageStatics().VoltResistanceDef);
+    RelevantAttributesToCapture.Add(DamageStatics().AeroResistanceDef);
+    RelevantAttributesToCapture.Add(DamageStatics().LuxResistanceDef);
+    RelevantAttributesToCapture.Add(DamageStatics().ChaosResistanceDef);
+    RelevantAttributesToCapture.Add(DamageStatics().BruteResistanceDef);
 }
 
 void UGP_DamageExecCalculation::Execute_Implementation(const FGameplayEffectCustomExecutionParameters& ExecutionParams, OUT FGameplayEffectCustomExecutionOutput& OutExecutionOutput) const
@@ -132,12 +135,13 @@ void UGP_DamageExecCalculation::Execute_Implementation(const FGameplayEffectCust
 
     // 4. 다/라. 속성 및 방어력 경감
     float Resistance_Elem = 0.0f;
-    if (Spec.GetDynamicAssetTags().HasTagExact(GPTags::Damage::Element::Fire)) { ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().FireResistanceDef, EvaluationParameters, Resistance_Elem); }
-    else if (Spec.GetDynamicAssetTags().HasTagExact(GPTags::Damage::Element::Water)) { ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().WaterResistanceDef, EvaluationParameters, Resistance_Elem); }
-    else if (Spec.GetDynamicAssetTags().HasTagExact(GPTags::Damage::Element::Electricity)) { ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().ElectricityResistanceDef, EvaluationParameters, Resistance_Elem); }
-    else if (Spec.GetDynamicAssetTags().HasTagExact(GPTags::Damage::Element::Ice)) { ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().IceResistanceDef, EvaluationParameters, Resistance_Elem); }
-    else if (Spec.GetDynamicAssetTags().HasTagExact(GPTags::Damage::Element::Poison)) { ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().PoisonResistanceDef, EvaluationParameters, Resistance_Elem); }
-    else if (Spec.GetDynamicAssetTags().HasTagExact(GPTags::Damage::Element::Light)) { ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().LightResistanceDef, EvaluationParameters, Resistance_Elem); }
+    if (Spec.GetDynamicAssetTags().HasTagExact(GPTags::Damage::Element::Pyros)) { ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().PyrosResistanceDef, EvaluationParameters, Resistance_Elem); }
+    else if (Spec.GetDynamicAssetTags().HasTagExact(GPTags::Damage::Element::Hydro)) { ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().HydroResistanceDef, EvaluationParameters, Resistance_Elem); }
+    else if (Spec.GetDynamicAssetTags().HasTagExact(GPTags::Damage::Element::Volt)) { ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().VoltResistanceDef, EvaluationParameters, Resistance_Elem); }
+    else if (Spec.GetDynamicAssetTags().HasTagExact(GPTags::Damage::Element::Aero)) { ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().AeroResistanceDef, EvaluationParameters, Resistance_Elem); }
+    else if (Spec.GetDynamicAssetTags().HasTagExact(GPTags::Damage::Element::Lux)) { ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().LuxResistanceDef, EvaluationParameters, Resistance_Elem); }
+    else if (Spec.GetDynamicAssetTags().HasTagExact(GPTags::Damage::Element::Chaos)) { ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().ChaosResistanceDef, EvaluationParameters, Resistance_Elem); }
+    else if (Spec.GetDynamicAssetTags().HasTagExact(GPTags::Damage::Element::Brute)) { ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().BruteResistanceDef, EvaluationParameters, Resistance_Elem); }
 
     float K = 100.0f; 
     float ArmorMitigation = K / (K + FMath::Max(Armor, 0.0f));

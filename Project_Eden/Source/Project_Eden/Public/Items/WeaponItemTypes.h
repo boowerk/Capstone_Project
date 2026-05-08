@@ -19,9 +19,13 @@ enum class EWeaponRarity : uint8
 UENUM(BlueprintType)
 enum class EWeaponElement : uint8
 {
-    Fire UMETA(DisplayName = "Fire"),
-    Water UMETA(DisplayName = "Water"),
-    Lightning UMETA(DisplayName = "Lightning")
+    Pyros UMETA(DisplayName = "Pyros"),
+    Hydro UMETA(DisplayName = "Hydro"),
+    Volt UMETA(DisplayName = "Volt"),
+    Aero UMETA(DisplayName = "Aero"),
+    Lux UMETA(DisplayName = "Lux"),
+    Chaos UMETA(DisplayName = "Chaos"),
+    Brute UMETA(DisplayName = "Brute")
 };
 
 USTRUCT(BlueprintType)

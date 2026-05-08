@@ -55,7 +55,7 @@ protected:
     int32 PreviewDamageValue = 1234;
 
     UPROPERTY(EditDefaultsOnly, Category = "Damage Number|Preview")
-    EWeaponElement PreviewElement = EWeaponElement::Fire;
+    EWeaponElement PreviewElement = EWeaponElement::Pyros;
 
 private:
     void SyncWidgetComponentClass();
@@ -68,7 +68,7 @@ private:
     int32 DamageValue = 0;
 
     UPROPERTY(ReplicatedUsing = OnRep_DamageData)
-    EWeaponElement DamageElement = EWeaponElement::Fire;
+    EWeaponElement DamageElement = EWeaponElement::Pyros;
 
     UFUNCTION()
     void OnRep_DamageData();

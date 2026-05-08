@@ -6,6 +6,7 @@
 #include "GP_DebugAttributeRow.generated.h"
 
 class UTextBlock;
+class UBorder;
 
 UCLASS()
 class PROJECT_EDEN_API UGP_DebugAttributeRow : public UUserWidget
@@ -16,6 +17,9 @@ public:
 	void InitializeRow(const FString& InLabel, const FGameplayAttribute& InAttribute, UAbilitySystemComponent* InASC);
 
 protected:
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UBorder> BackgroundBorder;
+
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UTextBlock> LabelText;
 

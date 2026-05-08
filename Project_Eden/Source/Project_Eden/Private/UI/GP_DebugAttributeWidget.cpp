@@ -1,5 +1,6 @@
 #include "UI/GP_DebugAttributeWidget.h"
 #include "Components/VerticalBox.h"
+#include "Components/Border.h"
 #include "UI/GP_DebugAttributeRow.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemInterface.h"
@@ -7,6 +8,11 @@
 
 void UGP_DebugAttributeWidget::InitializeDebugWidget()
 {
+	if (MainBackground)
+	{
+		MainBackground->SetBrushColor(FLinearColor(0.0f, 0.0f, 0.0f, 0.7f));
+	}
+
 	if (!AttributeContainer || !RowWidgetClass) return;
 
 	AttributeContainer->ClearChildren();
@@ -42,12 +48,13 @@ void UGP_DebugAttributeWidget::InitializeDebugWidget()
 	AddAttributeRow(TEXT("Toughness Recov"), UGP_AttributeSet::GetToughnessRecoveryRateAttribute(), ASC);
 	
 	AddAttributeRow(TEXT("--- Resistance ---"), FGameplayAttribute(), nullptr);
-	AddAttributeRow(TEXT("Fire Res"), UGP_AttributeSet::GetFireResistanceAttribute(), ASC);
-	AddAttributeRow(TEXT("Water Res"), UGP_AttributeSet::GetWaterResistanceAttribute(), ASC);
-	AddAttributeRow(TEXT("Lightn Res"), UGP_AttributeSet::GetElectricityResistanceAttribute(), ASC);
-	AddAttributeRow(TEXT("Ice Res"), UGP_AttributeSet::GetIceResistanceAttribute(), ASC);
-	AddAttributeRow(TEXT("Poison Res"), UGP_AttributeSet::GetPoisonResistanceAttribute(), ASC);
-	AddAttributeRow(TEXT("Light Res"), UGP_AttributeSet::GetLightResistanceAttribute(), ASC);
+	AddAttributeRow(TEXT("Pyros Res"), UGP_AttributeSet::GetPyrosResistanceAttribute(), ASC);
+	AddAttributeRow(TEXT("Hydro Res"), UGP_AttributeSet::GetHydroResistanceAttribute(), ASC);
+	AddAttributeRow(TEXT("Volt Res"), UGP_AttributeSet::GetVoltResistanceAttribute(), ASC);
+	AddAttributeRow(TEXT("Aero Res"), UGP_AttributeSet::GetAeroResistanceAttribute(), ASC);
+	AddAttributeRow(TEXT("Lux Res"), UGP_AttributeSet::GetLuxResistanceAttribute(), ASC);
+	AddAttributeRow(TEXT("Chaos Res"), UGP_AttributeSet::GetChaosResistanceAttribute(), ASC);
+	AddAttributeRow(TEXT("Brute Res"), UGP_AttributeSet::GetBruteResistanceAttribute(), ASC);
 
 	AddAttributeRow(TEXT("--- Utility ---"), FGameplayAttribute(), nullptr);
 	AddAttributeRow(TEXT("Move Speed"), UGP_AttributeSet::GetMoveSpeedAttribute(), ASC);

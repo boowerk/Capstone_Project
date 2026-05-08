@@ -29,7 +29,7 @@ protected:
     int32 PreviewDamageValue = 1234;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Damage Number|Preview")
-    EWeaponElement PreviewElement = EWeaponElement::Fire;
+    EWeaponElement PreviewElement = EWeaponElement::Pyros;
 
 private:
     void EnsureWidgetTree();
@@ -37,5 +37,5 @@ private:
     FLinearColor GetElementColor(EWeaponElement InElement) const;
 
     int32 CurrentDamageValue = 0;
-    EWeaponElement CurrentElement = EWeaponElement::Fire;
+    EWeaponElement CurrentElement = EWeaponElement::Pyros;
 };

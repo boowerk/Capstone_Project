@@ -71,14 +71,14 @@ namespace GPTags
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Magical);		// 마법 피해
 		}
 		namespace Element
-		{
-			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Fire);			// 화염 속성
-			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Water);			// 물 속성
-			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Lightning);		// 전격 속성
-			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Electricity);	// 전기 속성
-			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ice);			// 얼음 속성
-			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Poison);			// 독 속성
-			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Light);			// 빛 속성
+		{													// 속성			영어	모델링 수
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Pyros);			// 화염 속성		Pyros	1
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Hydro);			// 물 속성		Hydro	1/2
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Volt);			// 전격 속성		Volt	0
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Aero);			// 바람 속성		Aero	1
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Lux);			// 빛 속성		Lux		0
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Chaos);			// 혼돈 속성		Chaos	0
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Brute);			// 물리 속성		Brute	0
 		}
 	}
 
@@ -138,7 +138,7 @@ namespace GPTags
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(AttackHit);	// Player 공격 타격 프레임
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(ActionEnd);	// Player 액션 종료 프레임
 			
-			UE_DECLARE_GAMEPLAY_TAG_EXTERN(ComboEnable);	// Player 콤보 액션
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(ComboEnable);// Player 콤보 액션
 		}
 		
 		namespace Enemy

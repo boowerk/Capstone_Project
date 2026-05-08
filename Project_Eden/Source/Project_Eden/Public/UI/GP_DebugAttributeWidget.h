@@ -4,6 +4,7 @@
 #include "GP_DebugAttributeWidget.generated.h"
 
 class UVerticalBox;
+class UBorder;
 class UGP_DebugAttributeRow;
 class UAbilitySystemComponent;
 
@@ -17,6 +18,9 @@ public:
 	void InitializeDebugWidget();
 
 protected:
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UBorder> MainBackground;
+
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UVerticalBox> AttributeContainer;
 

@@ -20,18 +20,19 @@ void UGP_AttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	DOREPLIFETIME_CONDITION_NOTIFY(ThisClass, CritMultiplier, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(ThisClass, DamageIncreaseRate, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(ThisClass, Armor, COND_None, REPNOTIFY_Always);
-	DOREPLIFETIME_CONDITION_NOTIFY(ThisClass, FireResistance, COND_None, REPNOTIFY_Always);
-	DOREPLIFETIME_CONDITION_NOTIFY(ThisClass, WaterResistance, COND_None, REPNOTIFY_Always);
-	DOREPLIFETIME_CONDITION_NOTIFY(ThisClass, ElectricityResistance, COND_None, REPNOTIFY_Always);
-	DOREPLIFETIME_CONDITION_NOTIFY(ThisClass, IceResistance, COND_None, REPNOTIFY_Always);
-	DOREPLIFETIME_CONDITION_NOTIFY(ThisClass, PoisonResistance, COND_None, REPNOTIFY_Always);
-	DOREPLIFETIME_CONDITION_NOTIFY(ThisClass, LightResistance, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(ThisClass, PyrosResistance, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(ThisClass, HydroResistance, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(ThisClass, VoltResistance, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(ThisClass, AeroResistance, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(ThisClass, LuxResistance, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(ThisClass, ChaosResistance, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(ThisClass, BruteResistance, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(ThisClass, Toughness, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(ThisClass, MaxToughness, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(ThisClass, ToughnessRecoveryRate, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(ThisClass, MoveSpeed, COND_None, REPNOTIFY_Always);
 	
-	DOREPLIFETIME(ThisClass, bAttributesInitialized);
+	DOREPLIFETIME_CONDITION_NOTIFY(ThisClass, bAttributesInitialized, COND_None, REPNOTIFY_Always);
 }
 
 void UGP_AttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data)
@@ -64,13 +65,21 @@ void UGP_AttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallbac
 			FGameplayTag ElementTag = FGameplayTag::EmptyTag;
 			if (IsValid(SourceASC))
 			{
-				// 기존 로직: 소스의 태그를 검사하여 ElementTag 결정
-				if (SourceASC->HasMatchingGameplayTag(FGameplayTag::RequestGameplayTag(FName("Weapon.Element.Water"), false)))
-					ElementTag = FGameplayTag::RequestGameplayTag(FName("Weapon.Element.Water"), false);
-				else if (SourceASC->HasMatchingGameplayTag(FGameplayTag::RequestGameplayTag(FName("Weapon.Element.Lightning"), false)))
-					ElementTag = FGameplayTag::RequestGameplayTag(FName("Weapon.Element.Lightning"), false);
+				// 2. 가. 신규 로직: 소스의 태그를 검사하여 ElementTag 결정
+				if (SourceASC->HasMatchingGameplayTag(GPTags::Damage::Element::Hydro))
+					ElementTag = GPTags::Damage::Element::Hydro;
+				else if (SourceASC->HasMatchingGameplayTag(GPTags::Damage::Element::Volt))
+					ElementTag = GPTags::Damage::Element::Volt;
+				else if (SourceASC->HasMatchingGameplayTag(GPTags::Damage::Element::Aero))
+					ElementTag = GPTags::Damage::Element::Aero;
+				else if (SourceASC->HasMatchingGameplayTag(GPTags::Damage::Element::Lux))
+					ElementTag = GPTags::Damage::Element::Lux;
+				else if (SourceASC->HasMatchingGameplayTag(GPTags::Damage::Element::Chaos))
+					ElementTag = GPTags::Damage::Element::Chaos;
+				else if (SourceASC->HasMatchingGameplayTag(GPTags::Damage::Element::Brute))
+					ElementTag = GPTags::Damage::Element::Brute;
 				else
-					ElementTag = FGameplayTag::RequestGameplayTag(FName("Weapon.Element.Fire"), false); 
+					ElementTag = GPTags::Damage::Element::Pyros; 
 
 				// 3. 신규 기능: 흡혈 로직
 				if (SourceASC != TargetASC)
@@ -150,12 +159,13 @@ void UGP_AttributeSet::OnRep_Lifesteal(const FGameplayAttributeData& OldValue) c
 void UGP_AttributeSet::OnRep_CritMultiplier(const FGameplayAttributeData& OldValue) const { GAMEPLAYATTRIBUTE_REPNOTIFY(ThisClass, CritMultiplier, OldValue); }
 void UGP_AttributeSet::OnRep_DamageIncreaseRate(const FGameplayAttributeData& OldValue) const { GAMEPLAYATTRIBUTE_REPNOTIFY(ThisClass, DamageIncreaseRate, OldValue); }
 void UGP_AttributeSet::OnRep_Armor(const FGameplayAttributeData& OldValue) const { GAMEPLAYATTRIBUTE_REPNOTIFY(ThisClass, Armor, OldValue); }
-void UGP_AttributeSet::OnRep_FireResistance(const FGameplayAttributeData& OldValue) const { GAMEPLAYATTRIBUTE_REPNOTIFY(ThisClass, FireResistance, OldValue); }
-void UGP_AttributeSet::OnRep_WaterResistance(const FGameplayAttributeData& OldValue) const { GAMEPLAYATTRIBUTE_REPNOTIFY(ThisClass, WaterResistance, OldValue); }
-void UGP_AttributeSet::OnRep_ElectricityResistance(const FGameplayAttributeData& OldValue) const { GAMEPLAYATTRIBUTE_REPNOTIFY(ThisClass, ElectricityResistance, OldValue); }
-void UGP_AttributeSet::OnRep_IceResistance(const FGameplayAttributeData& OldValue) const { GAMEPLAYATTRIBUTE_REPNOTIFY(ThisClass, IceResistance, OldValue); }
-void UGP_AttributeSet::OnRep_PoisonResistance(const FGameplayAttributeData& OldValue) const { GAMEPLAYATTRIBUTE_REPNOTIFY(ThisClass, PoisonResistance, OldValue); }
-void UGP_AttributeSet::OnRep_LightResistance(const FGameplayAttributeData& OldValue) const { GAMEPLAYATTRIBUTE_REPNOTIFY(ThisClass, LightResistance, OldValue); }
+void UGP_AttributeSet::OnRep_PyrosResistance(const FGameplayAttributeData& OldValue) const { GAMEPLAYATTRIBUTE_REPNOTIFY(ThisClass, PyrosResistance, OldValue); }
+void UGP_AttributeSet::OnRep_HydroResistance(const FGameplayAttributeData& OldValue) const { GAMEPLAYATTRIBUTE_REPNOTIFY(ThisClass, HydroResistance, OldValue); }
+void UGP_AttributeSet::OnRep_VoltResistance(const FGameplayAttributeData& OldValue) const { GAMEPLAYATTRIBUTE_REPNOTIFY(ThisClass, VoltResistance, OldValue); }
+void UGP_AttributeSet::OnRep_AeroResistance(const FGameplayAttributeData& OldValue) const { GAMEPLAYATTRIBUTE_REPNOTIFY(ThisClass, AeroResistance, OldValue); }
+void UGP_AttributeSet::OnRep_LuxResistance(const FGameplayAttributeData& OldValue) const { GAMEPLAYATTRIBUTE_REPNOTIFY(ThisClass, LuxResistance, OldValue); }
+void UGP_AttributeSet::OnRep_ChaosResistance(const FGameplayAttributeData& OldValue) const { GAMEPLAYATTRIBUTE_REPNOTIFY(ThisClass, ChaosResistance, OldValue); }
+void UGP_AttributeSet::OnRep_BruteResistance(const FGameplayAttributeData& OldValue) const { GAMEPLAYATTRIBUTE_REPNOTIFY(ThisClass, BruteResistance, OldValue); }
 void UGP_AttributeSet::OnRep_Toughness(const FGameplayAttributeData& OldValue) const { GAMEPLAYATTRIBUTE_REPNOTIFY(ThisClass, Toughness, OldValue); }
 void UGP_AttributeSet::OnRep_MaxToughness(const FGameplayAttributeData& OldValue) const { GAMEPLAYATTRIBUTE_REPNOTIFY(ThisClass, MaxToughness, OldValue); }
 void UGP_AttributeSet::OnRep_ToughnessRecoveryRate(const FGameplayAttributeData& OldValue) const { GAMEPLAYATTRIBUTE_REPNOTIFY(ThisClass, ToughnessRecoveryRate, OldValue); }

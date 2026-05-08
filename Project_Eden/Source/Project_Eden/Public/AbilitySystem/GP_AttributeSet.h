@@ -101,29 +101,33 @@ public:
 	FGameplayAttributeData Armor;
 	ATTRIBUTE_ACCESSORS(ThisClass, Armor);
 
-	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_FireResistance, Category = "Defensive")
-	FGameplayAttributeData FireResistance;
-	ATTRIBUTE_ACCESSORS(ThisClass, FireResistance);
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_PyrosResistance, Category = "Defensive")
+	FGameplayAttributeData PyrosResistance;
+	ATTRIBUTE_ACCESSORS(ThisClass, PyrosResistance);
 
-	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_WaterResistance, Category = "Defensive")
-	FGameplayAttributeData WaterResistance;
-	ATTRIBUTE_ACCESSORS(ThisClass, WaterResistance);
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_HydroResistance, Category = "Defensive")
+	FGameplayAttributeData HydroResistance;
+	ATTRIBUTE_ACCESSORS(ThisClass, HydroResistance);
 
-	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_ElectricityResistance, Category = "Defensive")     
-	FGameplayAttributeData ElectricityResistance;
-	ATTRIBUTE_ACCESSORS(ThisClass, ElectricityResistance);
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_VoltResistance, Category = "Defensive")
+	FGameplayAttributeData VoltResistance;
+	ATTRIBUTE_ACCESSORS(ThisClass, VoltResistance);
 
-	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_IceResistance, Category = "Defensive")
-	FGameplayAttributeData IceResistance;
-	ATTRIBUTE_ACCESSORS(ThisClass, IceResistance);
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_AeroResistance, Category = "Defensive")
+	FGameplayAttributeData AeroResistance;
+	ATTRIBUTE_ACCESSORS(ThisClass, AeroResistance);
 
-	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_PoisonResistance, Category = "Defensive")
-	FGameplayAttributeData PoisonResistance;
-	ATTRIBUTE_ACCESSORS(ThisClass, PoisonResistance);
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_LuxResistance, Category = "Defensive")
+	FGameplayAttributeData LuxResistance;
+	ATTRIBUTE_ACCESSORS(ThisClass, LuxResistance);
 
-	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_LightResistance, Category = "Defensive")
-	FGameplayAttributeData LightResistance;
-	ATTRIBUTE_ACCESSORS(ThisClass, LightResistance);
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_ChaosResistance, Category = "Defensive")
+	FGameplayAttributeData ChaosResistance;
+	ATTRIBUTE_ACCESSORS(ThisClass, ChaosResistance);
+
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_BruteResistance, Category = "Defensive")
+	FGameplayAttributeData BruteResistance;
+	ATTRIBUTE_ACCESSORS(ThisClass, BruteResistance);
 
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_Toughness, Category = "Toughness")
 	FGameplayAttributeData Toughness;
@@ -157,12 +161,13 @@ public:
 	UFUNCTION() void OnRep_CritMultiplier(const FGameplayAttributeData& OldValue) const;
 	UFUNCTION() void OnRep_DamageIncreaseRate(const FGameplayAttributeData& OldValue) const;
 	UFUNCTION() void OnRep_Armor(const FGameplayAttributeData& OldValue) const;
-	UFUNCTION() void OnRep_FireResistance(const FGameplayAttributeData& OldValue) const;
-	UFUNCTION() void OnRep_WaterResistance(const FGameplayAttributeData& OldValue) const;
-	UFUNCTION() void OnRep_ElectricityResistance(const FGameplayAttributeData& OldValue) const;
-	UFUNCTION() void OnRep_IceResistance(const FGameplayAttributeData& OldValue) const;
-	UFUNCTION() void OnRep_PoisonResistance(const FGameplayAttributeData& OldValue) const;
-	UFUNCTION() void OnRep_LightResistance(const FGameplayAttributeData& OldValue) const;
+	UFUNCTION() void OnRep_PyrosResistance(const FGameplayAttributeData& OldValue) const;
+	UFUNCTION() void OnRep_HydroResistance(const FGameplayAttributeData& OldValue) const;
+	UFUNCTION() void OnRep_VoltResistance(const FGameplayAttributeData& OldValue) const;
+	UFUNCTION() void OnRep_AeroResistance(const FGameplayAttributeData& OldValue) const;
+	UFUNCTION() void OnRep_LuxResistance(const FGameplayAttributeData& OldValue) const;
+	UFUNCTION() void OnRep_ChaosResistance(const FGameplayAttributeData& OldValue) const;
+	UFUNCTION() void OnRep_BruteResistance(const FGameplayAttributeData& OldValue) const;
 	UFUNCTION() void OnRep_Toughness(const FGameplayAttributeData& OldValue) const;
 	UFUNCTION() void OnRep_MaxToughness(const FGameplayAttributeData& OldValue) const;
 	UFUNCTION() void OnRep_ToughnessRecoveryRate(const FGameplayAttributeData& OldValue) const;

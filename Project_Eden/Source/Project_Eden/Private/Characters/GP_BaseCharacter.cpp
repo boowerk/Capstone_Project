@@ -128,15 +128,31 @@ void AGP_BaseCharacter::HandleDamageTaken(AActor* InstigatorActor, AActor* Targe
 	// 내가 맞은 게 아니면 무시
 	if (TargetActor != this) return;
 
-	EWeaponElement ElementToShow = EWeaponElement::Fire;
+	EWeaponElement ElementToShow = EWeaponElement::Pyros;
 
-	if (ElementTag.MatchesTagExact(FGameplayTag::RequestGameplayTag(FName("Weapon.Element.Water"), false)))
+	if (ElementTag.MatchesTagExact(GPTags::Damage::Element::Hydro))
 	{
-		ElementToShow = EWeaponElement::Water;
+		ElementToShow = EWeaponElement::Hydro;
 	}
-	else if (ElementTag.MatchesTagExact(FGameplayTag::RequestGameplayTag(FName("Weapon.Element.Lightning"), false)))
+	else if (ElementTag.MatchesTagExact(GPTags::Damage::Element::Volt))
 	{
-		ElementToShow = EWeaponElement::Lightning;
+		ElementToShow = EWeaponElement::Volt;
+	}
+	else if (ElementTag.MatchesTagExact(GPTags::Damage::Element::Aero))
+	{
+		ElementToShow = EWeaponElement::Aero;
+	}
+	else if (ElementTag.MatchesTagExact(GPTags::Damage::Element::Lux))
+	{
+		ElementToShow = EWeaponElement::Lux;
+	}
+	else if (ElementTag.MatchesTagExact(GPTags::Damage::Element::Chaos))
+	{
+		ElementToShow = EWeaponElement::Chaos;
+	}
+	else if (ElementTag.MatchesTagExact(GPTags::Damage::Element::Brute))
+	{
+		ElementToShow = EWeaponElement::Brute;
 	}
 
 	ShowDamageNumber(FMath::RoundToInt(DamageAmount), ElementToShow);

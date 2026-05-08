@@ -1,17 +1,37 @@
 #include "UI/GP_DebugAttributeRow.h"
 #include "Components/TextBlock.h"
+#include "Components/Border.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemInterface.h"
 
 void UGP_DebugAttributeRow::InitializeRow(const FString& InLabel, const FGameplayAttribute& InAttribute, UAbilitySystemComponent* InASC)
 {
-	if (LabelText) LabelText->SetText(FText::FromString(InLabel));
+	if (BackgroundBorder)
+	{
+		// 반투명한 검은색 배경 설정
+		BackgroundBorder->SetBrushColor(FLinearColor(0.0f, 0.0f, 0.0f, 0.5f));
+	}
+
+	if (LabelText)
+	{
+		LabelText->SetText(FText::FromString(InLabel));
+		// 텍스트 그림자 추가로 가독성 향상
+		LabelText->SetShadowOffset(FVector2D(1.0f, 1.0f));
+		LabelText->SetShadowColorAndOpacity(FLinearColor::Black);
+	}
+
 	TargetAttribute = InAttribute;
 
 	if (InASC && InAttribute.IsValid())
 	{
 		// 초기값 설정
 		RefreshValue();
+
+		if (ValueText)
+		{
+			ValueText->SetShadowOffset(FVector2D(1.0f, 1.0f));
+			ValueText->SetShadowColorAndOpacity(FLinearColor::Black);
+		}
 
 		// 값이 변할 때마다 업데이트하도록 델리게이트 바인딩
 		InASC->GetGameplayAttributeValueChangeDelegate(InAttribute).AddUObject(this, &ThisClass::UpdateValue);
