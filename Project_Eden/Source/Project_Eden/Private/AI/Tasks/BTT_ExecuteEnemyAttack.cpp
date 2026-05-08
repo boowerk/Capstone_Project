@@ -10,7 +10,7 @@
 #include "Characters/GP_EnemyCharacter.h"
 #include "GameplayTags/GP_Tags.h"
 
-namespace
+namespace BTT_ExecuteEnemyAttack_Internal
 {
 	bool GetOptionalBlackboardBool(const UBlackboardComponent* BlackboardComponent, const FName& KeyName)
 	{
@@ -54,6 +54,8 @@ namespace
 		return DefaultAttackAbilityTag;
 	}
 }
+
+using namespace BTT_ExecuteEnemyAttack_Internal;
 
 UBTT_ExecuteEnemyAttack::UBTT_ExecuteEnemyAttack()
 {

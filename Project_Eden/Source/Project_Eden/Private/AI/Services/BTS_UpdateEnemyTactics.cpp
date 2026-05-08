@@ -14,7 +14,7 @@
 #include "GameplayTags/GP_Tags.h"
 #include "Navigation/PathFollowingComponent.h"
 
-namespace
+namespace BTS_UpdateEnemyTactics_Internal
 {
 	float GetClampedBlackboardFloat(const UBlackboardComponent* BlackboardComponent, const FName& KeyName, float DefaultValue, float MinValue, float MaxValue)
 	{
@@ -115,6 +115,8 @@ namespace
 		return FMath::Clamp(AttributeSet->GetHealth() / MaxHealth, 0.0f, 1.0f);
 	}
 }
+
+using namespace BTS_UpdateEnemyTactics_Internal;
 
 UBTS_UpdateEnemyTactics::UBTS_UpdateEnemyTactics()
 {

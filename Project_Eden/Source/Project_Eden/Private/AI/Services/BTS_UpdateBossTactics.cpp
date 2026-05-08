@@ -7,7 +7,7 @@
 #include "BehaviorTree/BlackboardComponent.h"
 #include "GameFramework/Actor.h"
 
-namespace
+namespace BTS_UpdateBossTactics_Internal
 {
 	bool HasBlackboardKey(const UBlackboardComponent* BlackboardComponent, const FName& KeyName)
 	{
@@ -50,6 +50,8 @@ namespace
 		return FMath::Fmod(FMath::Max(0.0f, WorldTimeSeconds), Interval) <= FMath::Max(0.0f, Window);
 	}
 }
+
+using namespace BTS_UpdateBossTactics_Internal;
 
 UBTS_UpdateBossTactics::UBTS_UpdateBossTactics()
 {
