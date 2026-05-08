@@ -116,8 +116,6 @@ namespace BTS_UpdateEnemyTactics_Internal
 	}
 }
 
-using namespace BTS_UpdateEnemyTactics_Internal;
-
 UBTS_UpdateEnemyTactics::UBTS_UpdateEnemyTactics()
 {
 	NodeName = TEXT("Update Enemy Tactics");
@@ -166,12 +164,12 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 	const bool bPreviousCanAttack = BlackboardComponent->GetValueAsBool(EnemyBlackboardKeys::bCanAttack);
 	const bool bPreviousShouldReposition = BlackboardComponent->GetValueAsBool(EnemyBlackboardKeys::bShouldReposition);
 	const bool bPreviousShouldChase = BlackboardComponent->GetValueAsBool(EnemyBlackboardKeys::bShouldChase);
-	const bool bPreviousShouldReturnHome = GetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldReturnHome);
-	const int32 PreviousBossPhase = HasBlackboardKey(BlackboardComponent, EnemyBlackboardKeys::BossPhase)
+	const bool bPreviousShouldReturnHome = BTS_UpdateEnemyTactics_Internal::GetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldReturnHome);
+	const int32 PreviousBossPhase = BTS_UpdateEnemyTactics_Internal::HasBlackboardKey(BlackboardComponent, EnemyBlackboardKeys::BossPhase)
 		? BlackboardComponent->GetValueAsInt(EnemyBlackboardKeys::BossPhase)
 		: 0;
 
-	const float HealthRatio = GetControlledPawnHealthRatio(ControlledPawn);
+	const float HealthRatio = BTS_UpdateEnemyTactics_Internal::GetControlledPawnHealthRatio(ControlledPawn);
 	BlackboardComponent->SetValueAsFloat(EnemyBlackboardKeys::HealthRatio, HealthRatio);
 
 	AEnemyAIController* EnemyAIController = Cast<AEnemyAIController>(AIController);
@@ -180,8 +178,8 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 	const float EffectiveReturnHomeAcceptanceRadius = IsValid(EnemyCharacter) ? EnemyCharacter->GetReturnHomeAcceptanceRadius() : ReturnHomeAcceptanceRadius;
 	const FVector HomeLocation = EnemyBTTaskCommon::GetBehaviorAnchorLocation(ControlledPawn);
 	const float DistanceFromHome = FVector::Dist2D(ControlledPawn->GetActorLocation(), HomeLocation);
-	SetOptionalBlackboardVector(BlackboardComponent, EnemyBlackboardKeys::HomeLocation, HomeLocation);
-	SetOptionalBlackboardFloat(BlackboardComponent, EnemyBlackboardKeys::DistanceFromHome, DistanceFromHome);
+	BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardVector(BlackboardComponent, EnemyBlackboardKeys::HomeLocation, HomeLocation);
+	BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardFloat(BlackboardComponent, EnemyBlackboardKeys::DistanceFromHome, DistanceFromHome);
 
 	AActor* TargetActor = Cast<AActor>(BlackboardComponent->GetValueAsObject(EnemyBlackboardKeys::TargetActor));
 	// If MoveTo stops slightly outside the authored radius, unlock near home instead of trapping the enemy in ReturnHome.
@@ -211,7 +209,7 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 		EnemyAIController->SetLeashReturnHomeActive(bShouldReturnHome);
 	}
 
-	SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldReturnHome, bShouldReturnHome);
+	BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldReturnHome, bShouldReturnHome);
 	if (!bShouldReturnHome && !IsValid(TargetActor) && IsValid(EnemyAIController))
 	{
 		// After returning home, perception may need an explicit rescore before the player can become TargetActor again.
@@ -221,7 +219,7 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 
 	if (bShouldReturnHome)
 	{
-		SetCombatStateTag(BlackboardComponent, GPTags::AI::State::Patrol);
+		BTS_UpdateEnemyTactics_Internal::SetCombatStateTag(BlackboardComponent, GPTags::AI::State::Patrol);
 		BlackboardComponent->SetValueAsVector(EnemyBlackboardKeys::MoveToLocation, HomeLocation);
 		BlackboardComponent->SetValueAsFloat(EnemyBlackboardKeys::DistanceToTarget, 0.0f);
 		BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bHasLineOfSight, false);
@@ -230,10 +228,10 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 		BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldReposition, false);
 		BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldChase, false);
 		// 귀환 중에는 보스 패턴 키를 내려서 공용 공격 태스크가 특수 패턴을 이어 실행하지 않게 한다.
-		SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldBossPhaseTransition, false);
-		SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossHeavyAttack, false);
-		SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossAreaAttack, false);
-		SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanSummonAdds, false);
+		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldBossPhaseTransition, false);
+		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossHeavyAttack, false);
+		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossAreaAttack, false);
+		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanSummonAdds, false);
 
 		if (!bPreviousShouldReturnHome)
 		{
@@ -265,7 +263,7 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 	{
 		// No target means all combat branch keys collapse to false; decorators can abort immediately.
 		// 이동 중이 아니면 Idle, 순찰 MoveTo가 진행 중이면 Patrol 태그로 BT 논리 상태를 나눈다.
-		SetCombatStateTag(
+		BTS_UpdateEnemyTactics_Internal::SetCombatStateTag(
 			BlackboardComponent,
 			AIController->GetMoveStatus() == EPathFollowingStatus::Moving ? GPTags::AI::State::Patrol : GPTags::AI::State::Idle);
 		BlackboardComponent->SetValueAsFloat(EnemyBlackboardKeys::DistanceToTarget, 0.0f);
@@ -274,12 +272,12 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 		BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bCanAttack, false);
 		BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldReposition, false);
 		BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldChase, false);
-		SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldReturnHome, false);
+		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldReturnHome, false);
 		// 타깃을 잃으면 보스 특수 패턴도 닫아 다음 감지 때 새 상태로 다시 평가하게 한다.
-		SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldBossPhaseTransition, false);
-		SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossHeavyAttack, false);
-		SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossAreaAttack, false);
-		SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanSummonAdds, false);
+		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldBossPhaseTransition, false);
+		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossHeavyAttack, false);
+		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossAreaAttack, false);
+		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanSummonAdds, false);
 
 		if (bPreviousShouldRetreat || bPreviousCanAttack || bPreviousShouldReposition || bPreviousShouldChase || bPreviousShouldReturnHome)
 		{
@@ -303,11 +301,11 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 
 	const float DistanceToTarget = FVector::Distance(ControlledPawn->GetActorLocation(), TargetActor->GetActorLocation());
 	const bool bHasLineOfSight = AIController->LineOfSightTo(TargetActor);
-	const float PreferredRange = GetClampedBlackboardFloat(BlackboardComponent, EnemyBlackboardKeys::PreferredRange, 600.0f, 0.0f, 3000.0f);
-	const float Aggression = GetClampedBlackboardFloat(BlackboardComponent, EnemyBlackboardKeys::Aggression, 0.5f, 0.0f, 1.0f);
-	const float ChasePersistence = GetClampedBlackboardFloat(BlackboardComponent, EnemyBlackboardKeys::ChasePersistence, 0.5f, 0.0f, 1.0f);
-	const float RetreatThreshold = GetClampedBlackboardFloat(BlackboardComponent, EnemyBlackboardKeys::RetreatThreshold, 0.35f, 0.0f, 1.0f);
-	const float CoverPreference = GetClampedBlackboardFloat(BlackboardComponent, EnemyBlackboardKeys::CoverPreference, 0.35f, 0.0f, 1.0f);
+	const float PreferredRange = BTS_UpdateEnemyTactics_Internal::GetClampedBlackboardFloat(BlackboardComponent, EnemyBlackboardKeys::PreferredRange, 600.0f, 0.0f, 3000.0f);
+	const float Aggression = BTS_UpdateEnemyTactics_Internal::GetClampedBlackboardFloat(BlackboardComponent, EnemyBlackboardKeys::Aggression, 0.5f, 0.0f, 1.0f);
+	const float ChasePersistence = BTS_UpdateEnemyTactics_Internal::GetClampedBlackboardFloat(BlackboardComponent, EnemyBlackboardKeys::ChasePersistence, 0.5f, 0.0f, 1.0f);
+	const float RetreatThreshold = BTS_UpdateEnemyTactics_Internal::GetClampedBlackboardFloat(BlackboardComponent, EnemyBlackboardKeys::RetreatThreshold, 0.35f, 0.0f, 1.0f);
+	const float CoverPreference = BTS_UpdateEnemyTactics_Internal::GetClampedBlackboardFloat(BlackboardComponent, EnemyBlackboardKeys::CoverPreference, 0.35f, 0.0f, 1.0f);
 	const FName EnemyMode = BlackboardComponent->GetValueAsName(EnemyBlackboardKeys::EnemyMode);
 
 	const bool bModeForcesRetreat = EnemyMode == FEnemyLLMEvaluationParser::ToBlackboardName(EEnemyMode::Retreat);
@@ -359,7 +357,7 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 	const FGameplayTag CombatStateTag = bShouldChase
 		? GPTags::AI::State::Chasing
 		: GPTags::AI::State::Combat;
-	SetCombatStateTag(BlackboardComponent, CombatStateTag);
+	BTS_UpdateEnemyTactics_Internal::SetCombatStateTag(BlackboardComponent, CombatStateTag);
 
 	BlackboardComponent->SetValueAsFloat(EnemyBlackboardKeys::DistanceToTarget, DistanceToTarget);
 	BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bHasLineOfSight, bHasLineOfSight);
@@ -367,9 +365,9 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 	BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bCanAttack, bCanAttack);
 	BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldReposition, bShouldReposition);
 	BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldChase, bShouldChase);
-	SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldReturnHome, false);
+	BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldReturnHome, false);
 
-	if (IsValid(EnemyCharacter) && EnemyCharacter->IsBossEnemy() && HasBlackboardKey(BlackboardComponent, EnemyBlackboardKeys::BossPhase))
+	if (IsValid(EnemyCharacter) && EnemyCharacter->IsBossEnemy() && BTS_UpdateEnemyTactics_Internal::HasBlackboardKey(BlackboardComponent, EnemyBlackboardKeys::BossPhase))
 	{
 		constexpr float BossPhaseTwoHealthRatio = 0.66f;
 		constexpr float BossPhaseThreeHealthRatio = 0.33f;
@@ -381,7 +379,7 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 		constexpr float BossSummonWindow = 1.5f;
 
 		const int32 BossPhase = HealthRatio <= BossPhaseThreeHealthRatio ? 3 : (HealthRatio <= BossPhaseTwoHealthRatio ? 2 : 1);
-		SetOptionalBlackboardInt(BlackboardComponent, EnemyBlackboardKeys::BossPhase, BossPhase);
+		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardInt(BlackboardComponent, EnemyBlackboardKeys::BossPhase, BossPhase);
 
 		const float WorldTimeSeconds = OwnerComp.GetWorld() != nullptr ? OwnerComp.GetWorld()->GetTimeSeconds() : 0.0f;
 		const bool bShouldBossPhaseTransition = PreviousBossPhase > 0 && PreviousBossPhase != BossPhase;
@@ -390,16 +388,16 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 			&& BossPhase >= 2
 			&& bHasLineOfSight
 			&& DistanceToTarget <= BossAreaAttackRange
-			&& IsPatternWindowOpen(WorldTimeSeconds, BossAreaAttackInterval, BossAreaAttackWindow);
+			&& BTS_UpdateEnemyTactics_Internal::IsPatternWindowOpen(WorldTimeSeconds, BossAreaAttackInterval, BossAreaAttackWindow);
 		const bool bCanSummonAdds = !bShouldBossPhaseTransition
 			&& BossPhase >= 3
-			&& IsPatternWindowOpen(WorldTimeSeconds, BossSummonInterval, BossSummonWindow);
+			&& BTS_UpdateEnemyTactics_Internal::IsPatternWindowOpen(WorldTimeSeconds, BossSummonInterval, BossSummonWindow);
 		const bool bBossPatternRequestsAttack = bShouldBossPhaseTransition || bCanSummonAdds || bCanUseBossAreaAttack || bCanUseBossHeavyAttack;
 
-		SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldBossPhaseTransition, bShouldBossPhaseTransition);
-		SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossHeavyAttack, bCanUseBossHeavyAttack);
-		SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossAreaAttack, bCanUseBossAreaAttack);
-		SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanSummonAdds, bCanSummonAdds);
+		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldBossPhaseTransition, bShouldBossPhaseTransition);
+		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossHeavyAttack, bCanUseBossHeavyAttack);
+		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossAreaAttack, bCanUseBossAreaAttack);
+		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanSummonAdds, bCanSummonAdds);
 
 		if (bBossPatternRequestsAttack)
 		{

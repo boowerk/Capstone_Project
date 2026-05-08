@@ -31,22 +31,22 @@ namespace BTT_ExecuteEnemyAttack_Internal
 		}
 
 		// 보스 공용 BT는 기존 공격 태스크를 재사용하고, 서비스가 켜둔 패턴 키로 실행 태그만 교체한다.
-		if (GetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldBossPhaseTransition))
+		if (BTT_ExecuteEnemyAttack_Internal::GetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldBossPhaseTransition))
 		{
 			return GPTags::Ability::Enemy::Utility_BossPhaseShift;
 		}
 
-		if (GetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanSummonAdds))
+		if (BTT_ExecuteEnemyAttack_Internal::GetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanSummonAdds))
 		{
 			return GPTags::Ability::Enemy::Utility_BossSummon;
 		}
 
-		if (GetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossAreaAttack))
+		if (BTT_ExecuteEnemyAttack_Internal::GetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossAreaAttack))
 		{
 			return GPTags::Ability::Enemy::Attack_BossArea;
 		}
 
-		if (GetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossHeavyAttack))
+		if (BTT_ExecuteEnemyAttack_Internal::GetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossHeavyAttack))
 		{
 			return GPTags::Ability::Enemy::Attack_BossHeavy;
 		}
@@ -54,8 +54,6 @@ namespace BTT_ExecuteEnemyAttack_Internal
 		return DefaultAttackAbilityTag;
 	}
 }
-
-using namespace BTT_ExecuteEnemyAttack_Internal;
 
 UBTT_ExecuteEnemyAttack::UBTT_ExecuteEnemyAttack()
 {
@@ -73,7 +71,7 @@ EBTNodeResult::Type UBTT_ExecuteEnemyAttack::ExecuteTask(UBehaviorTreeComponent&
 		return EBTNodeResult::Failed;
 	}
 
-	const FGameplayTag EffectiveAttackAbilityTag = ResolveAttackAbilityTagForContext(ControlledPawn, BlackboardComponent, AttackAbilityTag);
+	const FGameplayTag EffectiveAttackAbilityTag = BTT_ExecuteEnemyAttack_Internal::ResolveAttackAbilityTagForContext(ControlledPawn, BlackboardComponent, AttackAbilityTag);
 	if (!EffectiveAttackAbilityTag.IsValid())
 	{
 		return EBTNodeResult::Failed;
