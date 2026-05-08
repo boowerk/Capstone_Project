@@ -1,13 +1,13 @@
-#include "AbilitySystem/GP_AbilitySystemComponent.h"
+ï»¿#include "AbilitySystem/GP_AbilitySystemComponent.h"
 
 #include "GameplayTags/GP_Tags.h"
 
 
-// ÁÖÀÇ! 
-// AbilitySpecÀº CDO°ªÀ¸·Î ½ÇÁ¦ ÀÎ½ºÅÏ½º¿¡¼­ ½Ç½Ã°£À¸·Î ¾òÀº °ªÀÌ ¾Æ´Ñ CDO Áï ÅÛÇÃ¸´ °ªÀÌ¶ó
-// ÀÐ±â Àü¿ëÀ¸·Î ÅÂ±× µ¥ÀÌÅÍ¸¸ ÀÐ¾î¿À°Ô ±¸ÇöÇßÀ½ - ½¹
+// ì£¼ì˜! 
+// AbilitySpecì€ CDOê°’ìœ¼ë¡œ ì‹¤ì œ ì¸ìŠ¤í„´ìŠ¤ì—ì„œ ì‹¤ì‹œê°„ìœ¼ë¡œ ì–»ì€ ê°’ì´ ì•„ë‹Œ CDO ì¦‰ í…œí”Œë¦¿ ê°’ì´ë¼
+// ì½ê¸° ì „ìš©ìœ¼ë¡œ íƒœê·¸ ë°ì´í„°ë§Œ ì½ì–´ì˜¤ê²Œ êµ¬í˜„í–ˆìŒ - ìŠ
 
-// ¼­¹ö¿¡¼­ ASC¿¡ ¾îºô¸®Æ¼ ºÎ¿©½Ã ¾Ë¾Æ¼­ È£ÃâµÊ
+// ì„œë²„ì—ì„œ ASCì— ì–´ë¹Œë¦¬í‹° ë¶€ì—¬ì‹œ ì•Œì•„ì„œ í˜¸ì¶œë¨
 void UGP_AbilitySystemComponent::OnGiveAbility(FGameplayAbilitySpec& AbilitySpec) 
 {
 	Super::OnGiveAbility(AbilitySpec);
@@ -15,7 +15,7 @@ void UGP_AbilitySystemComponent::OnGiveAbility(FGameplayAbilitySpec& AbilitySpec
 	HandleAutoActivatedAbility(AbilitySpec);
 }
 
-// Å¬¶ó¿¡¼­ ¾îºô¸®Æ¼ º¹Á¦½Ã °»½ÅµÇ¾î È£ÃâµÊ
+// í´ë¼ì—ì„œ ì–´ë¹Œë¦¬í‹° ë³µì œì‹œ ê°±ì‹ ë˜ì–´ í˜¸ì¶œë¨
 void UGP_AbilitySystemComponent::OnRep_ActivateAbilities()
 {
 	Super::OnRep_ActivateAbilities();
@@ -27,13 +27,24 @@ void UGP_AbilitySystemComponent::OnRep_ActivateAbilities()
 	}
 }
 
-// ¾îºô¸®Æ¼ÀÇ ÅÂ±×¸¦ °Ë»çÇÏ¿© Æ¯Á¤ ÅÂ±×°¡ ÀÖ´Ù¸é ½ÇÇà½ÃÅ°´Â ·ÎÁ÷
+bool UGP_AbilitySystemComponent::TryActivateAbilityByTag(const FGameplayTag& AbilityTag)
+{
+	if (!AbilityTag.IsValid())
+	{
+		return false;
+	}
+
+	// íƒœê·¸ ê¸°ë°˜ ì‹¤í–‰ ê·œì•½ì„ ì»¨íŠ¸ë¡¤ëŸ¬ì™€ BT íƒœìŠ¤í¬ì—ì„œë„ ìž¬ì‚¬ìš©í•œë‹¤.
+	return TryActivateAbilitiesByTag(AbilityTag.GetSingleTagContainer());
+}
+
+// ì–´ë¹Œë¦¬í‹°ì˜ íƒœê·¸ë¥¼ ê²€ì‚¬í•˜ì—¬ íŠ¹ì • íƒœê·¸ê°€ ìžˆë‹¤ë©´ ì‹¤í–‰ì‹œí‚¤ëŠ” ë¡œì§
 void UGP_AbilitySystemComponent::HandleAutoActivatedAbility(const FGameplayAbilitySpec& AbilitySpec)
 {
 	if (!IsValid(AbilitySpec.Ability)) return;
 	for (const FGameplayTag& Tag : AbilitySpec.Ability->GetAssetTags()) 
 	{
-		if (Tag.MatchesTagExact(GPTags::GPAbilities::ActivateOnGiven))
+		if (Tag.MatchesTagExact(GPTags::Ability::System::ActivateOnGiven))
 		{
 			TryActivateAbility(AbilitySpec.Handle);
 		} 

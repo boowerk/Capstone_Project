@@ -1,19 +1,110 @@
-#include "AbilitySystem/Abilities/Player/GP_Dash.h"
+ï»¿#include "AbilitySystem/Abilities/Player/GP_Dash.h"
+
+#include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
+#include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
+#include "Characters/GP_PlayerCharacter.h"
+#include "GameplayTags/GP_Tags.h"
+#include "Animation/PDA_CharacterAnimationSet.h"
 
 UGP_Dash::UGP_Dash()
 {
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
+	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
+	// ì–´ë¹Œë¦¬í‹° ê³ ìœ  ì‹ë³„ íƒœê·¸
+	FGameplayTagContainer AbilityAssetTags;
+	AbilityAssetTags.AddTag(GPTags::Ability::Movement::Dash);
+	SetAssetTags(AbilityAssetTags);
+
+	ActivationOwnedTags.AddTag(GPTags::State::Movement::Dash);       // ëŒ€ì‹œ ìƒíƒœ 
+	ActivationOwnedTags.AddTag(GPTags::State::Status::Fixed);		// ì´ë™ ë° íšŒì „ ì…ë ¥ ì°¨ë‹¨
+	// ActivationOwnedTags.AddTag(GPTags::State::Status::Unstoppable);	// ì €ì§€ë¶ˆê°€ ìƒíƒœ
+	// ActivationOwnedTags.AddTag(GPTags::State::Status::Invincible);	// ë¬´ì  ìƒíƒœ
+	BlockAbilitiesWithTag.AddTag(GPTags::Ability::Skill::SkillRoot);
+	CancelAbilitiesWithTag.AddTag(GPTags::Ability::Skill::Primary);
 }
 
 void UGP_Dash::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
-	
-	if (bDrawDebugs)
+
+	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Dash Ability Activated!"));
+		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+		return;
+	}
+
+	AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo());
+	if (!IsValid(PC))
+	{
+		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+		return;
+	}
+
+	// ì• ë‹ˆë©”ì´ì…˜ ì„¸íŠ¸ - ëŒ€ì‹œ ëª½íƒ€ì£¼
+	UAnimMontage* DashMontage = nullptr;
+	if (UPDA_CharacterAnimationSet* AnimSet = PC->GetAnimationSet())
+	{
+		DashMontage = AnimSet->DashMontage;
+	}
+
+	if (!IsValid(DashMontage))
+	{
+		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+		return;
+	}
+
+	// ìºë¦­í„° íšŒì „ ë¡œì§: ì…ë ¥ ë°©í–¥ì´ ì—†ìœ¼ë©´ ë°”ë¼ë³´ëŠ” ë°©í–¥, ìˆìœ¼ë©´ ì…ë ¥ ë°©í–¥ìœ¼ë¡œ ì¦‰ì‹œ íšŒì „
+	FVector DashDirection = PC->GetLastMovementInputVector();
+	if (DashDirection.IsNearlyZero())
+	{
+		DashDirection = PC->GetActorForwardVector();
+	}
+    
+	DashDirection.Z = 0.0f;
+    
+	if (!DashDirection.IsNearlyZero())
+	{
+		DashDirection.Normalize();
+		PC->SetActorRotation(DashDirection.Rotation());
+	}
+
+	// ëª½íƒ€ì£¼ ì‹¤í–‰ íƒœìŠ¤í¬ ìƒì„±
+	UAbilityTask_PlayMontageAndWait* PlayTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
+		this, NAME_None, DashMontage, 1.0f);
+
+	if (PlayTask)
+	{
+		PlayTask->OnCompleted.AddDynamic(this, &ThisClass::OnMontageCompleted);
+		PlayTask->OnInterrupted.AddDynamic(this, &ThisClass::OnMontageInterrupted);
+		PlayTask->OnCancelled.AddDynamic(this, &ThisClass::OnMontageInterrupted);
+		PlayTask->ReadyForActivation();
+	}
+	else
+	{
+		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 	}
 	
-	// TODO: ³»°¡ ¾Æ¸¶ ±¸ÇöÇÒ°Í ÇÃ·¹ÀÌ¾î ÀÔ·Â ¹æÇâ¿¡ µû¸¥ È¸ÇÇ ¹æÇâ °è»ê - ½¹
-	// TODO: È¸ÇÇ ¸ùÅ¸ÁÖ Àç»ı ¹× ¹«Àû ÅÂ±×(Gameplay Effect) Àû¿ë
+	UAbilityTask_WaitGameplayEvent* WaitEventTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(
+       this, GPTags::Event::Player::ActionEnd);
+
+    if (WaitEventTask)
+    {
+       WaitEventTask->EventReceived.AddDynamic(this, &ThisClass::OnDashActionEnd);
+       WaitEventTask->ReadyForActivation();
+    }
+}
+
+void UGP_Dash::OnDashActionEnd(FGameplayEventData Payload)
+{
+	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+}
+
+void UGP_Dash::OnMontageCompleted()
+{
+	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+}
+
+void UGP_Dash::OnMontageInterrupted()
+{
+	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 }

@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 set CURRENT_DIR=%~dp0
 set SLN_FILE=%CURRENT_DIR%Project_Eden.sln
 

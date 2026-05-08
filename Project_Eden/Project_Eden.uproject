@@ -53,6 +53,13 @@
 		{
 			"Name": "Landmass",
 			"Enabled": true
+		},
+		{
+			"Name": "AnimationWarping",
+			"Enabled": true
 		}
+	],
+	"AdditionalPluginDirectories": [
+		"../../../GitHub/Unreal_mcp"
 	]
 }

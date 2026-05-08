@@ -1,13 +1,21 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "Characters/GP_BaseCharacter.h"
 #include "AbilitySystemInterface.h"
-
+#include "GameplayTagContainer.h"
 #include "GP_PlayerCharacter.generated.h"
 
 class USpringArmComponent;
 class UCameraComponent;
+class UPDA_WeaponItemCollection;
+class UPDA_CharacterAnimationSet;
+class UAnimSequenceBase;
+class UBlendSpace;
+
+class UGP_SkillData;
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnSkillEquipped, FGameplayTag, SlotTag, UGP_SkillData*, SkillData);
 
 UCLASS()
 class PROJECT_EDEN_API AGP_PlayerCharacter : public AGP_BaseCharacter
@@ -16,10 +24,39 @@ class PROJECT_EDEN_API AGP_PlayerCharacter : public AGP_BaseCharacter
 
 public:
 	AGP_PlayerCharacter();
+	virtual void BeginPlay() override;
+	virtual void Tick(float DeltaSeconds) override;
+	virtual void Landed(const FHitResult& Hit) override;
+	
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
+	virtual UAttributeSet* GetAttributeSet() const override;
 	virtual void PossessedBy(AController* NewController) override;
 	virtual void OnRep_PlayerState() override;
+	virtual void AddMovementInput(FVector WorldDirection, float ScaleValue, bool bForce = false) override;
 	
+	void ToggleSprinting(); 
+	void StartSprinting();
+	void StopSprinting();
+	bool IsSprinting() const; 
+	
+	bool TryPerformDash();
+	bool IsDashing() const;
+
+	UPDA_CharacterAnimationSet* GetAnimationSet() const { return AnimationSet; }
+	UBlendSpace* GetLocomotionBlendSpace() const;
+	UAnimSequenceBase* GetJumpLoopAnimation() const;
+	
+	/** [데이터 에셋 기반] 런타임 스킬 교체 함수 (bIgnoreRestrictions로 로그라이크식 예외 지원) */
+	UFUNCTION(BlueprintCallable, Category = "GAS|Combat")
+	void EquipSkill(UGP_SkillData* NewSkillData, FGameplayTag SlotTag, bool bIgnoreRestrictions = false);
+
+	/** 구형 호환용 (클래스 직접 교체) */
+	UFUNCTION(BlueprintCallable, Category = "GAS|Combat", meta = (DeprecatedFunction, DeprecationMessage = "Use DataAsset version instead"))
+	void EquipSkillByClass(FGameplayTag SlotTag, TSubclassOf<UGameplayAbility> NewAbilityClass);
+
+	UPROPERTY(BlueprintAssignable, Category = "GAS|Events")
+	FOnSkillEquipped OnSkillEquipped;
+
 
 private:
 	UPROPERTY(VisibleAnywhere, Category = "Camera")
@@ -27,15 +64,34 @@ private:
 
 	UPROPERTY(VisibleAnywhere, Category = "Camera")
 	TObjectPtr<UCameraComponent> FollowCamera;
-	
 protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Combat|LockOn")
-	bool bIsLockOn = false; // lockOn �ּ� �ѱ۷� �ܾȵǴ°ž��̾�
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Combat|LockOn")
-	TObjectPtr<AActor> TargetActor; // lockOn Target
+	bool bIsLockOn = false; 
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Combat|LockOn")
+	TObjectPtr<AActor> TargetActor; 
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|LockOn")
-	float LockOnRotationInterpSpeed = 10.0f;// lockOn ī�޶� �巡�� ������
+	float LockOnRotationInterpSpeed = 10.0f;
 
+	
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment|Weapon")
+	TObjectPtr<UPDA_WeaponItemCollection> DefaultWeaponCollection;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment|Weapon")
+	FName DefaultWeaponId = TEXT("WP_Common_Fire_Sword");
+	
+	// 이동 속도
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Speed")
+	float NormalWalkSpeed = 210.0f; 
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Speed")
+	float SprintSpeed = 420.0f;
+
+	
+	// GAS 태그 이벤트 콜백
+	void OnSprintingTagChanged(const FGameplayTag CallbackTag, int32 NewCount);
+	void OnFixedTagChanged(const FGameplayTag CallbackTag, int32 NewCount);
+	
 };

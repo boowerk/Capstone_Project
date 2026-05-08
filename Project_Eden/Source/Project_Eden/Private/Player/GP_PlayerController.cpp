@@ -4,6 +4,8 @@
 #include "AbilitySystemComponent.h"
 #include "Blueprint/UserWidget.h"
 #include "Characters/GP_EnemyCharacter.h"
+#include "Characters/GP_PlayerCharacter.h"
+#include "Components/InputComponent.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "GameFramework/Character.h"
@@ -45,6 +47,15 @@ void AGP_PlayerController::BeginPlay()
 	if (HUDWidget)
 	{
 		HUDWidget->SetBossVisible(false);
+
+		// HUD 생성 시점에 이미 Pawn이 준비되어 있다면 즉시 바인딩 시도
+		if (AGP_BaseCharacter* BaseChar = Cast<AGP_BaseCharacter>(GetPawn()))
+		{
+			if (UAbilitySystemComponent* ASC = BaseChar->GetAbilitySystemComponent())
+			{
+				HUDWidget->BindToASC(ASC);
+			}
+		}
 	}
 }
 
@@ -71,26 +82,44 @@ void AGP_PlayerController::SetupInputComponent()
 	{
 		InputSubsystem->AddMappingContext(Context, 0);
 	}
+	
 
-	UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(InputComponent);
-	if (!IsValid(EnhancedInputComponent)) return;
-	EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &ThisClass::Move);
-	EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ThisClass::Jump);
-	EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ThisClass::StopJump);
-	EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ThisClass::Look);
+	UEnhancedInputComponent* EnhancedInputComponent = CastChecked<UEnhancedInputComponent>(InputComponent);
 
-	EnhancedInputComponent->BindAction(PrimaryAction, ETriggerEvent::Triggered, this, &ThisClass::Primary);
-	EnhancedInputComponent->BindAction(SkillAction, ETriggerEvent::Triggered, this, &ThisClass::Skill);
-	EnhancedInputComponent->BindAction(UltimateAction, ETriggerEvent::Triggered, this, &ThisClass::Ultimate);
-	EnhancedInputComponent->BindAction(DashAction, ETriggerEvent::Triggered, this, &ThisClass::Dash);
-	EnhancedInputComponent->BindAction(TargetingAction, ETriggerEvent::Started, this, &ThisClass::Targeting);
+	check(MoveAction);
+	check(LookAction);
+	EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &ThisClass::Input_Move);
+	EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Completed, this, &ThisClass::Input_Move);
+	EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ThisClass::Input_Look);
+	if (JumpAction)
+	{
+		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ThisClass::Input_Jump);
+		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ThisClass::Input_StopJump);
+	}
+
+	// --- [상태 전환 ] ---
+	EnhancedInputComponent->BindAction(SprintAction, ETriggerEvent::Started, this, &ThisClass::Input_SprintPressed);
+	EnhancedInputComponent->BindAction(SprintAction, ETriggerEvent::Completed, this, &ThisClass::Input_SprintReleased);
+	if (DashAction)   EnhancedInputComponent->BindAction(DashAction,   ETriggerEvent::Started, this, &ThisClass::Input_Dash);
+
+	// --- [어빌리티 및 스킬] ---
+	if (PrimaryAttackAction)  EnhancedInputComponent->BindAction(PrimaryAttackAction,  ETriggerEvent::Started,   this, &ThisClass::Input_PrimaryAttack);
+	if (SkillSlot1Action) EnhancedInputComponent->BindAction(SkillSlot1Action, ETriggerEvent::Triggered, this, &ThisClass::Input_SkillSlot1);
+	if (SkillSlot2Action) EnhancedInputComponent->BindAction(SkillSlot2Action, ETriggerEvent::Triggered, this, &ThisClass::Input_SkillSlot2);
+	if (UltimateAction) EnhancedInputComponent->BindAction(UltimateAction, ETriggerEvent::Triggered, this, &ThisClass::Input_UltimateSkill);
+	if (TestToggleSkillAction) EnhancedInputComponent->BindAction(TestToggleSkillAction, ETriggerEvent::Started, this, &ThisClass::Input_TestToggleSkill);
 }
 
-void AGP_PlayerController::Move(const FInputActionValue& Value)
+
+void AGP_PlayerController::Input_Move(const FInputActionValue& Value)
 {
 	if (!IsValid(GetPawn())) return;
-	const FVector2D MovementVector = Value.Get<FVector2D>();
 
+	const FVector2D MovementVector = Value.Get<FVector2D>();
+	CurrentMoveInput = MovementVector;
+	
+	if (MovementVector.IsNearlyZero()) return;
+	
 	const FRotator YawRotation(0.f, GetControlRotation().Yaw, 0.f);
 	const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
 	const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
@@ -99,7 +128,7 @@ void AGP_PlayerController::Move(const FInputActionValue& Value)
 	GetPawn()->AddMovementInput(RightDirection, MovementVector.X);
 }
 
-void AGP_PlayerController::Look(const FInputActionValue& Value)
+void AGP_PlayerController::Input_Look(const FInputActionValue& Value)
 {
 	if (!IsValid(GetPawn())) return;
 	const FVector2D LookAxisVector = Value.Get<FVector2D>();
@@ -108,50 +137,126 @@ void AGP_PlayerController::Look(const FInputActionValue& Value)
 	AddPitchInput(LookAxisVector.Y);
 }
 
-void AGP_PlayerController::Jump()
+void AGP_PlayerController::Input_Jump()
 {
 	if (!IsValid(GetCharacter())) return;
 	GetCharacter()->Jump();
 }
 
-void AGP_PlayerController::StopJump()
+void AGP_PlayerController::Input_StopJump()
 {
 	if (!IsValid(GetCharacter())) return;
 	GetCharacter()->StopJumping();
 }
 
-void AGP_PlayerController::Primary()
+
+void AGP_PlayerController::Input_ToggleSprint()
 {
-	ActivateAbilityByTag(GPTags::GPAbilities::Primary);
+	if (auto* PC = Cast<AGP_PlayerCharacter>(GetPawn()))
+	{
+		PC->ToggleSprinting();
+	}
 }
 
-void AGP_PlayerController::Targeting()
+void AGP_PlayerController::Input_SprintPressed()
+{
+	if (AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetPawn()))
+	{
+		if (bIsSprintToggle) PC->ToggleSprinting();
+		else PC->StartSprinting();
+	}
+}
+
+void AGP_PlayerController::Input_SprintReleased()
+{
+	if (AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetPawn()))
+	{
+		if (!bIsSprintToggle) PC->StopSprinting();
+	}
+}
+void AGP_PlayerController::Input_Dash()
+{
+	if (AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetCharacter()))
+	{
+
+		if (PlayerCharacter->TryPerformDash())
+		{
+			return;
+		}
+	}
+
+	ActivateAbilityByTag(GPTags::Ability::Movement::Dash);
+}
+
+
+void AGP_PlayerController::Input_PrimaryAttack()
+{
+	APawn* ControlledPawn = GetPawn();
+	if (!IsValid(ControlledPawn)) return;
+
+	IAbilitySystemInterface* ASI = Cast<IAbilitySystemInterface>(ControlledPawn);
+	if (!ASI || !ASI->GetAbilitySystemComponent()) return;
+
+	UAbilitySystemComponent* ASC = ASI->GetAbilitySystemComponent();
+	FGameplayTag PrimaryTag = GPTags::Ability::Skill::Primary;
+
+	bool bInputHandled = false;
+
+	for (FGameplayAbilitySpec& Spec : ASC->GetActivatableAbilities())
+	{
+		// 부여된 동적 태그나 어빌리티 기본 태그 중 PrimaryTag가 있는지 검사
+		if (Spec.GetDynamicSpecSourceTags().HasTagExact(PrimaryTag) || 
+		   (Spec.Ability && Spec.Ability->GetAssetTags().HasTagExact(PrimaryTag)))
+		{
+			if (Spec.IsActive())
+			{
+				UE_LOG(LogTemp, Warning, TEXT("Controller: Active Primary Ability Found. Sending Input."));
+				ASC->AbilitySpecInputPressed(Spec);
+				bInputHandled = true;
+				break;
+			}
+		}
+	}
+
+	if (!bInputHandled)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Controller: Activating Primary Ability for the first time."));
+		ASC->TryActivateAbilitiesByTag(FGameplayTagContainer(PrimaryTag));
+	}
+}
+
+void AGP_PlayerController::Input_SkillSlot1()
 {
 	UE_LOG(LogTemp, Warning, TEXT("Targeting"));
-	ActivateAbilityByTag(GPTags::GPAbilities::Targeting);
+	ActivateAbilityByTag(GPTags::Ability::Skill::Slot01);
 }
 
-void AGP_PlayerController::ActivateAbilityByTag(const FGameplayTag& AbilityTag) const
+void AGP_PlayerController::Input_SkillSlot2()
+{
+	ActivateAbilityByTag(GPTags::Ability::Skill::Slot02);
+}
+
+void AGP_PlayerController::Input_UltimateSkill()
+{
+	ActivateAbilityByTag(GPTags::Ability::Skill::Ultimate);
+}
+
+
+bool AGP_PlayerController::ActivateAbilityByTag(const FGameplayTag& AbilityTag) const
 {
 	UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn());
-	if (!IsValid(ASC)) return;
+	if (!IsValid(ASC)) return false;
 
-	ASC->TryActivateAbilitiesByTag(AbilityTag.GetSingleTagContainer());
-}
+	// 동적 태그(슬롯)를 가진 어빌리티를 먼저 활성화 시도
+	for (FGameplayAbilitySpec& Spec : ASC->GetActivatableAbilities())
+	{
+		if (Spec.GetDynamicSpecSourceTags().HasTagExact(AbilityTag))
+		{
+			return ASC->TryActivateAbility(Spec.Handle);
+		}
+	}
 
-void AGP_PlayerController::Skill()
-{
-	ActivateAbilityByTag(GPTags::GPAbilities::Skill);
-}
-
-void AGP_PlayerController::Ultimate()
-{
-	ActivateAbilityByTag(GPTags::GPAbilities::Ultimate);
-}
-
-void AGP_PlayerController::Dash()
-{
-	ActivateAbilityByTag(GPTags::GPAbilities::Dash);
+	return ASC->TryActivateAbilitiesByTag(AbilityTag.GetSingleTagContainer());
 }
 
 void AGP_PlayerController::RefreshBossHUD()
@@ -194,4 +299,63 @@ void AGP_PlayerController::RefreshBossHUD()
 	CurrentBossEnemy = ClosestBoss;
 	HUDWidget->SetBossText(CurrentBossEnemy->GetBossDisplayName());
 	HUDWidget->SetBossVisible(true);
+}
+
+void AGP_PlayerController::Input_TestToggleSkill()
+{
+	Server_TestToggleSkill();
+}
+
+bool AGP_PlayerController::Server_TestToggleSkill_Validate()
+{
+	return true;
+}
+
+void AGP_PlayerController::Server_TestToggleSkill_Implementation()
+{
+	AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetPawn());
+	if (!PC) return;
+
+	UAbilitySystemComponent* ASC = PC->GetAbilitySystemComponent();
+	if (!ASC) return;
+
+	if (!bSkillsEquipped)
+	{
+		// 장착 로직
+		if (WaterPuddleAbilityClass)
+		{
+			PC->EquipSkillByClass(GPTags::Ability::Skill::Slot01, WaterPuddleAbilityClass);
+			PC->EquipSkillByClass(GPTags::Ability::Skill::Slot02, WaterPuddleAbilityClass);
+			bSkillsEquipped = true;
+			
+			if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Cyan, TEXT("Skills Equipped to Slot 1 & 2!"));
+			UE_LOG(LogTemp, Warning, TEXT("Server: WaterPuddle equipped to Slot 1 & 2"));
+		}
+	}
+	else
+	{
+		// 해제 로직
+		TArray<FGameplayTag> SlotTags = { GPTags::Ability::Skill::Slot01, GPTags::Ability::Skill::Slot02 };
+		TArray<FGameplayAbilitySpecHandle> HandlesToRemove;
+		
+		for (const FGameplayAbilitySpec& Spec : ASC->GetActivatableAbilities())
+		{
+			for (const FGameplayTag& SlotTag : SlotTags)
+			{
+				if (Spec.GetDynamicSpecSourceTags().HasTagExact(SlotTag))
+				{
+					HandlesToRemove.Add(Spec.Handle);
+				}
+			}
+		}
+
+		for (const FGameplayAbilitySpecHandle& Handle : HandlesToRemove)
+		{
+			ASC->ClearAbility(Handle);
+		}
+
+		bSkillsEquipped = false;
+		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Orange, TEXT("Skills Unequipped!"));
+		UE_LOG(LogTemp, Warning, TEXT("Server: WaterPuddle unequipped from Slot 1 & 2"));
+	}
 }
