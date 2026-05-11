@@ -1,0 +1,249 @@
+#include "AbilitySystem/Abilities/Enemy/GP_BossSweepAttack.h"
+
+#include "Actors/GP_BossSweepTelegraphActor.h"
+#include "AIController.h"
+#include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
+#include "AbilitySystem/Abilities/GP_GameplayAbility.h"
+#include "Animation/AnimMontage.h"
+#include "GameFramework/Pawn.h"
+#include "GameplayEffect.h"
+#include "GameplayTags/GP_Tags.h"
+#include "TimerManager.h"
+#include "UObject/ConstructorHelpers.h"
+#include "Utils/GP_BlueprintLibrary.h"
+
+UGP_BossSweepAttack::UGP_BossSweepAttack()
+{
+	// Sweep attack uses a broad forward arc so dodging behind or far to the side remains a clear counterplay.
+	FGameplayTagContainer AbilityAssetTags;
+	AbilityAssetTags.AddTag(GPTags::Ability::Enemy::Attack_BossSweep);
+	SetAssetTags(AbilityAssetTags);
+
+	AttackRadius = 650.0f;
+	ForwardOffset = 180.0f;
+	bUseGameplayEventForHitTiming = false;
+	bShowBossSweepTelegraph = true;
+	BossSweepTelegraphDelay = 0.85f;
+	BossSweepTelegraphColor = FLinearColor(1.0f, 0.08f, 0.02f, 0.48f);
+	BossSweepArcAngleDegrees = 165.0f;
+	BossSweepHitBoxElevationOffset = 40.0f;
+
+	static ConstructorHelpers::FObjectFinder<UAnimMontage> MontageFinder(TEXT("/Game/Animations/AM_Sans_BossSweep.AM_Sans_BossSweep"));
+	if (MontageFinder.Succeeded())
+	{
+		SkillMontage = MontageFinder.Object;
+	}
+
+	static ConstructorHelpers::FClassFinder<UGameplayEffect> DamageEffectFinder(TEXT("/Game/GAS_Pattern/AbilitySystem/GameplayEffects/GE_PrimaryDamage"));
+	if (DamageEffectFinder.Succeeded())
+	{
+		DamageEffectClass = DamageEffectFinder.Class;
+	}
+}
+
+void UGP_BossSweepAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
+	const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo,
+	const FGameplayEventData* TriggerEventData)
+{
+	UGP_GameplayAbility::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
+
+	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
+	{
+		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+		return;
+	}
+
+	bBossSweepHitApplied = false;
+	bWaitingForBossSweepTelegraph = false;
+	bEndAbilityAfterBossSweepHit = false;
+	ActiveBossSweepTelegraph = nullptr;
+
+	AActor* AvatarActor = GetAvatarActorFromActorInfo();
+	if (!IsValid(AvatarActor))
+	{
+		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+		return;
+	}
+
+	// The boss should commit to the sweep wind-up instead of sliding while the floor warning is visible.
+	if (APawn* AvatarPawn = Cast<APawn>(AvatarActor))
+	{
+		if (AAIController* AIController = Cast<AAIController>(AvatarPawn->GetController()))
+		{
+			AIController->StopMovement();
+		}
+	}
+
+	bool bMontageTaskStarted = false;
+	if (SkillMontage)
+	{
+		UAbilityTask_PlayMontageAndWait* PlayMontageTask =
+			UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(this, NAME_None, SkillMontage, 1.0f);
+		if (PlayMontageTask)
+		{
+			PlayMontageTask->OnCompleted.AddDynamic(this, &ThisClass::OnBossSweepMontageCompleted);
+			PlayMontageTask->OnBlendOut.AddDynamic(this, &ThisClass::OnBossSweepMontageCompleted);
+			PlayMontageTask->OnInterrupted.AddDynamic(this, &ThisClass::OnBossSweepMontageCompleted);
+			PlayMontageTask->OnCancelled.AddDynamic(this, &ThisClass::OnBossSweepMontageCompleted);
+			PlayMontageTask->ReadyForActivation();
+			bMontageTaskStarted = true;
+		}
+	}
+
+	StartBossSweepTelegraph(AvatarActor, !bMontageTaskStarted);
+}
+
+void UGP_BossSweepAttack::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
+	const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(BossSweepTelegraphTimerHandle);
+	}
+
+	if (IsValid(ActiveBossSweepTelegraph))
+	{
+		ActiveBossSweepTelegraph->Destroy();
+		ActiveBossSweepTelegraph = nullptr;
+	}
+
+	bWaitingForBossSweepTelegraph = false;
+	bEndAbilityAfterBossSweepHit = false;
+
+	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
+}
+
+void UGP_BossSweepAttack::OnBossSweepMontageCompleted()
+{
+	if (bWaitingForBossSweepTelegraph)
+	{
+		// If the animation ends before the warning delay, keep the ability alive until the promised hit time.
+		bEndAbilityAfterBossSweepHit = true;
+		return;
+	}
+
+	if (!bBossSweepHitApplied)
+	{
+		PerformBossSweepHit();
+	}
+
+	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+}
+
+void UGP_BossSweepAttack::StartBossSweepTelegraph(AActor* AvatarActor, bool bEndAbilityAfterHit)
+{
+	if (bShowBossSweepTelegraph && BossSweepTelegraphDelay > KINDA_SMALL_NUMBER)
+	{
+		SpawnBossSweepTelegraph(AvatarActor);
+		bWaitingForBossSweepTelegraph = true;
+		bEndAbilityAfterBossSweepHit = bEndAbilityAfterHit;
+
+		if (UWorld* World = GetWorld())
+		{
+			World->GetTimerManager().SetTimer(
+				BossSweepTelegraphTimerHandle,
+				this,
+				&ThisClass::OnBossSweepTelegraphElapsed,
+				BossSweepTelegraphDelay,
+				false);
+			return;
+		}
+	}
+
+	PerformBossSweepHit();
+	if (bEndAbilityAfterHit)
+	{
+		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+	}
+}
+
+void UGP_BossSweepAttack::OnBossSweepTelegraphElapsed()
+{
+	bWaitingForBossSweepTelegraph = false;
+	PerformBossSweepHit();
+
+	if (IsValid(ActiveBossSweepTelegraph))
+	{
+		ActiveBossSweepTelegraph->Destroy();
+		ActiveBossSweepTelegraph = nullptr;
+	}
+
+	if (bEndAbilityAfterBossSweepHit)
+	{
+		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+	}
+}
+
+void UGP_BossSweepAttack::SpawnBossSweepTelegraph(AActor* AvatarActor)
+{
+	if (!IsValid(AvatarActor))
+	{
+		return;
+	}
+
+	UWorld* World = AvatarActor->GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.Owner = AvatarActor;
+	SpawnParameters.Instigator = Cast<APawn>(AvatarActor);
+	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+	const FVector SpawnLocation = AvatarActor->GetActorLocation();
+	const FRotator SpawnRotation(0.0f, AvatarActor->GetActorRotation().Yaw, 0.0f);
+	ActiveBossSweepTelegraph = World->SpawnActor<AGP_BossSweepTelegraphActor>(
+		AGP_BossSweepTelegraphActor::StaticClass(),
+		SpawnLocation,
+		SpawnRotation,
+		SpawnParameters);
+
+	if (ActiveBossSweepTelegraph)
+	{
+		// The hitbox is offset forward, so the visible fan uses the full reach from the boss origin.
+		const float TelegraphRadius = AttackRadius + FMath::Max(0.0f, ForwardOffset);
+		ActiveBossSweepTelegraph->InitializeSweepTelegraph(
+			TelegraphRadius,
+			BossSweepArcAngleDegrees,
+			BossSweepTelegraphDelay,
+			BossSweepTelegraphColor,
+			BossSweepTelegraphMaterial);
+	}
+}
+
+void UGP_BossSweepAttack::PerformBossSweepHit()
+{
+	if (bBossSweepHitApplied)
+	{
+		return;
+	}
+
+	AActor* AvatarActor = GetAvatarActorFromActorInfo();
+	if (!IsValid(AvatarActor))
+	{
+		bBossSweepHitApplied = true;
+		return;
+	}
+
+	// Sans sweep keeps its own forward-arc damage path instead of sharing the generic enemy attack timing.
+	const TArray<AActor*> HitActors = UGP_BlueprintLibrary::ForwardArcMeleeHitBoxOverlap(
+		AvatarActor,
+		AttackRadius,
+		ForwardOffset,
+		BossSweepArcAngleDegrees,
+		BossSweepHitBoxElevationOffset,
+		bDrawDebugs);
+
+	if (HasAuthority(&CurrentActivationInfo) && DamageEffectClass)
+	{
+		UGP_BlueprintLibrary::ApplyGameplayEffectToActors(
+			AvatarActor,
+			HitActors,
+			DamageEffectClass,
+			GetAbilityLevel());
+	}
+
+	bBossSweepHitApplied = true;
+}

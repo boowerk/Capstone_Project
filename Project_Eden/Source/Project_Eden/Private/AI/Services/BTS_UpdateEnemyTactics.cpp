@@ -231,6 +231,7 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldBossPhaseTransition, false);
 		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossHeavyAttack, false);
 		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossAreaAttack, false);
+		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossSweepAttack, false);
 		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanSummonAdds, false);
 
 		if (!bPreviousShouldReturnHome)
@@ -277,6 +278,7 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldBossPhaseTransition, false);
 		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossHeavyAttack, false);
 		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossAreaAttack, false);
+		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossSweepAttack, false);
 		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanSummonAdds, false);
 
 		if (bPreviousShouldRetreat || bPreviousCanAttack || bPreviousShouldReposition || bPreviousShouldChase || bPreviousShouldReturnHome)
@@ -373,8 +375,11 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 		constexpr float BossPhaseThreeHealthRatio = 0.33f;
 		constexpr float BossHeavyAttackRange = 650.0f;
 		constexpr float BossAreaAttackRange = 1400.0f;
+		constexpr float BossSweepAttackRange = 900.0f;
 		constexpr float BossAreaAttackInterval = 8.0f;
 		constexpr float BossAreaAttackWindow = 1.2f;
+		constexpr float BossSweepAttackInterval = 5.5f;
+		constexpr float BossSweepAttackWindow = 1.0f;
 		constexpr float BossSummonInterval = 18.0f;
 		constexpr float BossSummonWindow = 1.5f;
 
@@ -389,14 +394,21 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 			&& bHasLineOfSight
 			&& DistanceToTarget <= BossAreaAttackRange
 			&& BTS_UpdateEnemyTactics_Internal::IsPatternWindowOpen(WorldTimeSeconds, BossAreaAttackInterval, BossAreaAttackWindow);
+		const bool bCanUseBossSweepAttack = !bShouldBossPhaseTransition
+			&& !bCanUseBossAreaAttack
+			&& bHasLineOfSight
+			&& DistanceToTarget <= BossSweepAttackRange
+			// Sweep uses a separate cadence so it remains a readable boss pattern, not just a bigger melee swing.
+			&& BTS_UpdateEnemyTactics_Internal::IsPatternWindowOpen(WorldTimeSeconds, BossSweepAttackInterval, BossSweepAttackWindow);
 		const bool bCanSummonAdds = !bShouldBossPhaseTransition
 			&& BossPhase >= 3
 			&& BTS_UpdateEnemyTactics_Internal::IsPatternWindowOpen(WorldTimeSeconds, BossSummonInterval, BossSummonWindow);
-		const bool bBossPatternRequestsAttack = bShouldBossPhaseTransition || bCanSummonAdds || bCanUseBossAreaAttack || bCanUseBossHeavyAttack;
+		const bool bBossPatternRequestsAttack = bShouldBossPhaseTransition || bCanSummonAdds || bCanUseBossAreaAttack || bCanUseBossSweepAttack || bCanUseBossHeavyAttack;
 
 		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldBossPhaseTransition, bShouldBossPhaseTransition);
 		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossHeavyAttack, bCanUseBossHeavyAttack);
 		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossAreaAttack, bCanUseBossAreaAttack);
+		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossSweepAttack, bCanUseBossSweepAttack);
 		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanSummonAdds, bCanSummonAdds);
 
 		if (bBossPatternRequestsAttack)

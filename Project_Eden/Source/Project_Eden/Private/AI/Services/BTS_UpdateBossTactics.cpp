@@ -71,11 +71,12 @@ void UBTS_UpdateBossTactics::OnSearchStart(FBehaviorTreeSearchData& SearchData)
 FString UBTS_UpdateBossTactics::GetStaticServiceDescription() const
 {
 	return FString::Printf(
-		TEXT("%s\nBoss phases %.0f%% / %.0f%%, AoE %.1fs, Summon %.1fs"),
+		TEXT("%s\nBoss phases %.0f%% / %.0f%%, AoE %.1fs, Sweep %.1fs, Summon %.1fs"),
 		*Super::GetStaticServiceDescription(),
 		PhaseTwoHealthRatio * 100.0f,
 		PhaseThreeHealthRatio * 100.0f,
 		AreaAttackInterval,
+		SweepAttackInterval,
 		SummonInterval);
 }
 
@@ -112,12 +113,20 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 		&& bHasLineOfSight
 		&& DistanceToTarget <= AreaAttackRange
 		&& BTS_UpdateBossTactics_Internal::IsPatternWindowOpen(WorldTimeSeconds, AreaAttackInterval, AreaAttackWindow);
+	const bool bCanUseSweepAttack = bHasTarget
+		&& !bReturningHome
+		&& !bShouldPhaseTransition
+		&& !bCanUseAreaAttack
+		&& bHasLineOfSight
+		&& DistanceToTarget <= SweepAttackRange
+		// Sweep has its own window so it reads as a deliberate pattern instead of replacing every heavy attack.
+		&& BTS_UpdateBossTactics_Internal::IsPatternWindowOpen(WorldTimeSeconds, SweepAttackInterval, SweepAttackWindow);
 	const bool bCanSummonAdds = bHasTarget
 		&& !bReturningHome
 		&& !bShouldPhaseTransition
 		&& BossPhase >= 3
 		&& BTS_UpdateBossTactics_Internal::IsPatternWindowOpen(WorldTimeSeconds, SummonInterval, SummonWindow);
-	const bool bBossPatternRequestsAttack = bShouldPhaseTransition || bCanSummonAdds || bCanUseAreaAttack || bCanUseHeavyAttack;
+	const bool bBossPatternRequestsAttack = bShouldPhaseTransition || bCanSummonAdds || bCanUseAreaAttack || bCanUseSweepAttack || bCanUseHeavyAttack;
 
 	if (bBossPatternRequestsAttack)
 	{
@@ -131,5 +140,6 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldBossPhaseTransition, bShouldPhaseTransition);
 	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossHeavyAttack, bCanUseHeavyAttack);
 	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossAreaAttack, bCanUseAreaAttack);
+	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossSweepAttack, bCanUseSweepAttack);
 	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanSummonAdds, bCanSummonAdds);
 }

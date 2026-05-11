@@ -106,6 +106,77 @@ TArray<AActor*> UGP_BlueprintLibrary::SphereMeleeHitBoxOverlap(AActor* AvatarAct
 	return ActorsHit;
 }
 
+TArray<AActor*> UGP_BlueprintLibrary::ForwardArcMeleeHitBoxOverlap(AActor* AvatarActor, float Radius,
+	float ForwardOffset, float ArcAngleDegrees, float ElevationOffset, bool bDrawDebug)
+{
+	TArray<AActor*> ActorsHit;
+	if (!IsValid(AvatarActor)) return ActorsHit;
+
+	UWorld* World = AvatarActor->GetWorld();
+	if (!IsValid(World)) return ActorsHit;
+
+	FCollisionQueryParams CollisionQueryParams;
+	CollisionQueryParams.AddIgnoredActor(AvatarActor);
+
+	FCollisionResponseParams CollisionResponseParams;
+	CollisionResponseParams.CollisionResponse.SetAllChannels(ECR_Ignore);
+	CollisionResponseParams.CollisionResponse.SetResponse(ECC_Pawn, ECR_Block);
+
+	TArray<FOverlapResult> OverlapResults;
+	const FVector ForwardVector = AvatarActor->GetActorForwardVector().GetSafeNormal2D();
+	const FVector HitBoxLocation = AvatarActor->GetActorLocation() + (ForwardVector * ForwardOffset) + FVector(0.f, 0.f, ElevationOffset);
+	const FCollisionShape CollisionShapeSphere = FCollisionShape::MakeSphere(Radius);
+
+	World->OverlapMultiByChannel(OverlapResults, HitBoxLocation, FQuat::Identity,
+		ECC_Visibility, CollisionShapeSphere, CollisionQueryParams, CollisionResponseParams);
+
+	const float HalfAngleDegrees = FMath::Clamp(ArcAngleDegrees * 0.5f, 0.0f, 180.0f);
+	const float CosThreshold = FMath::Cos(FMath::DegreesToRadians(HalfAngleDegrees));
+	const bool bFullCircle = HalfAngleDegrees >= 179.9f;
+
+	for (const FOverlapResult& Result : OverlapResults)
+	{
+		AActor* HitActor = Result.GetActor();
+		if (!IsValid(HitActor))
+		{
+			continue;
+		}
+
+		FVector DirectionToTarget = HitActor->GetActorLocation() - AvatarActor->GetActorLocation();
+		DirectionToTarget.Z = 0.0f;
+		if (DirectionToTarget.IsNearlyZero())
+		{
+			ActorsHit.AddUnique(HitActor);
+			continue;
+		}
+
+		// The broad sphere keeps the overlap cheap; this dot check carves it into a forward sweep arc.
+		if (bFullCircle || FVector::DotProduct(ForwardVector, DirectionToTarget.GetSafeNormal()) >= CosThreshold)
+		{
+			ActorsHit.AddUnique(HitActor);
+		}
+	}
+
+	if (bDrawDebug)
+	{
+		DrawDebugSphere(World, HitBoxLocation, Radius, 16, FColor::Orange, false, 3.f);
+		const FVector Origin = AvatarActor->GetActorLocation() + FVector(0.f, 0.f, ElevationOffset);
+		const FRotator LeftRotator(0.0f, -HalfAngleDegrees, 0.0f);
+		const FRotator RightRotator(0.0f, HalfAngleDegrees, 0.0f);
+		DrawDebugLine(World, Origin, Origin + LeftRotator.RotateVector(ForwardVector) * Radius, FColor::Yellow, false, 3.f, 0, 3.f);
+		DrawDebugLine(World, Origin, Origin + RightRotator.RotateVector(ForwardVector) * Radius, FColor::Yellow, false, 3.f, 0, 3.f);
+
+		for (AActor* HitActor : ActorsHit)
+		{
+			FVector DebugLocation = HitActor->GetActorLocation();
+			DebugLocation.Z += 100.f;
+			DrawDebugSphere(World, DebugLocation, 30.f, 10, FColor::Green, false, 3.f);
+		}
+	}
+
+	return ActorsHit;
+}
+
 void UGP_BlueprintLibrary::SendGameplayEventToActors(AActor* Instigator, const TArray<AActor*>& TargetActors, FGameplayTag EventTag)
 {
 	if (!IsValid(Instigator)) return;

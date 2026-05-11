@@ -121,6 +121,10 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss", meta = (EditCondition = "bIsBossEnemy"))
 	FText BossDisplayName;
 
+	// Boss 플래그만 켜도 기본 강공격/광역/휩쓸기 어빌리티를 받을 수 있게 합니다.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Abilities", meta = (EditCondition = "bIsBossEnemy"))
+	bool bGrantDefaultBossPatternAbilities = true;
+
 private:
 #if WITH_EDITORONLY_DATA
 	UPROPERTY(VisibleAnywhere, Category = "AI|Debug", meta = (AllowPrivateAccess = "true"))
@@ -138,5 +142,6 @@ private:
 
 	const FEnemyArchetypeTuning* ResolveEnemyArchetypeTuning() const;
 	int32 ResolvePersonalitySeed() const;
+	void GiveDefaultBossPatternAbilities();
 	void RefreshAIRangeVisualizers();
 };

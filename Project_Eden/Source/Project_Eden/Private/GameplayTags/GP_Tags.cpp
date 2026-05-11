@@ -46,6 +46,7 @@ namespace GPTags
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Attack_AoE, "GPTags.Ability.Enemy.Attack_AoE", "적 광역 공격");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Attack_BossHeavy, "GPTags.Ability.Enemy.Attack_BossHeavy", "보스 강공격");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Attack_BossArea, "GPTags.Ability.Enemy.Attack_BossArea", "보스 광역 공격");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Attack_BossSweep, "GPTags.Ability.Enemy.Attack_BossSweep", "보스 전방 휩쓸기 공격");
             
             // 유틸리티 및 특수 계열
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Utility_Dash, "GPTags.Ability.Enemy.Utility_Dash", "적 이동/돌진기");

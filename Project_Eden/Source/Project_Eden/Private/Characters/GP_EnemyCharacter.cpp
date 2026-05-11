@@ -4,6 +4,9 @@
 #include "AI/Data/EnemyArchetypeData.h"
 #include "AI/Data/EnemyLLMEvaluation.h"
 #include "AI/Debug/EnemyAIRangeVisualizationComponent.h"
+#include "AbilitySystem/Abilities/Enemy/GP_BossAreaAttack.h"
+#include "AbilitySystem/Abilities/Enemy/GP_BossHeavyAttack.h"
+#include "AbilitySystem/Abilities/Enemy/GP_BossSweepAttack.h"
 #include "AbilitySystem/GP_AbilitySystemComponent.h"
 #include "AbilitySystem/GP_AttributeSet.h"
 #include "Engine/DataTable.h"
@@ -99,6 +102,11 @@ void AGP_EnemyCharacter::BeginPlay()
 	}
 
 	GiveStartupAbilities();
+	if (bIsBossEnemy && bGrantDefaultBossPatternAbilities)
+	{
+		// Boss-specific defaults keep Sans prototypes playable even before designers add custom BP abilities.
+		GiveDefaultBossPatternAbilities();
+	}
 	InitializeAttributes();
 
 	// 기준 위치는 캐릭터가 저장하고, 실제 Blackboard/Behavior Tree 시작은 AEnemyAIController::OnPossess에서 담당한다.
@@ -134,6 +142,33 @@ int32 AGP_EnemyCharacter::ResolvePersonalitySeed() const
 		HashCombineFast(
 			GetTypeHash(GetFName()),
 			HashCombineFast(GetTypeHash(GetActorLocation()), GetUniqueID())));
+}
+
+void AGP_EnemyCharacter::GiveDefaultBossPatternAbilities()
+{
+	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+	if (!IsValid(ASC))
+	{
+		return;
+	}
+
+	const TSubclassOf<UGameplayAbility> BossPatternAbilities[] =
+	{
+		UGP_BossHeavyAttack::StaticClass(),
+		UGP_BossSweepAttack::StaticClass(),
+		UGP_BossAreaAttack::StaticClass(),
+	};
+
+	for (const TSubclassOf<UGameplayAbility>& AbilityClass : BossPatternAbilities)
+	{
+		if (!*AbilityClass || ASC->FindAbilitySpecFromClass(AbilityClass) != nullptr)
+		{
+			continue;
+		}
+
+		// Grant each default once; custom Blueprint abilities can still be added through StartupAbilities.
+		ASC->GiveAbility(FGameplayAbilitySpec(AbilityClass));
+	}
 }
 
 void AGP_EnemyCharacter::RefreshAIRangeVisualizers()

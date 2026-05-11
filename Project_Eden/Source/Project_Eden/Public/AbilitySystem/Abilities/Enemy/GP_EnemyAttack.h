@@ -23,15 +23,15 @@ public:
 		const FGameplayEventData* TriggerEventData) override;
 
 protected:
-	// 정밀한 타격 타이밍이 필요할 때 몽타주 노티파이에서 이 태그를 보낸다.
+	// Animation notifies can send this event when a montage should apply the hit.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS|Skill|Mechanics")
 	FGameplayTag AttackEventTag;
 
-	// true면 Gameplay Event 시점에 판정을 내고, false면 어빌리티 시작 즉시 판정한다.
+	// Generic enemies use event timing by default; boss abilities can override their own timing in derived classes.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS|Skill|Mechanics")
 	bool bUseGameplayEventForHitTiming = true;
 
-	/** 적 특유의 수직 오프셋 */
+	// Shared vertical offset kept for existing enemy and boss ability tuning.
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Skill|Values")
 	float HitBoxElevationOffset = 40.0f;
 

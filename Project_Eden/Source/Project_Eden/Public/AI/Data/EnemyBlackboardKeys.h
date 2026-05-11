@@ -30,5 +30,6 @@ namespace EnemyBlackboardKeys
 	PROJECT_EDEN_API extern const FName bShouldBossPhaseTransition;
 	PROJECT_EDEN_API extern const FName bCanUseBossHeavyAttack;
 	PROJECT_EDEN_API extern const FName bCanUseBossAreaAttack;
+	PROJECT_EDEN_API extern const FName bCanUseBossSweepAttack;
 	PROJECT_EDEN_API extern const FName bCanSummonAdds;
 }

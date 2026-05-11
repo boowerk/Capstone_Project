@@ -36,6 +36,10 @@ public:
 	// 구체 피격 검사
 	UFUNCTION(BlueprintCallable, Category = "Eden|Combat") 
 	static TArray<AActor*> SphereMeleeHitBoxOverlap(AActor* AvatarActor, float Radius, float ForwardOffset, float ElevationOffset, bool bDrawDebug = false);
+
+	// 전방 부채꼴 피격 검사: 보스 휩쓸기처럼 정면 각도가 중요한 공격에서 사용합니다.
+	UFUNCTION(BlueprintCallable, Category = "Eden|Combat")
+	static TArray<AActor*> ForwardArcMeleeHitBoxOverlap(AActor* AvatarActor, float Radius, float ForwardOffset, float ArcAngleDegrees, float ElevationOffset, bool bDrawDebug = false);
 	
 	
 	// GAS 유틸 

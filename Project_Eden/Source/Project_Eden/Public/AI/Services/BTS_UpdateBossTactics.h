@@ -35,12 +35,23 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "AI|Boss", meta = (ClampMin = "0.0", Units = "cm"))
 	float AreaAttackRange = 1400.0f;
 
+	// 보스가 플레이어를 정면에 잡았을 때 사용하는 전방 휩쓸기 판정 거리입니다.
+	UPROPERTY(EditAnywhere, Category = "AI|Boss", meta = (ClampMin = "0.0", Units = "cm"))
+	float SweepAttackRange = 900.0f;
+
 	// 광역 공격은 Ability 쿨다운과 별개로 BT 선택 빈도를 제한한다.
 	UPROPERTY(EditAnywhere, Category = "AI|Boss", meta = (ClampMin = "0.1", Units = "s"))
 	float AreaAttackInterval = 8.0f;
 
 	UPROPERTY(EditAnywhere, Category = "AI|Boss", meta = (ClampMin = "0.0", Units = "s"))
 	float AreaAttackWindow = 1.2f;
+
+	// 휩쓸기는 일반 강공격보다 드물게 열어 회피 타이밍을 읽기 쉽게 유지합니다.
+	UPROPERTY(EditAnywhere, Category = "AI|Boss", meta = (ClampMin = "0.1", Units = "s"))
+	float SweepAttackInterval = 5.5f;
+
+	UPROPERTY(EditAnywhere, Category = "AI|Boss", meta = (ClampMin = "0.0", Units = "s"))
+	float SweepAttackWindow = 1.0f;
 
 	// 3페이즈 소환 패턴도 주기적 선택 창을 둬서 매 틱 반복 선택을 피한다.
 	UPROPERTY(EditAnywhere, Category = "AI|Boss", meta = (ClampMin = "0.1", Units = "s"))

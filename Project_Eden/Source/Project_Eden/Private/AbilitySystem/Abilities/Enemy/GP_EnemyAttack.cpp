@@ -5,7 +5,6 @@
 #include "GameFramework/Pawn.h"
 #include "GameplayEffect.h"
 #include "GameplayTags/GP_Tags.h"
-#include "Utils/GP_BlueprintLibrary.h"
 
 UGP_EnemyAttack::UGP_EnemyAttack()
 {
@@ -112,7 +111,7 @@ void UGP_EnemyAttack::PerformAttackHit()
 {
 	if (bHasAppliedAttackHit) return;
 
-	// 메커니즘: 부모 클래스의 공통 공격 판정 실행 (HitBoxElevationOffset은 현재 Enemy에서만 특수하게 사용)
+	// Generic enemies keep the shared spherical hit; boss-only shapes live in derived boss ability classes.
 	PerformAreaAttack();
 
 	bHasAppliedAttackHit = true;

@@ -26,5 +26,6 @@ namespace EnemyBlackboardKeys
 	const FName bShouldBossPhaseTransition(TEXT("bShouldBossPhaseTransition"));
 	const FName bCanUseBossHeavyAttack(TEXT("bCanUseBossHeavyAttack"));
 	const FName bCanUseBossAreaAttack(TEXT("bCanUseBossAreaAttack"));
+	const FName bCanUseBossSweepAttack(TEXT("bCanUseBossSweepAttack"));
 	const FName bCanSummonAdds(TEXT("bCanSummonAdds"));
 }

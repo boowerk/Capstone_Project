@@ -46,6 +46,12 @@ namespace BTT_ExecuteEnemyAttack_Internal
 			return GPTags::Ability::Enemy::Attack_BossArea;
 		}
 
+		// Sweep is resolved before heavy so the close-range pattern window can override the basic punish.
+		if (BTT_ExecuteEnemyAttack_Internal::GetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossSweepAttack))
+		{
+			return GPTags::Ability::Enemy::Attack_BossSweep;
+		}
+
 		if (BTT_ExecuteEnemyAttack_Internal::GetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossHeavyAttack))
 		{
 			return GPTags::Ability::Enemy::Attack_BossHeavy;
