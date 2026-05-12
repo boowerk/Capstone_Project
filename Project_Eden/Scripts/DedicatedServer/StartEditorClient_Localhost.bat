@@ -15,12 +15,9 @@ if not "%~1"=="" (
     )
 )
 
-if "%UE_SERVER_ROOT%"=="" call :TryEngineRoot "C:\Engine_server\Windows"
-if "%UE_SERVER_ROOT%"=="" call :TryEngineRoot "C:\Program Files\Epic Games\UE_5.7"
-if "%UE_SERVER_ROOT%"=="" call :TryEngineRoot "C:\Program Files\Epic Games\UE_5.6"
-if "%UE_SERVER_ROOT%"=="" call :TryEngineRoot "D:\Engine_server\Windows"
-if "%UE_SERVER_ROOT%"=="" call :TryEngineRoot "D:\Epic Games\UE_5.7"
-if "%UE_SERVER_ROOT%"=="" call :TryEngineRoot "D:\Epic Games\UE_5.6"
+if "%UE_SERVER_ROOT%"=="" (
+    for /f "usebackq delims=" %%I in (`powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0ResolveEngineRoot.ps1" -UProject "%UPROJECT%" -Kind Editor`) do set "UE_SERVER_ROOT=%%I"
+)
 
 if "%UE_SERVER_ROOT%"=="" (
     echo UnrealEditor.exe was not found in the common engine paths.
@@ -52,8 +49,4 @@ goto CollectExtraArgs
 echo Starting Project Eden local client: %CLIENT_URL%
 echo Engine root: %UE_SERVER_ROOT%
 start "Project Eden Local Client" "%EDITOR_EXE%" "%UPROJECT%" %CLIENT_URL% -game -log %CLIENT_WINDOW_ARGS% %EXTRA_ARGS%
-exit /b 0
-
-:TryEngineRoot
-if exist "%~1\Engine\Binaries\Win64\UnrealEditor.exe" set "UE_SERVER_ROOT=%~1"
 exit /b 0

@@ -13,12 +13,9 @@ if not "%~1"=="" (
     )
 )
 
-if "%UE_SERVER_ROOT%"=="" call :TryEngineRoot "C:\Engine_server\Windows"
-if "%UE_SERVER_ROOT%"=="" call :TryEngineRoot "C:\Program Files\Epic Games\UE_5.7"
-if "%UE_SERVER_ROOT%"=="" call :TryEngineRoot "C:\Program Files\Epic Games\UE_5.6"
-if "%UE_SERVER_ROOT%"=="" call :TryEngineRoot "D:\Engine_server\Windows"
-if "%UE_SERVER_ROOT%"=="" call :TryEngineRoot "D:\Epic Games\UE_5.7"
-if "%UE_SERVER_ROOT%"=="" call :TryEngineRoot "D:\Epic Games\UE_5.6"
+if "%UE_SERVER_ROOT%"=="" (
+    for /f "usebackq delims=" %%I in (`powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0ResolveEngineRoot.ps1" -UProject "%UPROJECT%" -Kind Build`) do set "UE_SERVER_ROOT=%%I"
+)
 
 if "%UE_SERVER_ROOT%"=="" (
     echo Build.bat was not found in the common engine paths.
@@ -41,7 +38,3 @@ echo Building Project_EdenServer with engine root: %UE_SERVER_ROOT%
 call "%BUILD_BAT%" Project_EdenServer Win64 Development -Project="%UPROJECT%" -WaitMutex -FromMsBuild -architecture=x64 %*
 pause
 exit /b %ERRORLEVEL%
-
-:TryEngineRoot
-if exist "%~1\Engine\Build\BatchFiles\Build.bat" set "UE_SERVER_ROOT=%~1"
-exit /b 0
