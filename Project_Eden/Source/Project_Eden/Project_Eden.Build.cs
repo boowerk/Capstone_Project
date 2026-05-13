@@ -1,4 +1,4 @@
-﻿// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright Epic Games, Inc. All Rights Reserved.
 
 using UnrealBuildTool;
 
@@ -40,6 +40,9 @@ public class Project_Eden : ModuleRules
 				"BlueprintGraph",
 				"KismetCompiler",
 				"InputEditor",
+				"EditorScriptingUtilities",
+				"Blutility",
+				"AnimationDataController",
 			});
 		}
 
