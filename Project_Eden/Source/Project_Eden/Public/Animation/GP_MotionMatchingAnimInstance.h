@@ -23,23 +23,27 @@ public:
 
 protected:
 	/** Chooser 또는 로직에 의해 선택된 현재 포즈 검색 데이터베이스 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MotionMatching")
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "MotionMatching")
 	TObjectPtr<UPoseSearchDatabase> SelectedPoseSearchDatabase;
+
+	/** 블루프린트(Chooser 결과 등)에서 DB를 공식적으로 세팅하는 경로 */
+	UFUNCTION(BlueprintCallable, Category = "MotionMatching")
+	void SetSelectedPoseSearchDatabase(UPoseSearchDatabase* NewDatabase);
 
 	/** 
 	 * [단일 진실원] C++ 에넘 기반 상태 변수.
 	 * 블루프린트 및 Chooser와의 타입 정렬을 보장합니다.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MotionMatching|State")
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "MotionMatching|State")
 	E_Gait Gait;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MotionMatching|State")
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "MotionMatching|State")
 	E_Stance Stance;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MotionMatching|State")
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "MotionMatching|State")
 	E_MovementMode MovementMode;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MotionMatching|State")
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "MotionMatching|State")
 	E_MovementState MovementState;
 
 	/** 로코모션 상태(Gait, Stance 등)를 일괄 갱신하는 함수 */
@@ -47,8 +51,19 @@ protected:
 	virtual void UpdateLocomotionStates();
 
 	/** Chooser를 통해 적절한 PoseSearchDatabase를 선택하는 지점 */
-	UFUNCTION(BlueprintCallable, Category = "MotionMatching|Update")
-	virtual void UpdateMotionMatchingState();
+	/**
+	 * Chooser를 통해 적절한 PoseSearchDatabase를 선택하는 지점
+	 * - 기본 구현은 아무 것도 하지 않습니다.
+	 * - AnimBP에서 Override하여 Chooser Evaluate 후 SetSelectedPoseSearchDatabase()를 호출하는 패턴을 의도합니다.
+	 */
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "MotionMatching|Update")
+	void UpdateMotionMatchingState();
+	virtual void UpdateMotionMatchingState_Implementation();
+
+	// === 디버그 ===
+	/** 상태 변화를 로그로 출력할지 여부 (AnimInstance에서만 사용) */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MotionMatching|Debug")
+	bool bDebugMotionMatchingState = false;
 
 protected:
 	// === 상태 계산용 임계값 (상수) ===

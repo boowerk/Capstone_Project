@@ -29,6 +29,11 @@ void UGP_MotionMatchingAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 
 void UGP_MotionMatchingAnimInstance::UpdateLocomotionStates()
 {
+	const E_Gait PrevGait = Gait;
+	const E_Stance PrevStance = Stance;
+	const E_MovementMode PrevMovementMode = MovementMode;
+	const E_MovementState PrevMovementState = MovementState;
+
 	// 3-1. Stance 계산
 	Stance = bIsCrouching ? E_Stance::Crouch : E_Stance::Stand;
 
@@ -36,7 +41,12 @@ void UGP_MotionMatchingAnimInstance::UpdateLocomotionStates()
 	MovementMode = bIsFalling ? E_MovementMode::InAir : E_MovementMode::OnGround;
 
 	// 3-3. Gait 계산 (GroundSpeed 기반)
-	if (GroundSpeed < WalkToRunThreshold)
+	// - Crouch 상태에서는 일반적으로 Sprint를 허용하지 않으므로 최소한 Walk로 클램프합니다.
+	if (Stance == E_Stance::Crouch)
+	{
+		Gait = E_Gait::Walk;
+	}
+	else if (GroundSpeed < WalkToRunThreshold)
 	{
 		Gait = E_Gait::Walk;
 	}
@@ -63,13 +73,31 @@ void UGP_MotionMatchingAnimInstance::UpdateLocomotionStates()
 	{
 		MovementState = E_MovementState::Moving;
 	}
+
+	if (bDebugMotionMatchingState)
+	{
+		if (PrevGait != Gait || PrevStance != Stance || PrevMovementMode != MovementMode || PrevMovementState != MovementState)
+		{
+			UE_LOG(LogTemp, Log, TEXT("[MMState] Gait:%d->%d Stance:%d->%d Mode:%d->%d State:%d->%d Speed:%.1f Falling:%d Crouch:%d"),
+				(int32)PrevGait, (int32)Gait,
+				(int32)PrevStance, (int32)Stance,
+				(int32)PrevMovementMode, (int32)MovementMode,
+				(int32)PrevMovementState, (int32)MovementState,
+				GroundSpeed,
+				bIsFalling ? 1 : 0,
+				bIsCrouching ? 1 : 0);
+		}
+	}
 }
 
-void UGP_MotionMatchingAnimInstance::UpdateMotionMatchingState()
+void UGP_MotionMatchingAnimInstance::SetSelectedPoseSearchDatabase(UPoseSearchDatabase* NewDatabase)
 {
-	// [알림] 현재 단계에서는 상태 계산(Input 축 준비)까지만 C++에서 담당합니다.
-	// 실제 SelectedPoseSearchDatabase의 결정은 블루프린트에서 Chooser Table을 평가하여 수행하거나,
-	// 향후 Chooser API를 직접 호출하는 로직으로 확장될 예정입니다.
-	
-	// TODO: SelectedPoseSearchDatabase = Chooser->Evaluate(...);
+	SelectedPoseSearchDatabase = NewDatabase;
+}
+
+void UGP_MotionMatchingAnimInstance::UpdateMotionMatchingState_Implementation()
+{
+	// [알림] 현재 단계에서는 상태 계산까지만 C++에서 담당합니다.
+	// 실제 SelectedPoseSearchDatabase의 결정은 AnimBP에서 Chooser Table을 평가하여
+	// 본 함수를 Override하고 SetSelectedPoseSearchDatabase()를 호출하는 방식으로 확장합니다.
 }
