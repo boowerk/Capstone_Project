@@ -44,15 +44,17 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	if (!Character || !MovementComponent) return;
 
 	// 속도 및 이동 데이터 추출
-	FVector WorldVelocity = Character->GetVelocity();
-	GroundSpeed = WorldVelocity.Size2D();
+	Velocity = Character->GetVelocity();
+	Acceleration = MovementComponent->GetCurrentAcceleration();
+	GroundSpeed = Velocity.Size2D();
 	
 	// 캐릭터 로컬 방향으로 변환
-	LocalVelocityDirection = Character->GetActorTransform().InverseTransformVectorNoScale(WorldVelocity).GetSafeNormal2D();
+	LocalVelocityDirection = Character->GetActorTransform().InverseTransformVectorNoScale(Velocity).GetSafeNormal2D();
 
 	// 상태 데이터 업데이트
-	bHasAcceleration = MovementComponent->GetCurrentAcceleration().SizeSquared2D() > KINDA_SMALL_NUMBER;
+	bHasAcceleration = Acceleration.SizeSquared2D() > KINDA_SMALL_NUMBER;
 	bIsFalling = MovementComponent->IsFalling();
+	bIsCrouching = MovementComponent->IsCrouching();
 	bIsAnyMontagePlaying = Montage_IsPlaying(nullptr);
 }
 

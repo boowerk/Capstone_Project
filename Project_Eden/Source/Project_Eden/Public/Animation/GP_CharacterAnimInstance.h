@@ -11,7 +11,7 @@ class UBlendSpace;
 class UAnimSequenceBase;
 
 /**
- * 프로젝트의 모든 캐릭터 애니메이션 블루프린트를 위한 공통 베이스 클래스.
+ * 프로젝트의 모든 캐릭터 애니메이션 블루프린트를 위한 공통 베이스 클래스
  */
 UCLASS()
 class PROJECT_EDEN_API UGP_CharacterAnimInstance : public UAnimInstance
@@ -54,6 +54,12 @@ protected:
 	// === Locomotion Data (캐릭터 공통) ===
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Locomotion")
+	FVector Velocity;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Locomotion")
+	FVector Acceleration;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Locomotion")
 	float GroundSpeed;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Locomotion")
@@ -64,6 +70,9 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Locomotion")
 	bool bHasAcceleration;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Locomotion")
+	bool bIsCrouching;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Locomotion")
 	bool bIsAnyMontagePlaying;
