@@ -23,7 +23,7 @@ public:
 
 protected:
 	/** Chooser 또는 로직에 의해 선택된 현재 포즈 검색 데이터베이스 */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MotionMatching")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MotionMatching")
 	TObjectPtr<UPoseSearchDatabase> SelectedPoseSearchDatabase;
 
 	/** 
