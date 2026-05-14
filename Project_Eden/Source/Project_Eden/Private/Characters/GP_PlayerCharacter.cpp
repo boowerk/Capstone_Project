@@ -28,11 +28,11 @@ AGP_PlayerCharacter::AGP_PlayerCharacter()
 	GetCharacterMovement()->JumpZVelocity = 500.f;
 	GetCharacterMovement()->AirControl = 0.2f;
 	
-	// 초기 속도 세팅
+	// 초기 ?�도 ?�팅
 	GetCharacterMovement()->MaxWalkSpeed = NormalWalkSpeed; 
 	GetCharacterMovement()->MinAnalogWalkSpeed = 20.f;
 	
-	// 물리 제동 마찰력 (추후 블루프린트에서 제어하여 슬라이딩 거리를 조절합니다)
+	// 물리 ?�동 마찰??(추후 블루?�린?�에???�어?�여 ?�라?�딩 거리�?조절?�니??
 	GetCharacterMovement()->BrakingDecelerationWalking = 1000.f; 
 	GetCharacterMovement()->BrakingDecelerationFalling = 1500.f;
 
@@ -45,7 +45,7 @@ AGP_PlayerCharacter::AGP_PlayerCharacter()
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
 	FollowCamera->bUsePawnControlRotation = false;
 	
-	// 태그 추가 함수 추가후 호출 예정지
+	// ?�그 추�? ?�수 추�????�출 ?�정지
 }
 
 void AGP_PlayerCharacter::BeginPlay()
@@ -56,7 +56,6 @@ void AGP_PlayerCharacter::BeginPlay()
 void AGP_PlayerCharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-	
 }
 
 void AGP_PlayerCharacter::Landed(const FHitResult& Hit)
@@ -65,7 +64,7 @@ void AGP_PlayerCharacter::Landed(const FHitResult& Hit)
 }
 
 // ==========================================
-// GAS 및 초기화 로직
+// GAS �?초기??로직
 // ==========================================
 UAbilitySystemComponent* AGP_PlayerCharacter::GetAbilitySystemComponent() const
 {
@@ -100,7 +99,7 @@ void AGP_PlayerCharacter::OnRep_PlayerState()
 	
 	GetAbilitySystemComponent()->InitAbilityActorInfo(GetPlayerState(), this);
 	
-	// 클라이언트 환경 Sprinting 태그 리스너 바인딩
+	// ?�라?�언???�경 Sprinting ?�그 리스??바인??
 	GetAbilitySystemComponent()->RegisterGameplayTagEvent(GPTags::State::Movement::Sprinting, EGameplayTagEventType::NewOrRemoved).AddUObject(this, &ThisClass::OnSprintingTagChanged);
 	GetAbilitySystemComponent()->RegisterGameplayTagEvent(GPTags::State::Status::Fixed, EGameplayTagEventType::NewOrRemoved).AddUObject(this, &ThisClass::OnFixedTagChanged);
 
@@ -112,7 +111,7 @@ void AGP_PlayerCharacter::OnRep_PlayerState()
 
 void AGP_PlayerCharacter::AddMovementInput(FVector WorldDirection, float ScaleValue, bool bForce)
 {
-	// 기존 IsSprintExitControlLocked() 대신, ASC에서 직접 Fixed 태그만 검사
+	// 기존 IsSprintExitControlLocked() ?�?? ASC?�서 직접 Fixed ?�그�?검??
 	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
 	
 	if (!bForce && ASC && ASC->HasMatchingGameplayTag(GPTags::State::Status::Fixed))
@@ -128,18 +127,18 @@ void AGP_PlayerCharacter::ToggleSprinting()
 	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
 	if (!ASC) return;
 	
-	// Sprinting 토글을 위한 태그 요청 (어빌리티 동작을 가정)
+	// Sprinting ?��????�한 ?�그 ?�청 (?�빌리티 ?�작??가??
 	FGameplayTagContainer SprintTag;
 	SprintTag.AddTag(GPTags::State::Movement::Sprinting); 
 	
 	if (IsSprinting())
 	{
-		// 달리기 중이라면 어빌리티/태그 강제 취소
+		// ?�리�?중이?�면 ?�빌리티/?�그 강제 취소
 		ASC->CancelAbilities(&SprintTag);
 	}
 	else
 	{
-		// 걷기 중이라면 달리기 활성화 시도
+		// 걷기 중이?�면 ?�리�??�성???�도
 		ASC->TryActivateAbilitiesByTag(SprintTag);
 	}
 }
@@ -195,7 +194,7 @@ UAnimSequenceBase* AGP_PlayerCharacter::GetJumpLoopAnimation() const { return An
 
 void AGP_PlayerCharacter::OnSprintingTagChanged(const FGameplayTag CallbackTag, int32 NewCount)
 {
-	// ASC 델리게이트를 통해 Sprint 태그 개수가 변동될 때만 한 번씩 속도를 조절
+	// ASC ?�리게이?��? ?�해 Sprint ?�그 개수가 변?�될 ?�만 ??번씩 ?�도�?조절
 	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
 	{
 		MoveComp->MaxWalkSpeed = (NewCount > 0) ? SprintSpeed : NormalWalkSpeed;
@@ -206,7 +205,7 @@ void AGP_PlayerCharacter::OnFixedTagChanged(const FGameplayTag CallbackTag, int3
 {
 	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
 	{
-		// Fixed 태그가 있으면(공격 중 등) 이동 방향으로의 자동 회전을 끕니다.
+		// Fixed ?�그가 ?�으�?공격 �??? ?�동 방향?�로???�동 ?�전???�니??
 		MoveComp->bOrientRotationToMovement = (NewCount == 0);
 	}
 }
@@ -217,10 +216,10 @@ void AGP_PlayerCharacter::EquipSkill(UGP_SkillData* NewSkillData, FGameplayTag S
 {
 	if (!NewSkillData || !NewSkillData->AbilityClass) return;
 
-	// 1. 슬롯 제한 체크 (로그라이크 예외 지원)
+	// 1. ?�롯 ?�한 체크 (로그?�이???�외 지??
 	if (!bIgnoreRestrictions)
 	{
-		// 데이터 에셋에 허용 슬롯이 정의되어 있는데, 현재 요청한 슬롯이 그 안에 없다면 거부
+		// ?�이???�셋???�용 ?�롯???�의?�어 ?�는?? ?�재 ?�청???�롯??�??�에 ?�다�?거�?
 		if (!NewSkillData->SupportedSlotTags.IsEmpty() && !NewSkillData->SupportedSlotTags.HasTag(SlotTag))
 		{
 			UE_LOG(LogTemp, Warning, TEXT("Skill '%s' is not compatible with slot %s"), *NewSkillData->SkillName.ToString(), *SlotTag.ToString());
@@ -230,7 +229,7 @@ void AGP_PlayerCharacter::EquipSkill(UGP_SkillData* NewSkillData, FGameplayTag S
 
 	EquipSkillByClass(SlotTag, NewSkillData->AbilityClass);
 
-	// 교환 성공 알림 방송 (UI 연동용)
+	// 교환 ?�공 ?�림 방송 (UI ?�동??
 	if (OnSkillEquipped.IsBound())
 	{
 		OnSkillEquipped.Broadcast(SlotTag, NewSkillData);
@@ -242,7 +241,7 @@ void AGP_PlayerCharacter::EquipSkillByClass(FGameplayTag SlotTag, TSubclassOf<UG
 	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
 	if (!ASC || !NewAbilityClass || !HasAuthority()) return;
 
-	// 1. 기존 해당 슬롯에 있던 어빌리티 제거 (중복 방지)
+	// 1. 기존 ?�당 ?�롯???�던 ?�빌리티 ?�거 (중복 방�?)
 	const TArray<FGameplayAbilitySpec>& Specs = ASC->GetActivatableAbilities();
 	TArray<FGameplayAbilitySpecHandle> HandlesToRemove;
 	
@@ -259,7 +258,7 @@ void AGP_PlayerCharacter::EquipSkillByClass(FGameplayTag SlotTag, TSubclassOf<UG
 		ASC->ClearAbility(Handle);
 	}
 
-	// 2. 새 어빌리티 부여
+	// 2. ???�빌리티 부??
 	FGameplayAbilitySpec NewSpec(NewAbilityClass);
 	NewSpec.GetDynamicSpecSourceTags().AddTag(SlotTag); 
     

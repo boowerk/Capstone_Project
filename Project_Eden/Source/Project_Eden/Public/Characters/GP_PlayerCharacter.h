@@ -1,4 +1,4 @@
-ï»¿#pragma once
+#pragma once
 
 #include "CoreMinimal.h"
 #include "Characters/GP_BaseCharacter.h"
@@ -46,11 +46,11 @@ public:
 	UBlendSpace* GetLocomotionBlendSpace() const;
 	UAnimSequenceBase* GetJumpLoopAnimation() const;
 	
-	/** [ë°ì´í„° ì—ì…‹ ê¸°ë°˜] ëŸ°íƒ€ì„ ìŠ¤í‚¬ êµì²´ í•¨ìˆ˜ (bIgnoreRestrictionsë¡œ ë¡œê·¸ë¼ì´í¬ì‹ ì˜ˆì™¸ ì§€ì›) */
+	/** [µ¥ÀÌÅÍ ¿¡¼Â ±â¹İ] ·±Å¸ÀÓ ½ºÅ³ ±³Ã¼ ÇÔ¼ö (bIgnoreRestrictions·Î ·Î±×¶óÀÌÅ©½Ä ¿¹¿Ü Áö¿ø) */
 	UFUNCTION(BlueprintCallable, Category = "GAS|Combat")
 	void EquipSkill(UGP_SkillData* NewSkillData, FGameplayTag SlotTag, bool bIgnoreRestrictions = false);
 
-	/** êµ¬í˜• í˜¸í™˜ìš© (í´ë˜ìŠ¤ ì§ì ‘ êµì²´) */
+	/** ±¸Çü È£È¯¿ë (Å¬·¡½º Á÷Á¢ ±³Ã¼) */
 	UFUNCTION(BlueprintCallable, Category = "GAS|Combat", meta = (DeprecatedFunction, DeprecationMessage = "Use DataAsset version instead"))
 	void EquipSkillByClass(FGameplayTag SlotTag, TSubclassOf<UGameplayAbility> NewAbilityClass);
 
@@ -82,7 +82,7 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment|Weapon")
 	FName DefaultWeaponId = TEXT("WP_Common_Fire_Sword");
 	
-	// ì´ë™ ì†ë„
+	// ÀÌµ¿ ¼Óµµ
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Speed")
 	float NormalWalkSpeed = 210.0f; 
 
@@ -90,7 +90,7 @@ protected:
 	float SprintSpeed = 420.0f;
 
 	
-	// GAS íƒœê·¸ ì´ë²¤íŠ¸ ì½œë°±
+	// GAS ÅÂ±× ÀÌº¥Æ® Äİ¹é
 	void OnSprintingTagChanged(const FGameplayTag CallbackTag, int32 NewCount);
 	void OnFixedTagChanged(const FGameplayTag CallbackTag, int32 NewCount);
 	

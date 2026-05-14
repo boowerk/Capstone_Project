@@ -23,7 +23,7 @@ public:
 
 protected:
 	/** Chooser 또는 로직에 의해 선택된 현재 포즈 검색 데이터베이스 */
-	UPROPERTY(Transient, BlueprintReadWrite, Category = "MotionMatching")
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "MotionMatching")
 	TObjectPtr<UPoseSearchDatabase> SelectedPoseSearchDatabase;
 
 	/** 블루프린트(Chooser 결과 등)에서 DB를 공식적으로 세팅하는 경로 */
@@ -52,6 +52,10 @@ protected:
 	UPROPERTY(Transient, BlueprintReadOnly, Category = "MotionMatching|State")
 	bool IsPivoting = false;
 
+	/** Chooser/AnimBP에서 절댓값 처리 없이 바로 쓰도록 제공 */
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "MotionMatching|State")
+	float AbsControlYawDelta = 0.0f;
+
 	/** 로코모션 상태(Gait, Stance 등)를 일괄 갱신하는 함수 */
 	UFUNCTION(BlueprintCallable, Category = "MotionMatching|Update")
 	virtual void UpdateLocomotionStates();
@@ -72,6 +76,18 @@ protected:
 	bool bDebugMotionMatchingState = false;
 
 protected:
+	/** Turn In Place 튜닝(선택): 정지로 간주할 속도(이하) */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "MotionMatching|TurnInPlace", meta = (ClampMin = "0.0"))
+	float TurnInPlaceSpeedThreshold = 10.0f;
+
+	/** Turn In Place 튜닝(선택): 회전으로 간주할 Yaw Delta(이상, degrees) */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "MotionMatching|TurnInPlace", meta = (ClampMin = "0.0", ClampMax = "180.0"))
+	float TurnInPlaceYawThreshold = 45.0f;
+
+	/** Turn In Place 튜닝(선택): 회전으로 간주할 TurnRate(이상, deg/s) */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "MotionMatching|TurnInPlace", meta = (ClampMin = "0.0"))
+	float TurnInPlaceTurnRateThreshold = 90.0f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MotionMatching|Thresholds", meta = (ClampMin = "0.0"))
 	float IdleSpeedThreshold = 5.0f;
 

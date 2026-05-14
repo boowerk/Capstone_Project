@@ -47,6 +47,8 @@ void UGP_MotionMatchingAnimInstance::UpdateLocomotionStates()
 	const E_Stance PrevStance = Stance;
 	const E_MovementMode PrevMovementMode = MovementMode;
 	const E_MovementState PrevMovementState = MovementState;
+
+	AbsControlYawDelta = FMath::Abs(ControlYawDelta);
 	const EMovementMode NativeMovementMode = MovementComponent->MovementMode;
 	const bool bShouldBeInAir = bIsFalling || NativeMovementMode == MOVE_Falling;
 	const bool bSprintTagActive = HasSprintTag(Character);

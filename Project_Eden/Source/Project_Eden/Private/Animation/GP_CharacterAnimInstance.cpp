@@ -58,14 +58,6 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	Acceleration = MovementComponent->GetCurrentAcceleration();
 	GroundSpeed = Velocity.Size2D();
 	
-	// 캐릭터 로컬 방향으로 변환
-	const FVector LocalVelocity = Character->GetActorTransform().InverseTransformVectorNoScale(Velocity);
-	LocalVelocityDirection = LocalVelocity.GetSafeNormal2D();
-	LocalVelocityAngleDegrees = FMath::RadiansToDegrees(FMath::Atan2(LocalVelocity.Y, LocalVelocity.X));
-
-	const FVector LocalAcceleration = Character->GetActorTransform().InverseTransformVectorNoScale(Acceleration);
-	LocalAccelerationAngleDegrees = FMath::RadiansToDegrees(FMath::Atan2(LocalAcceleration.Y, LocalAcceleration.X));
-
 	const float ActorYaw = Character->GetActorRotation().Yaw;
 	TurnRate = DeltaSeconds > KINDA_SMALL_NUMBER
 		? FMath::FindDeltaAngleDegrees(PreviousActorYaw, ActorYaw) / DeltaSeconds
@@ -74,6 +66,14 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 
 	if (const AGP_PlayerController* PlayerController = Cast<AGP_PlayerController>(Character->GetController()))
 	{
+		const FRotator ReferenceRotation(0.0f, PlayerController->GetControlRotation().Yaw, 0.0f);
+		const FVector LocalVelocity = ReferenceRotation.UnrotateVector(Velocity);
+		LocalVelocityDirection = LocalVelocity.GetSafeNormal2D();
+		LocalVelocityAngleDegrees = FMath::RadiansToDegrees(FMath::Atan2(LocalVelocity.Y, LocalVelocity.X));
+
+		const FVector LocalAcceleration = ReferenceRotation.UnrotateVector(Acceleration);
+		LocalAccelerationAngleDegrees = FMath::RadiansToDegrees(FMath::Atan2(LocalAcceleration.Y, LocalAcceleration.X));
+
 		MoveInput = PlayerController->GetCurrentMoveInput();
 		bHasMoveInput = !MoveInput.IsNearlyZero();
 
@@ -86,6 +86,13 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	}
 	else
 	{
+		const FVector LocalVelocity = Character->GetActorTransform().InverseTransformVectorNoScale(Velocity);
+		LocalVelocityDirection = LocalVelocity.GetSafeNormal2D();
+		LocalVelocityAngleDegrees = FMath::RadiansToDegrees(FMath::Atan2(LocalVelocity.Y, LocalVelocity.X));
+
+		const FVector LocalAcceleration = Character->GetActorTransform().InverseTransformVectorNoScale(Acceleration);
+		LocalAccelerationAngleDegrees = FMath::RadiansToDegrees(FMath::Atan2(LocalAcceleration.Y, LocalAcceleration.X));
+
 		MoveInput = FVector2D::ZeroVector;
 		bHasMoveInput = false;
 		ControlYawDelta = 0.0f;
