@@ -8,7 +8,7 @@
 class UPoseSearchDatabase;
 
 /**
- * [마이그레이션 단계 4] Motion Matching 전용 애님 인스턴스.
+ * [마이그레이션 단계 4] Motion Matching 전용 애니메이션 인스턴스.
  * 공통 물리 데이터를 기반으로 MM/Chooser에 필요한 전략적 상태를 계산합니다.
  */
 UCLASS()
@@ -23,7 +23,7 @@ public:
 
 protected:
 	/** Chooser 또는 로직에 의해 선택된 현재 포즈 검색 데이터베이스 */
-	UPROPERTY(Transient, BlueprintReadOnly, Category = "MotionMatching")
+	UPROPERTY(Transient, BlueprintReadWrite, Category = "MotionMatching")
 	TObjectPtr<UPoseSearchDatabase> SelectedPoseSearchDatabase;
 
 	/** 블루프린트(Chooser 결과 등)에서 DB를 공식적으로 세팅하는 경로 */
@@ -31,7 +31,7 @@ protected:
 	void SetSelectedPoseSearchDatabase(UPoseSearchDatabase* NewDatabase);
 
 	/** 
-	 * [단일 진실원] C++ 에넘 기반 상태 변수.
+	 * [단일 진실원] C++ 열거형 기반 상태 변수.
 	 * 블루프린트 및 Chooser와의 타입 정렬을 보장합니다.
 	 */
 	UPROPERTY(Transient, BlueprintReadOnly, Category = "MotionMatching|State")
@@ -45,6 +45,12 @@ protected:
 
 	UPROPERTY(Transient, BlueprintReadOnly, Category = "MotionMatching|State")
 	E_MovementState MovementState;
+
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "MotionMatching|State")
+	bool IsStarting = false;
+
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "MotionMatching|State")
+	bool IsPivoting = false;
 
 	/** 로코모션 상태(Gait, Stance 등)를 일괄 갱신하는 함수 */
 	UFUNCTION(BlueprintCallable, Category = "MotionMatching|Update")
@@ -66,14 +72,37 @@ protected:
 	bool bDebugMotionMatchingState = false;
 
 protected:
-	// === 상태 계산용 임계값 (상수) ===
-	
-	/** 정지 상태로 간주할 최대 속도 */
-	static constexpr float IdleSpeedThreshold = 5.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MotionMatching|Thresholds", meta = (ClampMin = "0.0"))
+	float IdleSpeedThreshold = 5.0f;
 
-	/** 걷기에서 달리기로 전환되는 속도 임계값 */
-	static constexpr float WalkToRunThreshold = 250.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MotionMatching|Thresholds", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float WalkToRunSpeedRatio = 0.45f;
 
-	/** 달리기에서 전력 질주로 전환되는 속도 임계값 */
-	static constexpr float RunToSprintThreshold = 550.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MotionMatching|Thresholds", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float RunToSprintSpeedRatio = 0.85f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MotionMatching|Thresholds", meta = (ClampMin = "0.0"))
+	float MinimumSprintSpeed = 300.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MotionMatching|Thresholds", meta = (ClampMin = "0.0"))
+	float StartMinSpeedThreshold = 8.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MotionMatching|Thresholds", meta = (ClampMin = "0.0"))
+	float StartMaxSpeedThreshold = 135.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MotionMatching|Thresholds", meta = (ClampMin = "0.0"))
+	float StartMinAccelerationThreshold = 50.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MotionMatching|Thresholds", meta = (ClampMin = "0.0"))
+	float StartWindowSeconds = 0.22f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MotionMatching|Thresholds", meta = (ClampMin = "0.0"))
+	float PivotMinSpeedThreshold = 120.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MotionMatching|Thresholds", meta = (ClampMin = "0.0", ClampMax = "180.0"))
+	float PivotMinAngleDegrees = 70.0f;
+
+private:
+	float StartElapsedTime = 0.0f;
+	bool bWasMovingLastFrame = false;
 };

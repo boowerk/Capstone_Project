@@ -11,7 +11,7 @@ class UBlendSpace;
 class UAnimSequenceBase;
 
 /**
- * í”„ë¡œì íŠ¸ì˜ ëª¨ë“  ìºë¦­í„° ì• ë‹ˆë©”ì´ì…˜ ë¸”ë£¨í”„ë¦°íŠ¸ë¥¼ ìœ„í•œ ê³µí†µ ë² ì´ìŠ¤ í´ë˜ìŠ¤
+ * ÇÁ·ÎÁ§Æ®ÀÇ ¸ğµç Ä³¸¯ÅÍ ¾Ö´Ï¸ŞÀÌ¼Ç ºí·çÇÁ¸°Æ®¸¦ À§ÇÑ °øÅë º£ÀÌ½º Å¬·¡½º
  */
 UCLASS()
 class PROJECT_EDEN_API UGP_CharacterAnimInstance : public UAnimInstance
@@ -23,16 +23,16 @@ public:
 	virtual void NativeInitializeAnimation() override;
 	virtual void NativeUpdateAnimation(float DeltaSeconds) override;
 
-	/** ì™¸ë¶€(ìºë¦­í„° ë“±)ì—ì„œ ì• ë‹ˆë©”ì´ì…˜ ì„¸íŠ¸ë¥¼ ë™ì ìœ¼ë¡œ ì£¼ì…í•˜ê¸° ìœ„í•œ í•¨ìˆ˜ */
+	/** ¿ÜºÎ(Ä³¸¯ÅÍ µî)¿¡¼­ ¾Ö´Ï¸ŞÀÌ¼Ç ¼¼Æ®¸¦ µ¿ÀûÀ¸·Î ÁÖÀÔÇÏ±â À§ÇÑ ÇÔ¼ö */
 	UFUNCTION(BlueprintCallable, Category = "AnimationData")
 	void SetAnimationSet(UPDA_CharacterAnimationSet* NewSet);
 
 protected:
-	/** ìºë¦­í„°ë³„ ì• ë‹ˆë©”ì´ì…˜ ì„¸íŠ¸ ì—ì…‹ */
+	/** Ä³¸¯ÅÍº° ¾Ö´Ï¸ŞÀÌ¼Ç ¼¼Æ® ¿¡¼Â */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AnimationData")
 	TObjectPtr<UPDA_CharacterAnimationSet> AnimationSet;
 
-	// === Runtime Cached Assets (AnimGraphì—ì„œ ì§ì ‘ ì‚¬ìš©) ===
+	// === Runtime Cached Assets (AnimGraph¿¡¼­ Á÷Á¢ »ç¿ë) ===
 	
 	UPROPERTY(BlueprintReadOnly, Category = "AnimationData|Cached")
 	TObjectPtr<UBlendSpace> LocomotionBlendSpace;
@@ -43,15 +43,15 @@ protected:
 	UPROPERTY(BlueprintReadOnly, Category = "AnimationData|Cached")
 	TObjectPtr<UAnimSequenceBase> SprintStopAnimation;
 
-	/** í˜„ì¬ ì†Œìœ  ì¤‘ì¸ ìºë¦­í„° ìºì‹œ */
+	/** ÇöÀç ¼ÒÀ¯ ÁßÀÎ Ä³¸¯ÅÍ Ä³½Ã */
 	UPROPERTY(BlueprintReadOnly, Category = "Character")
 	TObjectPtr<ACharacter> Character;
 
-	/** ìºë¦­í„°ì˜ ë¬´ë¸Œë¨¼íŠ¸ ì»´í¬ë„ŒíŠ¸ ìºì‹œ */
+	/** Ä³¸¯ÅÍÀÇ ¹«ºê¸ÕÆ® ÄÄÆ÷³ÍÆ® Ä³½Ã */
 	UPROPERTY(BlueprintReadOnly, Category = "Character")
 	TObjectPtr<UCharacterMovementComponent> MovementComponent;
 
-	// === Locomotion Data (ìºë¦­í„° ê³µí†µ) ===
+	// === Locomotion Data (Ä³¸¯ÅÍ °øÅë) ===
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Locomotion")
 	FVector Velocity;
@@ -65,6 +65,27 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Locomotion")
 	FVector LocalVelocityDirection;
 
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Locomotion")
+    float LocalVelocityAngleDegrees;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Locomotion")
+    float LocalAccelerationAngleDegrees;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Locomotion")
+    FVector2D MoveInput;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Locomotion")
+    bool bHasMoveInput;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Locomotion")
+    float ControlYawDelta;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Locomotion")
+    float ControlYawDeltaRate;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Locomotion")
+    float TurnRate;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Locomotion")
 	bool bIsFalling;
 
@@ -76,4 +97,8 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Locomotion")
 	bool bIsAnyMontagePlaying;
+
+private:
+    float PreviousActorYaw = 0.0f;
+    float PreviousControlYawDelta = 0.0f;
 };

@@ -1,11 +1,19 @@
 #include "Animation/GP_CharacterAnimInstance.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Player/GP_PlayerController.h"
 
 UGP_CharacterAnimInstance::UGP_CharacterAnimInstance()
 {
-	// ìŠ¤í…Œì´íŠ¸ ë¨¸ì‹ ì˜ ì‹œí€€ìŠ¤ì—ì„œë„ ë£¨íŠ¸ ëª¨ì…˜ì´ ì‘ë™í•˜ë„ë¡ ì„¤ì •
+	// ½ºÅ×ÀÌÆ® ¸Ó½ÅÀÇ ½ÃÄö½º¿¡¼­µµ ·çÆ® ¸ğ¼ÇÀÌ ÀÛµ¿ÇÏµµ·Ï ¼³Á¤
 	RootMotionMode = ERootMotionMode::RootMotionFromEverything;
+	LocalVelocityAngleDegrees = 0.0f;
+	LocalAccelerationAngleDegrees = 0.0f;
+	MoveInput = FVector2D::ZeroVector;
+	bHasMoveInput = false;
+	ControlYawDelta = 0.0f;
+	ControlYawDeltaRate = 0.0f;
+	TurnRate = 0.0f;
 }
 
 void UGP_CharacterAnimInstance::NativeInitializeAnimation()
@@ -16,6 +24,7 @@ void UGP_CharacterAnimInstance::NativeInitializeAnimation()
 	if (Character)
 	{
 		MovementComponent = Character->GetCharacterMovement();
+		PreviousActorYaw = Character->GetActorRotation().Yaw;
 	}
 }
 
@@ -25,15 +34,16 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 
 	if (!Character || !MovementComponent)
 	{
-		// ìœ íš¨í•˜ì§€ ì•Šì„ ê²½ìš° ì¬ì‹œë„
+		// À¯È¿ÇÏÁö ¾ÊÀ» °æ¿ì Àç½Ãµµ
 		Character = Cast<ACharacter>(TryGetPawnOwner());
 		if (Character)
 		{
 			MovementComponent = Character->GetCharacterMovement();
+			PreviousActorYaw = Character->GetActorRotation().Yaw;
 		}
 	}
 
-	// ë°ì´í„° ì—ì…‹ìœ¼ë¡œë¶€í„° ì• ë‹ˆë©”ì´ì…˜ ìºì‹± (ë™ì  êµì²´ ì§€ì›)
+	// µ¥ÀÌÅÍ ¿¡¼ÂÀ¸·ÎºÎÅÍ ¾Ö´Ï¸ŞÀÌ¼Ç Ä³½Ì (µ¿Àû ±³Ã¼ Áö¿ø)
 	if (AnimationSet)
 	{
 		LocomotionBlendSpace = AnimationSet->LocomotionBlendSpace;
@@ -43,15 +53,47 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 
 	if (!Character || !MovementComponent) return;
 
-	// ì†ë„ ë° ì´ë™ ë°ì´í„° ì¶”ì¶œ
+	// ¼Óµµ ¹× ÀÌµ¿ µ¥ÀÌÅÍ ÃßÃâ
 	Velocity = Character->GetVelocity();
 	Acceleration = MovementComponent->GetCurrentAcceleration();
 	GroundSpeed = Velocity.Size2D();
 	
-	// ìºë¦­í„° ë¡œì»¬ ë°©í–¥ìœ¼ë¡œ ë³€í™˜
-	LocalVelocityDirection = Character->GetActorTransform().InverseTransformVectorNoScale(Velocity).GetSafeNormal2D();
+	// Ä³¸¯ÅÍ ·ÎÄÃ ¹æÇâÀ¸·Î º¯È¯
+	const FVector LocalVelocity = Character->GetActorTransform().InverseTransformVectorNoScale(Velocity);
+	LocalVelocityDirection = LocalVelocity.GetSafeNormal2D();
+	LocalVelocityAngleDegrees = FMath::RadiansToDegrees(FMath::Atan2(LocalVelocity.Y, LocalVelocity.X));
 
-	// ìƒíƒœ ë°ì´í„° ì—…ë°ì´íŠ¸
+	const FVector LocalAcceleration = Character->GetActorTransform().InverseTransformVectorNoScale(Acceleration);
+	LocalAccelerationAngleDegrees = FMath::RadiansToDegrees(FMath::Atan2(LocalAcceleration.Y, LocalAcceleration.X));
+
+	const float ActorYaw = Character->GetActorRotation().Yaw;
+	TurnRate = DeltaSeconds > KINDA_SMALL_NUMBER
+		? FMath::FindDeltaAngleDegrees(PreviousActorYaw, ActorYaw) / DeltaSeconds
+		: 0.0f;
+	PreviousActorYaw = ActorYaw;
+
+	if (const AGP_PlayerController* PlayerController = Cast<AGP_PlayerController>(Character->GetController()))
+	{
+		MoveInput = PlayerController->GetCurrentMoveInput();
+		bHasMoveInput = !MoveInput.IsNearlyZero();
+
+		const float CurrentControlYawDelta = FMath::FindDeltaAngleDegrees(ActorYaw, PlayerController->GetControlRotation().Yaw);
+		ControlYawDeltaRate = DeltaSeconds > KINDA_SMALL_NUMBER
+			? (CurrentControlYawDelta - PreviousControlYawDelta) / DeltaSeconds
+			: 0.0f;
+		ControlYawDelta = CurrentControlYawDelta;
+		PreviousControlYawDelta = CurrentControlYawDelta;
+	}
+	else
+	{
+		MoveInput = FVector2D::ZeroVector;
+		bHasMoveInput = false;
+		ControlYawDelta = 0.0f;
+		ControlYawDeltaRate = 0.0f;
+		PreviousControlYawDelta = 0.0f;
+	}
+
+	// »óÅÂ µ¥ÀÌÅÍ ¾÷µ¥ÀÌÆ®
 	bHasAcceleration = Acceleration.SizeSquared2D() > KINDA_SMALL_NUMBER;
 	bIsFalling = MovementComponent->IsFalling();
 	bIsCrouching = MovementComponent->IsCrouching();
@@ -64,7 +106,7 @@ void UGP_CharacterAnimInstance::SetAnimationSet(UPDA_CharacterAnimationSet* NewS
 	{
 		AnimationSet = NewSet;
 		
-		// ìºì‹œ ì¦‰ì‹œ ê°±ì‹ 
+		// Ä³½Ã Áï½Ã °»½Å
 		LocomotionBlendSpace = AnimationSet->LocomotionBlendSpace;
 		JumpLoopAnimation = AnimationSet->JumpLoopAnimation;
 		SprintStopAnimation = AnimationSet->SprintStopAnimation;
