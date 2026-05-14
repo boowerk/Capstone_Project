@@ -8,8 +8,8 @@
 class UPoseSearchDatabase;
 
 /**
- * [마이그레이션 단계 3] Motion Matching 전용 애님 인스턴스.
- * 승격된 C++ 에넘 타입을 직접 사용하여 타입 안전성을 확보합니다.
+ * [마이그레이션 단계 4] Motion Matching 전용 애님 인스턴스.
+ * 공통 물리 데이터를 기반으로 MM/Chooser에 필요한 전략적 상태를 계산합니다.
  */
 UCLASS()
 class PROJECT_EDEN_API UGP_MotionMatchingAnimInstance : public UGP_CharacterAnimInstance
@@ -42,7 +42,23 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MotionMatching|State")
 	E_MovementState MovementState;
 
-	/** Chooser를 통해 적절한 PoseSearchDatabase를 선택하는 함수 */
-	UFUNCTION(BlueprintCallable, Category = "MotionMatching")
+	/** 로코모션 상태(Gait, Stance 등)를 일괄 갱신하는 함수 */
+	UFUNCTION(BlueprintCallable, Category = "MotionMatching|Update")
+	virtual void UpdateLocomotionStates();
+
+	/** Chooser를 통해 적절한 PoseSearchDatabase를 선택하는 지점 */
+	UFUNCTION(BlueprintCallable, Category = "MotionMatching|Update")
 	virtual void UpdateMotionMatchingState();
+
+protected:
+	// === 상태 계산용 임계값 (상수) ===
+	
+	/** 정지 상태로 간주할 최대 속도 */
+	static constexpr float IdleSpeedThreshold = 5.0f;
+
+	/** 걷기에서 달리기로 전환되는 속도 임계값 */
+	static constexpr float WalkToRunThreshold = 250.0f;
+
+	/** 달리기에서 전력 질주로 전환되는 속도 임계값 */
+	static constexpr float RunToSprintThreshold = 550.0f;
 };
