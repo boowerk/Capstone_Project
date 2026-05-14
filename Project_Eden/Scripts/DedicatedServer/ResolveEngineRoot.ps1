@@ -50,11 +50,8 @@ if (Test-Path -LiteralPath $UProject) {
 
 if (-not [string]::IsNullOrWhiteSpace($engineAssociation)) {
     try {
-        $builds = Get-ItemProperty -Path "HKCU:\Software\Epic Games\Unreal Engine\Builds" -ErrorAction Stop
-        $buildProperty = $builds.PSObject.Properties[$engineAssociation]
-        if ($buildProperty) {
-            Add-Candidate $candidates $buildProperty.Value
-        }
+        $registeredBuild = Get-ItemPropertyValue -Path "HKCU:\Software\Epic Games\Unreal Engine\Builds" -Name $engineAssociation -ErrorAction Stop
+        Add-Candidate $candidates $registeredBuild
     } catch {
     }
 
@@ -93,6 +90,7 @@ if (Test-Path -LiteralPath $launcherInstalledPath) {
 }
 
 Add-Candidate $candidates "C:\Engine_server\Windows"
+Add-Candidate $candidates "C:\Engine\Windows"
 Add-Candidate $candidates "C:\Program Files\Epic Games\UE_5.7"
 Add-Candidate $candidates "C:\Program Files\Epic Games\UE_5.6"
 Add-Candidate $candidates "D:\Engine_server\Windows"
