@@ -8,8 +8,8 @@
 class UPoseSearchDatabase;
 
 /**
- * Motion Matching 및 Chooser를 사용하는 애니메이션 블루프린트를 위한 전용 애님 인스턴스.
- * ABP_UEFN_Puppet 등에서 부모 클래스로 사용됩니다.
+ * [마이그레이션 단계 3] Motion Matching 전용 애님 인스턴스.
+ * 승격된 C++ 에넘 타입을 직접 사용하여 타입 안전성을 확보합니다.
  */
 UCLASS()
 class PROJECT_EDEN_API UGP_MotionMatchingAnimInstance : public UGP_CharacterAnimInstance
@@ -26,7 +26,10 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MotionMatching")
 	TObjectPtr<UPoseSearchDatabase> SelectedPoseSearchDatabase;
 
-	/** Chooser 입력 및 MM 상태 전용 변수들 (승격된 C++ Enum 사용) */
+	/** 
+	 * [단일 진실원] C++ 에넘 기반 상태 변수.
+	 * 블루프린트 및 Chooser와의 타입 정렬을 보장합니다.
+	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MotionMatching|State")
 	E_Gait Gait;
 

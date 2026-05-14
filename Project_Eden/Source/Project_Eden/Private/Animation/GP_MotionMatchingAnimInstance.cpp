@@ -3,6 +3,7 @@
 
 UGP_MotionMatchingAnimInstance::UGP_MotionMatchingAnimInstance()
 {
+	// 승격된 C++ 에넘 타입으로 초기화
 	Gait = E_Gait::Walk;
 	Stance = E_Stance::Stand;
 	MovementMode = E_MovementMode::OnGround;
@@ -18,5 +19,5 @@ void UGP_MotionMatchingAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 
 void UGP_MotionMatchingAnimInstance::UpdateMotionMatchingState()
 {
-	// TODO: Chooser 평가 및 SelectedPoseSearchDatabase 갱신 로직
+	// TODO: 마이그레이션 단계 5에서 Chooser 평가 결과와 연동할 예정입니다.
 }
