@@ -23,6 +23,10 @@ public class Project_Eden : ModuleRules
             "GameplayTags",
             "AIModule",
             "NavigationSystem",
+            "PoseSearch",
+            "MotionTrajectory",
+            "AnimationWarpingRuntime",
+            "Chooser",
         });
 
 		PrivateDependencyModuleNames.AddRange(new string[] { 
