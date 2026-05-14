@@ -26,7 +26,7 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MotionMatching")
 	TObjectPtr<UPoseSearchDatabase> SelectedPoseSearchDatabase;
 
-	/** Chooser 입력 및 MM 상태 전용 변수들 (타입 안정성을 위해 전용 Enum 사용) */
+	/** Chooser 입력 및 MM 상태 전용 변수들 (승격된 C++ Enum 사용) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MotionMatching|State")
 	E_Gait Gait;
 
