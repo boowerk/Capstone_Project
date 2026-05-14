@@ -2,15 +2,14 @@
 
 #include "CoreMinimal.h"
 #include "Animation/GP_CharacterAnimInstance.h"
+#include "GP_AnimationTypes.h"
 #include "GP_MotionMatchingAnimInstance.generated.h"
 
 class UPoseSearchDatabase;
 
 /**
- * Motion Matching, Chooser를 사용하는 애니메이션 블루프린트를 위한 전용 애님 인스턴스
- * 기존 블루프린트 Enum 에셋 사용 
- * 경로는 (/Game/Blueprints/Data/E_*) 
- * 관리는 uint8로 상태 관리
+ * Motion Matching 및 Chooser를 사용하는 애니메이션 블루프린트를 위한 전용 애님 인스턴스.
+ * ABP_UEFN_Puppet 등에서 부모 클래스로 사용됩니다.
  */
 UCLASS()
 class PROJECT_EDEN_API UGP_MotionMatchingAnimInstance : public UGP_CharacterAnimInstance
@@ -23,24 +22,22 @@ public:
 	virtual void NativeUpdateAnimation(float DeltaSeconds) override;
 
 protected:
-	/** Chooser 또는 로직으로 선택된 현재 포즈 검색 DB  */
+	/** Chooser 또는 로직에 의해 선택된 현재 포즈 검색 데이터베이스 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MotionMatching")
 	TObjectPtr<UPoseSearchDatabase> SelectedPoseSearchDatabase;
 
-	/** 
-	 * Chooser 입력 상태 변수들
-	 */
+	/** Chooser 입력 및 MM 상태 전용 변수들 (타입 안정성을 위해 전용 Enum 사용) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MotionMatching|State")
-	uint8 Gait;
+	E_Gait Gait;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MotionMatching|State")
-	uint8 Stance;
+	E_Stance Stance;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MotionMatching|State")
-	uint8 MovementMode;
+	E_MovementMode MovementMode;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MotionMatching|State")
-	uint8 MovementState;
+	E_MovementState MovementState;
 
 	/** Chooser를 통해 적절한 PoseSearchDatabase를 선택하는 함수 */
 	UFUNCTION(BlueprintCallable, Category = "MotionMatching")
