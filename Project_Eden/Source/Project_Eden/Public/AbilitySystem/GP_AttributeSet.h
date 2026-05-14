@@ -21,6 +21,7 @@ class PROJECT_EDEN_API UGP_AttributeSet : public UAttributeSet
 {
 	GENERATED_BODY()
 public:
+	UGP_AttributeSet();
 	using ThisClass = UGP_AttributeSet;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	virtual void PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data) override;

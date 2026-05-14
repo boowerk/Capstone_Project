@@ -3,6 +3,16 @@
 #include "Net/UnrealNetwork.h"
 #include "GameplayTags/GP_Tags.h"
 
+UGP_AttributeSet::UGP_AttributeSet()
+{
+	InitHealth(100.f);
+	InitMaxHealth(100.f);
+	InitMana(100.f);
+	InitMaxMana(100.f);
+	InitToughness(100.f);
+	InitMaxToughness(100.f);
+}
+
 void UGP_AttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
