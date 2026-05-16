@@ -18,7 +18,7 @@ namespace
 
 UGP_MotionMatchingAnimInstance::UGP_MotionMatchingAnimInstance()
 {
-	// 초기값 설정
+	// Initialize conservative defaults before the first update.
 	Gait = E_Gait::Walk;
 	Stance = E_Stance::Stand;
 	MovementMode = E_MovementMode::OnGround;
@@ -27,17 +27,17 @@ UGP_MotionMatchingAnimInstance::UGP_MotionMatchingAnimInstance()
 
 void UGP_MotionMatchingAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 {
-	// 1. 공통 데이터 업데이트 (Velocity, GroundSpeed 등)
+	// 1. Refresh shared locomotion data first.
 	Super::NativeUpdateAnimation(DeltaSeconds);
 	StartElapsedTime += DeltaSeconds;
 
-	// 2. 캐릭터 및 컴포넌트 유효성 확인 (부모 클래스에서 캐싱됨)
+	// 2. Abort if the pawn or movement component is still unavailable.
 	if (!Character || !MovementComponent) return;
 
-	// 3. Motion Matching 전용 상태 계산
+	// 3. Evaluate locomotion state for motion matching.
 	UpdateLocomotionStates();
 
-	// 4. Chooser 기반 데이터베이스 선택 (확장 지원)
+	// 4. Let the chooser select the active pose database.
 	UpdateMotionMatchingState();
 }
 
@@ -58,6 +58,7 @@ void UGP_MotionMatchingAnimInstance::UpdateLocomotionStates()
 	const float DynamicRunToSprintThreshold = bSprintSpeedAvailable
 		? FMath::Clamp(MaxSpeed * RunToSprintSpeedRatio, DynamicWalkToRunThreshold + 1.0f, MaxSpeed)
 		: TNumericLimits<float>::Max();
+	const float StartSpeedCeiling = FMath::Min(StartMaxSpeedThreshold, DynamicWalkToRunThreshold);
 	const float AccelerationMagnitude = Acceleration.Size2D();
 	const bool bHasMeaningfulAcceleration = AccelerationMagnitude >= StartMinAccelerationThreshold;
 	const bool bHasDedicatedRunBand = MaxSpeed > MinimumSprintSpeed;
@@ -65,13 +66,13 @@ void UGP_MotionMatchingAnimInstance::UpdateLocomotionStates()
 	const bool bJustStartedMoving = !bWasMovingLastFrame && bIsMovingNow && bHasMeaningfulAcceleration;
 	const bool bWithinStartWindow = StartElapsedTime <= StartWindowSeconds;
 
-	// 3-1. Stance 계산
+	// 3-1. Resolve stance.
 	Stance = bIsCrouching ? E_Stance::Crouch : E_Stance::Stand;
 
-	// 3-2. MovementMode 계산
+	// 3-2. Resolve movement mode.
 	MovementMode = bShouldBeInAir ? E_MovementMode::InAir : E_MovementMode::OnGround;
 
-	// 3-3. Gait 계산 (현재 속도 및 스프린트 의도 기반)
+	// 3-3. Resolve gait from the same dynamic thresholds the sample uses.
 	if (Stance == E_Stance::Crouch)
 	{
 		Gait = E_Gait::Walk;
@@ -89,10 +90,10 @@ void UGP_MotionMatchingAnimInstance::UpdateLocomotionStates()
 		Gait = E_Gait::Walk;
 	}
 
-	// 3-4. MovementState 계산
+	// 3-4. Resolve movement state.
 	if (MovementMode == E_MovementMode::InAir)
 	{
-		// 공중에 있을 때는 Moving 상태로 간주 (필요 시 Jump/Fall 분리 가능)
+		// Treat any airborne state as moving for chooser purposes.
 		MovementState = E_MovementState::Moving;
 	}
 	else if (GroundSpeed < IdleSpeedThreshold)
@@ -113,14 +114,23 @@ void UGP_MotionMatchingAnimInstance::UpdateLocomotionStates()
 		&& MovementState == E_MovementState::Moving
 		&& bHasMeaningfulAcceleration
 		&& bWithinStartWindow
+		&& !bShouldBeInAir
+		&& !bWasMovingLastFrame
 		&& GroundSpeed >= StartMinSpeedThreshold
-		&& GroundSpeed <= StartMaxSpeedThreshold;
+		&& GroundSpeed <= StartSpeedCeiling
+		&& Gait != E_Gait::Sprint;
 
 	IsPivoting = MovementMode == E_MovementMode::OnGround
 		&& MovementState == E_MovementState::Moving
 		&& GroundSpeed >= PivotMinSpeedThreshold
 		&& bHasMeaningfulAcceleration
 		&& FMath::Abs(LocalVelocityAngleDegrees) >= PivotMinAngleDegrees;
+
+	if (MovementState == E_MovementState::Idle)
+	{
+		IsStarting = false;
+		IsPivoting = false;
+	}
 
 	bWasMovingLastFrame = bIsMovingNow;
 
@@ -150,7 +160,6 @@ void UGP_MotionMatchingAnimInstance::SetSelectedPoseSearchDatabase(UPoseSearchDa
 
 void UGP_MotionMatchingAnimInstance::UpdateMotionMatchingState_Implementation()
 {
-	// [알림] 현재 단계에서는 상태 계산까지만 C++에서 담당합니다.
-	// 실제 SelectedPoseSearchDatabase의 결정은 AnimBP에서 Chooser Table을 평가하여
-	// 본 함수를 Override하고 SetSelectedPoseSearchDatabase()를 호출하는 방식으로 확장합니다.
+	// Anim blueprints override this hook and assign the active pose database.
 }
+

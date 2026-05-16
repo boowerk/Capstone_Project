@@ -1,6 +1,7 @@
 ﻿#include "Characters/GP_BaseCharacter.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystem/GP_AttributeSet.h"
+#include "GameplayTags/GP_Tags.h"
 #include "Items/WeaponItemTypes.h"
 #include "UI/GP_DamageNumberActor.h"
 #include "Animation/PDA_CharacterAnimationSet.h"
@@ -30,22 +31,32 @@ void AGP_BaseCharacter::UpdateAnimationSet()
 {
 	if (!IsValid(AnimationSet)) return;
 
-	// 1. 스켈레탈 메시 업데이트
-	if (AnimationSet->CharacterMesh)
-	{
-		GetMesh()->SetSkeletalMeshAsset(AnimationSet->CharacterMesh);
-	}
+	TArray<USkeletalMeshComponent*> SkeletalMeshComponents;
+	GetComponents(SkeletalMeshComponents);
 
-	// 2. 애니메이션 블루프린트 클래스 교체 (스켈레톤 불일치 해결)
-	if (AnimationSet->AnimBlueprintClass)
+	for (USkeletalMeshComponent* MeshComponent : SkeletalMeshComponents)
 	{
-		GetMesh()->SetAnimInstanceClass(AnimationSet->AnimBlueprintClass);
-	}
+		if (!IsValid(MeshComponent))
+		{
+			continue;
+		}
 
-	// 3. 애니메이션 데이터 주입
-	if (UGP_CharacterAnimInstance* AnimInst = Cast<UGP_CharacterAnimInstance>(GetMesh()->GetAnimInstance()))
-	{
-		AnimInst->SetAnimationSet(AnimationSet);
+		const bool bIsPrimaryMesh = MeshComponent == GetMesh();
+
+		if (bIsPrimaryMesh && AnimationSet->CharacterMesh)
+		{
+			MeshComponent->SetSkeletalMeshAsset(AnimationSet->CharacterMesh);
+		}
+
+		if (bIsPrimaryMesh && AnimationSet->AnimBlueprintClass)
+		{
+			MeshComponent->SetAnimInstanceClass(AnimationSet->AnimBlueprintClass);
+		}
+
+		if (UGP_CharacterAnimInstance* AnimInst = Cast<UGP_CharacterAnimInstance>(MeshComponent->GetAnimInstance()))
+		{
+			AnimInst->SetAnimationSet(AnimationSet);
+		}
 	}
 }
 
