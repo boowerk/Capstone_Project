@@ -106,20 +106,20 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MotionMatching|Thresholds", meta = (ClampMin = "0.0"))
 	float IdleSpeedThreshold = 5.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MotionMatching|Thresholds", meta = (ClampMin = "0.0", ClampMax = "1.0"))
-	float WalkToRunSpeedRatio = 0.45f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MotionMatching|Thresholds", meta = (ClampMin = "0.0", ClampMax = "1.0"))
-	float RunToSprintSpeedRatio = 0.85f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MotionMatching|Thresholds", meta = (ClampMin = "0.0"))
+	float WalkSpeedThreshold = 210.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MotionMatching|Thresholds", meta = (ClampMin = "0.0"))
-	float MinimumSprintSpeed = 300.0f;
+	float RunSpeedThreshold = 600.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MotionMatching|Thresholds", meta = (ClampMin = "0.0"))
+	float SprintSpeedThreshold = 800.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MotionMatching|Thresholds", meta = (ClampMin = "0.0"))
 	float StartMinSpeedThreshold = 8.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MotionMatching|Thresholds", meta = (ClampMin = "0.0"))
-	float StartMaxSpeedThreshold = 135.0f;
+	float StartMaxSpeedThreshold = 250.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MotionMatching|Thresholds", meta = (ClampMin = "0.0"))
 	float StartMinAccelerationThreshold = 50.0f;
@@ -128,7 +128,7 @@ protected:
 	float StartWindowSeconds = 0.22f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MotionMatching|Thresholds", meta = (ClampMin = "0.0"))
-	float PivotMinSpeedThreshold = 120.0f;
+	float PivotMinSpeedThreshold = 250.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MotionMatching|Thresholds", meta = (ClampMin = "0.0", ClampMax = "180.0"))
 	float PivotMinAngleDegrees = 70.0f;

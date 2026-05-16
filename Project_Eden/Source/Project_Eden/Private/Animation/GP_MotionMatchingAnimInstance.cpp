@@ -54,16 +54,9 @@ void UGP_MotionMatchingAnimInstance::UpdateLocomotionStates()
 	const EMovementMode NativeMovementMode = MovementComponent->MovementMode;
 	const bool bShouldBeInAir = bIsFalling || NativeMovementMode == MOVE_Falling;
 	const bool bSprintTagActive = HasSprintTag(Character);
-	const float MaxSpeed = FMath::Max(MovementComponent->GetMaxSpeed(), 1.0f);
-	const float DynamicWalkToRunThreshold = FMath::Clamp(MaxSpeed * WalkToRunSpeedRatio, IdleSpeedThreshold + 1.0f, MaxSpeed);
-	const bool bSprintSpeedAvailable = MaxSpeed >= MinimumSprintSpeed;
-	const float DynamicRunToSprintThreshold = bSprintSpeedAvailable
-		? FMath::Clamp(MaxSpeed * RunToSprintSpeedRatio, DynamicWalkToRunThreshold + 1.0f, MaxSpeed)
-		: TNumericLimits<float>::Max();
-	const float StartSpeedCeiling = FMath::Min(StartMaxSpeedThreshold, DynamicWalkToRunThreshold);
+
 	const float AccelerationMagnitude = Acceleration.Size2D();
 	const bool bHasMeaningfulAcceleration = AccelerationMagnitude >= StartMinAccelerationThreshold;
-	const bool bHasDedicatedRunBand = MaxSpeed > MinimumSprintSpeed;
 	const bool bIsMovingNow = GroundSpeed >= StartMinSpeedThreshold;
 	const bool bJustStartedMoving = !bWasMovingLastFrame && bIsMovingNow && bHasMeaningfulAcceleration;
 	const bool bWithinStartWindow = StartElapsedTime <= StartWindowSeconds;
@@ -74,16 +67,16 @@ void UGP_MotionMatchingAnimInstance::UpdateLocomotionStates()
 	// 3-2. Resolve movement mode.
 	MovementMode = bShouldBeInAir ? E_MovementMode::InAir : E_MovementMode::OnGround;
 
-	// 3-3. Resolve gait from the same dynamic thresholds the sample uses.
+	// 3-3. Resolve gait based on absolute thresholds.
 	if (Stance == E_Stance::Crouch)
 	{
 		Gait = E_Gait::Walk;
 	}
-	else if (bSprintTagActive || (bSprintSpeedAvailable && GroundSpeed >= DynamicRunToSprintThreshold))
+	else if (bSprintTagActive || GroundSpeed >= RunSpeedThreshold)
 	{
 		Gait = E_Gait::Sprint;
 	}
-	else if (bHasDedicatedRunBand && GroundSpeed >= DynamicWalkToRunThreshold)
+	else if (GroundSpeed >= WalkSpeedThreshold)
 	{
 		Gait = E_Gait::Run;
 	}
@@ -113,8 +106,6 @@ void UGP_MotionMatchingAnimInstance::UpdateLocomotionStates()
 	}
 
 	// 3-5. Resolve Start and Pivot states based on specific criteria.
-	// Start is active within the window (e.g., 0.22s) if we are moving on ground and not sprinting.
-	// We allow it to stay true for the duration of StartWindowSeconds once triggered.
 	const bool bValidStartSpeed = GroundSpeed >= StartMinSpeedThreshold && GroundSpeed <= StartMaxSpeedThreshold;
 	
 	IsStarting = bWithinStartWindow
@@ -144,17 +135,16 @@ void UGP_MotionMatchingAnimInstance::UpdateLocomotionStates()
 	{
 		if (PrevGait != Gait || PrevStance != Stance || PrevMovementMode != MovementMode || PrevMovementState != MovementState)
 		{
-			UE_LOG(LogTemp, Log, TEXT("[MMState] Gait:%d->%d Stance:%d->%d Mode:%d->%d State:%d->%d Speed:%.1f WalkToRun:%.1f RunToSprint:%.1f SprintTag:%d Falling:%d Crouch:%d"),
+			UE_LOG(LogTemp, Log, TEXT("[MMState] Gait:%d->%d Stance:%d->%d Mode:%d->%d State:%d->%d Speed:%.1f Thresholds(W:%.1f, R:%.1f, S:%.1f) SprintTag:%d"),
 				(int32)PrevGait, (int32)Gait,
 				(int32)PrevStance, (int32)Stance,
 				(int32)PrevMovementMode, (int32)MovementMode,
 				(int32)PrevMovementState, (int32)MovementState,
 				GroundSpeed,
-				DynamicWalkToRunThreshold,
-				bSprintSpeedAvailable ? DynamicRunToSprintThreshold : -1.0f,
-				bSprintTagActive ? 1 : 0,
-				bShouldBeInAir ? 1 : 0,
-				bIsCrouching ? 1 : 0);
+				WalkSpeedThreshold,
+				RunSpeedThreshold,
+				SprintSpeedThreshold,
+				bSprintTagActive ? 1 : 0);
 		}
 	}
 }

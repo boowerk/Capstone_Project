@@ -4,6 +4,7 @@
 #include "Characters/GP_BaseCharacter.h"
 #include "AbilitySystemInterface.h"
 #include "GameplayTagContainer.h"
+#include "GameplayEffectTypes.h"
 #include "GP_PlayerCharacter.generated.h"
 
 class USpringArmComponent;
@@ -46,11 +47,11 @@ public:
 	UBlendSpace* GetLocomotionBlendSpace() const;
 	UAnimSequenceBase* GetJumpLoopAnimation() const;
 	
-	/** [������ ���� ���] ��Ÿ�� ��ų ��ü �Լ� (bIgnoreRestrictions�� �α׶���ũ�� ���� ����) */
+	/** [  ] Ÿ ų ü Լ (bIgnoreRestrictions α׶ũ  ) */
 	UFUNCTION(BlueprintCallable, Category = "GAS|Combat")
 	void EquipSkill(UGP_SkillData* NewSkillData, FGameplayTag SlotTag, bool bIgnoreRestrictions = false);
 
-	/** ���� ȣȯ�� (Ŭ���� ���� ��ü) */
+	/**  ȣȯ (Ŭ  ü) */
 	UFUNCTION(BlueprintCallable, Category = "GAS|Combat", meta = (DeprecatedFunction, DeprecationMessage = "Use DataAsset version instead"))
 	void EquipSkillByClass(FGameplayTag SlotTag, TSubclassOf<UGameplayAbility> NewAbilityClass);
 
@@ -82,16 +83,17 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment|Weapon")
 	FName DefaultWeaponId = TEXT("WP_Common_Fire_Sword");
 	
-	// �̵� �ӵ�
+	// ̵ ӵ
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Speed")
-	float NormalWalkSpeed = 375.0f; 
+	float NormalWalkSpeed = 500.0f; 
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Speed")
-	float SprintSpeed = 600.0f;
+	float SprintSpeed = 700.0f;
 
 	
-	// GAS �±� �̺�Ʈ �ݹ�
+	// GAS ± ̺Ʈ ݹ
 	void OnSprintingTagChanged(const FGameplayTag CallbackTag, int32 NewCount);
 	void OnFixedTagChanged(const FGameplayTag CallbackTag, int32 NewCount);
+	void OnMoveSpeedAttributeChanged(const FOnAttributeChangeData& Data);
 	
 };
