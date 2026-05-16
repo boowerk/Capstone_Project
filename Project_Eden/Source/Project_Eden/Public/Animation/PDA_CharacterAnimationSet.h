@@ -16,6 +16,10 @@ class PROJECT_EDEN_API UPDA_CharacterAnimationSet : public UPrimaryDataAsset
 	GENERATED_BODY()
 
 public:
+	/** 이 애니메이션 셋의 설정을 스켈레톤 및 캐릭터에 강제로 적용할지 여부 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Setup")
+	bool bForceApply = true;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Visual")
 	TObjectPtr<USkeletalMesh> CharacterMesh;
 

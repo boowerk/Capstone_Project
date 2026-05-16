@@ -43,18 +43,24 @@ void AGP_BaseCharacter::UpdateAnimationSet()
 
 		const bool bIsPrimaryMesh = MeshComponent == GetMesh();
 
-		if (bIsPrimaryMesh && AnimationSet->CharacterMesh)
+		// PDA의 bForceApply가 켜져있을 때만 메쉬와 애니메이션 블루프린트 클래스를 강제로 변경함
+		if (AnimationSet->bForceApply && bIsPrimaryMesh)
 		{
-			MeshComponent->SetSkeletalMeshAsset(AnimationSet->CharacterMesh);
-		}
+			if (AnimationSet->CharacterMesh)
+			{
+				MeshComponent->SetSkeletalMeshAsset(AnimationSet->CharacterMesh);
+			}
 
-		if (bIsPrimaryMesh && AnimationSet->AnimBlueprintClass)
-		{
-			MeshComponent->SetAnimInstanceClass(AnimationSet->AnimBlueprintClass);
+			if (AnimationSet->AnimBlueprintClass)
+			{
+				MeshComponent->SetAnimInstanceClass(AnimationSet->AnimBlueprintClass);
+			}
 		}
 
 		if (UGP_CharacterAnimInstance* AnimInst = Cast<UGP_CharacterAnimInstance>(MeshComponent->GetAnimInstance()))
 		{
+			// 애니메이션 인스턴스의 강제 적용 플래그를 PDA의 플래그와 동기화
+			AnimInst->bForceApplyAnimationSet = AnimationSet->bForceApply;
 			AnimInst->SetAnimationSet(AnimationSet);
 		}
 	}

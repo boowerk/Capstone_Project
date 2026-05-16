@@ -52,6 +52,21 @@ protected:
 	UPROPERTY(Transient, BlueprintReadOnly, Category = "MotionMatching|State")
 	bool IsPivoting = false;
 
+public:
+	// UI 및 외부 접근을 위한 Getter
+	UFUNCTION(BlueprintPure, Category = "MotionMatching|State")
+	E_Gait GetGait() const { return Gait; }
+
+	UFUNCTION(BlueprintPure, Category = "MotionMatching|State")
+	bool GetIsStarting() const { return IsStarting; }
+
+	UFUNCTION(BlueprintPure, Category = "MotionMatching|State")
+	bool GetIsPivoting() const { return IsPivoting; }
+
+	UFUNCTION(BlueprintPure, Category = "MotionMatching|State")
+	float GetGroundSpeed() const { return GroundSpeed; }
+
+protected:
 	/** Chooser/AnimBP에서 절댓값 처리 없이 바로 쓰도록 제공 */
 	UPROPERTY(Transient, BlueprintReadOnly, Category = "MotionMatching|State")
 	float AbsControlYawDelta = 0.0f;

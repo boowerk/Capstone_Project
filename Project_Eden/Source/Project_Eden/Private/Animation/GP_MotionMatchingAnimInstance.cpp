@@ -1,4 +1,6 @@
 #include "Animation/GP_MotionMatchingAnimInstance.h"
+#include "UI/GP_MotionMatchingDebugWidget.h"
+#include "Blueprint/UserWidget.h"
 #include "PoseSearch/PoseSearchDatabase.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -110,26 +112,30 @@ void UGP_MotionMatchingAnimInstance::UpdateLocomotionStates()
 		StartElapsedTime = 0.0f;
 	}
 
-	IsStarting = MovementMode == E_MovementMode::OnGround
+	// 3-5. Resolve Start and Pivot states based on specific criteria.
+	// Start is active within the window (e.g., 0.22s) if we are moving on ground and not sprinting.
+	// We allow it to stay true for the duration of StartWindowSeconds once triggered.
+	const bool bValidStartSpeed = GroundSpeed >= StartMinSpeedThreshold && GroundSpeed <= StartMaxSpeedThreshold;
+	
+	IsStarting = bWithinStartWindow
+		&& MovementMode == E_MovementMode::OnGround
 		&& MovementState == E_MovementState::Moving
-		&& bHasMeaningfulAcceleration
-		&& bWithinStartWindow
-		&& !bShouldBeInAir
-		&& !bWasMovingLastFrame
-		&& GroundSpeed >= StartMinSpeedThreshold
-		&& GroundSpeed <= StartSpeedCeiling
+		&& bValidStartSpeed
 		&& Gait != E_Gait::Sprint;
 
+	// Pivot is active when turning sharply at sufficient speed.
 	IsPivoting = MovementMode == E_MovementMode::OnGround
 		&& MovementState == E_MovementState::Moving
 		&& GroundSpeed >= PivotMinSpeedThreshold
 		&& bHasMeaningfulAcceleration
 		&& FMath::Abs(LocalVelocityAngleDegrees) >= PivotMinAngleDegrees;
 
+	// Force clear states if idle.
 	if (MovementState == E_MovementState::Idle)
 	{
 		IsStarting = false;
 		IsPivoting = false;
+		StartElapsedTime = StartWindowSeconds + 1.0f; // Reset window
 	}
 
 	bWasMovingLastFrame = bIsMovingNow;

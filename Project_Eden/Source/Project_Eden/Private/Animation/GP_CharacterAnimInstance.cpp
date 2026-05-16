@@ -44,7 +44,7 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	}
 
 	// Refresh animation asset references from the data asset.
-	if (AnimationSet)
+	if (AnimationSet && bForceApplyAnimationSet)
 	{
 		LocomotionBlendSpace = AnimationSet->LocomotionBlendSpace;
 		JumpLoopAnimation = AnimationSet->JumpLoopAnimation;
@@ -113,10 +113,13 @@ void UGP_CharacterAnimInstance::SetAnimationSet(UPDA_CharacterAnimationSet* NewS
 	{
 		AnimationSet = NewSet;
 		
-		// Refresh cached references immediately.
-		LocomotionBlendSpace = AnimationSet->LocomotionBlendSpace;
-		JumpLoopAnimation = AnimationSet->JumpLoopAnimation;
-		SprintStopAnimation = AnimationSet->SprintStopAnimation;
+		// Refresh cached references immediately if force apply is enabled.
+		if (bForceApplyAnimationSet)
+		{
+			LocomotionBlendSpace = AnimationSet->LocomotionBlendSpace;
+			JumpLoopAnimation = AnimationSet->JumpLoopAnimation;
+			SprintStopAnimation = AnimationSet->SprintStopAnimation;
+		}
 	}
 }
 

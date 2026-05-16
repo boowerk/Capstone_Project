@@ -11,7 +11,7 @@ class UBlendSpace;
 class UAnimSequenceBase;
 
 /**
- * ÇÁ·ÎÁ§Æ®ÀÇ ¸ğµç Ä³¸¯ÅÍ ¾Ö´Ï¸ŞÀÌ¼Ç ºí·çÇÁ¸°Æ®¸¦ À§ÇÑ °øÅë º£ÀÌ½º Å¬·¡½º
+ * ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ®ï¿½ï¿½ ï¿½ï¿½ï¿½ Ä³ï¿½ï¿½ï¿½ï¿½ ï¿½Ö´Ï¸ï¿½ï¿½Ì¼ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ®ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ì½ï¿½ Å¬ï¿½ï¿½ï¿½ï¿½
  */
 UCLASS()
 class PROJECT_EDEN_API UGP_CharacterAnimInstance : public UAnimInstance
@@ -23,16 +23,21 @@ public:
 	virtual void NativeInitializeAnimation() override;
 	virtual void NativeUpdateAnimation(float DeltaSeconds) override;
 
-	/** ¿ÜºÎ(Ä³¸¯ÅÍ µî)¿¡¼­ ¾Ö´Ï¸ŞÀÌ¼Ç ¼¼Æ®¸¦ µ¿ÀûÀ¸·Î ÁÖÀÔÇÏ±â À§ÇÑ ÇÔ¼ö */
+	/** ï¿½Üºï¿½(Ä³ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½)ï¿½ï¿½ï¿½ï¿½ ï¿½Ö´Ï¸ï¿½ï¿½Ì¼ï¿½ ï¿½ï¿½Æ®ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï±ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ô¼ï¿½ */
 	UFUNCTION(BlueprintCallable, Category = "AnimationData")
 	void SetAnimationSet(UPDA_CharacterAnimationSet* NewSet);
 
-protected:
-	/** Ä³¸¯ÅÍº° ¾Ö´Ï¸ŞÀÌ¼Ç ¼¼Æ® ¿¡¼Â */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AnimationData")
-	TObjectPtr<UPDA_CharacterAnimationSet> AnimationSet;
+/** ì• ë‹ˆë©”ì´ì…˜ ì…‹ì˜ ì—ì…‹ë“¤ì„ ì‹¤ì‹œê°„ìœ¼ë¡œ ê°•ì œ ì ìš©í• ì§€ ì—¬ë¶€ */
+UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AnimationData")
+bool bForceApplyAnimationSet = true;
 
-	// === Runtime Cached Assets (AnimGraph¿¡¼­ Á÷Á¢ »ç¿ë) ===
+protected:
+/** Ä³Íº Ö´Ï¸Ì¼ Æ®  */
+UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AnimationData")
+TObjectPtr<UPDA_CharacterAnimationSet> AnimationSet;
+
+
+	// === Runtime Cached Assets (AnimGraphï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½) ===
 	
 	UPROPERTY(BlueprintReadOnly, Category = "AnimationData|Cached")
 	TObjectPtr<UBlendSpace> LocomotionBlendSpace;
@@ -43,15 +48,15 @@ protected:
 	UPROPERTY(BlueprintReadOnly, Category = "AnimationData|Cached")
 	TObjectPtr<UAnimSequenceBase> SprintStopAnimation;
 
-	/** ÇöÀç ¼ÒÀ¯ ÁßÀÎ Ä³¸¯ÅÍ Ä³½Ã */
+	/** ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ Ä³ï¿½ï¿½ï¿½ï¿½ Ä³ï¿½ï¿½ */
 	UPROPERTY(BlueprintReadOnly, Category = "Character")
 	TObjectPtr<ACharacter> Character;
 
-	/** Ä³¸¯ÅÍÀÇ ¹«ºê¸ÕÆ® ÄÄÆ÷³ÍÆ® Ä³½Ã */
+	/** Ä³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ® Ä³ï¿½ï¿½ */
 	UPROPERTY(BlueprintReadOnly, Category = "Character")
 	TObjectPtr<UCharacterMovementComponent> MovementComponent;
 
-	// === Locomotion Data (Ä³¸¯ÅÍ °øÅë) ===
+	// === Locomotion Data (Ä³ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½) ===
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Locomotion")
 	FVector Velocity;
