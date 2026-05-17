@@ -22,13 +22,25 @@ public:
 	virtual void NativeUpdateAnimation(float DeltaSeconds) override;
 
 protected:
-	/** Chooser 또는 로직에 의해 선택된 현재 포즈 검색 데이터베이스 */
-	UPROPERTY(Transient, BlueprintReadOnly, Category = "MotionMatching")
+	/** 일반 루프용 활성 포즈 데이터베이스 */
+	UPROPERTY(Transient, BlueprintReadWrite, Category = "MotionMatching")
 	TObjectPtr<UPoseSearchDatabase> SelectedPoseSearchDatabase;
 
-	/** 블루프린트(Chooser 결과 등)에서 DB를 공식적으로 세팅하는 경로 */
+	/** 전이(Start/Stop/Pivot)용 활성 포즈 데이터베이스 */
+	UPROPERTY(Transient, BlueprintReadWrite, Category = "MotionMatching")
+	TObjectPtr<UPoseSearchDatabase> SelectedTransitionDatabase;
+
+	/** 
+	 * Chooser의 Evaluate 결과로 나온 PSD를 C++ 로직에 전달하는 경로.
+	 */
 	UFUNCTION(BlueprintCallable, Category = "MotionMatching")
 	void SetSelectedPoseSearchDatabase(UPoseSearchDatabase* NewDatabase);
+
+	/** 
+	 * Chooser의 Evaluate 결과로 나온 전이용 PSD를 C++ 로직에 전달하는 경로.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "MotionMatching")
+	void SetSelectedTransitionDatabase(UPoseSearchDatabase* NewDatabase);
 
 	/** 
 	 * [단일 진실원] C++ 열거형 기반 상태 변수.
@@ -47,10 +59,46 @@ protected:
 	E_MovementState MovementState;
 
 	UPROPERTY(Transient, BlueprintReadOnly, Category = "MotionMatching|State")
+	E_ExperimentalStateMachineState ExperimentalState;
+
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "MotionMatching|State")
+	E_MovementDirection MovementDirection;
+
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "MotionMatching|State")
+	E_RotationMode RotationMode;
+
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "MotionMatching|State")
+	E_ContextObjectDirection ContextObjectDirection;
+
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "MotionMatching|State")
+	float Speed2D = 0.0f;
+
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "MotionMatching|State")
+	float TimeToLand = 0.0f;
+
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "MotionMatching|State")
 	bool IsStarting = false;
 
 	UPROPERTY(Transient, BlueprintReadOnly, Category = "MotionMatching|State")
 	bool IsPivoting = false;
+
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "MotionMatching|State")
+	bool JustLanded_Light = false;
+
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "MotionMatching|State")
+	bool JustLanded_Heavy = false;
+
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "MotionMatching|State")
+	bool ShouldTurnInPlace = false;
+
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "MotionMatching|State")
+	bool ShouldSpinTransition = false;
+
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "MotionMatching|State")
+	bool JustTraversed = false;
+
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "MotionMatching|State")
+	int32 MMDatabaseLOD = 0;
 
 public:
 	// UI 및 외부 접근을 위한 Getter
@@ -89,6 +137,12 @@ protected:
 	/** 상태 변화를 로그로 출력할지 여부 (AnimInstance에서만 사용) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MotionMatching|Debug")
 	bool bDebugMotionMatchingState = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MotionMatching|Thresholds", meta = (ClampMin = "0.0"))
+	float HeavyLandSpeedThreshold = 700.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MotionMatching|Thresholds", meta = (ClampMin = "0.0"))
+	float SpinTransitionThreshold = 100.0f;
 
 protected:
 	/** Turn In Place 튜닝(선택): 정지로 간주할 속도(이하) */
@@ -135,5 +189,7 @@ protected:
 
 private:
 	float StartElapsedTime = 0.0f;
+	float IdleUpdateTimer = 0.0f;
 	bool bWasMovingLastFrame = false;
+	bool bCanUpdateChooser = true;
 };

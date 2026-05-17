@@ -20,142 +20,290 @@ namespace
 
 UGP_MotionMatchingAnimInstance::UGP_MotionMatchingAnimInstance()
 {
-	// Initialize conservative defaults before the first update.
 	Gait = E_Gait::Walk;
 	Stance = E_Stance::Stand;
 	MovementMode = E_MovementMode::OnGround;
 	MovementState = E_MovementState::Idle;
+	ExperimentalState = E_ExperimentalStateMachineState::Idle_Loop;
+	IdleUpdateTimer = 0.0f;
+	bCanUpdateChooser = true;
+	RootMotionMode = ERootMotionMode::IgnoreRootMotion;
 }
 
 void UGP_MotionMatchingAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 {
-	// 1. Refresh shared locomotion data first.
 	Super::NativeUpdateAnimation(DeltaSeconds);
-	StartElapsedTime += DeltaSeconds;
-
-	// 2. Abort if the pawn or movement component is still unavailable.
+	
 	if (!Character || !MovementComponent) return;
 
-	// 3. Evaluate locomotion state for motion matching.
+	StartElapsedTime += DeltaSeconds;
+	
+	// 1. Update core locomotion states
 	UpdateLocomotionStates();
 
-	// 4. Let the chooser select the active pose database.
-	UpdateMotionMatchingState();
+	// 2. Control Chooser evaluation frequency (Anti-Jitter)
+	bool bShouldLockChooser = false;
+
+	// Transition Lock: 전이 중에는 절대로 에셋을 갈아치우지 않습니다. (PSD 기반 전이라도 잠금은 필요)
+	if (ExperimentalState == E_ExperimentalStateMachineState::Transition_to_Idle_Loop ||
+		ExperimentalState == E_ExperimentalStateMachineState::Transition_to_Locomotion_Loop ||
+		ExperimentalState == E_ExperimentalStateMachineState::Transition_to_In_Air_Loop ||
+		ExperimentalState == E_ExperimentalStateMachineState::Transition_to_Slide)
+	{
+		if (StartElapsedTime < 0.4f)
+		{
+			bShouldLockChooser = true;
+		}
+	}
+	else if (ExperimentalState == E_ExperimentalStateMachineState::Idle_Loop)
+	{
+		IdleUpdateTimer += DeltaSeconds;
+		if (IdleUpdateTimer < 3.0f) bShouldLockChooser = true;
+		else IdleUpdateTimer = 0.0f;
+	}
+
+	// 3. Trigger Chooser
+	if (!bShouldLockChooser)
+	{
+		UpdateMotionMatchingState();
+	}
 }
 
 void UGP_MotionMatchingAnimInstance::UpdateLocomotionStates()
 {
 	const E_Gait PrevGait = Gait;
-	const E_Stance PrevStance = Stance;
-	const E_MovementMode PrevMovementMode = MovementMode;
 	const E_MovementState PrevMovementState = MovementState;
+	const E_ExperimentalStateMachineState PrevExpState = ExperimentalState;
+	const E_MovementMode PrevMovementMode = MovementMode;
+	const bool bWasFallingLastFrame = bIsFalling;
+
+	// Physics Data Smoothing
+	float TargetSpeed = Velocity.Size2D();
+	GroundSpeed = FMath::FInterpTo(GroundSpeed, TargetSpeed, GetWorld()->GetDeltaSeconds(), 15.0f);
+	Speed2D = GroundSpeed;
 
 	AbsControlYawDelta = FMath::Abs(ControlYawDelta);
 	const EMovementMode NativeMovementMode = MovementComponent->MovementMode;
 	const bool bShouldBeInAir = bIsFalling || NativeMovementMode == MOVE_Falling;
 	const bool bSprintTagActive = HasSprintTag(Character);
-
-	const float AccelerationMagnitude = Acceleration.Size2D();
-	const bool bHasMeaningfulAcceleration = AccelerationMagnitude >= StartMinAccelerationThreshold;
-	const bool bIsMovingNow = GroundSpeed >= StartMinSpeedThreshold;
-	const bool bJustStartedMoving = !bWasMovingLastFrame && bIsMovingNow && bHasMeaningfulAcceleration;
-	const bool bWithinStartWindow = StartElapsedTime <= StartWindowSeconds;
-
-	// 3-1. Resolve stance.
+	const bool bIsMovingNow = GroundSpeed > (bWasMovingLastFrame ? 3.0f : 8.0f);
+	
+	// Stance & Mode
 	Stance = bIsCrouching ? E_Stance::Crouch : E_Stance::Stand;
-
-	// 3-2. Resolve movement mode.
 	MovementMode = bShouldBeInAir ? E_MovementMode::InAir : E_MovementMode::OnGround;
 
-	// 3-3. Resolve gait based on absolute thresholds.
-	if (Stance == E_Stance::Crouch)
+	// Rotation Mode
+	if (MovementComponent->bOrientRotationToMovement)
 	{
-		Gait = E_Gait::Walk;
-	}
-	else if (bSprintTagActive || GroundSpeed >= RunSpeedThreshold)
-	{
-		Gait = E_Gait::Sprint;
-	}
-	else if (GroundSpeed >= WalkSpeedThreshold)
-	{
-		Gait = E_Gait::Run;
+		RotationMode = E_RotationMode::VelocityDirection;
 	}
 	else
 	{
-		Gait = E_Gait::Walk;
+		// 임시: 캐릭터에 LockOn 변수가 있다면 LookingDirection으로 설정 가능
+		RotationMode = E_RotationMode::LookingDirection;
 	}
 
-	// 3-4. Resolve movement state.
+	// Landing Logic
+	JustLanded_Light = false;
+	JustLanded_Heavy = false;
+	if (bWasFallingLastFrame && !bShouldBeInAir)
+	{
+		const float LandVelocityZ = FMath::Abs(Velocity.Z);
+		if (LandVelocityZ >= HeavyLandSpeedThreshold)
+		{
+			JustLanded_Heavy = true;
+		}
+		else
+		{
+			JustLanded_Light = true;
+		}
+	}
+
+	// TimeToLand (Falling 시에만 계산)
+	if (bShouldBeInAir && Velocity.Z < 0.0f)
+	{
+		FHitResult Hit;
+		FVector Start = Character->GetActorLocation();
+		FVector End = Start + (FVector::DownVector * 1000.0f);
+		FCollisionQueryParams Params;
+		Params.AddIgnoredActor(Character);
+
+		if (GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, Params))
+		{
+			float Distance = Hit.Distance;
+			TimeToLand = Distance / FMath::Abs(Velocity.Z);
+		}
+		else
+		{
+			TimeToLand = 99.0f;
+		}
+	}
+	else
+	{
+		TimeToLand = 0.0f;
+	}
+
+	// Gait
+	if (Stance == E_Stance::Crouch) Gait = E_Gait::Walk;
+	else if (bSprintTagActive || GroundSpeed >= RunSpeedThreshold) Gait = E_Gait::Sprint;
+	else if (GroundSpeed >= WalkSpeedThreshold) Gait = E_Gait::Run;
+	else Gait = E_Gait::Walk;
+
+	// Movement State
+	MovementState = (MovementMode == E_MovementMode::InAir || bIsMovingNow) ? E_MovementState::Moving : E_MovementState::Idle;
+
+	// Helper States
+	IsStarting = (MovementMode == E_MovementMode::OnGround) && bIsMovingNow && !bWasMovingLastFrame;
+	IsPivoting = (MovementMode == E_MovementMode::OnGround) && (MovementState == E_MovementState::Moving)
+		&& GroundSpeed >= PivotMinSpeedThreshold && FMath::Abs(LocalVelocityAngleDegrees) >= PivotMinAngleDegrees;
+
+	// ShouldTurnInPlace
+	ShouldTurnInPlace = (MovementState == E_MovementState::Idle) && (AbsControlYawDelta >= TurnInPlaceYawThreshold);
+
+	// ShouldSpinTransition
+	if (MovementState == E_MovementState::Moving && !IsStarting && !IsPivoting)
+	{
+		const FVector AccelDir = Acceleration.GetSafeNormal2D();
+		const FVector VelDir = Velocity.GetSafeNormal2D();
+		const float AngleDiff = FMath::RadiansToDegrees(FMath::Acos(FVector::DotProduct(AccelDir, VelDir)));
+		ShouldSpinTransition = (AngleDiff >= SpinTransitionThreshold);
+	}
+	else
+	{
+		ShouldSpinTransition = false;
+	}
+
+	// JustTraversed
+	if (PrevMovementMode == E_MovementMode::Traversing && MovementMode != E_MovementMode::Traversing)
+	{
+		JustTraversed = true;
+	}
+	else if (MovementState == E_MovementState::Moving)
+	{
+		// 이동 중에는 일정 시간 후 혹은 이동이 안정화되면 해제
+		JustTraversed = false;
+	}
+
+	// 5. Resolve Experimental State Machine
 	if (MovementMode == E_MovementMode::InAir)
 	{
-		// Treat any airborne state as moving for chooser purposes.
-		MovementState = E_MovementState::Moving;
+		if (PrevMovementMode != E_MovementMode::InAir)
+		{
+			StartElapsedTime = 0.0f;
+			ExperimentalState = E_ExperimentalStateMachineState::Transition_to_In_Air_Loop;
+		}
+		else if (ExperimentalState == E_ExperimentalStateMachineState::Transition_to_In_Air_Loop && StartElapsedTime >= 0.2f)
+		{
+			ExperimentalState = E_ExperimentalStateMachineState::In_Air_Loop;
+		}
 	}
-	else if (GroundSpeed < IdleSpeedThreshold)
+	else if (NativeMovementMode == MOVE_Custom && MovementComponent->CustomMovementMode == 1)
 	{
-		MovementState = E_MovementState::Idle;
+		if (ExperimentalState != E_ExperimentalStateMachineState::Slide_Loop && ExperimentalState != E_ExperimentalStateMachineState::Transition_to_Slide)
+		{
+			StartElapsedTime = 0.0f;
+			ExperimentalState = E_ExperimentalStateMachineState::Transition_to_Slide;
+		}
+		else if (ExperimentalState == E_ExperimentalStateMachineState::Transition_to_Slide && StartElapsedTime >= 0.3f)
+		{
+			ExperimentalState = E_ExperimentalStateMachineState::Slide_Loop;
+		}
 	}
 	else
 	{
-		MovementState = E_MovementState::Moving;
-	}
+		// Direction
+		if (GroundSpeed > 10.0f)
+		{
+			const float Angle = LocalVelocityAngleDegrees;
+			if (Angle >= -45.f && Angle <= 45.f) MovementDirection = E_MovementDirection::Forward;
+			else if (Angle > 45.f && Angle <= 135.f) MovementDirection = E_MovementDirection::Right;
+			else if (Angle < -45.f && Angle >= -135.f) MovementDirection = E_MovementDirection::Left;
+			else MovementDirection = E_MovementDirection::Backward;
+		}
 
-	if (bJustStartedMoving)
-	{
-		StartElapsedTime = 0.0f;
-	}
+		if (MovementState == E_MovementState::Idle)
+		{
+			if (PrevMovementState == E_MovementState::Moving)
+			{
+				StartElapsedTime = 0.0f;
+				ExperimentalState = E_ExperimentalStateMachineState::Transition_to_Idle_Loop;
+			}
+			else if (ExperimentalState == E_ExperimentalStateMachineState::Transition_to_Idle_Loop && StartElapsedTime >= 0.45f)
+			{
+				ExperimentalState = E_ExperimentalStateMachineState::Idle_Loop;
+				IdleUpdateTimer = 3.0f; 
+			}
+			else if (ExperimentalState != E_ExperimentalStateMachineState::Transition_to_Idle_Loop)
+			{
+				ExperimentalState = E_ExperimentalStateMachineState::Idle_Loop;
+			}
+		}
+		else // Moving
+		{
+			const FVector VelocityNormal = Velocity.GetSafeNormal2D();
+			const FVector AccelNormal = Acceleration.GetSafeNormal2D();
+			float AccelDotVel = FVector::DotProduct(VelocityNormal, AccelNormal);
+			bool bIsCorrecting = (AccelDotVel < -0.1f) && (GroundSpeed > 150.0f);
 
-	// 3-5. Resolve Start and Pivot states based on specific criteria.
-	const bool bValidStartSpeed = GroundSpeed >= StartMinSpeedThreshold && GroundSpeed <= StartMaxSpeedThreshold;
-	
-	IsStarting = bWithinStartWindow
-		&& MovementMode == E_MovementMode::OnGround
-		&& MovementState == E_MovementState::Moving
-		&& bValidStartSpeed
-		&& Gait != E_Gait::Sprint;
+			bool bIsAlreadyTransitioning = (ExperimentalState == E_ExperimentalStateMachineState::Transition_to_Locomotion_Loop && StartElapsedTime < 0.4f);
 
-	// Pivot is active when turning sharply at sufficient speed.
-	IsPivoting = MovementMode == E_MovementMode::OnGround
-		&& MovementState == E_MovementState::Moving
-		&& GroundSpeed >= PivotMinSpeedThreshold
-		&& bHasMeaningfulAcceleration
-		&& FMath::Abs(LocalVelocityAngleDegrees) >= PivotMinAngleDegrees;
-
-	// Force clear states if idle.
-	if (MovementState == E_MovementState::Idle)
-	{
-		IsStarting = false;
-		IsPivoting = false;
-		StartElapsedTime = StartWindowSeconds + 1.0f; // Reset window
+			if (!bIsAlreadyTransitioning && (PrevMovementState == E_MovementState::Idle || IsStarting || IsPivoting || bIsCorrecting))
+			{
+				StartElapsedTime = 0.0f;
+				ExperimentalState = E_ExperimentalStateMachineState::Transition_to_Locomotion_Loop;
+			}
+			else if (ExperimentalState == E_ExperimentalStateMachineState::Transition_to_Locomotion_Loop && StartElapsedTime >= 0.4f)
+			{
+				ExperimentalState = E_ExperimentalStateMachineState::Locomotion_Loop;
+			}
+			else if (ExperimentalState != E_ExperimentalStateMachineState::Transition_to_Locomotion_Loop)
+			{
+				ExperimentalState = E_ExperimentalStateMachineState::Locomotion_Loop;
+			}
+		}
 	}
 
 	bWasMovingLastFrame = bIsMovingNow;
 
-	if (bDebugMotionMatchingState)
+	if (bDebugMotionMatchingState && (PrevExpState != ExperimentalState))
 	{
-		if (PrevGait != Gait || PrevStance != Stance || PrevMovementMode != MovementMode || PrevMovementState != MovementState)
-		{
-			UE_LOG(LogTemp, Log, TEXT("[MMState] Gait:%d->%d Stance:%d->%d Mode:%d->%d State:%d->%d Speed:%.1f Thresholds(W:%.1f, R:%.1f, S:%.1f) SprintTag:%d"),
-				(int32)PrevGait, (int32)Gait,
-				(int32)PrevStance, (int32)Stance,
-				(int32)PrevMovementMode, (int32)MovementMode,
-				(int32)PrevMovementState, (int32)MovementState,
-				GroundSpeed,
-				WalkSpeedThreshold,
-				RunSpeedThreshold,
-				SprintSpeedThreshold,
-				bSprintTagActive ? 1 : 0);
-		}
+		FString StateName;
+		const UEnum* EnumPtr = StaticEnum<E_ExperimentalStateMachineState>();
+		if (EnumPtr) StateName = EnumPtr->GetNameStringByValue((int64)ExperimentalState);
+		UE_LOG(LogTemp, Warning, TEXT(">> [ExpState] %s (Speed: %.1f)"), *StateName, GroundSpeed);
 	}
 }
 
 void UGP_MotionMatchingAnimInstance::SetSelectedPoseSearchDatabase(UPoseSearchDatabase* NewDatabase)
 {
-	SelectedPoseSearchDatabase = NewDatabase;
+	if (SelectedPoseSearchDatabase != NewDatabase)
+	{
+		SelectedPoseSearchDatabase = NewDatabase;
+		if (bDebugMotionMatchingState && NewDatabase)
+		{
+			UE_LOG(LogTemp, Log, TEXT(">> [Chooser] Base PSD Changed: %s"), *NewDatabase->GetName());
+		}
+	}
+}
+
+void UGP_MotionMatchingAnimInstance::SetSelectedTransitionDatabase(UPoseSearchDatabase* NewDatabase)
+{
+	if (SelectedTransitionDatabase != NewDatabase)
+	{
+		SelectedTransitionDatabase = NewDatabase;
+		if (bDebugMotionMatchingState && NewDatabase)
+		{
+			UE_LOG(LogTemp, Warning, TEXT(">> [Chooser] Transition PSD Changed: %s"), *NewDatabase->GetName());
+		}
+	}
+
+	// SAFETY FALLBACK: 만약 전이 DB가 없으면 일반 루프 DB라도 사용하도록 강제
+	if (SelectedTransitionDatabase == nullptr && SelectedPoseSearchDatabase != nullptr)
+	{
+		SelectedTransitionDatabase = SelectedPoseSearchDatabase;
+	}
 }
 
 void UGP_MotionMatchingAnimInstance::UpdateMotionMatchingState_Implementation()
 {
-	// Anim blueprints override this hook and assign the active pose database.
 }
-
