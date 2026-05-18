@@ -108,6 +108,7 @@ void AGP_PlayerController::SetupInputComponent()
 	if (SkillSlot2Action) EnhancedInputComponent->BindAction(SkillSlot2Action, ETriggerEvent::Triggered, this, &ThisClass::Input_SkillSlot2);
 	if (UltimateAction) EnhancedInputComponent->BindAction(UltimateAction, ETriggerEvent::Triggered, this, &ThisClass::Input_UltimateSkill);
 	if (TestToggleSkillAction) EnhancedInputComponent->BindAction(TestToggleSkillAction, ETriggerEvent::Started, this, &ThisClass::Input_TestToggleSkill);
+	if (RotateTestSkillAction) EnhancedInputComponent->BindAction(RotateTestSkillAction, ETriggerEvent::Started, this, &ThisClass::Input_RotateTestSkill);
 }
 
 
@@ -241,7 +242,6 @@ void AGP_PlayerController::Input_UltimateSkill()
 	ActivateAbilityByTag(GPTags::Ability::Skill::Ultimate);
 }
 
-
 bool AGP_PlayerController::ActivateAbilityByTag(const FGameplayTag& AbilityTag) const
 {
 	UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn());
@@ -306,6 +306,11 @@ void AGP_PlayerController::Input_TestToggleSkill()
 	Server_TestToggleSkill();
 }
 
+void AGP_PlayerController::Input_RotateTestSkill()
+{
+	Server_RotateTestSkill();
+}
+
 bool AGP_PlayerController::Server_TestToggleSkill_Validate()
 {
 	return true;
@@ -357,5 +362,97 @@ void AGP_PlayerController::Server_TestToggleSkill_Implementation()
 		bSkillsEquipped = false;
 		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Orange, TEXT("Skills Unequipped!"));
 		UE_LOG(LogTemp, Warning, TEXT("Server: WaterPuddle unequipped from Slot 1 & 2"));
+	}
+}
+
+bool AGP_PlayerController::Server_RotateTestSkill_Validate()
+{
+	return true;
+}
+
+void AGP_PlayerController::Server_RotateTestSkill_Implementation()
+{
+	// 여기서 프리셋 순환 장착
+	AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetPawn());
+	if (!PC) return;
+
+	UAbilitySystemComponent* ASC = PC->GetAbilitySystemComponent();
+	if (!ASC) return;
+
+	ClearTestSkillSlots(ASC);
+	EquipTestSkillPreset(PC, TestSkillPresetIndex);
+
+	TestSkillPresetIndex = (TestSkillPresetIndex + 1) % 3;
+}
+
+
+void AGP_PlayerController::ClearTestSkillSlots(UAbilitySystemComponent* ASC)
+{
+	if (!ASC) return;
+
+	const TArray<FGameplayTag> SlotTags = { GPTags::Ability::Skill::Slot01, GPTags::Ability::Skill::Slot02 };
+	TArray<FGameplayAbilitySpecHandle> HandlesToRemove;
+
+	for (const FGameplayAbilitySpec& Spec : ASC->GetActivatableAbilities())
+	{
+		for (const FGameplayTag& SlotTag : SlotTags)
+		{
+			if (Spec.GetDynamicSpecSourceTags().HasTagExact(SlotTag))
+			{
+				HandlesToRemove.Add(Spec.Handle);
+			}
+		}
+	}
+
+	for (const FGameplayAbilitySpecHandle& Handle : HandlesToRemove)
+	{
+		ASC->ClearAbility(Handle);
+	}
+}
+
+void AGP_PlayerController::EquipTestSkillPreset(AGP_PlayerCharacter* PlayerCharacter, int32 PresetIndex)
+{
+	if (!PlayerCharacter) return;
+
+	switch (PresetIndex)
+	{
+	case 0:
+		if (WaterPuddleAbilityClass)
+		{
+			PlayerCharacter->EquipSkillByClass(GPTags::Ability::Skill::Slot02, WaterPuddleAbilityClass);
+			PlayerCharacter->EquipSkillByClass(GPTags::Ability::Skill::Slot01, WaterPuddleAbilityClass);
+		}
+
+		if (GEngine)
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Cyan, TEXT("Preset 0: Q WaterPuddle / E WaterPuddle"));
+		}
+
+		UE_LOG(LogTemp, Warning, TEXT("Server: Test preset 0 equipped"));
+		break;
+
+	case 1:
+		if (NetTestProjectileAbilityClass)
+		{
+			PlayerCharacter->EquipSkillByClass(GPTags::Ability::Skill::Slot01, NetTestProjectileAbilityClass);
+			PlayerCharacter->EquipSkillByClass(GPTags::Ability::Skill::Slot02, NetTestProjectileAbilityClass);
+		}
+
+		if (GEngine)
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Cyan, TEXT("Preset 1: Q Projectile / E Projectile"));
+		}
+
+		UE_LOG(LogTemp, Warning, TEXT("Server: Test preset 1 equipped"));
+		break;
+
+	default:
+		if (GEngine)
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Orange, TEXT("Preset 2: Skills unequipped"));
+		}
+
+		UE_LOG(LogTemp, Warning, TEXT("Server: Test skills unequipped"));
+		break;
 	}
 }

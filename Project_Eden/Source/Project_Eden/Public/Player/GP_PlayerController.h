@@ -4,6 +4,8 @@
 #include "GameFramework/PlayerController.h"
 #include "GP_PlayerController.generated.h"
 
+class AGP_PlayerCharacter;
+class UAbilitySystemComponent;
 class AGP_EnemyCharacter;
 class UGP_PlayerHUDWidget;
 class UInputAction;
@@ -68,7 +70,13 @@ private:
 	TObjectPtr<UInputAction> TestToggleSkillAction;
 
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Tests")
+	TObjectPtr<UInputAction> RotateTestSkillAction;
+
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Tests")
 	TSubclassOf<class UGameplayAbility> WaterPuddleAbilityClass;
+
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Tests")
+	TSubclassOf<class UGameplayAbility> NetTestProjectileAbilityClass;
 	
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
 	TSubclassOf<UUserWidget> HUDWidgetClass;
@@ -104,12 +112,19 @@ private:
 	void Input_SkillSlot2();
 	void Input_UltimateSkill();
 	void Input_TestToggleSkill();
+	void Input_RotateTestSkill();
 
 	UFUNCTION(Server, Reliable, WithValidation)
 	void Server_TestToggleSkill();
 
+	UFUNCTION(Server, Reliable, WithValidation)
+	void Server_RotateTestSkill();
+
 	bool ActivateAbilityByTag(const FGameplayTag& AbilityTag) const;
+	void ClearTestSkillSlots(UAbilitySystemComponent* ASC);
+	void EquipTestSkillPreset(AGP_PlayerCharacter* PlayerCharacter, int32 PresetIndex);
 	void RefreshBossHUD();
 
 	bool bSkillsEquipped = false;
+	int32 TestSkillPresetIndex = 0;
 };
