@@ -151,6 +151,7 @@ namespace GPTags
         namespace Skill
         {
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(WaterPuddle, "GPTags.Cooldown.Skill.WaterPuddle", "물웅덩이 스킬 쿨다운");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(NetTestProjectile, "GPTags.Cooldown.Skill.NetTestProjectile", "테스트 프로젝타일 스킬 쿨다운");
         }
     }
     

@@ -155,6 +155,8 @@ namespace GPTags
 		namespace Skill
 		{
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(WaterPuddle);
+			
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(NetTestProjectile);
 		}
 	}
 	
