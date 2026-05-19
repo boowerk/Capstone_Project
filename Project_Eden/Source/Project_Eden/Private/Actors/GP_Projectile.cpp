@@ -78,7 +78,7 @@ void AGP_Projectile::OnProjectileOverlap(UPrimitiveComponent* OverlappedComponen
 	bHasHit = true;
 
 
-	if (HasAuthority() && GetInstigator())
+	if (GetInstigator())
 	{
 		TArray<AActor*> HitActors;
 		HitActors.Add(OtherActor);
@@ -94,10 +94,15 @@ void AGP_Projectile::OnProjectileOverlap(UPrimitiveComponent* OverlappedComponen
 		}
 	}
 
-	BP_OnHitEffect(GetActorLocation());
+	MulticastPlayHitEffect(GetActorLocation());
 
 	if (bDestroyOnHit)
 	{
 		Destroy();
 	}
+}
+
+void AGP_Projectile::MulticastPlayHitEffect_Implementation(const FVector& ImpactLocation)
+{
+	BP_OnHitEffect(ImpactLocation);
 }

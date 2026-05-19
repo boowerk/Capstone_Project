@@ -53,6 +53,9 @@ protected:
 	UFUNCTION()
 	virtual void OnProjectileOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastPlayHitEffect(const FVector& ImpactLocation);
+
 	UFUNCTION(BlueprintImplementableEvent, Category = "Eden|Projectile")
 	void BP_OnHitEffect(const FVector& ImpactLocation);
 
