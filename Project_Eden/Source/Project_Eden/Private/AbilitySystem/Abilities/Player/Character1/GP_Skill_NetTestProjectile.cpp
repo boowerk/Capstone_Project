@@ -36,6 +36,7 @@ void UGP_Skill_NetTestProjectile::ActivateAbility(const FGameplayAbilitySpecHand
 		if (AController* Controller = Avatar->GetController())
 		{
 			SpawnRotation = Controller->GetControlRotation();
+			SpawnRotation.Pitch = FMath::ClampAngle(SpawnRotation.Pitch, -5.f, 10.f);
 		}
 
 		const FVector AimDirection = SpawnRotation.Vector();
