@@ -7,6 +7,7 @@
 class AGP_PlayerCharacter;
 class UAbilitySystemComponent;
 class AGP_EnemyCharacter;
+class UGP_TestSkillSet;
 class UGP_PlayerHUDWidget;
 class UInputAction;
 class UInputMappingContext;
@@ -73,6 +74,9 @@ private:
 	TObjectPtr<UInputAction> RotateTestSkillAction;
 
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Tests")
+	TObjectPtr<UGP_TestSkillSet> TestSkillSet;
+
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Tests")
 	TSubclassOf<class UGameplayAbility> WaterPuddleAbilityClass;
 
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Tests")
@@ -122,6 +126,7 @@ private:
 
 	bool ActivateAbilityByTag(const FGameplayTag& AbilityTag) const;
 	void ClearTestSkillSlots(UAbilitySystemComponent* ASC);
+	int32 GetTestSkillPresetCount() const;
 	void EquipTestSkillPreset(AGP_PlayerCharacter* PlayerCharacter, int32 PresetIndex);
 	void RefreshBossHUD();
 

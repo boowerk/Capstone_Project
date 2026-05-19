@@ -2,6 +2,7 @@
 
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
+#include "AbilitySystem/Abilities/GP_TestSkillSet.h"
 #include "Blueprint/UserWidget.h"
 #include "Characters/GP_EnemyCharacter.h"
 #include "Characters/GP_PlayerCharacter.h"
@@ -382,7 +383,7 @@ void AGP_PlayerController::Server_RotateTestSkill_Implementation()
 	ClearTestSkillSlots(ASC);
 	EquipTestSkillPreset(PC, TestSkillPresetIndex);
 
-	TestSkillPresetIndex = (TestSkillPresetIndex + 1) % 3;
+	TestSkillPresetIndex = (TestSkillPresetIndex + 1) % GetTestSkillPresetCount();
 }
 
 
@@ -410,9 +411,46 @@ void AGP_PlayerController::ClearTestSkillSlots(UAbilitySystemComponent* ASC)
 	}
 }
 
+int32 AGP_PlayerController::GetTestSkillPresetCount() const
+{
+	if (TestSkillSet && !TestSkillSet->Presets.IsEmpty())
+	{
+		return TestSkillSet->Presets.Num();
+	}
+
+	return 3;
+}
+
 void AGP_PlayerController::EquipTestSkillPreset(AGP_PlayerCharacter* PlayerCharacter, int32 PresetIndex)
 {
 	if (!PlayerCharacter) return;
+
+	if (TestSkillSet && TestSkillSet->Presets.IsValidIndex(PresetIndex))
+	{
+		const FGP_TestSkillPreset& Preset = TestSkillSet->Presets[PresetIndex];
+
+		if (Preset.Slot01Skill)
+		{
+			PlayerCharacter->EquipSkill(Preset.Slot01Skill, GPTags::Ability::Skill::Slot01, true);
+		}
+
+		if (Preset.Slot02Skill)
+		{
+			PlayerCharacter->EquipSkill(Preset.Slot02Skill, GPTags::Ability::Skill::Slot02, true);
+		}
+
+		const FString PresetName = Preset.PresetName.IsEmpty()
+			? FString::Printf(TEXT("Preset %d"), PresetIndex)
+			: Preset.PresetName.ToString();
+
+		if (GEngine)
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Cyan, FString::Printf(TEXT("%s equipped"), *PresetName));
+		}
+
+		UE_LOG(LogTemp, Warning, TEXT("Server: Test preset %d equipped from data asset (%s)"), PresetIndex, *PresetName);
+		return;
+	}
 
 	switch (PresetIndex)
 	{
