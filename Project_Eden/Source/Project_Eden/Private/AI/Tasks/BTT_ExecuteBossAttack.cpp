@@ -170,6 +170,7 @@ namespace BossAttackSelector
 		const float PhaseBonus = FMath::Clamp(static_cast<float>(BossPhase - 1) * 0.15f, 0.0f, 0.35f);
 
 		const bool bClosePunishWindow = GetBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossHeavyAttack);
+		const bool bCanSummonAdds = GetBool(BlackboardComponent, EnemyBlackboardKeys::bCanSummonAdds);
 
 		const float BasicScore = 0.35f
 			+ (1.0f - Aggression) * 0.25f
@@ -181,6 +182,17 @@ namespace BossAttackSelector
 		// Basic attacks stay in the selector so a valid sweep window no longer collapses every boss attack into sweep.
 		// The heavy blackboard flag currently boosts this scratch attack instead of using the legacy missing heavy montage.
 		AddCandidate(Candidates, DefaultAttackAbilityTag, BasicScore, TEXT("Basic"));
+
+		if (bCanSummonAdds)
+		{
+			const float SummonScore = 0.65f
+				+ PhaseBonus
+				+ (bHoldMode ? 0.25f : 0.0f)
+				+ (bRetreatMode ? 0.15f : 0.0f)
+				+ FarPressure * 0.2f;
+			// Summon is part of the same BT attack selector, so it competes with sweep/basic instead of using a separate branch.
+			AddCandidate(Candidates, GPTags::Ability::Enemy::Utility_BossSummon, SummonScore, TEXT("Summon"));
+		}
 
 		if (GetBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossSweepAttack))
 		{

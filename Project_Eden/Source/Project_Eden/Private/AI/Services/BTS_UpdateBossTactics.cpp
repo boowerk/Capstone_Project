@@ -123,7 +123,8 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 	const bool bCanSummonAdds = bHasTarget
 		&& !bReturningHome
 		&& !bShouldPhaseTransition
-		&& BossPhase >= 3
+		// Let the summon pattern enter from phase 2 so it is visible before the fight is nearly over.
+		&& BossPhase >= 2
 		&& BTS_UpdateBossTactics_Internal::IsPatternWindowOpen(WorldTimeSeconds, SummonInterval, SummonWindow);
 	const bool bBossPatternRequestsAttack = bShouldPhaseTransition || bCanSummonAdds || bCanUseAreaAttack || bCanUseSweepAttack || bCanUseHeavyAttack;
 
