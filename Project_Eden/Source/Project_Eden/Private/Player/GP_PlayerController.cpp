@@ -380,10 +380,17 @@ void AGP_PlayerController::Server_RotateTestSkill_Implementation()
 	UAbilitySystemComponent* ASC = PC->GetAbilitySystemComponent();
 	if (!ASC) return;
 
+	const int32 PresetCount = GetTestSkillPresetCount();
+	if (PresetCount <= 0)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Server: TestSkillSet is not assigned or has no presets"));
+		return;
+	}
+
 	ClearTestSkillSlots(ASC);
 	EquipTestSkillPreset(PC, TestSkillPresetIndex);
 
-	TestSkillPresetIndex = (TestSkillPresetIndex + 1) % GetTestSkillPresetCount();
+	TestSkillPresetIndex = (TestSkillPresetIndex + 1) % PresetCount;
 }
 
 
@@ -418,79 +425,35 @@ int32 AGP_PlayerController::GetTestSkillPresetCount() const
 		return TestSkillSet->Presets.Num();
 	}
 
-	return 3;
+	return 0;
 }
 
 void AGP_PlayerController::EquipTestSkillPreset(AGP_PlayerCharacter* PlayerCharacter, int32 PresetIndex)
 {
 	if (!PlayerCharacter) return;
 
-	if (TestSkillSet && TestSkillSet->Presets.IsValidIndex(PresetIndex))
+	if (!TestSkillSet || !TestSkillSet->Presets.IsValidIndex(PresetIndex)) return;
+
+	const FGP_TestSkillPreset& Preset = TestSkillSet->Presets[PresetIndex];
+
+	if (Preset.Slot01Skill)
 	{
-		const FGP_TestSkillPreset& Preset = TestSkillSet->Presets[PresetIndex];
-
-		if (Preset.Slot01Skill)
-		{
-			PlayerCharacter->EquipSkill(Preset.Slot01Skill, GPTags::Ability::Skill::Slot01, true);
-		}
-
-		if (Preset.Slot02Skill)
-		{
-			PlayerCharacter->EquipSkill(Preset.Slot02Skill, GPTags::Ability::Skill::Slot02, true);
-		}
-
-		const FString PresetName = Preset.PresetName.IsEmpty()
-			? FString::Printf(TEXT("Preset %d"), PresetIndex)
-			: Preset.PresetName.ToString();
-
-		if (GEngine)
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Cyan, FString::Printf(TEXT("%s equipped"), *PresetName));
-		}
-
-		UE_LOG(LogTemp, Warning, TEXT("Server: Test preset %d equipped from data asset (%s)"), PresetIndex, *PresetName);
-		return;
+		PlayerCharacter->EquipSkill(Preset.Slot01Skill, GPTags::Ability::Skill::Slot01, true);
 	}
 
-	switch (PresetIndex)
+	if (Preset.Slot02Skill)
 	{
-	case 0:
-		if (WaterPuddleAbilityClass)
-		{
-			PlayerCharacter->EquipSkillByClass(GPTags::Ability::Skill::Slot02, WaterPuddleAbilityClass);
-			PlayerCharacter->EquipSkillByClass(GPTags::Ability::Skill::Slot01, WaterPuddleAbilityClass);
-		}
-
-		if (GEngine)
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Cyan, TEXT("Preset 0: Q WaterPuddle / E WaterPuddle"));
-		}
-
-		UE_LOG(LogTemp, Warning, TEXT("Server: Test preset 0 equipped"));
-		break;
-
-	case 1:
-		if (NetTestProjectileAbilityClass)
-		{
-			PlayerCharacter->EquipSkillByClass(GPTags::Ability::Skill::Slot01, NetTestProjectileAbilityClass);
-			PlayerCharacter->EquipSkillByClass(GPTags::Ability::Skill::Slot02, NetTestProjectileAbilityClass);
-		}
-
-		if (GEngine)
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Cyan, TEXT("Preset 1: Q Projectile / E Projectile"));
-		}
-
-		UE_LOG(LogTemp, Warning, TEXT("Server: Test preset 1 equipped"));
-		break;
-
-	default:
-		if (GEngine)
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Orange, TEXT("Preset 2: Skills unequipped"));
-		}
-
-		UE_LOG(LogTemp, Warning, TEXT("Server: Test skills unequipped"));
-		break;
+		PlayerCharacter->EquipSkill(Preset.Slot02Skill, GPTags::Ability::Skill::Slot02, true);
 	}
+
+	const FString PresetName = Preset.PresetName.IsEmpty()
+		? FString::Printf(TEXT("Preset %d"), PresetIndex)
+		: Preset.PresetName.ToString();
+
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Cyan, FString::Printf(TEXT("%s equipped"), *PresetName));
+	}
+
+	UE_LOG(LogTemp, Warning, TEXT("Server: Test preset %d equipped from data asset (%s)"), PresetIndex, *PresetName);
 }
