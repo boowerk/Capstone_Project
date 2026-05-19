@@ -8,6 +8,7 @@
 #include "AI/Data/EnemyLLMEvaluation.h"
 #include "AI/Debug/EnemyAIDebugUtils.h"
 #include "AI/Tasks/EnemyBTTaskCommon.h"
+#include "Abilities/GameplayAbility.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "GameplayTags/GP_Tags.h"
 
@@ -103,6 +104,36 @@ namespace BossAttackSelector
 		Candidates.Insert(SelectedCandidate, 0);
 	}
 
+	FString DescribeCandidates(const TArray<FPatternCandidate>& Candidates)
+	{
+		TArray<FString> Parts;
+		for (const FPatternCandidate& Candidate : Candidates)
+		{
+			Parts.Add(FString::Printf(TEXT("%s:%.2f:%s"), Candidate.DebugName, Candidate.Score, *Candidate.AbilityTag.ToString()));
+		}
+
+		return FString::Join(Parts, TEXT(", "));
+	}
+
+	bool HasGrantedAbilityForTag(const UAbilitySystemComponent* ASC, const FGameplayTag& AbilityTag)
+	{
+		if (!IsValid(ASC) || !AbilityTag.IsValid())
+		{
+			return false;
+		}
+
+		for (const FGameplayAbilitySpec& AbilitySpec : ASC->GetActivatableAbilities())
+		{
+			const UGameplayAbility* Ability = AbilitySpec.Ability;
+			if (IsValid(Ability) && Ability->GetAssetTags().HasTagExact(AbilityTag))
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 	TArray<FPatternCandidate> BuildPatternCandidates(const APawn* ControlledPawn, const UBlackboardComponent* BlackboardComponent, const FGameplayTag& DefaultAttackAbilityTag)
 	{
 		TArray<FPatternCandidate> Candidates;
@@ -138,33 +169,18 @@ namespace BossAttackSelector
 		const float FarPressure = FMath::Clamp((DistanceToTarget - PreferredRange) / PreferredRange, 0.0f, 1.0f);
 		const float PhaseBonus = FMath::Clamp(static_cast<float>(BossPhase - 1) * 0.15f, 0.0f, 0.35f);
 
-		if (GetBool(BlackboardComponent, EnemyBlackboardKeys::bShouldBossPhaseTransition))
-		{
-			AddCandidate(Candidates, GPTags::Ability::Enemy::Utility_BossPhaseShift, 100.0f, TEXT("PhaseShift"));
-		}
-
-		if (GetBool(BlackboardComponent, EnemyBlackboardKeys::bCanSummonAdds))
-		{
-			AddCandidate(Candidates, GPTags::Ability::Enemy::Utility_BossSummon, 35.0f + PhaseBonus, TEXT("Summon"));
-		}
+		const bool bClosePunishWindow = GetBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossHeavyAttack);
 
 		const float BasicScore = 0.35f
 			+ (1.0f - Aggression) * 0.25f
 			+ ClosePressure * 0.2f
 			+ (bHoldMode ? 0.2f : 0.0f)
-			+ (bWeakestFocus ? 0.1f : 0.0f);
+			+ (bWeakestFocus ? 0.1f : 0.0f)
+			+ (bClosePunishWindow ? 0.25f : 0.0f)
+			+ (HealthRatio <= 0.45f ? 0.1f : 0.0f);
 		// Basic attacks stay in the selector so a valid sweep window no longer collapses every boss attack into sweep.
+		// The heavy blackboard flag currently boosts this scratch attack instead of using the legacy missing heavy montage.
 		AddCandidate(Candidates, DefaultAttackAbilityTag, BasicScore, TEXT("Basic"));
-
-		if (GetBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossHeavyAttack))
-		{
-			const float HeavyScore = 0.2f
-				+ Aggression * 0.35f
-				+ ClosePressure * 0.45f
-				+ (bPressureMode ? 0.25f : 0.0f)
-				+ (HealthRatio <= 0.45f ? 0.1f : 0.0f);
-			AddCandidate(Candidates, GPTags::Ability::Enemy::Attack_BossHeavy, HeavyScore, TEXT("Heavy"));
-		}
 
 		if (GetBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossSweepAttack))
 		{
@@ -258,8 +274,21 @@ EBTNodeResult::Type UBTT_ExecuteBossAttack::ExecuteTask(UBehaviorTreeComponent& 
 	}
 
 	const TArray<BossAttackSelector::FPatternCandidate> Candidates = BossAttackSelector::BuildPatternCandidates(ControlledPawn, BlackboardComponent, AttackAbilityTag);
+	bool bFoundGrantedCandidate = false;
 	for (const BossAttackSelector::FPatternCandidate& Candidate : Candidates)
 	{
+		if (!BossAttackSelector::HasGrantedAbilityForTag(ASC, Candidate.AbilityTag))
+		{
+			UE_LOG(
+				LogEnemyAI,
+				Log,
+				TEXT("[BossAI] Pattern skipped because ability is not granted: %s Tag=%s"),
+				Candidate.DebugName,
+				*Candidate.AbilityTag.ToString());
+			continue;
+		}
+
+		bFoundGrantedCandidate = true;
 		if (BossAttackSelector::TryActivateAbilityByTag(ASC, Candidate.AbilityTag))
 		{
 			UE_LOG(
@@ -274,6 +303,23 @@ EBTNodeResult::Type UBTT_ExecuteBossAttack::ExecuteTask(UBehaviorTreeComponent& 
 		}
 	}
 
-	UE_LOG(LogEnemyAI, Warning, TEXT("[BossAI] Failed to activate any selected boss pattern: %s"), *GetNameSafe(ControlledPawn));
+	if (bFoundGrantedCandidate)
+	{
+		// Treat a temporary block as handled so the attack sequence wait can run instead of instantly reselecting sweep.
+		UE_LOG(
+			LogEnemyAI,
+			Log,
+			TEXT("[BossAI] Pattern candidates were blocked this tick: %s Candidates=%s"),
+			*GetNameSafe(ControlledPawn),
+			*BossAttackSelector::DescribeCandidates(Candidates));
+		return EBTNodeResult::Succeeded;
+	}
+
+	UE_LOG(
+		LogEnemyAI,
+		Warning,
+		TEXT("[BossAI] No granted ability matched selected boss patterns: %s Candidates=%s"),
+		*GetNameSafe(ControlledPawn),
+		*BossAttackSelector::DescribeCandidates(Candidates));
 	return EBTNodeResult::Failed;
 }

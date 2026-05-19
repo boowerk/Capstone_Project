@@ -1,6 +1,5 @@
 #include "AbilitySystem/Abilities/Enemy/GP_BossHeavyAttack.h"
 
-#include "Animation/AnimMontage.h"
 #include "GameplayEffect.h"
 #include "GameplayTags/GP_Tags.h"
 #include "UObject/ConstructorHelpers.h"
@@ -17,11 +16,7 @@ UGP_BossHeavyAttack::UGP_BossHeavyAttack()
 	HitBoxElevationOffset = 40.0f;
 	bUseGameplayEventForHitTiming = false;
 
-	static ConstructorHelpers::FObjectFinder<UAnimMontage> MontageFinder(TEXT("/Game/Animations/AM_Sans_BossHeavy.AM_Sans_BossHeavy"));
-	if (MontageFinder.Succeeded())
-	{
-		SkillMontage = MontageFinder.Object;
-	}
+	// Sans does not have a dedicated heavy montage yet, so this branch falls back to the boss AnimationSet scratch montage.
 
 	static ConstructorHelpers::FClassFinder<UGameplayEffect> DamageEffectFinder(TEXT("/Game/GAS_Pattern/AbilitySystem/GameplayEffects/GE_PrimaryDamage"));
 	if (DamageEffectFinder.Succeeded())

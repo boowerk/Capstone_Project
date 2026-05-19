@@ -1,6 +1,5 @@
 #include "AbilitySystem/Abilities/Enemy/GP_BossAreaAttack.h"
 
-#include "Animation/AnimMontage.h"
 #include "GameplayEffect.h"
 #include "GameplayTags/GP_Tags.h"
 #include "UObject/ConstructorHelpers.h"
@@ -17,11 +16,7 @@ UGP_BossAreaAttack::UGP_BossAreaAttack()
 	HitBoxElevationOffset = 35.0f;
 	bUseGameplayEventForHitTiming = false;
 
-	static ConstructorHelpers::FObjectFinder<UAnimMontage> MontageFinder(TEXT("/Game/Animations/AM_Sans_BossArea.AM_Sans_BossArea"));
-	if (MontageFinder.Succeeded())
-	{
-		SkillMontage = MontageFinder.Object;
-	}
+	// Area currently uses the data-asset fallback animation instead of the old placeholder montage path.
 
 	static ConstructorHelpers::FClassFinder<UGameplayEffect> DamageEffectFinder(TEXT("/Game/GAS_Pattern/AbilitySystem/GameplayEffects/GE_PrimaryDamage"));
 	if (DamageEffectFinder.Succeeded())
