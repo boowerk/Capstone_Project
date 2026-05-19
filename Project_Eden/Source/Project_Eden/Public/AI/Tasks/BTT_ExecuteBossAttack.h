@@ -10,4 +10,7 @@ class PROJECT_EDEN_API UBTT_ExecuteBossAttack : public UBTT_ExecuteEnemyAttack
 
 public:
 	UBTT_ExecuteBossAttack();
+
+protected:
+	virtual EBTNodeResult::Type ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory) override;
 };
