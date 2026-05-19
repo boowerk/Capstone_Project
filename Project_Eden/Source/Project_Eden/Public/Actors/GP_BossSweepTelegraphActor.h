@@ -11,6 +11,30 @@ class UMaterialInstanceDynamic;
 class UProceduralMeshComponent;
 class USceneComponent;
 
+USTRUCT()
+struct FGPBossSweepTelegraphSpec
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	float Radius = 0.0f;
+
+	UPROPERTY()
+	float ArcAngleDegrees = 0.0f;
+
+	UPROPERTY()
+	float LifeSeconds = 0.0f;
+
+	UPROPERTY()
+	FLinearColor TelegraphColor = FLinearColor::Red;
+
+	UPROPERTY()
+	TObjectPtr<UMaterialInterface> OverrideMaterial = nullptr;
+
+	UPROPERTY()
+	bool bInitialized = false;
+};
+
 UCLASS()
 class PROJECT_EDEN_API AGP_BossSweepTelegraphActor : public AActor
 {
@@ -23,10 +47,16 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Boss|Sweep")
 	void InitializeSweepTelegraph(float Radius, float ArcAngleDegrees, float LifeSeconds, FLinearColor TelegraphColor, UMaterialInterface* OverrideMaterial = nullptr);
 
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
 protected:
 	virtual void BeginPlay() override;
 
 private:
+	UFUNCTION()
+	void OnRep_TelegraphSpec();
+
+	void ApplyTelegraphSpec();
 	void SnapToFloor();
 	void BuildFanMesh(float Radius, float ArcAngleDegrees, FLinearColor TelegraphColor);
 	UMaterialInterface* ResolveTelegraphMaterial(UMaterialInterface* OverrideMaterial) const;
@@ -43,6 +73,9 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInstanceDynamic> DynamicTelegraphMaterial;
+
+	UPROPERTY(ReplicatedUsing = OnRep_TelegraphSpec)
+	FGPBossSweepTelegraphSpec TelegraphSpec;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Boss|Sweep")
 	float FloorTraceUpDistance = 200.0f;

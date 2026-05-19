@@ -6,6 +6,7 @@
 #include "GP_BossSweepAttack.generated.h"
 
 class AGP_BossSweepTelegraphActor;
+class UAnimMontage;
 class UMaterialInterface;
 struct FGameplayEventData;
 
@@ -35,8 +36,9 @@ private:
 	UFUNCTION()
 	void OnBossSweepMontageCompleted();
 
-	void StartBossSweepTelegraph(AActor* AvatarActor, bool bEndAbilityAfterHit);
+	bool StartBossSweepTelegraph(AActor* AvatarActor);
 	void OnBossSweepTelegraphElapsed();
+	void BeginBossSweepAttack();
 	void SpawnBossSweepTelegraph(AActor* AvatarActor);
 	void PerformBossSweepHit();
 
@@ -61,9 +63,12 @@ private:
 
 	bool bBossSweepHitApplied = false;
 	bool bWaitingForBossSweepTelegraph = false;
-	bool bEndAbilityAfterBossSweepHit = false;
+	bool bBossSweepMontageStarted = false;
 	FTimerHandle BossSweepTelegraphTimerHandle;
 
 	UPROPERTY(Transient)
 	TObjectPtr<AGP_BossSweepTelegraphActor> ActiveBossSweepTelegraph;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UAnimMontage> PendingBossSweepMontage;
 };

@@ -4,12 +4,15 @@
 
 #include "Engine/World.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "Net/UnrealNetwork.h"
 #include "ProceduralMeshComponent.h"
 #include "UObject/ConstructorHelpers.h"
 
 AGP_BossSweepTelegraphActor::AGP_BossSweepTelegraphActor()
 {
 	PrimaryActorTick.bCanEverTick = false;
+	bReplicates = true;
+	SetNetUpdateFrequency(30.0f);
 
 	SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("SceneRoot"));
 	SetRootComponent(SceneRoot);
@@ -45,27 +48,60 @@ void AGP_BossSweepTelegraphActor::BeginPlay()
 
 void AGP_BossSweepTelegraphActor::InitializeSweepTelegraph(float Radius, float ArcAngleDegrees, float LifeSeconds, FLinearColor TelegraphColor, UMaterialInterface* OverrideMaterial)
 {
-	// The mesh is generated at runtime so this boss warning still works if designer material assets are missing.
-	BuildFanMesh(Radius, ArcAngleDegrees, TelegraphColor);
+	TelegraphSpec.Radius = Radius;
+	TelegraphSpec.ArcAngleDegrees = ArcAngleDegrees;
+	TelegraphSpec.LifeSeconds = LifeSeconds;
+	TelegraphSpec.TelegraphColor = TelegraphColor;
+	TelegraphSpec.OverrideMaterial = OverrideMaterial;
+	TelegraphSpec.bInitialized = true;
 
-	if (UMaterialInterface* MaterialToUse = ResolveTelegraphMaterial(OverrideMaterial))
+	ApplyTelegraphSpec();
+
+	if (HasAuthority())
+	{
+		ForceNetUpdate();
+		if (LifeSeconds > 0.0f)
+		{
+			SetLifeSpan(LifeSeconds + 0.15f);
+		}
+	}
+}
+
+void AGP_BossSweepTelegraphActor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(AGP_BossSweepTelegraphActor, TelegraphSpec);
+}
+
+void AGP_BossSweepTelegraphActor::OnRep_TelegraphSpec()
+{
+	ApplyTelegraphSpec();
+}
+
+void AGP_BossSweepTelegraphActor::ApplyTelegraphSpec()
+{
+	if (!TelegraphSpec.bInitialized)
+	{
+		return;
+	}
+
+	// Every client builds the procedural fan locally because procedural mesh section data itself is not replicated.
+	BuildFanMesh(TelegraphSpec.Radius, TelegraphSpec.ArcAngleDegrees, TelegraphSpec.TelegraphColor);
+
+	if (UMaterialInterface* MaterialToUse = ResolveTelegraphMaterial(TelegraphSpec.OverrideMaterial))
 	{
 		DynamicTelegraphMaterial = UMaterialInstanceDynamic::Create(MaterialToUse, this);
 		if (DynamicTelegraphMaterial)
 		{
-			DynamicTelegraphMaterial->SetVectorParameterValue(TEXT("TelegraphColor"), TelegraphColor);
-			DynamicTelegraphMaterial->SetScalarParameterValue(TEXT("Opacity"), TelegraphColor.A);
+			DynamicTelegraphMaterial->SetVectorParameterValue(TEXT("TelegraphColor"), TelegraphSpec.TelegraphColor);
+			DynamicTelegraphMaterial->SetScalarParameterValue(TEXT("Opacity"), TelegraphSpec.TelegraphColor.A);
 			TelegraphMesh->SetMaterial(0, DynamicTelegraphMaterial);
 		}
 		else
 		{
 			TelegraphMesh->SetMaterial(0, MaterialToUse);
 		}
-	}
-
-	if (LifeSeconds > 0.0f)
-	{
-		SetLifeSpan(LifeSeconds + 0.15f);
 	}
 }
 

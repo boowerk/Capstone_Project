@@ -69,8 +69,9 @@ void UGP_BossSweepAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 
 	bBossSweepHitApplied = false;
 	bWaitingForBossSweepTelegraph = false;
-	bEndAbilityAfterBossSweepHit = false;
+	bBossSweepMontageStarted = false;
 	ActiveBossSweepTelegraph = nullptr;
+	PendingBossSweepMontage = nullptr;
 
 	AActor* AvatarActor = GetAvatarActorFromActorInfo();
 	if (!IsValid(AvatarActor))
@@ -88,24 +89,11 @@ void UGP_BossSweepAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 		}
 	}
 
-	bool bMontageTaskStarted = false;
-	UAnimMontage* MontageToPlay = GP_BossSweepAttack_Internal::ResolveSweepMontage(AvatarActor, SkillMontage);
-	if (MontageToPlay)
+	PendingBossSweepMontage = GP_BossSweepAttack_Internal::ResolveSweepMontage(AvatarActor, SkillMontage);
+	if (!StartBossSweepTelegraph(AvatarActor))
 	{
-		UAbilityTask_PlayMontageAndWait* PlayMontageTask =
-			UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(this, NAME_None, MontageToPlay, 1.0f);
-		if (PlayMontageTask)
-		{
-			PlayMontageTask->OnCompleted.AddDynamic(this, &ThisClass::OnBossSweepMontageCompleted);
-			PlayMontageTask->OnBlendOut.AddDynamic(this, &ThisClass::OnBossSweepMontageCompleted);
-			PlayMontageTask->OnInterrupted.AddDynamic(this, &ThisClass::OnBossSweepMontageCompleted);
-			PlayMontageTask->OnCancelled.AddDynamic(this, &ThisClass::OnBossSweepMontageCompleted);
-			PlayMontageTask->ReadyForActivation();
-			bMontageTaskStarted = true;
-		}
+		BeginBossSweepAttack();
 	}
-
-	StartBossSweepTelegraph(AvatarActor, !bMontageTaskStarted);
 }
 
 void UGP_BossSweepAttack::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
@@ -123,20 +111,14 @@ void UGP_BossSweepAttack::EndAbility(const FGameplayAbilitySpecHandle Handle, co
 	}
 
 	bWaitingForBossSweepTelegraph = false;
-	bEndAbilityAfterBossSweepHit = false;
+	bBossSweepMontageStarted = false;
+	PendingBossSweepMontage = nullptr;
 
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }
 
 void UGP_BossSweepAttack::OnBossSweepMontageCompleted()
 {
-	if (bWaitingForBossSweepTelegraph)
-	{
-		// If the animation ends before the warning delay, keep the ability alive until the promised hit time.
-		bEndAbilityAfterBossSweepHit = true;
-		return;
-	}
-
 	if (!bBossSweepHitApplied)
 	{
 		PerformBossSweepHit();
@@ -145,37 +127,35 @@ void UGP_BossSweepAttack::OnBossSweepMontageCompleted()
 	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 }
 
-void UGP_BossSweepAttack::StartBossSweepTelegraph(AActor* AvatarActor, bool bEndAbilityAfterHit)
+bool UGP_BossSweepAttack::StartBossSweepTelegraph(AActor* AvatarActor)
 {
-	if (bShowBossSweepTelegraph && BossSweepTelegraphDelay > KINDA_SMALL_NUMBER)
+	if (!bShowBossSweepTelegraph || BossSweepTelegraphDelay <= KINDA_SMALL_NUMBER)
 	{
-		SpawnBossSweepTelegraph(AvatarActor);
-		bWaitingForBossSweepTelegraph = true;
-		bEndAbilityAfterBossSweepHit = bEndAbilityAfterHit;
-
-		if (UWorld* World = GetWorld())
-		{
-			World->GetTimerManager().SetTimer(
-				BossSweepTelegraphTimerHandle,
-				this,
-				&ThisClass::OnBossSweepTelegraphElapsed,
-				BossSweepTelegraphDelay,
-				false);
-			return;
-		}
+		return false;
 	}
 
-	PerformBossSweepHit();
-	if (bEndAbilityAfterHit)
+	SpawnBossSweepTelegraph(AvatarActor);
+	bWaitingForBossSweepTelegraph = true;
+
+	if (UWorld* World = GetWorld())
 	{
-		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+		// The sweep animation and hit are delayed until the red floor warning has been readable for 0.85 seconds.
+		World->GetTimerManager().SetTimer(
+			BossSweepTelegraphTimerHandle,
+			this,
+			&ThisClass::OnBossSweepTelegraphElapsed,
+			BossSweepTelegraphDelay,
+			false);
+		return true;
 	}
+
+	bWaitingForBossSweepTelegraph = false;
+	return false;
 }
 
 void UGP_BossSweepAttack::OnBossSweepTelegraphElapsed()
 {
 	bWaitingForBossSweepTelegraph = false;
-	PerformBossSweepHit();
 
 	if (IsValid(ActiveBossSweepTelegraph))
 	{
@@ -183,7 +163,37 @@ void UGP_BossSweepAttack::OnBossSweepTelegraphElapsed()
 		ActiveBossSweepTelegraph = nullptr;
 	}
 
-	if (bEndAbilityAfterBossSweepHit)
+	BeginBossSweepAttack();
+}
+
+void UGP_BossSweepAttack::BeginBossSweepAttack()
+{
+	if (bBossSweepMontageStarted)
+	{
+		return;
+	}
+
+	bool bMontageTaskStarted = false;
+	if (PendingBossSweepMontage)
+	{
+		UAbilityTask_PlayMontageAndWait* PlayMontageTask =
+			UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(this, NAME_None, PendingBossSweepMontage, 1.0f);
+		if (PlayMontageTask)
+		{
+			PlayMontageTask->OnCompleted.AddDynamic(this, &ThisClass::OnBossSweepMontageCompleted);
+			PlayMontageTask->OnBlendOut.AddDynamic(this, &ThisClass::OnBossSweepMontageCompleted);
+			PlayMontageTask->OnInterrupted.AddDynamic(this, &ThisClass::OnBossSweepMontageCompleted);
+			PlayMontageTask->OnCancelled.AddDynamic(this, &ThisClass::OnBossSweepMontageCompleted);
+			PlayMontageTask->ReadyForActivation();
+			bMontageTaskStarted = true;
+			bBossSweepMontageStarted = true;
+		}
+	}
+
+	// The damage window opens only after the warning has disappeared, matching the visible sweep start.
+	PerformBossSweepHit();
+
+	if (!bMontageTaskStarted)
 	{
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 	}
