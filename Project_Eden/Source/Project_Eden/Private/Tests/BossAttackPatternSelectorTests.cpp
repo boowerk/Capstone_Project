@@ -1,0 +1,132 @@
+#if WITH_DEV_AUTOMATION_TESTS
+
+#include "AI/Data/EnemyLLMEvaluation.h"
+#include "AI/Tasks/BossAttackPatternSelector.h"
+#include "GameplayTags/GP_Tags.h"
+#include "Misc/AutomationTest.h"
+
+namespace BossAttackPatternSelectorTests
+{
+	FGPBossAttackPatternContext MakeBaseContext()
+	{
+		FGPBossAttackPatternContext Context;
+		Context.DefaultAttackAbilityTag = GPTags::Ability::Enemy::Attack_Melee;
+		Context.DistanceToTarget = 600.0f;
+		Context.Aggression = 0.5f;
+		Context.PreferredRange = 600.0f;
+		Context.HealthRatio = 1.0f;
+		Context.BossPhase = 2;
+		Context.EnemyMode = FEnemyLLMEvaluationParser::ToBlackboardName(EEnemyMode::Patrol);
+		Context.FocusTargetRule = FEnemyLLMEvaluationParser::ToBlackboardName(EEnemyFocusTargetRule::CurrentThreat);
+		return Context;
+	}
+
+	bool ExpectTopPattern(FAutomationTestBase& Test, const TCHAR* CaseName, const FGPBossAttackPatternContext& Context, const FGameplayTag& ExpectedTag)
+	{
+		const TArray<FGPBossAttackPatternCandidate> Candidates = FGPBossAttackPatternSelector::BuildCandidates(Context);
+		const FGPBossAttackPatternCandidate* SelectedCandidate = FGPBossAttackPatternSelector::SelectBestCandidate(Candidates);
+		const FString CandidateText = FGPBossAttackPatternSelector::DescribeCandidates(Candidates);
+
+		if (!Test.TestTrue(FString::Printf(TEXT("%s produced candidates: %s"), CaseName, *CandidateText), SelectedCandidate != nullptr))
+		{
+			return false;
+		}
+
+		// Include the full candidate list in the assertion so a future score regression explains itself.
+		return Test.TestTrue(
+			FString::Printf(
+				TEXT("%s expected %s but selected %s. Candidates: %s"),
+				CaseName,
+				*ExpectedTag.ToString(),
+				*SelectedCandidate->AbilityTag.ToString(),
+				*CandidateText),
+			SelectedCandidate->AbilityTag.MatchesTagExact(ExpectedTag));
+	}
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FBossAttackPatternSelectorScoresTest,
+	"ProjectEden.AI.Boss.PatternSelector.ScoreCases",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBossAttackPatternSelectorScoresTest::RunTest(const FString& Parameters)
+{
+	using namespace BossAttackPatternSelectorTests;
+
+	FGPBossAttackPatternContext Context = MakeBaseContext();
+	ExpectTopPattern(*this, TEXT("No boss pattern window falls back to basic"), Context, GPTags::Ability::Enemy::Attack_Melee);
+
+	Context = MakeBaseContext();
+	Context.bCanUseBossSweepAttack = true;
+	Context.Aggression = 0.95f;
+	Context.EnemyMode = FEnemyLLMEvaluationParser::ToBlackboardName(EEnemyMode::Pressure);
+	Context.FocusTargetRule = FEnemyLLMEvaluationParser::ToBlackboardName(EEnemyFocusTargetRule::PlayerFirst);
+	ExpectTopPattern(*this, TEXT("Pressure evaluation prefers sweep"), Context, GPTags::Ability::Enemy::Attack_BossSweep);
+
+	Context = MakeBaseContext();
+	Context.bCanUseBossSweepAttack = true;
+	Context.bCanUseBossHeavyAttack = true;
+	Context.DistanceToTarget = 160.0f;
+	Context.Aggression = 0.15f;
+	Context.EnemyMode = FEnemyLLMEvaluationParser::ToBlackboardName(EEnemyMode::Hold);
+	Context.FocusTargetRule = FEnemyLLMEvaluationParser::ToBlackboardName(EEnemyFocusTargetRule::Weakest);
+	ExpectTopPattern(*this, TEXT("Close defensive evaluation escapes sweep spam with basic"), Context, GPTags::Ability::Enemy::Attack_Melee);
+
+	Context = MakeBaseContext();
+	Context.bCanUseBossSweepAttack = true;
+	Context.bCanUseBossAreaAttack = true;
+	Context.DistanceToTarget = 1250.0f;
+	Context.Aggression = 0.2f;
+	Context.EnemyMode = FEnemyLLMEvaluationParser::ToBlackboardName(EEnemyMode::Hold);
+	ExpectTopPattern(*this, TEXT("Far hold evaluation prefers area"), Context, GPTags::Ability::Enemy::Attack_BossArea);
+
+	Context = MakeBaseContext();
+	Context.bCanUseBossSweepAttack = true;
+	Context.bCanUseBossAreaAttack = true;
+	Context.bCanSummonAdds = true;
+	Context.DistanceToTarget = 1300.0f;
+	Context.Aggression = 0.2f;
+	Context.EnemyMode = FEnemyLLMEvaluationParser::ToBlackboardName(EEnemyMode::Retreat);
+	ExpectTopPattern(*this, TEXT("Retreat evaluation opens summon pressure"), Context, GPTags::Ability::Enemy::Utility_BossSummon);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FBossAttackPatternSelectorLiveEvaluationTest,
+	"ProjectEden.AI.Boss.PatternSelector.LiveEvaluationChangesPattern",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBossAttackPatternSelectorLiveEvaluationTest::RunTest(const FString& Parameters)
+{
+	using namespace BossAttackPatternSelectorTests;
+
+	FGPBossAttackPatternContext Context = MakeBaseContext();
+	Context.bCanUseBossSweepAttack = true;
+	Context.bCanUseBossAreaAttack = true;
+	Context.bCanSummonAdds = true;
+	Context.bCanUseBossHeavyAttack = true;
+
+	Context.DistanceToTarget = 180.0f;
+	Context.Aggression = 0.2f;
+	Context.EnemyMode = FEnemyLLMEvaluationParser::ToBlackboardName(EEnemyMode::Hold);
+	Context.FocusTargetRule = FEnemyLLMEvaluationParser::ToBlackboardName(EEnemyFocusTargetRule::Weakest);
+	ExpectTopPattern(*this, TEXT("Live eval 1: hold/close"), Context, GPTags::Ability::Enemy::Attack_Melee);
+
+	Context.DistanceToTarget = 600.0f;
+	Context.Aggression = 0.95f;
+	Context.EnemyMode = FEnemyLLMEvaluationParser::ToBlackboardName(EEnemyMode::Pressure);
+	Context.FocusTargetRule = FEnemyLLMEvaluationParser::ToBlackboardName(EEnemyFocusTargetRule::PlayerFirst);
+	ExpectTopPattern(*this, TEXT("Live eval 2: pressure/preferred range"), Context, GPTags::Ability::Enemy::Attack_BossSweep);
+
+	Context.bCanUseBossHeavyAttack = false;
+	Context.DistanceToTarget = 1350.0f;
+	Context.Aggression = 0.15f;
+	Context.EnemyMode = FEnemyLLMEvaluationParser::ToBlackboardName(EEnemyMode::Retreat);
+	Context.FocusTargetRule = FEnemyLLMEvaluationParser::ToBlackboardName(EEnemyFocusTargetRule::CurrentThreat);
+	ExpectTopPattern(*this, TEXT("Live eval 3: retreat/far"), Context, GPTags::Ability::Enemy::Utility_BossSummon);
+
+	return true;
+}
+
+#endif
