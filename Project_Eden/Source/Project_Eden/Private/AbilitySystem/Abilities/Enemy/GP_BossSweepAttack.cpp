@@ -5,12 +5,30 @@
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 #include "AbilitySystem/Abilities/GP_GameplayAbility.h"
 #include "Animation/AnimMontage.h"
+#include "Animation/PDA_CharacterAnimationSet.h"
+#include "Characters/GP_BaseCharacter.h"
 #include "GameFramework/Pawn.h"
 #include "GameplayEffect.h"
 #include "GameplayTags/GP_Tags.h"
 #include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Utils/GP_BlueprintLibrary.h"
+
+namespace GP_BossSweepAttack_Internal
+{
+	UAnimMontage* ResolveSweepMontage(AActor* AvatarActor, UAnimMontage* ConfiguredMontage)
+	{
+		const AGP_BaseCharacter* BaseCharacter = Cast<AGP_BaseCharacter>(AvatarActor);
+		const UPDA_CharacterAnimationSet* AnimationSet = IsValid(BaseCharacter) ? BaseCharacter->AnimationSet : nullptr;
+		if (IsValid(AnimationSet) && AnimationSet->HeavyAttackMontages.Num() > 0 && IsValid(AnimationSet->HeavyAttackMontages[0]))
+		{
+			// Sans stores the requested sweep clip as the first heavy montage, mirroring the player combo data layout.
+			return AnimationSet->HeavyAttackMontages[0];
+		}
+
+		return ConfiguredMontage;
+	}
+}
 
 UGP_BossSweepAttack::UGP_BossSweepAttack()
 {
@@ -28,11 +46,7 @@ UGP_BossSweepAttack::UGP_BossSweepAttack()
 	BossSweepArcAngleDegrees = 165.0f;
 	BossSweepHitBoxElevationOffset = 40.0f;
 
-	static ConstructorHelpers::FObjectFinder<UAnimMontage> MontageFinder(TEXT("/Game/Animations/AM_Sans_BossSweep.AM_Sans_BossSweep"));
-	if (MontageFinder.Succeeded())
-	{
-		SkillMontage = MontageFinder.Object;
-	}
+	// Sans sweep animation is resolved from the boss AnimationSet so the setup commandlet can create the montage first.
 
 	static ConstructorHelpers::FClassFinder<UGameplayEffect> DamageEffectFinder(TEXT("/Game/GAS_Pattern/AbilitySystem/GameplayEffects/GE_PrimaryDamage"));
 	if (DamageEffectFinder.Succeeded())
@@ -75,10 +89,11 @@ void UGP_BossSweepAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 	}
 
 	bool bMontageTaskStarted = false;
-	if (SkillMontage)
+	UAnimMontage* MontageToPlay = GP_BossSweepAttack_Internal::ResolveSweepMontage(AvatarActor, SkillMontage);
+	if (MontageToPlay)
 	{
 		UAbilityTask_PlayMontageAndWait* PlayMontageTask =
-			UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(this, NAME_None, SkillMontage, 1.0f);
+			UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(this, NAME_None, MontageToPlay, 1.0f);
 		if (PlayMontageTask)
 		{
 			PlayMontageTask->OnCompleted.AddDynamic(this, &ThisClass::OnBossSweepMontageCompleted);

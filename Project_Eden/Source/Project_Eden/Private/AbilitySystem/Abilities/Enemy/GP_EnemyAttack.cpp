@@ -2,9 +2,28 @@
 #include "AIController.h"
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
+#include "Animation/PDA_CharacterAnimationSet.h"
+#include "Characters/GP_BaseCharacter.h"
 #include "GameFramework/Pawn.h"
 #include "GameplayEffect.h"
 #include "GameplayTags/GP_Tags.h"
+
+namespace GP_EnemyAttack_Internal
+{
+	UAnimMontage* ResolvePrimaryAttackMontage(AActor* AvatarActor, UAnimMontage* ConfiguredMontage)
+	{
+		if (IsValid(ConfiguredMontage))
+		{
+			return ConfiguredMontage;
+		}
+
+		const AGP_BaseCharacter* BaseCharacter = Cast<AGP_BaseCharacter>(AvatarActor);
+		const UPDA_CharacterAnimationSet* AnimationSet = IsValid(BaseCharacter) ? BaseCharacter->AnimationSet : nullptr;
+
+		// Enemy basic attacks follow the same data-asset animation path as player attacks when a set is assigned.
+		return IsValid(AnimationSet) ? AnimationSet->PrimaryAttackMontage.Get() : nullptr;
+	}
+}
 
 UGP_EnemyAttack::UGP_EnemyAttack()
 {
@@ -51,7 +70,7 @@ void UGP_EnemyAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 	}
 
 	// 부모의 SkillMontage 변수를 공격 몽타주로 사용
-	UAnimMontage* MontageToPlay = SkillMontage;
+	UAnimMontage* MontageToPlay = GP_EnemyAttack_Internal::ResolvePrimaryAttackMontage(AvatarActor, SkillMontage);
 
 	if (MontageToPlay)
 	{
