@@ -7,8 +7,6 @@
 #include "GP_BossSweepTelegraphActor.generated.h"
 
 class UMaterialInterface;
-class UMaterialInstanceDynamic;
-class UProceduralMeshComponent;
 class USceneComponent;
 
 USTRUCT()
@@ -29,9 +27,6 @@ struct FGPBossSweepTelegraphSpec
 	FLinearColor TelegraphColor = FLinearColor::Red;
 
 	UPROPERTY()
-	TObjectPtr<UMaterialInterface> OverrideMaterial = nullptr;
-
-	UPROPERTY()
 	bool bInitialized = false;
 };
 
@@ -43,7 +38,7 @@ class PROJECT_EDEN_API AGP_BossSweepTelegraphActor : public AActor
 public:
 	AGP_BossSweepTelegraphActor();
 
-	// Builds the warning fan used before the Sans boss sweep attack applies damage.
+	// Draws the temporary red attack range used before the Sans boss sweep applies damage.
 	UFUNCTION(BlueprintCallable, Category = "Boss|Sweep")
 	void InitializeSweepTelegraph(float Radius, float ArcAngleDegrees, float LifeSeconds, FLinearColor TelegraphColor, UMaterialInterface* OverrideMaterial = nullptr);
 
@@ -57,22 +52,12 @@ private:
 	void OnRep_TelegraphSpec();
 
 	void ApplyTelegraphSpec();
+	void DrawAttackRangePreview();
 	void SnapToFloor();
-	void BuildFanMesh(float Radius, float ArcAngleDegrees, FLinearColor TelegraphColor);
-	UMaterialInterface* ResolveTelegraphMaterial(UMaterialInterface* OverrideMaterial) const;
 
 private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Sweep", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USceneComponent> SceneRoot;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Sweep", meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UProceduralMeshComponent> TelegraphMesh;
-
-	UPROPERTY(EditDefaultsOnly, Category = "Boss|Sweep")
-	TObjectPtr<UMaterialInterface> DefaultTelegraphMaterial;
-
-	UPROPERTY(Transient)
-	TObjectPtr<UMaterialInstanceDynamic> DynamicTelegraphMaterial;
 
 	UPROPERTY(ReplicatedUsing = OnRep_TelegraphSpec)
 	FGPBossSweepTelegraphSpec TelegraphSpec;

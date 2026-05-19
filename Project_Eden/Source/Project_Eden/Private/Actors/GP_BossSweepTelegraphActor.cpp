@@ -2,11 +2,9 @@
 
 #include "Actors/GP_BossSweepTelegraphActor.h"
 
+#include "DrawDebugHelpers.h"
 #include "Engine/World.h"
-#include "Materials/MaterialInstanceDynamic.h"
 #include "Net/UnrealNetwork.h"
-#include "ProceduralMeshComponent.h"
-#include "UObject/ConstructorHelpers.h"
 
 AGP_BossSweepTelegraphActor::AGP_BossSweepTelegraphActor()
 {
@@ -16,27 +14,6 @@ AGP_BossSweepTelegraphActor::AGP_BossSweepTelegraphActor()
 
 	SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("SceneRoot"));
 	SetRootComponent(SceneRoot);
-
-	TelegraphMesh = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("TelegraphMesh"));
-	TelegraphMesh->SetupAttachment(SceneRoot);
-	TelegraphMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	TelegraphMesh->SetCastShadow(false);
-	TelegraphMesh->SetReceivesDecals(false);
-	TelegraphMesh->SetTranslucentSortPriority(10);
-
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> GameTelegraphMaterial(TEXT("/Game/Effects/M_BossTelegraph_Fan.M_BossTelegraph_Fan"));
-	if (GameTelegraphMaterial.Succeeded())
-	{
-		DefaultTelegraphMaterial = GameTelegraphMaterial.Object;
-	}
-	else
-	{
-		static ConstructorHelpers::FObjectFinder<UMaterialInterface> FallbackMaterial(TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
-		if (FallbackMaterial.Succeeded())
-		{
-			DefaultTelegraphMaterial = FallbackMaterial.Object;
-		}
-	}
 }
 
 void AGP_BossSweepTelegraphActor::BeginPlay()
@@ -48,11 +25,12 @@ void AGP_BossSweepTelegraphActor::BeginPlay()
 
 void AGP_BossSweepTelegraphActor::InitializeSweepTelegraph(float Radius, float ArcAngleDegrees, float LifeSeconds, FLinearColor TelegraphColor, UMaterialInterface* OverrideMaterial)
 {
+	// OverrideMaterial is intentionally ignored because this warning now uses debug range lines instead of mesh materials.
+	(void)OverrideMaterial;
 	TelegraphSpec.Radius = Radius;
 	TelegraphSpec.ArcAngleDegrees = ArcAngleDegrees;
 	TelegraphSpec.LifeSeconds = LifeSeconds;
 	TelegraphSpec.TelegraphColor = TelegraphColor;
-	TelegraphSpec.OverrideMaterial = OverrideMaterial;
 	TelegraphSpec.bInitialized = true;
 
 	ApplyTelegraphSpec();
@@ -86,22 +64,56 @@ void AGP_BossSweepTelegraphActor::ApplyTelegraphSpec()
 		return;
 	}
 
-	// Every client builds the procedural fan locally because procedural mesh section data itself is not replicated.
-	BuildFanMesh(TelegraphSpec.Radius, TelegraphSpec.ArcAngleDegrees, TelegraphSpec.TelegraphColor);
+	// Show the attack range with debug lines so the warning stays visible even when mesh materials fail to render.
+	DrawAttackRangePreview();
+}
 
-	if (UMaterialInterface* MaterialToUse = ResolveTelegraphMaterial(TelegraphSpec.OverrideMaterial))
+void AGP_BossSweepTelegraphActor::DrawAttackRangePreview()
+{
+	UWorld* World = GetWorld();
+	if (!World)
 	{
-		DynamicTelegraphMaterial = UMaterialInstanceDynamic::Create(MaterialToUse, this);
-		if (DynamicTelegraphMaterial)
+		return;
+	}
+
+	SnapToFloor();
+
+	const float SafeRadius = FMath::Max(0.0f, TelegraphSpec.Radius);
+	const float HalfAngleDegrees = FMath::Clamp(TelegraphSpec.ArcAngleDegrees * 0.5f, 0.0f, 180.0f);
+	const int32 SegmentCount = FMath::Max(8, ArcSegments);
+	const float LifeSeconds = FMath::Max(TelegraphSpec.LifeSeconds, 0.05f);
+	const FColor RangeColor = FColor::Red;
+	const float LineThickness = 8.0f;
+	const FVector Origin = GetActorLocation() + FVector(0.0f, 0.0f, 18.0f);
+	FVector ForwardVector = GetActorForwardVector().GetSafeNormal2D();
+	if (ForwardVector.IsNearlyZero())
+	{
+		ForwardVector = FVector::ForwardVector;
+	}
+
+	DrawDebugSphere(World, Origin, 24.0f, 12, RangeColor, false, LifeSeconds, 0, LineThickness);
+
+	FVector PreviousArcPoint = FVector::ZeroVector;
+	for (int32 SegmentIndex = 0; SegmentIndex <= SegmentCount; ++SegmentIndex)
+	{
+		const float Alpha = static_cast<float>(SegmentIndex) / static_cast<float>(SegmentCount);
+		const float AngleDegrees = FMath::Lerp(-HalfAngleDegrees, HalfAngleDegrees, Alpha);
+		const FVector Direction = FRotator(0.0f, AngleDegrees, 0.0f).RotateVector(ForwardVector).GetSafeNormal();
+		const FVector ArcPoint = Origin + Direction * SafeRadius;
+
+		if (SegmentIndex > 0)
 		{
-			DynamicTelegraphMaterial->SetVectorParameterValue(TEXT("TelegraphColor"), TelegraphSpec.TelegraphColor);
-			DynamicTelegraphMaterial->SetScalarParameterValue(TEXT("Opacity"), TelegraphSpec.TelegraphColor.A);
-			TelegraphMesh->SetMaterial(0, DynamicTelegraphMaterial);
+			DrawDebugLine(World, PreviousArcPoint, ArcPoint, RangeColor, false, LifeSeconds, 0, LineThickness);
 		}
-		else
+
+		const bool bBoundaryLine = SegmentIndex == 0 || SegmentIndex == SegmentCount;
+		const bool bGuideLine = SegmentIndex % 6 == 0;
+		if (bBoundaryLine || bGuideLine)
 		{
-			TelegraphMesh->SetMaterial(0, MaterialToUse);
+			DrawDebugLine(World, Origin, ArcPoint, RangeColor, false, LifeSeconds, 0, LineThickness);
 		}
+
+		PreviousArcPoint = ArcPoint;
 	}
 }
 
@@ -126,64 +138,4 @@ void AGP_BossSweepTelegraphActor::SnapToFloor()
 	}
 
 	SetActorLocation(CurrentLocation + FVector(0.0f, 0.0f, FloorOffset));
-}
-
-void AGP_BossSweepTelegraphActor::BuildFanMesh(float Radius, float ArcAngleDegrees, FLinearColor TelegraphColor)
-{
-	const float SafeRadius = FMath::Max(0.0f, Radius);
-	const float ClampedArcAngle = FMath::Clamp(ArcAngleDegrees, 1.0f, 360.0f);
-	const int32 SegmentCount = FMath::Max(3, ArcSegments);
-	const float HalfArcRadians = FMath::DegreesToRadians(ClampedArcAngle * 0.5f);
-
-	TArray<FVector> Vertices;
-	TArray<int32> Triangles;
-	TArray<FVector> Normals;
-	TArray<FVector2D> UVs;
-	TArray<FLinearColor> VertexColors;
-	TArray<FProcMeshTangent> Tangents;
-
-	Vertices.Reserve(SegmentCount + 2);
-	Triangles.Reserve(SegmentCount * 3);
-	Normals.Reserve(SegmentCount + 2);
-	UVs.Reserve(SegmentCount + 2);
-	VertexColors.Reserve(SegmentCount + 2);
-	Tangents.Reserve(SegmentCount + 2);
-
-	Vertices.Add(FVector::ZeroVector);
-	Normals.Add(FVector::UpVector);
-	UVs.Add(FVector2D(0.5f, 0.0f));
-	VertexColors.Add(TelegraphColor);
-	Tangents.Add(FProcMeshTangent(1.0f, 0.0f, 0.0f));
-
-	for (int32 SegmentIndex = 0; SegmentIndex <= SegmentCount; ++SegmentIndex)
-	{
-		const float Alpha = static_cast<float>(SegmentIndex) / static_cast<float>(SegmentCount);
-		const float AngleRadians = FMath::Lerp(-HalfArcRadians, HalfArcRadians, Alpha);
-		const FVector VertexLocation(FMath::Cos(AngleRadians) * SafeRadius, FMath::Sin(AngleRadians) * SafeRadius, 0.0f);
-
-		Vertices.Add(VertexLocation);
-		Normals.Add(FVector::UpVector);
-		UVs.Add(FVector2D(Alpha, 1.0f));
-		VertexColors.Add(TelegraphColor);
-		Tangents.Add(FProcMeshTangent(1.0f, 0.0f, 0.0f));
-	}
-
-	for (int32 SegmentIndex = 1; SegmentIndex <= SegmentCount; ++SegmentIndex)
-	{
-		Triangles.Add(0);
-		Triangles.Add(SegmentIndex);
-		Triangles.Add(SegmentIndex + 1);
-	}
-
-	TelegraphMesh->CreateMeshSection_LinearColor(0, Vertices, Triangles, Normals, UVs, VertexColors, Tangents, false);
-}
-
-UMaterialInterface* AGP_BossSweepTelegraphActor::ResolveTelegraphMaterial(UMaterialInterface* OverrideMaterial) const
-{
-	if (OverrideMaterial)
-	{
-		return OverrideMaterial;
-	}
-
-	return DefaultTelegraphMaterial;
 }
