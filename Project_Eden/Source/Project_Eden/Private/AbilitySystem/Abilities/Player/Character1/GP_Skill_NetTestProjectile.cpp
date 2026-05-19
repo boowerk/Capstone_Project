@@ -23,8 +23,7 @@ void UGP_Skill_NetTestProjectile::ActivateAbility(const FGameplayAbilitySpecHand
 	ACharacter* Avatar = Cast<ACharacter>(ActorInfo->AvatarActor.Get());
 	UAbilitySystemComponent* ASC = ActorInfo->AbilitySystemComponent.Get();
 
-	if (!Avatar || !ASC || (CooldownTag.IsValid() && ASC->HasMatchingGameplayTag(CooldownTag))
-	|| !CommitAbility(Handle, ActorInfo, ActivationInfo))
+	if (!Avatar || !ASC || !CommitAbility(Handle, ActorInfo, ActivationInfo))
 	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
@@ -52,28 +51,12 @@ void UGP_Skill_NetTestProjectile::ActivateAbility(const FGameplayAbilitySpecHand
 			ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
 		// --- 스폰 ---
-		AGP_Projectile* SpawnedProjectile = Avatar->GetWorld()->SpawnActor<AGP_Projectile>(
+		Avatar->GetWorld()->SpawnActor<AGP_Projectile>(
 			ProjectileClass,
 			SpawnLocation,
 			SpawnRotation,
 			SpawnParams
 		);
-
-		// --- 쿨다운 적용 ---
-		if (SpawnedProjectile && ManualCooldownEffectClass)
-		{
-			FGameplayEffectSpecHandle CooldownSpecHandle =
-				ASC->MakeOutgoingSpec(
-					ManualCooldownEffectClass,
-					GetAbilityLevel(),
-					ASC->MakeEffectContext()
-				);
-
-			if (CooldownSpecHandle.IsValid())
-			{
-				ASC->ApplyGameplayEffectSpecToSelf(*CooldownSpecHandle.Data.Get());
-			}
-		}
 	}
 
 	EndAbility(Handle, ActorInfo, ActivationInfo, true, false);

@@ -4,11 +4,9 @@
 
 #include "CoreMinimal.h"
 #include "AbilitySystem/Abilities/GP_SkillBase.h"
-#include "GameplayTagContainer.h"
 #include "GP_Skill_NetTestProjectile.generated.h"
 
 class AGP_Projectile;
-class UGameplayEffect;
 
 /**
  * 네트워크 테스트 프로젝타일 스킬
@@ -33,11 +31,4 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS|Skill|Projectile")
 	float SpawnUpOffset = 60.f;
-
-	// --- 쿨다운 설정 ---
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS|Skill|Cooldown")
-	FGameplayTag CooldownTag;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS|Skill|Cooldown")
-	TSubclassOf<UGameplayEffect> ManualCooldownEffectClass;
 };
