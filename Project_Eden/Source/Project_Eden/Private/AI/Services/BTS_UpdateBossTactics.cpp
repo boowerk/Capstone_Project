@@ -71,12 +71,12 @@ void UBTS_UpdateBossTactics::OnSearchStart(FBehaviorTreeSearchData& SearchData)
 FString UBTS_UpdateBossTactics::GetStaticServiceDescription() const
 {
 	return FString::Printf(
-		TEXT("%s\nBoss phases %.0f%% / %.0f%%, AoE %.1fs, Sweep %.1fs, Summon %.1fs"),
+		TEXT("%s\nBoss phases %.0f%% / %.0f%%, AoE %.1fs, Sweep random <= %.0fcm, Summon %.1fs"),
 		*Super::GetStaticServiceDescription(),
 		PhaseTwoHealthRatio * 100.0f,
 		PhaseThreeHealthRatio * 100.0f,
 		AreaAttackInterval,
-		SweepAttackInterval,
+		SweepAttackRange,
 		SummonInterval);
 }
 
@@ -116,11 +116,10 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 	const bool bCanUseSweepAttack = bHasTarget
 		&& !bReturningHome
 		&& !bShouldPhaseTransition
-		&& !bCanUseAreaAttack
+		&& bCanAttack
 		&& bHasLineOfSight
-		&& DistanceToTarget <= SweepAttackRange
-		// Sweep has its own window so it reads as a deliberate pattern instead of replacing every heavy attack.
-		&& BTS_UpdateBossTactics_Internal::IsPatternWindowOpen(WorldTimeSeconds, SweepAttackInterval, SweepAttackWindow);
+		// 실제 기본 공격/휘둘러치기 선택은 공격 태스크에서 공격 1회마다 랜덤으로 결정한다.
+		&& DistanceToTarget <= SweepAttackRange;
 	const bool bCanSummonAdds = bHasTarget
 		&& !bReturningHome
 		&& !bShouldPhaseTransition

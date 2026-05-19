@@ -22,7 +22,8 @@ namespace BTT_ExecuteEnemyAttack_Internal
 	FGameplayTag ResolveAttackAbilityTagForContext(
 		const APawn* ControlledPawn,
 		const UBlackboardComponent* BlackboardComponent,
-		const FGameplayTag& DefaultAttackAbilityTag)
+		const FGameplayTag& DefaultAttackAbilityTag,
+		float BossSweepAttackChance)
 	{
 		const AGP_EnemyCharacter* EnemyCharacter = Cast<AGP_EnemyCharacter>(ControlledPawn);
 		if (!IsValid(EnemyCharacter) || !EnemyCharacter->IsBossEnemy())
@@ -46,16 +47,16 @@ namespace BTT_ExecuteEnemyAttack_Internal
 			return GPTags::Ability::Enemy::Attack_BossArea;
 		}
 
-		// Sweep is resolved before heavy so the close-range pattern window can override the basic punish.
 		if (BTT_ExecuteEnemyAttack_Internal::GetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossSweepAttack))
 		{
-			return GPTags::Ability::Enemy::Attack_BossSweep;
+			// 보스 공격 1회마다 굴림을 해서 기본 공격과 휘둘러치기가 자연스럽게 섞이게 한다.
+			const float ClampedSweepChance = FMath::Clamp(BossSweepAttackChance, 0.0f, 1.0f);
+			return FMath::FRand() <= ClampedSweepChance
+				? GPTags::Ability::Enemy::Attack_BossSweep
+				: DefaultAttackAbilityTag;
 		}
 
-		if (BTT_ExecuteEnemyAttack_Internal::GetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossHeavyAttack))
-		{
-			return GPTags::Ability::Enemy::Attack_BossHeavy;
-		}
+		// Sans 보스는 공용 공격 분기에서는 기본 공격/휘둘러치기 랜덤만 사용한다.
 
 		return DefaultAttackAbilityTag;
 	}
@@ -77,7 +78,7 @@ EBTNodeResult::Type UBTT_ExecuteEnemyAttack::ExecuteTask(UBehaviorTreeComponent&
 		return EBTNodeResult::Failed;
 	}
 
-	const FGameplayTag EffectiveAttackAbilityTag = BTT_ExecuteEnemyAttack_Internal::ResolveAttackAbilityTagForContext(ControlledPawn, BlackboardComponent, AttackAbilityTag);
+	const FGameplayTag EffectiveAttackAbilityTag = BTT_ExecuteEnemyAttack_Internal::ResolveAttackAbilityTagForContext(ControlledPawn, BlackboardComponent, AttackAbilityTag, BossSweepAttackChance);
 	if (!EffectiveAttackAbilityTag.IsValid())
 	{
 		return EBTNodeResult::Failed;

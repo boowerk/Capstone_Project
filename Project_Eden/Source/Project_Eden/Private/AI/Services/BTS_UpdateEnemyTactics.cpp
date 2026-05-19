@@ -378,8 +378,6 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 		constexpr float BossSweepAttackRange = 900.0f;
 		constexpr float BossAreaAttackInterval = 8.0f;
 		constexpr float BossAreaAttackWindow = 1.2f;
-		constexpr float BossSweepAttackInterval = 5.5f;
-		constexpr float BossSweepAttackWindow = 1.0f;
 		constexpr float BossSummonInterval = 18.0f;
 		constexpr float BossSummonWindow = 1.5f;
 
@@ -395,11 +393,10 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 			&& DistanceToTarget <= BossAreaAttackRange
 			&& BTS_UpdateEnemyTactics_Internal::IsPatternWindowOpen(WorldTimeSeconds, BossAreaAttackInterval, BossAreaAttackWindow);
 		const bool bCanUseBossSweepAttack = !bShouldBossPhaseTransition
-			&& !bCanUseBossAreaAttack
+			&& bCanAttack
 			&& bHasLineOfSight
-			&& DistanceToTarget <= BossSweepAttackRange
-			// Sweep uses a separate cadence so it remains a readable boss pattern, not just a bigger melee swing.
-			&& BTS_UpdateEnemyTactics_Internal::IsPatternWindowOpen(WorldTimeSeconds, BossSweepAttackInterval, BossSweepAttackWindow);
+			// 공격 태스크에서 기본 공격/휘둘러치기 중 하나를 공격 1회마다 랜덤 선택한다.
+			&& DistanceToTarget <= BossSweepAttackRange;
 		const bool bCanSummonAdds = !bShouldBossPhaseTransition
 			&& BossPhase >= 3
 			&& BTS_UpdateEnemyTactics_Internal::IsPatternWindowOpen(WorldTimeSeconds, BossSummonInterval, BossSummonWindow);
