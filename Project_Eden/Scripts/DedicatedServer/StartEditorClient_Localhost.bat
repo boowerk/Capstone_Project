@@ -6,6 +6,13 @@ set "UPROJECT=%PROJECT_ROOT%Project_Eden.uproject"
 set "CLIENT_URL=127.0.0.1:7778"
 set "CLIENT_WINDOW_ARGS=-windowed -ResX=960 -ResY=540 -WinX=60 -WinY=60"
 
+for /f "tokens=1,* delims==" %%A in ('findstr /b /c:"ServerDefaultMap=" "%PROJECT_ROOT%Config\DefaultEngine.ini"') do set "CLIENT_DEFAULT_MAP=%%B"
+if "%CLIENT_DEFAULT_MAP%"=="" (
+    echo ServerDefaultMap was not found in %PROJECT_ROOT%Config\DefaultEngine.ini
+    pause
+    exit /b 1
+)
+
 rem Optional first argument: engine root folder that contains the Engine directory.
 rem Example: StartEditorClient_Localhost.bat "C:\Engine_server\Windows"
 if not "%~1"=="" (
@@ -47,6 +54,7 @@ goto CollectExtraArgs
 :ExtraArgsDone
 
 echo Starting Project Eden local client: %CLIENT_URL%
+echo Client GameDefaultMap override: %CLIENT_DEFAULT_MAP%
 echo Engine root: %UE_SERVER_ROOT%
-start "Project Eden Local Client" "%EDITOR_EXE%" "%UPROJECT%" %CLIENT_URL% -game -log %CLIENT_WINDOW_ARGS% %EXTRA_ARGS%
+start "Project Eden Local Client" "%EDITOR_EXE%" "%UPROJECT%" %CLIENT_URL% -game -log -ini:Engine:[/Script/EngineSettings.GameMapsSettings]:GameDefaultMap=%CLIENT_DEFAULT_MAP% %CLIENT_WINDOW_ARGS% %EXTRA_ARGS%
 exit /b 0
