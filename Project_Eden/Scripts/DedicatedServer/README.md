@@ -47,6 +47,38 @@ StartEditorClient_Radmin.bat <RadminVPN server IP>
 
 Use localhost for same-machine tests. Use Radmin when testing remote clients.
 
+## Verified Test State
+
+Last verified: 2026-05-19
+
+Verified flow:
+
+```text
+Remote client connects through RadminVPN
+Client input activates GAS ability
+Server spawns BP_NetTestProjectile
+Projectile replicates to clients
+Server handles hit and applies GE_Damage_NetTestProjectile
+GE_Cooldown_NetTestProjectile blocks repeated activation
+HitReact event fires once
+Hit VFX appears on clients through AGP_Projectile::MulticastPlayHitEffect
+Damage number duplicate display is resolved
+```
+
+Current known deferred issue:
+
+```text
+Animation sync looks slightly off during remote dedicated-server play.
+This is intentionally deferred from the projectile/GAS verification path.
+```
+
+Next feature direction:
+
+```text
+Design DataAsset-based skill management so PlayerController does not keep
+growing one AbilityClass property per test skill.
+```
+
 ## Rule of Thumb
 
 ```text
