@@ -55,4 +55,7 @@ protected:
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "Eden|Projectile")
 	void BP_OnHitEffect(const FVector& ImpactLocation);
+
+	UPROPERTY(Transient)
+	bool bHasHit = false;
 };

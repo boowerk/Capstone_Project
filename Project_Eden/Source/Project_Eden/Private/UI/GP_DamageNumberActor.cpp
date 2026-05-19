@@ -7,7 +7,7 @@
 AGP_DamageNumberActor::AGP_DamageNumberActor()
 {
     PrimaryActorTick.bCanEverTick = true;
-    bReplicates = true;
+    bReplicates = false;
     SetReplicateMovement(false);
 
     SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("SceneRoot"));
