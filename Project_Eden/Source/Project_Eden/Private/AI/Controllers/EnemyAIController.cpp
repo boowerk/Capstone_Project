@@ -421,20 +421,24 @@ void AEnemyAIController::StopEvaluationRefreshLoop()
 
 void AEnemyAIController::ResolveBehaviorAssets(APawn* InPawn, UBehaviorTree*& OutBehaviorTreeAsset, UBlackboardData*& OutBlackboardAsset) const
 {
-	OutBehaviorTreeAsset = DefaultBehaviorTreeAsset;
-	OutBlackboardAsset = DefaultBlackboardAsset;
+	OutBehaviorTreeAsset = nullptr;
+	OutBlackboardAsset = nullptr;
 
 	if (const AGP_EnemyCharacter* EnemyCharacter = Cast<AGP_EnemyCharacter>(InPawn))
 	{
-		if (!IsValid(OutBehaviorTreeAsset))
-		{
-			OutBehaviorTreeAsset = EnemyCharacter->GetBehaviorTreeAssetOverride();
-		}
+		// Pawn overrides must win over controller defaults so boss Blueprints can select their own BT/Blackboard.
+		OutBehaviorTreeAsset = EnemyCharacter->GetBehaviorTreeAssetOverride();
+		OutBlackboardAsset = EnemyCharacter->GetBlackboardAssetOverride();
+	}
 
-		if (!IsValid(OutBlackboardAsset))
-		{
-			OutBlackboardAsset = EnemyCharacter->GetBlackboardAssetOverride();
-		}
+	if (!IsValid(OutBehaviorTreeAsset))
+	{
+		OutBehaviorTreeAsset = DefaultBehaviorTreeAsset;
+	}
+
+	if (!IsValid(OutBlackboardAsset))
+	{
+		OutBlackboardAsset = DefaultBlackboardAsset;
 	}
 
 	if (!IsValid(OutBehaviorTreeAsset) && bUseSharedBehaviorAssetFallback)
