@@ -76,6 +76,19 @@ namespace GPTags
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Chaos, "GPTags.Damage.Element.Chaos", "혼돈 속성 (Chaos)");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Brute, "GPTags.Damage.Element.Brute", "물리/강타 속성 (Brute)");
         }
+        namespace Coef
+        {
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Atk, "Damage.Coef.Atk", "SetByCaller 공격력 계수");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Def, "Damage.Coef.Def", "SetByCaller 대상 방어력 계수");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Hp, "Damage.Coef.Hp", "SetByCaller 대상 최대 체력 계수");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(M_Atk, "Damage.Coef.M_Atk", "SetByCaller 마법력 계수");
+        }
+        namespace Data
+        {
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Base, "Damage.Base", "SetByCaller 물리/공통 기본 데미지");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(BaseSpell, "Damage.BaseSpell", "SetByCaller 마법 기본 데미지");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(ToughnessBase, "Damage.ToughnessBase", "SetByCaller 강인도 기본 데미지");
+        }
     }
 
     // [3] State : 캐릭터 상태, 버프, 디버프

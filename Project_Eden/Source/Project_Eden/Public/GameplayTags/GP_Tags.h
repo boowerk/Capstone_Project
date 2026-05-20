@@ -80,6 +80,19 @@ namespace GPTags
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Chaos);			// 혼돈 속성		Chaos	0
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Brute);			// 물리 속성		Brute	0
 		}
+		namespace Coef
+		{
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Atk);			// 공격력 계수
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Def);			// 대상 방어력 계수
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Hp);				// 대상 최대 체력 계수
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(M_Atk);			// 마법력 계수
+		}
+		namespace Data
+		{
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Base);			// 물리/공통 기본 데미지
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(BaseSpell);		// 마법 기본 데미지
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(ToughnessBase);	// 강인도 기본 데미지
+		}
 	}
 
 	// [3] State : 캐릭터 상태, 버프, 디버프
