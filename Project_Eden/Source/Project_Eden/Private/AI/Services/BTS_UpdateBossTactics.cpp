@@ -3,6 +3,7 @@
 #include "AI/Controllers/EnemyAIController.h"
 #include "AI/Data/EnemyBlackboardKeys.h"
 #include "AI/Data/EnemyLLMEvaluation.h"
+#include "AI/Tasks/BossAttackPatternSelector.h"
 #include "AIController.h"
 #include "BehaviorTree/BehaviorTreeComponent.h"
 #include "BehaviorTree/BehaviorTreeTypes.h"
@@ -100,48 +101,54 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 
 	const bool bHasTarget = IsValid(Cast<AActor>(BlackboardComponent->GetValueAsObject(EnemyBlackboardKeys::TargetActor)));
 	const bool bReturningHome = BTS_UpdateBossTactics_Internal::GetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldReturnHome);
-	const bool bCanAttack = BTS_UpdateBossTactics_Internal::GetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanAttack);
+	const bool bShouldReposition = BTS_UpdateBossTactics_Internal::GetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldReposition);
 	const bool bHasLineOfSight = BTS_UpdateBossTactics_Internal::GetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bHasLineOfSight);
 	const float DistanceToTarget = BTS_UpdateBossTactics_Internal::GetOptionalBlackboardFloat(BlackboardComponent, EnemyBlackboardKeys::DistanceToTarget, 0.0f);
 	const float WorldTimeSeconds = OwnerComp.GetWorld() != nullptr ? OwnerComp.GetWorld()->GetTimeSeconds() : 0.0f;
 	const AEnemyAIController* EnemyAIController = Cast<AEnemyAIController>(OwnerComp.GetAIOwner());
 	const FName EnemyMode = BlackboardComponent->GetValueAsName(EnemyBlackboardKeys::EnemyMode);
 	const float PreferredRange = BTS_UpdateBossTactics_Internal::GetOptionalBlackboardFloat(BlackboardComponent, EnemyBlackboardKeys::PreferredRange, 600.0f);
+	const float EffectiveBasicReach = FMath::Min(HeavyAttackRange, FGPBossAttackPatternRanges::BasicAttackReach);
+	const float EffectiveSweepReach = FMath::Min(SweepAttackRange, FGPBossAttackPatternRanges::SweepAttackReach);
+	const float EffectiveAreaReach = FMath::Min(AreaAttackRange, FGPBossAttackPatternRanges::AreaAttackReach);
+	const bool bBasicAttackCanReach = FGPBossAttackPatternRanges::IsWithinReach(DistanceToTarget, EffectiveBasicReach);
+	const bool bSweepAttackCanReach = FGPBossAttackPatternRanges::IsWithinReach(DistanceToTarget, EffectiveSweepReach);
+	const bool bAreaAttackCanReach = FGPBossAttackPatternRanges::IsWithinReach(DistanceToTarget, EffectiveAreaReach);
 
 	// 페이즈 전환은 한 틱짜리 신호로 두어 BT가 전환 연출/버프 패턴을 우선 선택할 수 있게 한다.
 	bool bShouldPhaseTransition = bHasTarget && !bReturningHome && PreviousBossPhase > 0 && PreviousBossPhase != BossPhase;
-	bool bCanUseHeavyAttack = bHasTarget && !bReturningHome && !bShouldPhaseTransition && bCanAttack && DistanceToTarget <= HeavyAttackRange;
+	bool bCanUseHeavyAttack = bHasTarget && !bReturningHome && !bShouldPhaseTransition && bHasLineOfSight && bBasicAttackCanReach;
 	bool bCanUseAreaAttack = bHasTarget
 		&& !bReturningHome
 		&& !bShouldPhaseTransition
 		&& BossPhase >= 2
 		&& bHasLineOfSight
-		&& DistanceToTarget <= AreaAttackRange
+		&& bAreaAttackCanReach
 		&& BTS_UpdateBossTactics_Internal::IsPatternWindowOpen(WorldTimeSeconds, AreaAttackInterval, AreaAttackWindow);
 	bool bCanUseSweepAttack = bHasTarget
 		&& !bReturningHome
 		&& !bShouldPhaseTransition
-		&& bCanAttack
 		&& bHasLineOfSight
 		// 실제 기본 공격/휘둘러치기 선택은 공격 태스크에서 실시간 평가 점수로 결정한다.
-		&& DistanceToTarget <= SweepAttackRange;
+		&& bSweepAttackCanReach;
 	bool bCanSummonAdds = bHasTarget
 		&& !bReturningHome
 		&& !bShouldPhaseTransition
 		// Let the summon pattern enter from phase 2 so it is visible before the fight is nearly over.
 		&& BossPhase >= 2
+		&& (bBasicAttackCanReach || bSweepAttackCanReach || bAreaAttackCanReach)
 		&& BTS_UpdateBossTactics_Internal::IsPatternWindowOpen(WorldTimeSeconds, SummonInterval, SummonWindow);
 
 	if (IsValid(EnemyAIController) && EnemyAIController->IsBossRuntimeEvaluationTestCycleActive() && bHasTarget && !bReturningHome && bHasLineOfSight)
 	{
 		const bool bModePrefersHold = EnemyMode == FEnemyLLMEvaluationParser::ToBlackboardName(EEnemyMode::Hold);
 		const bool bTestAreaWindow = bModePrefersHold && PreferredRange <= 250.0f;
-		// Test cycle bypasses phase/time gates so each authored boss pattern can be observed on demand.
+		// Test cycle bypasses phase/time gates but still refuses attacks outside hit reach.
 		bShouldPhaseTransition = false;
-		bCanUseHeavyAttack = bModePrefersHold && !bTestAreaWindow;
-		bCanUseAreaAttack = bTestAreaWindow;
-		bCanUseSweepAttack = EnemyMode == FEnemyLLMEvaluationParser::ToBlackboardName(EEnemyMode::Pressure);
-		bCanSummonAdds = EnemyMode == FEnemyLLMEvaluationParser::ToBlackboardName(EEnemyMode::Retreat);
+		bCanUseHeavyAttack = bModePrefersHold && !bTestAreaWindow && bBasicAttackCanReach;
+		bCanUseAreaAttack = bTestAreaWindow && bAreaAttackCanReach;
+		bCanUseSweepAttack = EnemyMode == FEnemyLLMEvaluationParser::ToBlackboardName(EEnemyMode::Pressure) && bSweepAttackCanReach;
+		bCanSummonAdds = EnemyMode == FEnemyLLMEvaluationParser::ToBlackboardName(EEnemyMode::Retreat) && (bBasicAttackCanReach || bSweepAttackCanReach || bAreaAttackCanReach);
 	}
 
 	const bool bBossPatternRequestsAttack = bShouldPhaseTransition || bCanSummonAdds || bCanUseAreaAttack || bCanUseSweepAttack || bCanUseHeavyAttack;
@@ -153,6 +160,13 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldRetreat, false);
 		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldReposition, false);
 		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldChase, false);
+	}
+	else if (bHasTarget && !bReturningHome && !bShouldReposition)
+	{
+		// If no boss attack can reach, keep the boss moving instead of playing whiffed attacks.
+		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanAttack, false);
+		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldRetreat, false);
+		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldChase, true);
 	}
 
 	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldBossPhaseTransition, bShouldPhaseTransition);

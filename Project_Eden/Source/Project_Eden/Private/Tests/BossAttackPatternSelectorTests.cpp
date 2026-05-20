@@ -42,6 +42,17 @@ namespace BossAttackPatternSelectorTests
 				*CandidateText),
 			SelectedCandidate->AbilityTag.MatchesTagExact(ExpectedTag));
 	}
+
+	bool ExpectNoDamagePattern(FAutomationTestBase& Test, const TCHAR* CaseName, const FGPBossAttackPatternContext& Context)
+	{
+		const TArray<FGPBossAttackPatternCandidate> Candidates = FGPBossAttackPatternSelector::BuildCandidates(Context);
+		const FGPBossAttackPatternCandidate* SelectedCandidate = FGPBossAttackPatternSelector::SelectBestCandidate(Candidates);
+
+		// Out-of-reach damage patterns should fail closed so the BT can chase instead of playing whiffed attacks.
+		return Test.TestTrue(
+			FString::Printf(TEXT("%s expected no damage candidates. Candidates: %s"), CaseName, *FGPBossAttackPatternSelector::DescribeCandidates(Candidates)),
+			SelectedCandidate == nullptr);
+	}
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -54,6 +65,7 @@ bool FBossAttackPatternSelectorScoresTest::RunTest(const FString& Parameters)
 	using namespace BossAttackPatternSelectorTests;
 
 	FGPBossAttackPatternContext Context = MakeBaseContext();
+	Context.DistanceToTarget = 240.0f;
 	ExpectTopPattern(*this, TEXT("No boss pattern window falls back to basic"), Context, GPTags::Ability::Enemy::Attack_Melee);
 
 	Context = MakeBaseContext();
@@ -75,10 +87,18 @@ bool FBossAttackPatternSelectorScoresTest::RunTest(const FString& Parameters)
 	Context = MakeBaseContext();
 	Context.bCanUseBossSweepAttack = true;
 	Context.bCanUseBossAreaAttack = true;
-	Context.DistanceToTarget = 1250.0f;
+	Context.DistanceToTarget = 820.0f;
 	Context.Aggression = 0.2f;
+	Context.PreferredRange = 120.0f;
 	Context.EnemyMode = FEnemyLLMEvaluationParser::ToBlackboardName(EEnemyMode::Hold);
 	ExpectTopPattern(*this, TEXT("Far hold evaluation prefers area"), Context, GPTags::Ability::Enemy::Attack_BossArea);
+
+	Context = MakeBaseContext();
+	Context.bCanUseBossSweepAttack = true;
+	Context.bCanUseBossAreaAttack = true;
+	Context.bCanUseBossHeavyAttack = true;
+	Context.DistanceToTarget = 1000.0f;
+	ExpectNoDamagePattern(*this, TEXT("Out-of-reach damage patterns are filtered"), Context);
 
 	Context = MakeBaseContext();
 	Context.bCanUseBossSweepAttack = true;

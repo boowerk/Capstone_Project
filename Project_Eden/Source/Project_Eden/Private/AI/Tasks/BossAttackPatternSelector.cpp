@@ -3,6 +3,13 @@
 #include "AI/Data/EnemyLLMEvaluation.h"
 #include "GameplayTags/GP_Tags.h"
 
+bool FGPBossAttackPatternRanges::IsWithinReach(float DistanceToTarget, float AttackReach)
+{
+	// Keep a small tolerance so capsule edge and animation root motion do not make valid hits flicker.
+	constexpr float ReachTolerance = 25.0f;
+	return FMath::Max(0.0f, DistanceToTarget) <= AttackReach + ReachTolerance;
+}
+
 void FGPBossAttackPatternSelector::AddCandidate(TArray<FGPBossAttackPatternCandidate>& Candidates, const FGameplayTag& AbilityTag, float Score, FName DebugName)
 {
 	if (!AbilityTag.IsValid() || Score <= KINDA_SMALL_NUMBER)
@@ -48,15 +55,18 @@ TArray<FGPBossAttackPatternCandidate> FGPBossAttackPatternSelector::BuildCandida
 	const float FarPressure = FMath::Clamp((DistanceToTarget - PreferredRange) / PreferredRange, 0.0f, 1.0f);
 	const float PhaseBonus = FMath::Clamp(static_cast<float>(BossPhase - 1) * 0.15f, 0.0f, 0.35f);
 
-	const float BasicScore = 0.35f
-		+ (1.0f - Aggression) * 0.25f
-		+ ClosePressure * 0.2f
-		+ (bHoldMode ? 0.2f : 0.0f)
-		+ (bWeakestFocus ? 0.1f : 0.0f)
-		+ (Context.bCanUseBossHeavyAttack ? 0.25f : 0.0f)
-		+ (HealthRatio <= 0.45f ? 0.1f : 0.0f);
-	// Basic must remain a scored candidate so close/defensive evaluations can pull the boss out of sweep spam.
-	AddCandidate(Candidates, Context.DefaultAttackAbilityTag, BasicScore, TEXT("Basic"));
+	if (FGPBossAttackPatternRanges::IsWithinReach(DistanceToTarget, FGPBossAttackPatternRanges::BasicAttackReach))
+	{
+		const float BasicScore = 0.35f
+			+ (1.0f - Aggression) * 0.25f
+			+ ClosePressure * 0.2f
+			+ (bHoldMode ? 0.2f : 0.0f)
+			+ (bWeakestFocus ? 0.1f : 0.0f)
+			+ (Context.bCanUseBossHeavyAttack ? 0.25f : 0.0f)
+			+ (HealthRatio <= 0.45f ? 0.1f : 0.0f);
+		// Basic must remain a scored candidate only when the scratch hitbox can actually reach the target.
+		AddCandidate(Candidates, Context.DefaultAttackAbilityTag, BasicScore, TEXT("Basic"));
+	}
 
 	if (Context.bCanSummonAdds)
 	{
@@ -69,7 +79,7 @@ TArray<FGPBossAttackPatternCandidate> FGPBossAttackPatternSelector::BuildCandida
 		AddCandidate(Candidates, GPTags::Ability::Enemy::Utility_BossSummon, SummonScore, TEXT("Summon"));
 	}
 
-	if (Context.bCanUseBossSweepAttack)
+	if (Context.bCanUseBossSweepAttack && FGPBossAttackPatternRanges::IsWithinReach(DistanceToTarget, FGPBossAttackPatternRanges::SweepAttackReach))
 	{
 		const float SweepScore = 0.2f
 			+ Aggression * 0.25f
@@ -79,7 +89,7 @@ TArray<FGPBossAttackPatternCandidate> FGPBossAttackPatternSelector::BuildCandida
 		AddCandidate(Candidates, GPTags::Ability::Enemy::Attack_BossSweep, SweepScore, TEXT("Sweep"));
 	}
 
-	if (Context.bCanUseBossAreaAttack)
+	if (Context.bCanUseBossAreaAttack && FGPBossAttackPatternRanges::IsWithinReach(DistanceToTarget, FGPBossAttackPatternRanges::AreaAttackReach))
 	{
 		const float AreaScore = 0.18f
 			+ PhaseBonus

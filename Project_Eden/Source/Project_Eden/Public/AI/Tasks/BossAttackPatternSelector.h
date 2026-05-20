@@ -10,6 +10,15 @@ struct FGPBossAttackPatternCandidate
 	FName DebugName = NAME_None;
 };
 
+struct PROJECT_EDEN_API FGPBossAttackPatternRanges
+{
+	static constexpr float BasicAttackReach = 360.0f;
+	static constexpr float SweepAttackReach = 830.0f;
+	static constexpr float AreaAttackReach = 850.0f;
+
+	static bool IsWithinReach(float DistanceToTarget, float AttackReach);
+};
+
 // Snapshot of the blackboard/evaluation state used to score the next boss attack pattern.
 struct FGPBossAttackPatternContext
 {
