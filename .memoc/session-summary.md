@@ -1,29 +1,23 @@
 # Session Summary
-Last: 2026-05-20T13:22:00
+Last: 2026-05-20T18:25:00
 Keep each section ≤ 3 bullets. Agent-owned — updated by you, not by `memoc update`.
 
 ## Status
-- Runtime retarget path now uses `UEFNSourceMesh` as animation source and `CharacterMesh0` (`MaskMan`) as retarget target.
-- Source AnimBP `/Game/Characters/PlayerCharacter/ABP_UEFNSource_Player` is now being reworked around `ESourceMotionMatchState` enum selection instead of runtime bool helpers.
-- `BP_GP_PlayerCharacter` also has a Blueprint-added `CharacterTrajectoryComponent`; trajectory validation is shifting toward that path.
+- Runtime retarget path still uses `UEFNSourceMesh` as animation source and `CharacterMesh0` (`MaskMan`) as retarget target.
+- `BP_GP_PlayerCharacter` has a Blueprint `CharacterTrajectoryComponent`, and `UGP_CharacterAnimInstance` now bridges that into `GeneratedTrajectory`.
+- New custom chooser authoring started under `ChooserTables/CHT_MM_MaskMan_Root`, with `Idle / Run / Sprint / InAir` embedded nested choosers tuned for MaskMan's `500 -> Run`, `700 -> Sprint` locomotion.
 
 ## Changed
-- Created `ABP_UEFNSource_Player` on the UEFN mannequin skeleton with a minimal `Motion Matching -> Pose History -> Output Pose` AnimGraph.
-- `BP_GP_PlayerCharacter` now points `UEFNSourceMesh` to `ABP_UEFNSource_Player`.
-- Added shared C++ trajectory generation fields to `GP_CharacterAnimInstance` and wired `PoseSearchGenerateTransformTrajectory(...)` into `NativeUpdateAnimation()`.
-- Added runtime DB selection fields/state to `GP_CharacterAnimInstance` for idle / walk / run / sprint / jump and selected them from locomotion state each tick.
-- Rebuilt `ABP_UEFNSource_Player` AnimGraph as fixed state branches:
-  `Idle`, `Walk`, `Run`, `Sprint`, `Jump` source poses are being selected around `CurrentMotionMatchState`-driven enum blending.
-- Removed temporary `bUseIdle/Walk/Run/Sprint/JumpMotionMatch` debug/helper flags from `GP_CharacterAnimInstance`; enum state remains the source of truth.
-- Kept per-state PSD defaults on the blueprint CDO and removed old single-node/chooser experiment nodes.
-- Confirmed `ABP_UEFNSource_Player` currently caches `BP_GP_PlayerCharacter.CharacterTrajectory` in EventGraph, but `Pose History.TransformTrajectory` is not yet wired to that component's `trajectory` property.
+- Exported `/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/CHT_PoseSearchDatabases_Relaxed` and identified the root and nested chooser inputs.
+- Added chooser-facing enums and variables to `UGP_CharacterAnimInstance`: `MovementMode`, `Stance`, `MovementState`, `Gait`, `MovementDirection`, `MovementDirection_Recent`, `Speed2D`, `MovementMode_LastFrame`, `Gait_LastFrame`, `IsStarting`, `IsPivoting`, `ShouldSpinTransition`, `JustTraversed`, `JustLanded_Light`, `JustLanded_Heavy`, `ShouldTurnInPlace`.
+- Kept the current enum-branch AnimGraph alive as a temporary fallback while the chooser path is being restored safely, and fixed the user-found one-slot blend offset in `ABP_UEFNSource_Player`.
+- Seeded `CHT_MM_MaskMan_Root` embedded chooser rows for `Idle` (`Idles`, `TurnInPlace`, `Run_Stops`, `Sprint_Stops`, `Idle_Lands_*`), `Run`, `Sprint`, and `InAir`.
 
 ## Open Tasks
-- Wire `ABP_UEFNSource_Player.Character Trajectory -> trajectory` into `Pose History.TransformTrajectory`.
-- Verify in PIE that `UEFNSourceMesh` visibly changes pose when entering walk / run / sprint / jump states with the enum-driven multi-node AnimGraph.
-- Confirm `ABP_MaskMan_Player` continues to retarget correctly after the source DB swap logic took over.
-- Tune thresholds or database choices if gait transitions feel off.
+- Point runtime chooser evaluation at `CHT_MM_MaskMan_Root`.
+- Verify in PIE that `Idle / TurnInPlace / Run / Sprint / InAir` resolve to the intended PSDs and that the half-step start issue improves.
+- Decide whether `MovementDirection_Recent` needs separate exposure before expanding the new `Run` chooser beyond the initial forward-focused rows.
 
 ## Resume
-- Start by inspecting `/Game/Characters/PlayerCharacter/ABP_UEFNSource_Player` and `/Game/Characters/PlayerCharacter/BP_GP_PlayerCharacter`.
-- If gait switching looks wrong, inspect `GP_CharacterAnimInstance::NativeUpdateAnimation()` and the CDO defaults on `ABP_UEFNSource_Player`.
+- Start with `GP_CharacterAnimInstance.h/.cpp`; chooser input contract and runtime evaluation live there.
+- Then finish wiring runtime to `/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/ChooserTables/CHT_MM_MaskMan_Root` and validate the new embedded nested choosers.

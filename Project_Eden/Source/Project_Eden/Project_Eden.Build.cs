@@ -25,6 +25,7 @@ public class Project_Eden : ModuleRules
             "NavigationSystem",
             "PoseSearch",
             "MotionTrajectory",
+            "Chooser",
         });
 
 		PrivateDependencyModuleNames.AddRange(new string[] { 

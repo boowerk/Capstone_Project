@@ -12,6 +12,7 @@ class AGP_PlayerCharacter;
 class UCharacterMovementComponent;
 class UBlendSpace;
 class UAnimSequenceBase;
+class UChooserTable;
 class UPoseSearchDatabase;
 
 UENUM(BlueprintType)
@@ -22,6 +23,45 @@ enum class ESourceMotionMatchState : uint8
 	Run,
 	Sprint,
 	Jump
+};
+
+UENUM(BlueprintType)
+enum class E_MovementMode : uint8
+{
+	Grounded = 0,
+	Slide = 1,
+	InAir = 2
+};
+
+UENUM(BlueprintType)
+enum class E_Stance : uint8
+{
+	Standing = 0,
+	Crouching = 1
+};
+
+UENUM(BlueprintType)
+enum class E_MovementState : uint8
+{
+	Idle = 0,
+	Moving = 1
+};
+
+UENUM(BlueprintType)
+enum class E_Gait : uint8
+{
+	Walk = 0,
+	Run = 1,
+	Sprint = 2
+};
+
+UENUM(BlueprintType, meta = (Bitflags, UseEnumValuesAsMaskValuesInEditor = "true"))
+enum class E_MovementDirection : uint8
+{
+	Forward = 0,
+	Backward = 1,
+	Left = 2,
+	Right = 4
 };
 
 /**
@@ -70,6 +110,9 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Locomotion")
 	float GroundSpeed;
 
+	UPROPERTY(BlueprintReadOnly, Category = "Chooser")
+	float Speed2D = 0.f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Locomotion")
 	FVector LocalVelocityDirection;
 
@@ -84,6 +127,51 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Locomotion")
 	bool bIsSprinting;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Chooser")
+	E_MovementMode MovementMode = E_MovementMode::Grounded;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Chooser")
+	E_MovementMode MovementMode_LastFrame = E_MovementMode::Grounded;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Chooser")
+	E_Stance Stance = E_Stance::Standing;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Chooser")
+	E_MovementState MovementState = E_MovementState::Idle;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Chooser")
+	E_Gait Gait = E_Gait::Walk;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Chooser")
+	E_Gait Gait_LastFrame = E_Gait::Walk;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Chooser")
+	E_MovementDirection MovementDirection = E_MovementDirection::Forward;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Chooser")
+	uint8 MovementDirection_Recent = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Chooser")
+	bool IsStarting = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Chooser")
+	bool IsPivoting = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Chooser")
+	bool ShouldSpinTransition = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Chooser")
+	bool JustTraversed = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Chooser")
+	bool JustLanded_Light = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Chooser")
+	bool JustLanded_Heavy = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Chooser")
+	bool ShouldTurnInPlace = false;
 
 	UPROPERTY(BlueprintReadOnly, Category = "MotionMatching")
 	FTransformTrajectory GeneratedTrajectory;
@@ -121,6 +209,9 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MotionMatching|Databases")
 	TObjectPtr<UPoseSearchDatabase> JumpPoseSearchDatabase;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MotionMatching|Chooser")
+	TObjectPtr<UChooserTable> PoseSearchChooser;
+
 	UPROPERTY(BlueprintReadOnly, Category = "MotionMatching|Databases")
 	TObjectPtr<UPoseSearchDatabase> RuntimePoseSearchDatabase;
 
@@ -135,4 +226,21 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MotionMatching|Databases", meta = (ClampMin = "0.0"))
 	float RunSpeedThreshold = 360.f;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MotionMatching|State")
+	bool bWasMovingLastFrame = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MotionMatching|State", meta = (ClampMin = "0.0"))
+	float TimeSinceMovementStarted = 0.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MotionMatching|State", meta = (ClampMin = "0.0"))
+	float MovementStartGraceTime = 0.2f;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Chooser|State")
+	FVector LastLocalVelocityDirection = FVector::ZeroVector;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Chooser|State")
+	float LastVerticalVelocity = 0.f;
+
+	void ApplyChosenDatabase(UPoseSearchDatabase* SelectedDatabase);
 };
