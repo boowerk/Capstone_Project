@@ -8,6 +8,7 @@
 
 class USpringArmComponent;
 class UCameraComponent;
+class USkeletalMeshComponent;
 class UPDA_WeaponItemCollection;
 class UPDA_CharacterAnimationSet;
 class UAnimSequenceBase;
@@ -64,6 +65,9 @@ private:
 
 	UPROPERTY(VisibleAnywhere, Category = "Camera")
 	TObjectPtr<UCameraComponent> FollowCamera;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Animation|Retarget", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<USkeletalMeshComponent> UEFNSourceMesh;
 protected:
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Combat|LockOn")

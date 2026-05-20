@@ -2,13 +2,27 @@
 
 #include "CoreMinimal.h"
 #include "Animation/AnimInstance.h"
+#include "Animation/TrajectoryTypes.h"
 #include "PDA_CharacterAnimationSet.h"
+#include "PoseSearch/PoseSearchTrajectoryLibrary.h"
 #include "GP_CharacterAnimInstance.generated.h"
 
 class ACharacter;
+class AGP_PlayerCharacter;
 class UCharacterMovementComponent;
 class UBlendSpace;
 class UAnimSequenceBase;
+class UPoseSearchDatabase;
+
+UENUM(BlueprintType)
+enum class ESourceMotionMatchState : uint8
+{
+	Idle,
+	Walk,
+	Run,
+	Sprint,
+	Jump
+};
 
 /**
  * 프로젝트의 모든 캐릭터 애니메이션 블루프린트를 위한 공통 베이스 클래스.
@@ -67,4 +81,58 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Locomotion")
 	bool bIsAnyMontagePlaying;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Locomotion")
+	bool bIsSprinting;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MotionMatching")
+	FTransformTrajectory GeneratedTrajectory;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MotionMatching")
+	FPoseSearchTrajectoryData TrajectoryData;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MotionMatching", meta = (ClampMin = "0.0"))
+	float TrajectoryHistorySamplingInterval = 0.04f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MotionMatching", meta = (ClampMin = "0"))
+	int32 TrajectoryHistoryCount = 10;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MotionMatching", meta = (ClampMin = "0.0"))
+	float TrajectoryPredictionSamplingInterval = 0.2f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MotionMatching", meta = (ClampMin = "0"))
+	int32 TrajectoryPredictionCount = 8;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MotionMatching")
+	float DesiredControllerYawLastUpdate = 0.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MotionMatching|Databases")
+	TObjectPtr<UPoseSearchDatabase> IdlePoseSearchDatabase;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MotionMatching|Databases")
+	TObjectPtr<UPoseSearchDatabase> WalkPoseSearchDatabase;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MotionMatching|Databases")
+	TObjectPtr<UPoseSearchDatabase> RunPoseSearchDatabase;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MotionMatching|Databases")
+	TObjectPtr<UPoseSearchDatabase> SprintPoseSearchDatabase;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MotionMatching|Databases")
+	TObjectPtr<UPoseSearchDatabase> JumpPoseSearchDatabase;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MotionMatching|Databases")
+	TObjectPtr<UPoseSearchDatabase> RuntimePoseSearchDatabase;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MotionMatching|State")
+	ESourceMotionMatchState CurrentMotionMatchState = ESourceMotionMatchState::Idle;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MotionMatching|Databases", meta = (ClampMin = "0.0"))
+	float IdleSpeedThreshold = 10.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MotionMatching|Databases", meta = (ClampMin = "0.0"))
+	float WalkSpeedThreshold = 100.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MotionMatching|Databases", meta = (ClampMin = "0.0"))
+	float RunSpeedThreshold = 360.f;
 };

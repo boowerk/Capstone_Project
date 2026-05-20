@@ -6,6 +6,7 @@
 #include "Animation/PDA_CharacterAnimationSet.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Player/GP_PlayerState.h"
@@ -35,6 +36,17 @@ AGP_PlayerCharacter::AGP_PlayerCharacter()
 	// 물리 제동 마찰력 (추후 블루프린트에서 제어하여 슬라이딩 거리를 조절합니다)
 	GetCharacterMovement()->BrakingDecelerationWalking = 1000.f; 
 	GetCharacterMovement()->BrakingDecelerationFalling = 1500.f;
+
+	UEFNSourceMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("UEFNSourceMesh"));
+	UEFNSourceMesh->SetupAttachment(GetCapsuleComponent());
+	UEFNSourceMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	UEFNSourceMesh->SetGenerateOverlapEvents(false);
+	UEFNSourceMesh->SetHiddenInGame(true);
+	UEFNSourceMesh->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
+	UEFNSourceMesh->SetRelativeLocation(FVector::ZeroVector);
+	UEFNSourceMesh->SetRelativeRotation(FRotator::ZeroRotator);
+
+	GetMesh()->SetupAttachment(UEFNSourceMesh);
 
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>("CameraBoom");
 	CameraBoom->SetupAttachment(GetRootComponent());

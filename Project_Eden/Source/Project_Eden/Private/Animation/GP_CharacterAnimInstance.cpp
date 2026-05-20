@@ -1,6 +1,7 @@
 #include "Animation/GP_CharacterAnimInstance.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "PoseSearch/PoseSearchDatabase.h"
 
 UGP_CharacterAnimInstance::UGP_CharacterAnimInstance()
 {
@@ -54,6 +55,68 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	bHasAcceleration = MovementComponent->GetCurrentAcceleration().SizeSquared2D() > KINDA_SMALL_NUMBER;
 	bIsFalling = MovementComponent->IsFalling();
 	bIsAnyMontagePlaying = Montage_IsPlaying(nullptr);
+	const float CurrentMaxSpeed = MovementComponent->GetMaxSpeed();
+	bIsSprinting = CurrentMaxSpeed > RunSpeedThreshold;
+
+	FTransformTrajectory UpdatedTrajectory;
+	UPoseSearchTrajectoryLibrary::PoseSearchGenerateTransformTrajectory(
+		this,
+		TrajectoryData,
+		DeltaSeconds,
+		GeneratedTrajectory,
+		DesiredControllerYawLastUpdate,
+		UpdatedTrajectory,
+		TrajectoryHistorySamplingInterval,
+		TrajectoryHistoryCount,
+		TrajectoryPredictionSamplingInterval,
+		TrajectoryPredictionCount);
+	GeneratedTrajectory = MoveTemp(UpdatedTrajectory);
+
+	if (bIsFalling && JumpPoseSearchDatabase)
+	{
+		CurrentMotionMatchState = ESourceMotionMatchState::Jump;
+		RuntimePoseSearchDatabase = JumpPoseSearchDatabase;
+	}
+	else if (bIsSprinting && (GroundSpeed > IdleSpeedThreshold || bHasAcceleration) && SprintPoseSearchDatabase)
+	{
+		CurrentMotionMatchState = ESourceMotionMatchState::Sprint;
+		RuntimePoseSearchDatabase = SprintPoseSearchDatabase;
+	}
+	else if (GroundSpeed <= IdleSpeedThreshold && !bHasAcceleration && IdlePoseSearchDatabase)
+	{
+		CurrentMotionMatchState = ESourceMotionMatchState::Idle;
+		RuntimePoseSearchDatabase = IdlePoseSearchDatabase;
+	}
+	else if (GroundSpeed <= WalkSpeedThreshold && WalkPoseSearchDatabase)
+	{
+		CurrentMotionMatchState = ESourceMotionMatchState::Walk;
+		RuntimePoseSearchDatabase = WalkPoseSearchDatabase;
+	}
+	else if (GroundSpeed <= RunSpeedThreshold && RunPoseSearchDatabase)
+	{
+		CurrentMotionMatchState = ESourceMotionMatchState::Run;
+		RuntimePoseSearchDatabase = RunPoseSearchDatabase;
+	}
+	else if (SprintPoseSearchDatabase)
+	{
+		CurrentMotionMatchState = ESourceMotionMatchState::Sprint;
+		RuntimePoseSearchDatabase = SprintPoseSearchDatabase;
+	}
+	else if (RunPoseSearchDatabase)
+	{
+		CurrentMotionMatchState = ESourceMotionMatchState::Run;
+		RuntimePoseSearchDatabase = RunPoseSearchDatabase;
+	}
+	else if (WalkPoseSearchDatabase)
+	{
+		CurrentMotionMatchState = ESourceMotionMatchState::Walk;
+		RuntimePoseSearchDatabase = WalkPoseSearchDatabase;
+	}
+	else
+	{
+		CurrentMotionMatchState = ESourceMotionMatchState::Idle;
+		RuntimePoseSearchDatabase = IdlePoseSearchDatabase;
+	}
 }
 
 void UGP_CharacterAnimInstance::SetAnimationSet(UPDA_CharacterAnimationSet* NewSet)
