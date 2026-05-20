@@ -129,4 +129,57 @@ bool FBossAttackPatternSelectorLiveEvaluationTest::RunTest(const FString& Parame
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FBossAttackPatternSelectorRuntimeTestCycleTest,
+	"ProjectEden.AI.Boss.PatternSelector.RuntimeTestCycleCases",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBossAttackPatternSelectorRuntimeTestCycleTest::RunTest(const FString& Parameters)
+{
+	using namespace BossAttackPatternSelectorTests;
+
+	// Mirrors the controller's runtime debug cycle so pattern visibility regressions fail in automation.
+	FGPBossAttackPatternContext Context = MakeBaseContext();
+	Context.BossPhase = 1;
+	Context.bCanUseBossHeavyAttack = true;
+	Context.DistanceToTarget = 220.0f;
+	Context.Aggression = 0.2f;
+	Context.PreferredRange = 650.0f;
+	Context.EnemyMode = FEnemyLLMEvaluationParser::ToBlackboardName(EEnemyMode::Hold);
+	Context.FocusTargetRule = FEnemyLLMEvaluationParser::ToBlackboardName(EEnemyFocusTargetRule::Weakest);
+	ExpectTopPattern(*this, TEXT("Runtime cycle sample 0: basic"), Context, GPTags::Ability::Enemy::Attack_Melee);
+
+	Context = MakeBaseContext();
+	Context.BossPhase = 1;
+	Context.bCanUseBossSweepAttack = true;
+	Context.DistanceToTarget = 600.0f;
+	Context.Aggression = 0.95f;
+	Context.PreferredRange = 600.0f;
+	Context.EnemyMode = FEnemyLLMEvaluationParser::ToBlackboardName(EEnemyMode::Pressure);
+	Context.FocusTargetRule = FEnemyLLMEvaluationParser::ToBlackboardName(EEnemyFocusTargetRule::PlayerFirst);
+	ExpectTopPattern(*this, TEXT("Runtime cycle sample 1: sweep"), Context, GPTags::Ability::Enemy::Attack_BossSweep);
+
+	Context = MakeBaseContext();
+	Context.BossPhase = 1;
+	Context.bCanUseBossAreaAttack = true;
+	Context.DistanceToTarget = 600.0f;
+	Context.Aggression = 0.55f;
+	Context.PreferredRange = 120.0f;
+	Context.EnemyMode = FEnemyLLMEvaluationParser::ToBlackboardName(EEnemyMode::Hold);
+	Context.FocusTargetRule = FEnemyLLMEvaluationParser::ToBlackboardName(EEnemyFocusTargetRule::CurrentThreat);
+	ExpectTopPattern(*this, TEXT("Runtime cycle sample 2: area"), Context, GPTags::Ability::Enemy::Attack_BossArea);
+
+	Context = MakeBaseContext();
+	Context.BossPhase = 1;
+	Context.bCanSummonAdds = true;
+	Context.DistanceToTarget = 600.0f;
+	Context.Aggression = 0.15f;
+	Context.PreferredRange = 120.0f;
+	Context.EnemyMode = FEnemyLLMEvaluationParser::ToBlackboardName(EEnemyMode::Retreat);
+	Context.FocusTargetRule = FEnemyLLMEvaluationParser::ToBlackboardName(EEnemyFocusTargetRule::CurrentThreat);
+	ExpectTopPattern(*this, TEXT("Runtime cycle sample 3: summon"), Context, GPTags::Ability::Enemy::Utility_BossSummon);
+
+	return true;
+}
+
 #endif

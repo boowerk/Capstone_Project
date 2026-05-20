@@ -63,6 +63,61 @@ namespace
 		return TEXT("/Game/Characters/EnemyCharacter/BT/BB_EnemyCommon.BB_EnemyCommon");
 	}
 
+	FEnemyLLMEvaluation BuildBossRuntimeEvaluationTestSample(int32 SampleIndex)
+	{
+		FEnemyLLMEvaluation Evaluation = FEnemyLLMEvaluation::MakeSafeDefault();
+
+		switch (SampleIndex % 4)
+		{
+		case 0:
+			// Basic sample: close/defensive values boost the boss basic scratch above sweep.
+			Evaluation.EnemyMode = EEnemyMode::Hold;
+			Evaluation.Aggression = 0.2f;
+			Evaluation.PreferredRange = 650.0f;
+			Evaluation.RetreatThreshold = 0.0f;
+			Evaluation.ChasePersistence = 0.4f;
+			Evaluation.CoverPreference = 0.65f;
+			Evaluation.FocusTargetRule = EEnemyFocusTargetRule::Weakest;
+			break;
+
+		case 1:
+			// Sweep sample: aggressive pressure at preferred range should select the fan attack.
+			Evaluation.EnemyMode = EEnemyMode::Pressure;
+			Evaluation.Aggression = 0.95f;
+			Evaluation.PreferredRange = 600.0f;
+			Evaluation.RetreatThreshold = 0.0f;
+			Evaluation.ChasePersistence = 0.9f;
+			Evaluation.CoverPreference = 0.1f;
+			Evaluation.FocusTargetRule = EEnemyFocusTargetRule::PlayerFirst;
+			break;
+
+		case 2:
+			// Area sample: very short preferred range makes the current player distance score as far pressure.
+			Evaluation.EnemyMode = EEnemyMode::Hold;
+			Evaluation.Aggression = 0.55f;
+			Evaluation.PreferredRange = 120.0f;
+			Evaluation.RetreatThreshold = 0.0f;
+			Evaluation.ChasePersistence = 0.35f;
+			Evaluation.CoverPreference = 0.75f;
+			Evaluation.FocusTargetRule = EEnemyFocusTargetRule::CurrentThreat;
+			break;
+
+		default:
+			// Summon sample: retreat mode opens add pressure in the boss tactics service.
+			Evaluation.EnemyMode = EEnemyMode::Retreat;
+			Evaluation.Aggression = 0.15f;
+			Evaluation.PreferredRange = 120.0f;
+			Evaluation.RetreatThreshold = 0.0f;
+			Evaluation.ChasePersistence = 0.25f;
+			Evaluation.CoverPreference = 0.8f;
+			Evaluation.FocusTargetRule = EEnemyFocusTargetRule::CurrentThreat;
+			break;
+		}
+
+		Evaluation.ValidateAndClamp();
+		return Evaluation;
+	}
+
 	AActor* SelectNearestTargetCandidate(const APawn* ControlledPawn, const TArray<AActor*>& Candidates)
 	{
 		if (!IsValid(ControlledPawn))
@@ -161,6 +216,7 @@ void AEnemyAIController::OnUnPossess()
 	bLeashReturnHomeActive = false;
 	bHasPendingBehaviorTreeRootReevaluation = false;
 	PendingBehaviorTreeRootReevaluationRetryCount = 0;
+	BossRuntimeEvaluationTestIndex = 0;
 
 	// TargetActor belongs to perception selection, so clear it when the controller releases the pawn.
 	SetBlackboardTargetActor(nullptr);
@@ -223,6 +279,11 @@ bool AEnemyAIController::SubmitEnemyEvaluationFromJson(const FString& JsonPayloa
 	}
 
 	return SubmitEnemyEvaluation(ParsedEvaluation, bForceImmediate);
+}
+
+bool AEnemyAIController::IsBossRuntimeEvaluationTestCycleActive() const
+{
+	return ShouldUseBossRuntimeEvaluationTestCycle();
 }
 
 bool AEnemyAIController::ApplyEnemyEvaluationToBlackboard(const FEnemyLLMEvaluation& InEvaluation)
@@ -392,12 +453,31 @@ void AEnemyAIController::HandlePendingEnemyEvaluationTimerElapsed()
 
 void AEnemyAIController::HandleEvaluationRefreshTimerElapsed()
 {
+	if (ShouldUseBossRuntimeEvaluationTestCycle())
+	{
+		const int32 SampleIndex = BossRuntimeEvaluationTestIndex++;
+		const FEnemyLLMEvaluation Evaluation = BuildBossRuntimeEvaluationTestSample(SampleIndex);
+		UE_LOG(
+			LogEnemyAI,
+			Log,
+			TEXT("[EvalTest] Boss runtime evaluation sample %d: %s"),
+			SampleIndex % 4,
+			*EnemyAIDebugUtils::DescribeEvaluation(Evaluation));
+		SubmitEnemyEvaluation(Evaluation, true);
+		return;
+	}
+
 	// Future hook: request an async LLM update, then call SubmitEnemyEvaluation with the response.
 }
 
 void AEnemyAIController::StartEvaluationRefreshLoop()
 {
-	if (!bEnableEvaluationRefreshLoop || EvaluationRefreshInterval <= 0.0f)
+	const bool bUseBossTestCycle = ShouldUseBossRuntimeEvaluationTestCycle();
+	const float EffectiveRefreshInterval = bUseBossTestCycle
+		? BossRuntimeEvaluationTestInterval
+		: EvaluationRefreshInterval;
+
+	if ((!bEnableEvaluationRefreshLoop && !bUseBossTestCycle) || EffectiveRefreshInterval <= 0.0f)
 	{
 		return;
 	}
@@ -407,8 +487,14 @@ void AEnemyAIController::StartEvaluationRefreshLoop()
 		EvaluationRefreshTimerHandle,
 		this,
 		&ThisClass::HandleEvaluationRefreshTimerElapsed,
-		EvaluationRefreshInterval,
+		EffectiveRefreshInterval,
 		true);
+
+	if (bUseBossTestCycle)
+	{
+		// Apply the first sample immediately so PIE logs show pattern rotation without waiting for the first timer tick.
+		HandleEvaluationRefreshTimerElapsed();
+	}
 }
 
 void AEnemyAIController::StopEvaluationRefreshLoop()
@@ -417,6 +503,14 @@ void AEnemyAIController::StopEvaluationRefreshLoop()
 	{
 		GetWorldTimerManager().ClearTimer(EvaluationRefreshTimerHandle);
 	}
+}
+
+bool AEnemyAIController::ShouldUseBossRuntimeEvaluationTestCycle() const
+{
+	const AGP_EnemyCharacter* EnemyCharacter = Cast<AGP_EnemyCharacter>(GetPawn());
+	return bEnableBossRuntimeEvaluationTestCycle
+		&& IsValid(EnemyCharacter)
+		&& EnemyCharacter->IsBossEnemy();
 }
 
 void AEnemyAIController::ResolveBehaviorAssets(APawn* InPawn, UBehaviorTree*& OutBehaviorTreeAsset, UBlackboardData*& OutBlackboardAsset) const

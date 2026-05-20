@@ -385,21 +385,33 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardInt(BlackboardComponent, EnemyBlackboardKeys::BossPhase, BossPhase);
 
 		const float WorldTimeSeconds = OwnerComp.GetWorld() != nullptr ? OwnerComp.GetWorld()->GetTimeSeconds() : 0.0f;
-		const bool bShouldBossPhaseTransition = PreviousBossPhase > 0 && PreviousBossPhase != BossPhase;
-		const bool bCanUseBossHeavyAttack = !bShouldBossPhaseTransition && bCanAttack && DistanceToTarget <= BossHeavyAttackRange;
-		const bool bCanUseBossAreaAttack = !bShouldBossPhaseTransition
+		bool bShouldBossPhaseTransition = PreviousBossPhase > 0 && PreviousBossPhase != BossPhase;
+		bool bCanUseBossHeavyAttack = !bShouldBossPhaseTransition && bCanAttack && DistanceToTarget <= BossHeavyAttackRange;
+		bool bCanUseBossAreaAttack = !bShouldBossPhaseTransition
 			&& BossPhase >= 2
 			&& bHasLineOfSight
 			&& DistanceToTarget <= BossAreaAttackRange
 			&& BTS_UpdateEnemyTactics_Internal::IsPatternWindowOpen(WorldTimeSeconds, BossAreaAttackInterval, BossAreaAttackWindow);
-		const bool bCanUseBossSweepAttack = !bShouldBossPhaseTransition
+		bool bCanUseBossSweepAttack = !bShouldBossPhaseTransition
 			&& bCanAttack
 			&& bHasLineOfSight
-			// 공격 태스크에서 기본 공격/휘둘러치기 중 하나를 공격 1회마다 랜덤 선택한다.
+			// 공격 태스크에서 실시간 평가 점수로 기본 공격/휘둘러치기 중 하나를 고른다.
 			&& DistanceToTarget <= BossSweepAttackRange;
-		const bool bCanSummonAdds = !bShouldBossPhaseTransition
+		bool bCanSummonAdds = !bShouldBossPhaseTransition
 			&& BossPhase >= 3
 			&& BTS_UpdateEnemyTactics_Internal::IsPatternWindowOpen(WorldTimeSeconds, BossSummonInterval, BossSummonWindow);
+
+		if (IsValid(EnemyAIController) && EnemyAIController->IsBossRuntimeEvaluationTestCycleActive() && bHasLineOfSight)
+		{
+			const bool bTestAreaWindow = bModePrefersHold && PreferredRange <= 250.0f;
+			// Test cycle maps the current high-level evaluation mode to one explicit boss pattern window.
+			bShouldBossPhaseTransition = false;
+			bCanUseBossHeavyAttack = bModePrefersHold && !bTestAreaWindow;
+			bCanUseBossAreaAttack = bTestAreaWindow;
+			bCanUseBossSweepAttack = bModePrefersPressure;
+			bCanSummonAdds = bModeForcesRetreat;
+		}
+
 		const bool bBossPatternRequestsAttack = bShouldBossPhaseTransition || bCanSummonAdds || bCanUseBossAreaAttack || bCanUseBossSweepAttack || bCanUseBossHeavyAttack;
 
 		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldBossPhaseTransition, bShouldBossPhaseTransition);

@@ -1,6 +1,8 @@
 #include "AI/Services/BTS_UpdateBossTactics.h"
 
+#include "AI/Controllers/EnemyAIController.h"
 #include "AI/Data/EnemyBlackboardKeys.h"
+#include "AI/Data/EnemyLLMEvaluation.h"
 #include "AIController.h"
 #include "BehaviorTree/BehaviorTreeComponent.h"
 #include "BehaviorTree/BehaviorTreeTypes.h"
@@ -102,30 +104,46 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 	const bool bHasLineOfSight = BTS_UpdateBossTactics_Internal::GetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bHasLineOfSight);
 	const float DistanceToTarget = BTS_UpdateBossTactics_Internal::GetOptionalBlackboardFloat(BlackboardComponent, EnemyBlackboardKeys::DistanceToTarget, 0.0f);
 	const float WorldTimeSeconds = OwnerComp.GetWorld() != nullptr ? OwnerComp.GetWorld()->GetTimeSeconds() : 0.0f;
+	const AEnemyAIController* EnemyAIController = Cast<AEnemyAIController>(OwnerComp.GetAIOwner());
+	const FName EnemyMode = BlackboardComponent->GetValueAsName(EnemyBlackboardKeys::EnemyMode);
+	const float PreferredRange = BTS_UpdateBossTactics_Internal::GetOptionalBlackboardFloat(BlackboardComponent, EnemyBlackboardKeys::PreferredRange, 600.0f);
 
 	// 페이즈 전환은 한 틱짜리 신호로 두어 BT가 전환 연출/버프 패턴을 우선 선택할 수 있게 한다.
-	const bool bShouldPhaseTransition = bHasTarget && !bReturningHome && PreviousBossPhase > 0 && PreviousBossPhase != BossPhase;
-	const bool bCanUseHeavyAttack = bHasTarget && !bReturningHome && !bShouldPhaseTransition && bCanAttack && DistanceToTarget <= HeavyAttackRange;
-	const bool bCanUseAreaAttack = bHasTarget
+	bool bShouldPhaseTransition = bHasTarget && !bReturningHome && PreviousBossPhase > 0 && PreviousBossPhase != BossPhase;
+	bool bCanUseHeavyAttack = bHasTarget && !bReturningHome && !bShouldPhaseTransition && bCanAttack && DistanceToTarget <= HeavyAttackRange;
+	bool bCanUseAreaAttack = bHasTarget
 		&& !bReturningHome
 		&& !bShouldPhaseTransition
 		&& BossPhase >= 2
 		&& bHasLineOfSight
 		&& DistanceToTarget <= AreaAttackRange
 		&& BTS_UpdateBossTactics_Internal::IsPatternWindowOpen(WorldTimeSeconds, AreaAttackInterval, AreaAttackWindow);
-	const bool bCanUseSweepAttack = bHasTarget
+	bool bCanUseSweepAttack = bHasTarget
 		&& !bReturningHome
 		&& !bShouldPhaseTransition
 		&& bCanAttack
 		&& bHasLineOfSight
-		// 실제 기본 공격/휘둘러치기 선택은 공격 태스크에서 공격 1회마다 랜덤으로 결정한다.
+		// 실제 기본 공격/휘둘러치기 선택은 공격 태스크에서 실시간 평가 점수로 결정한다.
 		&& DistanceToTarget <= SweepAttackRange;
-	const bool bCanSummonAdds = bHasTarget
+	bool bCanSummonAdds = bHasTarget
 		&& !bReturningHome
 		&& !bShouldPhaseTransition
 		// Let the summon pattern enter from phase 2 so it is visible before the fight is nearly over.
 		&& BossPhase >= 2
 		&& BTS_UpdateBossTactics_Internal::IsPatternWindowOpen(WorldTimeSeconds, SummonInterval, SummonWindow);
+
+	if (IsValid(EnemyAIController) && EnemyAIController->IsBossRuntimeEvaluationTestCycleActive() && bHasTarget && !bReturningHome && bHasLineOfSight)
+	{
+		const bool bModePrefersHold = EnemyMode == FEnemyLLMEvaluationParser::ToBlackboardName(EEnemyMode::Hold);
+		const bool bTestAreaWindow = bModePrefersHold && PreferredRange <= 250.0f;
+		// Test cycle bypasses phase/time gates so each authored boss pattern can be observed on demand.
+		bShouldPhaseTransition = false;
+		bCanUseHeavyAttack = bModePrefersHold && !bTestAreaWindow;
+		bCanUseAreaAttack = bTestAreaWindow;
+		bCanUseSweepAttack = EnemyMode == FEnemyLLMEvaluationParser::ToBlackboardName(EEnemyMode::Pressure);
+		bCanSummonAdds = EnemyMode == FEnemyLLMEvaluationParser::ToBlackboardName(EEnemyMode::Retreat);
+	}
+
 	const bool bBossPatternRequestsAttack = bShouldPhaseTransition || bCanSummonAdds || bCanUseAreaAttack || bCanUseSweepAttack || bCanUseHeavyAttack;
 
 	if (bBossPatternRequestsAttack)

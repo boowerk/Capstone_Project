@@ -5,6 +5,7 @@
 #include "AI/Data/EnemyLLMEvaluation.h"
 #include "AI/Debug/EnemyAIRangeVisualizationComponent.h"
 #include "AbilitySystem/Abilities/Enemy/GP_BossAreaAttack.h"
+#include "AbilitySystem/Abilities/Enemy/GP_BossBasicAttack.h"
 #include "AbilitySystem/Abilities/Enemy/GP_BossHeavyAttack.h"
 #include "AbilitySystem/Abilities/Enemy/GP_BossSummonAdds.h"
 #include "AbilitySystem/Abilities/Enemy/GP_BossSweepAttack.h"
@@ -155,6 +156,7 @@ void AGP_EnemyCharacter::GiveDefaultBossPatternAbilities()
 
 	const TSubclassOf<UGameplayAbility> BossPatternAbilities[] =
 	{
+		UGP_BossBasicAttack::StaticClass(),
 		UGP_BossHeavyAttack::StaticClass(),
 		UGP_BossSweepAttack::StaticClass(),
 		UGP_BossAreaAttack::StaticClass(),
