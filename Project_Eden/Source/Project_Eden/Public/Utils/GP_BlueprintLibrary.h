@@ -47,6 +47,10 @@ public:
 	// 액터배열에 게임플레이 이벤트 전송
 	UFUNCTION(BlueprintCallable, Category = "Eden|Combat|Abilities")
 	static void SendGameplayEventToActors(AActor* Instigator, const TArray<AActor*>& TargetActors, FGameplayTag EventTag);
+
+	// 같은 적 진영끼리 데미지/피격 이벤트가 들어가지 않도록 공용 전투 필터를 제공합니다.
+	UFUNCTION(BlueprintPure, Category = "Eden|Combat|Abilities")
+	static bool CanApplyCombatEffect(AActor* Instigator, AActor* TargetActor);
 	
 	// 액터배열에 게임플레이 이펙트 일괄 적용
 	UFUNCTION(BlueprintCallable, Category = "Eden|Combat|Abilities")

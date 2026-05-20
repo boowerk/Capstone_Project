@@ -5,6 +5,7 @@
 #include "Engine/OverlapResult.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
+#include "Characters/GP_EnemyCharacter.h"
 #include "GameplayEffect.h"
 
 EHitDirection UGP_BlueprintLibrary::GetHitDirection(const FVector& TargetForward, const FVector& ToInstigator)
@@ -85,7 +86,11 @@ TArray<AActor*> UGP_BlueprintLibrary::SphereMeleeHitBoxOverlap(AActor* AvatarAct
 	{
 		if (AActor* HitActor = Result.GetActor())
 		{
-			ActorsHit.AddUnique(HitActor);
+			// Keep friendly enemies out of the hit list before any ability-specific follow-up logic runs.
+			if (CanApplyCombatEffect(AvatarActor, HitActor))
+			{
+				ActorsHit.AddUnique(HitActor);
+			}
 		}
 	}
 	
@@ -146,12 +151,16 @@ TArray<AActor*> UGP_BlueprintLibrary::ForwardArcMeleeHitBoxOverlap(AActor* Avata
 		DirectionToTarget.Z = 0.0f;
 		if (DirectionToTarget.IsNearlyZero())
 		{
-			ActorsHit.AddUnique(HitActor);
+			if (CanApplyCombatEffect(AvatarActor, HitActor))
+			{
+				ActorsHit.AddUnique(HitActor);
+			}
 			continue;
 		}
 
 		// The broad sphere keeps the overlap cheap; this dot check carves it into a forward sweep arc.
-		if (bFullCircle || FVector::DotProduct(ForwardVector, DirectionToTarget.GetSafeNormal()) >= CosThreshold)
+		if ((bFullCircle || FVector::DotProduct(ForwardVector, DirectionToTarget.GetSafeNormal()) >= CosThreshold)
+			&& CanApplyCombatEffect(AvatarActor, HitActor))
 		{
 			ActorsHit.AddUnique(HitActor);
 		}
@@ -183,10 +192,26 @@ void UGP_BlueprintLibrary::SendGameplayEventToActors(AActor* Instigator, const T
 
 	for (AActor* HitActor : TargetActors)
 	{
+		if (!CanApplyCombatEffect(Instigator, HitActor))
+		{
+			continue;
+		}
+
 		FGameplayEventData Payload;
 		Payload.Instigator = Instigator;
 		UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(HitActor, EventTag, Payload);
 	}
+}
+
+bool UGP_BlueprintLibrary::CanApplyCombatEffect(AActor* Instigator, AActor* TargetActor)
+{
+	if (!IsValid(Instigator) || !IsValid(TargetActor) || Instigator == TargetActor)
+	{
+		return false;
+	}
+
+	// Enemy-vs-enemy friendly fire is disabled so bosses, summons, and regular enemies cannot damage each other.
+	return !(Instigator->IsA<AGP_EnemyCharacter>() && TargetActor->IsA<AGP_EnemyCharacter>());
 }
 
 void UGP_BlueprintLibrary::ApplyGameplayEffectToActors(AActor* Instigator, const TArray<AActor*>& TargetActors, TSubclassOf<UGameplayEffect> EffectClass, float EffectLevel)
@@ -198,6 +223,11 @@ void UGP_BlueprintLibrary::ApplyGameplayEffectToActors(AActor* Instigator, const
 
 	for (AActor* TargetActor : TargetActors)
 	{
+		if (!CanApplyCombatEffect(Instigator, TargetActor))
+		{
+			continue;
+		}
+
 		UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(TargetActor);
 		if (IsValid(TargetASC))
 		{
