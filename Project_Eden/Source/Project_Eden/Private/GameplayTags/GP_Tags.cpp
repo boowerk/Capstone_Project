@@ -167,6 +167,10 @@ namespace GPTags
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(NetTestProjectile, "GPTags.Cooldown.Skill.NetTestProjectile", "테스트 프로젝타일 스킬 쿨다운");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(SplitShot, "GPTags.Cooldown.Skill.SplitShot", "스플릿샷 스킬 쿨다운");
         }
+        namespace Data
+        {
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Duration, "GPTags.Cooldown.Data.Duration", "SetByCaller 쿨다운 시간");
+        }
     }
     
     // [8] AI : BT 연동 논리상태

@@ -173,6 +173,10 @@ namespace GPTags
 
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(SplitShot);
 		}
+		namespace Data
+		{
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Duration);
+		}
 	}
 	
 	// [8] AI : BT 연동 논리상태 사용할수도 있을것 같아서 추가
