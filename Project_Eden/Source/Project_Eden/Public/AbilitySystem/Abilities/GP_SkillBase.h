@@ -18,6 +18,9 @@ class PROJECT_EDEN_API UGP_SkillBase : public UGP_GameplayAbility
 public:
 	UGP_SkillBase();
 
+	virtual bool CheckCooldown(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
+	virtual void ApplyCooldown(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo) const override;
+
 protected:
 	// 블루프린트에서 설정 수치
 	
@@ -26,6 +29,9 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Skill|Values")
 	TSubclassOf<UGameplayEffect> DamageEffectClass;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS|Skill|Cooldown")
+	TSubclassOf<UGameplayEffect> GenericCooldownEffectClass;
 
 	// 공격 반경
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Skill|Values")
@@ -44,4 +50,6 @@ protected:
 	// 어빌리티 종료 시 호출할 정리 함수
 	UFUNCTION()
 	void OnMontageEnded(UAnimMontage* Montage, bool bInterrupted);
+
+	const UGP_SkillData* GetSkillDataFromSpec(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo) const;
 };
