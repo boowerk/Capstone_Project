@@ -12,6 +12,7 @@ Keep each section ≤ 3 bullets. Agent-owned — updated by you, not by `memoc u
 - Added chooser-facing enums and variables to `UGP_CharacterAnimInstance`: `MovementMode`, `Stance`, `MovementState`, `Gait`, `MovementDirection`, `MovementDirection_Recent`, `Speed2D`, `MovementMode_LastFrame`, `Gait_LastFrame`, `IsStarting`, `IsPivoting`, `ShouldSpinTransition`, `JustTraversed`, `JustLanded_Light`, `JustLanded_Heavy`, `ShouldTurnInPlace`.
 - Kept the current enum-branch AnimGraph alive as a temporary fallback while the chooser path is being restored safely, and fixed the user-found one-slot blend offset in `ABP_UEFNSource_Player`.
 - Seeded `CHT_MM_MaskMan_Root` embedded chooser rows for `Idle` (`Idles`, `TurnInPlace`, `Run_Stops`, `Sprint_Stops`, `Idle_Lands_*`), `Run`, `Sprint`, and `InAir`.
+- Switched the default runtime chooser load path to `CHT_MM_MaskMan_Root` and split sprint detection onto `SprintSpeedThreshold = 650` so base speed `500` remains run-family.
 
 ## Open Tasks
 - Point runtime chooser evaluation at `CHT_MM_MaskMan_Root`.

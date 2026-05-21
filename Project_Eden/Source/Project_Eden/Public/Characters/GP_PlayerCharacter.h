@@ -87,11 +87,11 @@ protected:
 	FName DefaultWeaponId = TEXT("WP_Common_Fire_Sword");
 	
 	// 이동 속도
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Speed")
-	float NormalWalkSpeed = 210.0f; 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Speed")
+	float NormalWalkSpeed = 375.0f; 
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Speed")
-	float SprintSpeed = 420.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Speed")
+	float SprintSpeed = 600.0f;
 
 	
 	// GAS 태그 이벤트 콜백

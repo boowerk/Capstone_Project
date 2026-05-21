@@ -54,6 +54,7 @@ See `.memoc/log.md` for full history.
 - `ABP_UEFNSource_Player` is still using enum-driven branches as a temporary fallback while the new chooser is authored and validated.
 - Exported `/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/CHT_PoseSearchDatabases_Relaxed` to inspect required inputs. Root chooser expects `MovementMode`, `Stance`, `MovementState`, and `Gait`; nested tables also expect `MovementDirection`, `MovementDirection_Recent`, `MovementMode_LastFrame`, `Gait_LastFrame`, `IsStarting`, `IsPivoting`, `ShouldSpinTransition`, `JustTraversed`, `JustLanded_Light`, `JustLanded_Heavy`, `ShouldTurnInPlace`, and `Speed2D`.
 - New custom chooser authoring started under `/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/ChooserTables/`; `Idle`, `Run`, `Sprint`, and `InAir` nested chooser rows were seeded from the stock relaxed chooser layout, but tuned around MaskMan's run-first locomotion (`500 -> Run`, `700 -> Sprint`).
+- Runtime default chooser load path now points at `ChooserTables/CHT_MM_MaskMan_Root`, and sprint classification was split out with `SprintSpeedThreshold = 650` so base movement speed `500` stays in the run family.
 - Temporary `bUse*MotionMatch` helper flags were removed from `GP_CharacterAnimInstance`.
 - `ABP_UEFNSource_Player` CDO defaults:
   - `IdlePoseSearchDatabase = PSD_Relaxed_Stand_Idles`

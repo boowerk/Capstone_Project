@@ -1,9 +1,13 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Animation/AnimExecutionContext.h"
 #include "Animation/AnimInstance.h"
+#include "Animation/AnimNodeReference.h"
 #include "Animation/TrajectoryTypes.h"
 #include "PDA_CharacterAnimationSet.h"
+#include "PoseSearch/PoseSearchLibrary.h"
+#include "PoseSearch/MotionMatchingAnimNodeLibrary.h"
 #include "PoseSearch/PoseSearchTrajectoryLibrary.h"
 #include "GP_CharacterAnimInstance.generated.h"
 
@@ -80,6 +84,9 @@ public:
 	/** 외부(캐릭터 등)에서 애니메이션 세트를 동적으로 주입하기 위한 함수 */
 	UFUNCTION(BlueprintCallable, Category = "AnimationData")
 	void SetAnimationSet(UPDA_CharacterAnimationSet* NewSet);
+
+	UFUNCTION(BlueprintCallable, Category = "MotionMatching", meta = (BlueprintThreadSafe))
+	void ApplyRuntimeDatabaseToMotionMatchingNode(const FAnimUpdateContext& Context, const FAnimNodeReference& Node);
 
 protected:
 	/** 캐릭터별 애니메이션 세트 에셋 */
@@ -186,10 +193,10 @@ protected:
 	int32 TrajectoryHistoryCount = 10;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MotionMatching", meta = (ClampMin = "0.0"))
-	float TrajectoryPredictionSamplingInterval = 0.2f;
+	float TrajectoryPredictionSamplingInterval = 0.15f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MotionMatching", meta = (ClampMin = "0"))
-	int32 TrajectoryPredictionCount = 8;
+	int32 TrajectoryPredictionCount = 12;
 
 	UPROPERTY(BlueprintReadOnly, Category = "MotionMatching")
 	float DesiredControllerYawLastUpdate = 0.f;
@@ -218,6 +225,15 @@ protected:
 	UPROPERTY(BlueprintReadOnly, Category = "MotionMatching|State")
 	ESourceMotionMatchState CurrentMotionMatchState = ESourceMotionMatchState::Idle;
 
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "MotionMatching|State")
+	TObjectPtr<UPoseSearchDatabase> LastAppliedRuntimePoseSearchDatabase;
+
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "MotionMatching|Debug")
+	bool bMotionMatchingResultValid = false;
+
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "MotionMatching|Debug")
+	FName MotionMatchingSelectedAnimName = NAME_None;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MotionMatching|Databases", meta = (ClampMin = "0.0"))
 	float IdleSpeedThreshold = 10.f;
 
@@ -226,6 +242,9 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MotionMatching|Databases", meta = (ClampMin = "0.0"))
 	float RunSpeedThreshold = 360.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MotionMatching|Databases", meta = (ClampMin = "0.0"))
+	float SprintSpeedThreshold = 650.f;
 
 	UPROPERTY(BlueprintReadOnly, Category = "MotionMatching|State")
 	bool bWasMovingLastFrame = false;

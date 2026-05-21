@@ -16,3 +16,4 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 - Restore the stock relaxed chooser by matching its input contract in `UGP_CharacterAnimInstance` (`MovementMode`, `Stance`, `MovementState`, `Gait`, direction flags, landing flags, and previous-frame state) rather than cloning chooser logic into code.
 - For MaskMan locomotion, treat default movement speed (`500`) as run-family motion and sprint speed (`700`) as sprint-family motion; do not require a walk-family chooser branch in the first custom table pass.
 - Build a new custom chooser rooted at `CHT_MM_MaskMan_Root` with embedded `Idle`, `Run`, `Sprint`, and `InAir` nested choosers, using the stock relaxed chooser layouts as templates instead of trying to salvage every original branch directly.
+- Use a dedicated `SprintSpeedThreshold` (currently `650`) instead of reusing the broad run threshold, so chooser gait classification does not mark base speed `500` as sprint.
