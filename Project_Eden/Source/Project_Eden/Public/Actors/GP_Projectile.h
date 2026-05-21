@@ -9,6 +9,7 @@
 class UShapeComponent; 
 class UProjectileMovementComponent;
 class UGameplayEffect;
+class UGP_SkillData;
 
 UCLASS()
 class PROJECT_EDEN_API AGP_Projectile : public AActor
@@ -17,6 +18,8 @@ class PROJECT_EDEN_API AGP_Projectile : public AActor
 	
 public:	
 	AGP_Projectile();
+
+	void SetSkillData(UGP_SkillData* InSkillData) { SkillData = InSkillData; }
 
 protected:
 	virtual void BeginPlay() override;
@@ -48,6 +51,9 @@ protected:
 
 	UPROPERTY(BlueprintReadWrite, Category = "Eden|GAS", meta = (ExposeOnSpawn = "true"))
 	float EffectLevel = 1.0f;
+
+	UPROPERTY(BlueprintReadWrite, Category = "Eden|GAS", meta = (ExposeOnSpawn = "true"))
+	TObjectPtr<UGP_SkillData> SkillData;
 
 	// 이름 변경 (OnSphereOverlap -> OnProjectileOverlap)
 	UFUNCTION()

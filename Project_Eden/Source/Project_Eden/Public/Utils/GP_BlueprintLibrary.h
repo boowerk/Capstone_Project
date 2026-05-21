@@ -6,6 +6,7 @@
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "GP_BlueprintLibrary.generated.h"
 
+class UGP_SkillData;
 
 UENUM(BlueprintType)
 enum class EHitDirection : uint8 {
@@ -46,5 +47,5 @@ public:
 	
 	// 액터배열에 게임플레이 이펙트 일괄 적용
 	UFUNCTION(BlueprintCallable, Category = "Eden|Combat|Abilities")
-	static void ApplyGameplayEffectToActors(AActor* Instigator, const TArray<AActor*>& TargetActors, TSubclassOf<UGameplayEffect> EffectClass, float EffectLevel = 1.0f);
+	static void ApplyGameplayEffectToActors(AActor* Instigator, const TArray<AActor*>& TargetActors, TSubclassOf<UGameplayEffect> EffectClass, float EffectLevel = 1.0f, UGP_SkillData* SkillData = nullptr);
 };

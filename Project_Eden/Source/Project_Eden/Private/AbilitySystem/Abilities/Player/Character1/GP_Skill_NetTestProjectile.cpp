@@ -4,6 +4,7 @@
 #include "AbilitySystem/Abilities/Player/Character1/GP_Skill_NetTestProjectile.h"
 
 #include "AbilitySystemComponent.h"
+#include "AbilitySystem/Abilities/GP_SkillData.h"
 #include "Actors/GP_Projectile.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/Character.h"
@@ -52,12 +53,20 @@ void UGP_Skill_NetTestProjectile::ActivateAbility(const FGameplayAbilitySpecHand
 			ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
 		// --- 스폰 ---
-		Avatar->GetWorld()->SpawnActor<AGP_Projectile>(
+		AGP_Projectile* Projectile = Avatar->GetWorld()->SpawnActor<AGP_Projectile>(
 			ProjectileClass,
 			SpawnLocation,
 			SpawnRotation,
 			SpawnParams
 		);
+
+		if (Projectile)
+		{
+			if (const FGameplayAbilitySpec* Spec = ASC->FindAbilitySpecFromHandle(Handle))
+			{
+				Projectile->SetSkillData(Cast<UGP_SkillData>(Spec->SourceObject.Get()));
+			}
+		}
 	}
 
 	EndAbility(Handle, ActorInfo, ActivationInfo, true, false);

@@ -59,6 +59,9 @@ public:
 
 
 private:
+	bool GiveAbilityToSlot(FGameplayTag SlotTag, TSubclassOf<UGameplayAbility> AbilityClass, UObject* SourceObject = nullptr);
+	void ClearAbilitySlot(FGameplayTag SlotTag);
+
 	UPROPERTY(VisibleAnywhere, Category = "Camera")
 	TObjectPtr<USpringArmComponent> CameraBoom;
 

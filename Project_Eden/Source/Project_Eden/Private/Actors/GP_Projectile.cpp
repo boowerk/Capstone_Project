@@ -85,7 +85,7 @@ void AGP_Projectile::OnProjectileOverlap(UPrimitiveComponent* OverlappedComponen
 
 		if (DamageEffectClass)
 		{
-			UGP_BlueprintLibrary::ApplyGameplayEffectToActors(GetInstigator(), HitActors, DamageEffectClass, EffectLevel);
+			UGP_BlueprintLibrary::ApplyGameplayEffectToActors(GetInstigator(), HitActors, DamageEffectClass, EffectLevel, SkillData);
 		}
 
 		if (HitEventTag.IsValid())

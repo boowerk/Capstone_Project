@@ -108,22 +108,23 @@ void UGP_DamageExecCalculation::Execute_Implementation(const FGameplayEffectCust
     float BaseDamage = 0.f;
     
     // SetByCaller에서 스킬 계수 가져오기
-    float C_atk = Spec.GetSetByCallerMagnitude(FGameplayTag::RequestGameplayTag(FName("Damage.Coef.Atk")), false, 1.0f);
-    float C_def = Spec.GetSetByCallerMagnitude(FGameplayTag::RequestGameplayTag(FName("Damage.Coef.Def")), false, 0.0f);
-    float C_hp  = Spec.GetSetByCallerMagnitude(FGameplayTag::RequestGameplayTag(FName("Damage.Coef.Hp")), false, 0.0f);
+    float Base = Spec.GetSetByCallerMagnitude(GPTags::Damage::Data::Base, false, 0.0f);
+    float C_atk = Spec.GetSetByCallerMagnitude(GPTags::Damage::Coef::Atk, false, 1.0f);
+    float C_def = Spec.GetSetByCallerMagnitude(GPTags::Damage::Coef::Def, false, 0.0f);
+    float C_hp  = Spec.GetSetByCallerMagnitude(GPTags::Damage::Coef::Hp, false, 0.0f);
     
     // [기존/신규 로직 통합] 물리/마법 분기
     if (Spec.GetDynamicAssetTags().HasTagExact(GPTags::Damage::Type::Magical))
     {
-        float M_atk = Spec.GetSetByCallerMagnitude(FGameplayTag::RequestGameplayTag(FName("Damage.Coef.M_Atk")), false, 1.0f);
-        float BaseSpell = Spec.GetSetByCallerMagnitude(FGameplayTag::RequestGameplayTag(FName("Damage.BaseSpell")), false, 0.0f);
+        float M_atk = Spec.GetSetByCallerMagnitude(GPTags::Damage::Coef::M_Atk, false, 1.0f);
+        float BaseSpell = Spec.GetSetByCallerMagnitude(GPTags::Damage::Data::BaseSpell, false, 0.0f);
         // 마법력(MagicPower) 우선 참조
         BaseDamage = (MagicPower * M_atk) + (AttackPower * 0.2f) + BaseSpell; 
     }
     else
     {
         // 물리 공식 적용
-        BaseDamage = (AttackPower * C_atk) + (Armor * C_def) + (MaxHealth * C_hp); 
+        BaseDamage = Base + (AttackPower * C_atk) + (Armor * C_def) + (MaxHealth * C_hp);
     }
 
     // 3. 나. 공격 수정치 적용 (치명타 및 피해 증가)
@@ -149,7 +150,7 @@ void UGP_DamageExecCalculation::Execute_Implementation(const FGameplayEffectCust
     float Damage_Final = Damage_Modified * ArmorMitigation * (1.0f - Resistance_Elem);
 
     // 5. 마. 강인도 피해 산출
-    float ToughnessDamageBase = Spec.GetSetByCallerMagnitude(FGameplayTag::RequestGameplayTag(FName("Damage.ToughnessBase")), false, 0.0f);
+    float ToughnessDamageBase = Spec.GetSetByCallerMagnitude(GPTags::Damage::Data::ToughnessBase, false, 0.0f);
 
     OutExecutionOutput.AddOutputModifier(FGameplayModifierEvaluatedData(UGP_AttributeSet::GetDamageAttribute(), EGameplayModOp::Additive, Damage_Final));
     OutExecutionOutput.AddOutputModifier(FGameplayModifierEvaluatedData(UGP_AttributeSet::GetToughnessDamageAttribute(), EGameplayModOp::Additive, ToughnessDamageBase));

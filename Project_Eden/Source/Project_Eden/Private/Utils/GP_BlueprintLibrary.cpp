@@ -5,7 +5,9 @@
 #include "Engine/OverlapResult.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
+#include "AbilitySystem/Abilities/GP_SkillData.h"
 #include "GameplayEffect.h"
+#include "GameplayTags/GP_Tags.h"
 
 EHitDirection UGP_BlueprintLibrary::GetHitDirection(const FVector& TargetForward, const FVector& ToInstigator)
 {
@@ -118,7 +120,7 @@ void UGP_BlueprintLibrary::SendGameplayEventToActors(AActor* Instigator, const T
 	}
 }
 
-void UGP_BlueprintLibrary::ApplyGameplayEffectToActors(AActor* Instigator, const TArray<AActor*>& TargetActors, TSubclassOf<UGameplayEffect> EffectClass, float EffectLevel)
+void UGP_BlueprintLibrary::ApplyGameplayEffectToActors(AActor* Instigator, const TArray<AActor*>& TargetActors, TSubclassOf<UGameplayEffect> EffectClass, float EffectLevel, UGP_SkillData* SkillData)
 {
 	if (!IsValid(Instigator) || !IsValid(EffectClass)) return;
 
@@ -134,7 +136,21 @@ void UGP_BlueprintLibrary::ApplyGameplayEffectToActors(AActor* Instigator, const
 			ContextHandle.AddInstigator(Instigator, Instigator);
 			
 			FGameplayEffectSpecHandle SpecHandle = InstigatorASC->MakeOutgoingSpec(EffectClass, EffectLevel, ContextHandle);
-			InstigatorASC->ApplyGameplayEffectSpecToTarget(*SpecHandle.Data.Get(), TargetASC);
+			if (SpecHandle.IsValid())
+			{
+				if (SkillData)
+				{
+					SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Data::Base, SkillData->BaseDamage);
+					SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Data::BaseSpell, SkillData->BaseSpellDamage);
+					SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Data::ToughnessBase, SkillData->ToughnessDamage);
+					SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Coef::Atk, SkillData->AttackPowerCoefficient);
+					SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Coef::M_Atk, SkillData->MagicPowerCoefficient);
+					SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Coef::Def, SkillData->DefenseCoefficient);
+					SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Coef::Hp, SkillData->MaxHealthCoefficient);
+				}
+
+				InstigatorASC->ApplyGameplayEffectSpecToTarget(*SpecHandle.Data.Get(), TargetASC);
+			}
 		}
 	}
 }
