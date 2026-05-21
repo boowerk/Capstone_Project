@@ -2,8 +2,8 @@
 memoc: true
 type: core
 scope: project-memory
-created: 2026-05-21T07:03:24
-updated: 2026-05-21T07:03:24
+created: 2026-05-21T10:55:44
+updated: 2026-05-21T10:55:44
 status: active
 tags:
   - memoc
@@ -27,12 +27,12 @@ Shared protocol for any coding agent.
 | --- | --- |
 | User asks "update memoc", "refresh project memory", or similar | Run `memoc update` first, then update relevant agent-owned memory files |
 | User creates or changes a requirement | `02-current-project-state.md`, `06-project-rules.md`, `memoc work "<title>" --from-git` |
-| Code, config, data, or assets changed | `02-current-project-state.md`, relevant `systems/*.md`, `memoc work "<title>" --from-git` |
-| Architecture or system behavior changed | relevant `systems/*.md`, `03-decisions.md` |
+| Code, config, data, or assets changed | `02-current-project-state.md`, relevant `wiki/project/*.md`, `memoc work "<title>" --from-git` |
+| Architecture or system behavior changed | relevant `wiki/project/*.md`, `03-decisions.md` |
 | A decision should affect future agents | `03-decisions.md`, `02-current-project-state.md` |
 | Work is substantial enough to resume later | `04-handoff.md`, `02-current-project-state.md`, `memoc work "<title>" --from-git` |
-| Durable knowledge was learned | `wiki/*.md`, `wiki/index.md` |
-| Source material should feed the wiki | `memoc ingest <path-or-url>`, then synthesize affected `wiki/topics/*.md` |
+| Durable project implementation knowledge was learned | `wiki/project/*.md`, `wiki/index.md` |
+| Source material should feed the wiki | `memoc ingest <path-or-url>`, then synthesize affected `wiki/knowledge/topics/*.md` |
 | A useful query answer should persist | `memoc note "<title>"`, then link related sources/topics |
 | Shared repo work should be traceable | `memoc work "<title>"`; avoid appending long details to shared core files |
 | `session-summary.md` exceeds 800B or starts accumulating history | Run `memoc trim-summary`; move completed history to worklog, resume details to `04-handoff.md` |
@@ -51,4 +51,5 @@ Shared protocol for any coding agent.
 - `04-handoff.md`: resume context, blockers, verified/unverified checks.
 - `03-decisions.md`: append durable decisions only.
 - `worklog/<actor>/YYYY-MM/*.md`: actor-scoped append-by-new-file activity records for shared repos.
-- `systems/*.md` and `wiki/*.md`: on-demand durable knowledge.
+- `wiki/project/*.md`: repo implementation docs.
+- `wiki/knowledge/*.md`: source-backed concepts, provenance, glossary, questions.

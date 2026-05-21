@@ -10,6 +10,7 @@ tags:
   - memoc
   - memoc/wiki
   - memoc/question
+  - memoc/knowledge-wiki
 ---
 # Open Questions
 
@@ -21,7 +22,7 @@ _No open questions yet. Link each question to affected pages and sources._
 
 ## Related
 
-- [Wiki Index](index.md)
+- [Wiki Index](../index.md)
 - [Sources](sources.md)
 - [Topics](topics/README.md)
 - [Wiki Lint](lint.md)

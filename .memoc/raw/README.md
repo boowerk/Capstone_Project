@@ -17,7 +17,7 @@ Immutable source material for the memoc wiki.
 
 - Do not edit raw files after ingest; create a new raw file or source record when material changes.
 - Do not read raw files at session start. Search or open the linked source/topic page first.
-- Source records under [wiki/sources](../wiki/sources/README.md) summarize raw material and link to affected topics.
+- Source records under [wiki/sources](../wiki/knowledge/sources/README.md) summarize raw material and link to affected topics.
 
 ## Subdirectories
 

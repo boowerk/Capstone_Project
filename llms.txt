@@ -17,10 +17,11 @@ This file is a map, not a startup read. Start from the entry-file protocol and o
 - [Project Brief](.memoc/00-project-brief.md): short identity and direction.
 - [Workflow](.memoc/01-agent-workflow.md): update trigger matrix.
 - [Decisions](.memoc/03-decisions.md): durable decisions.
-- [Systems](.memoc/systems/README.md): subsystem docs.
+- [Project Wiki](.memoc/wiki/project/README.md): repo implementation docs.
+- [Knowledge Wiki](.memoc/wiki/knowledge/README.md): external sources, concepts, glossary.
 - [Activity](.memoc/activity.md): generated worklog index.
 - [Raw Sources](.memoc/raw/README.md): immutable source material; do not read by default.
-- [Wiki](.memoc/wiki/index.md): synthesized knowledge.
+- [Wiki](.memoc/wiki/index.md): project/knowledge wiki hub.
 <!-- memoc:core:end -->
 
 ## Systems
@@ -32,13 +33,7 @@ _None yet._
 ## Wiki
 
 <!-- memoc:wiki:start -->
-- [glossary](.memoc/wiki/glossary.md): wiki page.
-- [lint](.memoc/wiki/lint.md): wiki page.
-- [questions](.memoc/wiki/questions.md): wiki page.
-- [sources](.memoc/wiki/sources.md): wiki page.
-- [README](.memoc/wiki/sources/README.md): wiki page.
-- [README](.memoc/wiki/topics/README.md): wiki page.
-- [README](.memoc/wiki/global/README.md): wiki page.
+_None yet._
 <!-- memoc:wiki:end -->
 
 ## Optional

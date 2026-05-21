@@ -16,4 +16,4 @@ Local files copied by `memoc ingest <path>`.
 ## Related
 
 - [Raw Sources](../README.md)
-- [Source Records](../../wiki/sources/README.md)
+- [Source Records](../../wiki/knowledge/sources/README.md)

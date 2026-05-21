@@ -16,4 +16,4 @@ Conversation excerpts that should feed durable wiki synthesis.
 ## Related
 
 - [Raw Sources](../README.md)
-- [Source Records](../../wiki/sources/README.md)
+- [Source Records](../../wiki/knowledge/sources/README.md)

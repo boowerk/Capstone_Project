@@ -10,6 +10,7 @@ tags:
   - memoc
   - memoc/wiki
   - memoc/global
+  - memoc/knowledge-wiki
 ---
 # Global
 
@@ -21,12 +22,12 @@ _None yet. Add pages here for broad context that many topic/system pages should 
 
 ## How To Link
 
-- Link global pages back to [Wiki Index](../index.md), this [Global](README.md) page, and affected topic/system docs.
+- Link global pages back to [Wiki Index](../../index.md), this [Global](README.md) page, and affected topic/system docs.
 - Use global pages for durable synthesis, not temporary task notes.
 
 ## Related
 
-- [Wiki Index](../index.md)
-- [Project Brief](../../00-project-brief.md)
-- [Project Rules](../../06-project-rules.md)
+- [Wiki Index](../../index.md)
+- [Project Brief](../../../00-project-brief.md)
+- [Project Rules](../../../06-project-rules.md)
 - [Topics](../topics/README.md)

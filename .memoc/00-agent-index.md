@@ -2,8 +2,8 @@
 memoc: true
 type: core
 scope: project-memory
-created: 2026-05-21T07:03:24
-updated: 2026-05-21T07:03:24
+created: 2026-05-21T10:55:44
+updated: 2026-05-21T10:55:44
 status: active
 tags:
   - memoc
@@ -22,11 +22,12 @@ This is the fast entry map for agents. Start here, then open only the docs relev
 ## Project Snapshot
 
 <!-- memoc:snapshot:start -->
-- Last synced: 2026-05-21T07:03:24
+- Last synced: 2026-05-21T10:55:44
 - Detected stack: Not detected
 
 ### Source Directories
 
+- `.claude`
 - `.dance-of-tal`
 - `.opencode`
 - `.vs`
@@ -49,17 +50,16 @@ This is the fast entry map for agents. Start here, then open only the docs relev
 - [Actors](actors/README.md)
 - [Worklog](worklog/README.md)
 - [Wiki Index](wiki/index.md)
+- [Project Wiki](wiki/project/README.md)
+- [Knowledge Wiki](wiki/knowledge/README.md)
 - [Raw Sources](raw/README.md)
-- [Systems Index](systems/README.md)
-
-## System Docs
-
-_None yet. Add entries when subsystems are documented._
 
 ## Wiki
 
-- [Wiki Index](wiki/index.md) — hub for every synthesized wiki page.
-- [Sources](wiki/sources.md) — source provenance and ingest notes.
-- [Glossary](wiki/glossary.md) — project terms and aliases.
-- [Open Questions](wiki/questions.md) — unresolved knowledge gaps.
-- [Wiki Lint](wiki/lint.md) — orphan, stale, and contradiction checks.
+- [Wiki Index](wiki/index.md) — hub for project and knowledge wikis.
+- [Project Wiki](wiki/project/README.md) — implementation docs for this repo.
+- [Knowledge Wiki](wiki/knowledge/README.md) — source-backed concepts and external knowledge.
+- [Sources](wiki/knowledge/sources.md) — source provenance and ingest notes.
+- [Glossary](wiki/knowledge/glossary.md) — terms and aliases.
+- [Open Questions](wiki/knowledge/questions.md) — unresolved knowledge gaps.
+- [Wiki Lint](wiki/knowledge/lint.md) — orphan, stale, and contradiction checks.

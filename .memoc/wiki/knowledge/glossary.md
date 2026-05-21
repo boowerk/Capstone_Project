@@ -10,6 +10,7 @@ tags:
   - memoc
   - memoc/wiki
   - memoc/glossary
+  - memoc/knowledge-wiki
 ---
 # Glossary
 
@@ -21,7 +22,7 @@ _No terms defined yet. Link terms to their canonical topic, global, source, or s
 
 ## Related
 
-- [Wiki Index](index.md)
+- [Wiki Index](../index.md)
 - [Topics](topics/README.md)
 - [Global](global/README.md)
 - [Open Questions](questions.md)

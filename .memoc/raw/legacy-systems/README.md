@@ -1,6 +1,6 @@
 ---
 memoc: true
-type: system
+type: raw
 scope: project-memory
 created: 2026-05-21T07:03:24
 updated: 2026-05-21T07:03:24
@@ -8,6 +8,7 @@ status: active
 tags:
   - memoc
   - memoc/system
+  - memoc/raw
 ---
 # Systems
 

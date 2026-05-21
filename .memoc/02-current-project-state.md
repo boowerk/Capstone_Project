@@ -28,11 +28,12 @@ Last synced: 2026-05-20T18:25:00
 ## Project Snapshot
 
 <!-- memoc:snapshot:start -->
-- Last synced: 2026-05-21T07:03:24
+- Last synced: 2026-05-21T10:55:44
 - Detected stack: Not detected
 
 ### Source Directories
 
+- `.claude`
 - `.dance-of-tal`
 - `.opencode`
 - `.vs`

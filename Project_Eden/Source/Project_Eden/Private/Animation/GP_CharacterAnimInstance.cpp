@@ -138,6 +138,8 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	GroundSpeed = WorldVelocity.Size2D();
 	Speed2D = GroundSpeed;
 	LocalVelocityDirection = Character->GetActorTransform().InverseTransformVectorNoScale(WorldVelocity).GetSafeNormal2D();
+	const FVector LocalAccelerationDirection =
+		Character->GetActorTransform().InverseTransformVectorNoScale(MovementComponent->GetCurrentAcceleration()).GetSafeNormal2D();
 
 	bHasAcceleration = MovementComponent->GetCurrentAcceleration().SizeSquared2D() > KINDA_SMALL_NUMBER;
 	bIsFalling = MovementComponent->IsFalling();
@@ -151,11 +153,17 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	if (bIsMovingNow)
 	{
 		TimeSinceMovementStarted = bWasMovingLastFrame ? (TimeSinceMovementStarted + DeltaSeconds) : 0.f;
+		TimeSinceMovementStopped = 0.f;
 	}
 	else
 	{
 		TimeSinceMovementStarted = 0.f;
+		TimeSinceMovementStopped = bWasMovingLastFrame ? 0.f : (TimeSinceMovementStopped + DeltaSeconds);
 	}
+
+	TimeSinceLastLanded += DeltaSeconds;
+	TimeSinceStopStarted += DeltaSeconds;
+	TimeSincePivotStarted += DeltaSeconds;
 
 	const bool bRecentlyStartedMoving = bIsMovingNow && TimeSinceMovementStarted < MovementStartGraceTime;
 
@@ -170,22 +178,60 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 
 	// Detect movement start for Chooser to select Start animations
 	IsStarting = !bWasMovingLastFrame && bIsMovingNow && bHasAcceleration;
-	IsStopping = bWasMovingLastFrame && !bHasAcceleration && GroundSpeed > IdleSpeedThreshold && !bIsFalling;
+	const bool bStopTriggeredThisFrame = bWasMovingLastFrame && !bHasAcceleration && !bIsFalling;
+	if (bStopTriggeredThisFrame)
+	{
+		TimeSinceStopStarted = 0.f;
+	}
 
-	const FVector LastDirection = LastLocalVelocityDirection.GetSafeNormal2D();
-	const FVector CurrentDirection = LocalVelocityDirection.GetSafeNormal2D();
-	const float DirectionDot = FVector::DotProduct(LastDirection, CurrentDirection);
-	IsPivoting = bIsMovingNow && !LastDirection.IsNearlyZero() && DirectionDot < -0.35f;
+	const bool bHoldStopState = !bHasAcceleration && !bIsFalling && TimeSinceStopStarted <= StopHoldDuration;
+	IsStopping = bStopTriggeredThisFrame || bHoldStopState;
+
+	const FVector LastDirection = LastLocalAccelerationDirection.GetSafeNormal2D();
+	const FVector CurrentDirection = LocalAccelerationDirection.GetSafeNormal2D();
+	const float DirectionDot =
+		(!LastDirection.IsNearlyZero() && !CurrentDirection.IsNearlyZero())
+			? FVector::DotProduct(LastDirection, CurrentDirection)
+			: 1.f;
+	const bool bPivotTriggeredThisFrame =
+		bIsMovingNow &&
+		bHasAcceleration &&
+		GroundSpeed >= WalkSpeedThreshold &&
+		DirectionDot < PivotDirectionDotThreshold;
+	if (bPivotTriggeredThisFrame)
+	{
+		TimeSincePivotStarted = 0.f;
+	}
+
+	const bool bHoldPivotState =
+		bIsMovingNow &&
+		bHasAcceleration &&
+		GroundSpeed >= WalkSpeedThreshold &&
+		TimeSincePivotStarted <= PivotHoldDuration;
+
+	IsPivoting = bPivotTriggeredThisFrame || bHoldPivotState;
 
 	const float CurrentYaw = Character->GetActorRotation().Yaw;
 	const float DesiredYaw = Character->GetControlRotation().Yaw;
 	const float YawDelta = FMath::Abs(FMath::FindDeltaAngleDegrees(CurrentYaw, DesiredYaw));
-	ShouldTurnInPlace = !bIsFalling && GroundSpeed <= TurnInPlaceMaxSpeed && !bHasAcceleration && YawDelta > TurnInPlaceYawThreshold;
+	ShouldTurnInPlace =
+		!bIsFalling &&
+		GroundSpeed <= TurnInPlaceMaxSpeed &&
+		!bHasAcceleration &&
+		TimeSinceMovementStopped >= TurnInPlaceMinIdleTime &&
+		TimeSinceLastLanded > LandedSignalDuration &&
+		YawDelta > TurnInPlaceYawThreshold;
 	ShouldSpinTransition = false;
 
 	JustTraversed = false;
-	JustLanded_Light = bWasFallingLastFrame && !bIsFalling && FMath::Abs(LastVerticalVelocity) < 900.f;
-	JustLanded_Heavy = bWasFallingLastFrame && !bIsFalling && FMath::Abs(LastVerticalVelocity) >= 900.f;
+	if (bWasFallingLastFrame && !bIsFalling)
+	{
+		TimeSinceLastLanded = 0.f;
+	}
+
+	const bool bLandedRecently = TimeSinceLastLanded <= LandedSignalDuration;
+	JustLanded_Light = bLandedRecently && FMath::Abs(LastVerticalVelocity) < 900.f;
+	JustLanded_Heavy = bLandedRecently && FMath::Abs(LastVerticalVelocity) >= 900.f;
 
 	MovementDirection_Recent = static_cast<uint8>(MovementDirection);
 	if (PreviousDirection != MovementDirection)
@@ -287,6 +333,7 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 
 	bWasMovingLastFrame = bIsMovingNow;
 	LastLocalVelocityDirection = LocalVelocityDirection;
+	LastLocalAccelerationDirection = LocalAccelerationDirection;
 	LastVerticalVelocity = WorldVelocity.Z;
 
 #if !UE_BUILD_SHIPPING
@@ -296,12 +343,18 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 			? (MotionMatchingSelectedAnimName.IsNone() ? TEXT("Null Asset") : MotionMatchingSelectedAnimName.ToString())
 			: TEXT("Invalid Result");
 		const FString DebugText = FString::Printf(
-			TEXT("MM Speed: %.1f \nGait: %s \nState: %s \nTurn:%d \nStop:%d"),
+			TEXT("MM Speed: %.1f \nGait: %s \nState: %s \nTurn:%d \nStop:%d \nPivot:%d \nDirDot: %.2f \nIdleT: %.2f \nStopT: %.2f \nPivotT: %.2f \nLandT: %.2f"),
 			GroundSpeed,
 			*UEnum::GetValueAsString(Gait),
 			*UEnum::GetValueAsString(CurrentMotionMatchState),
 			ShouldTurnInPlace ? 1 : 0,
-			IsStopping ? 1 : 0);
+			IsStopping ? 1 : 0,
+			IsPivoting ? 1 : 0,
+			DirectionDot,
+			TimeSinceMovementStopped,
+			TimeSinceStopStarted,
+			TimeSincePivotStarted,
+			TimeSinceLastLanded);
 		const FString DebugAssetText = FString::Printf(
 			TEXT("MM DB: %s \nValid:%d \nAnim: %s"),
 			*GetNameSafe(RuntimePoseSearchDatabase),
@@ -399,7 +452,7 @@ void UGP_CharacterAnimInstance::ApplyRuntimeDatabaseToMotionMatchingNode(const F
 	UMotionMatchingAnimNodeLibrary::GetMotionMatchingSearchResult(MotionMatchingNode, SearchResult, bIsResultValid);
 	bMotionMatchingResultValid = bIsResultValid;
 	
-	// SelectedAnimÀ¸·Î º¹±¸ÇÏµÇ, À¯È¿¼º Ã¼Å© °­È­
+	// SelectedAnimï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ïµï¿½, ï¿½ï¿½È¿ï¿½ï¿½ Ã¼Å© ï¿½ï¿½È­
 	MotionMatchingSelectedAnimName = NAME_None;
 	if (bIsResultValid)
 	{

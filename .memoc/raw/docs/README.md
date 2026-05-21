@@ -16,4 +16,4 @@ Long-form docs, specs, and references kept separate from synthesized topic pages
 ## Related
 
 - [Raw Sources](../README.md)
-- [Source Records](../../wiki/sources/README.md)
+- [Source Records](../../wiki/knowledge/sources/README.md)

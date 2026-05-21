@@ -22,7 +22,7 @@ This is the Codex entry file for the project.
 - [ ] Decision made? Update `03-decisions.md` + `02`
 - [ ] Work incomplete or risky? Update `04-handoff.md`
 - [ ] Rule/preference set? Update `06-project-rules.md`
-- [ ] Wiki/systems work? Read `skills/project-memory-maintainer/SKILL.md`
+- [ ] Wiki/project-memory work? Read `skills/project-memory-maintainer/SKILL.md`
 - [ ] User asked to update memoc/project memory? Run `memoc update`, then update the smallest relevant agent-owned memory files.
 - [ ] Shared repo work? Prefer `memoc work "<title>" --from-git` over appending shared files; run `memoc activity --write` only when regenerating indexes.
 - [ ] Keep `session-summary.md` as a replace-only snapshot under 800B; move completed work to actor worklogs and resume risks to `04-handoff.md`. If it grew, run `memoc trim-summary`.

@@ -10,6 +10,7 @@ tags:
   - memoc
   - memoc/wiki
   - memoc/source
+  - memoc/knowledge-wiki
 ---
 # Sources
 
@@ -23,8 +24,8 @@ Use `memoc ingest <path-or-url>` to create source records without loading raw ma
 
 ## Related
 
-- [Wiki Index](index.md)
-- [Raw Sources](../raw/README.md)
+- [Wiki Index](../index.md)
+- [Raw Sources](../../raw/README.md)
 - [Source Records Directory](sources/README.md)
 - [Topics](topics/README.md)
 - [Open Questions](questions.md)

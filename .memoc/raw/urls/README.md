@@ -16,4 +16,4 @@ URL references recorded by `memoc ingest <url>`.
 ## Related
 
 - [Raw Sources](../README.md)
-- [Source Records](../../wiki/sources/README.md)
+- [Source Records](../../wiki/knowledge/sources/README.md)

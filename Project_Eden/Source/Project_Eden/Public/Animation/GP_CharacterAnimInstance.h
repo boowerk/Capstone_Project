@@ -258,17 +258,47 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MotionMatching|State", meta = (ClampMin = "0.0"))
 	float TurnInPlaceYawThreshold = 50.f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MotionMatching|State", meta = (ClampMin = "-1.0", ClampMax = "1.0"))
+	float PivotDirectionDotThreshold = 0.45f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MotionMatching|State", meta = (ClampMin = "0.0"))
+	float TurnInPlaceMinIdleTime = 0.2f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MotionMatching|State", meta = (ClampMin = "0.0"))
+	float LandedSignalDuration = 0.15f;
+
 	UPROPERTY(BlueprintReadOnly, Category = "MotionMatching|State")
 	bool bWasMovingLastFrame = false;
 
 	UPROPERTY(BlueprintReadOnly, Category = "MotionMatching|State", meta = (ClampMin = "0.0"))
 	float TimeSinceMovementStarted = 0.f;
 
+	UPROPERTY(BlueprintReadOnly, Category = "MotionMatching|State", meta = (ClampMin = "0.0"))
+	float TimeSinceMovementStopped = 0.f;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MotionMatching|State", meta = (ClampMin = "0.0"))
+	float TimeSinceStopStarted = 0.f;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MotionMatching|State", meta = (ClampMin = "0.0"))
+	float TimeSincePivotStarted = 0.f;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MotionMatching|State", meta = (ClampMin = "0.0"))
+	float TimeSinceLastLanded = 999.f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MotionMatching|State", meta = (ClampMin = "0.0"))
 	float MovementStartGraceTime = 0.2f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MotionMatching|State", meta = (ClampMin = "0.0"))
+	float StopHoldDuration = 1.5f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MotionMatching|State", meta = (ClampMin = "0.0"))
+	float PivotHoldDuration = 0.2f;
+
 	UPROPERTY(BlueprintReadOnly, Category = "Chooser|State")
 	FVector LastLocalVelocityDirection = FVector::ZeroVector;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Chooser|State")
+	FVector LastLocalAccelerationDirection = FVector::ZeroVector;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Chooser|State")
 	float LastVerticalVelocity = 0.f;

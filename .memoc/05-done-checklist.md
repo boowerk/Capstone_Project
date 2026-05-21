@@ -2,8 +2,8 @@
 memoc: true
 type: core
 scope: project-memory
-created: 2026-05-21T07:03:24
-updated: 2026-05-21T07:03:24
+created: 2026-05-21T10:55:44
+updated: 2026-05-21T10:55:44
 status: active
 tags:
   - memoc
@@ -26,7 +26,7 @@ Run through this before saying substantial work is complete.
 - [ ] `.memoc/03-decisions.md` updated if a durable decision was made.
 - [ ] `.memoc/04-handoff.md` updated if work is incomplete or risky.
 - [ ] Meaningful shared work has a `.memoc/worklog/<actor>/YYYY-MM/*.md` entry.
-- [ ] Relevant `.memoc/systems/*.md` or wiki pages updated.
+- [ ] Relevant `.memoc/wiki/project/*.md` or `.memoc/wiki/knowledge/*.md` pages updated.
 
 ## Communication
 

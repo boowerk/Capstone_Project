@@ -2,8 +2,8 @@
 memoc: true
 type: wiki
 scope: project-memory
-created: 2026-05-21T07:03:24
-updated: 2026-05-21T07:03:24
+created: 2026-05-21T10:55:44
+updated: 2026-05-21T10:55:44
 status: active
 confidence: medium
 tags:
@@ -12,31 +12,21 @@ tags:
 ---
 # Wiki Index
 
-Persistent LLM-maintained project wiki.
+Persistent LLM-maintained wiki hub.
 
-## Graph Hubs
+## Wiki Layers
 
+- [Project Wiki](project/README.md) — this repo's implementation docs.
+- [Knowledge Wiki](knowledge/README.md) — source-backed concepts, external docs, glossary, questions.
 - [Raw Sources](../raw/README.md) — immutable source material before synthesis.
-- [Sources](sources.md) — provenance, ingests, and source-to-topic links.
-- [Topics](topics/README.md) — synthesized topic pages.
-- [Global](global/README.md) — project-wide principles and long-lived direction.
-- [Glossary](glossary.md) — terms, aliases, and canonical page names.
-- [Open Questions](questions.md) — unresolved questions and research leads.
-- [Wiki Lint](lint.md) — graph health, orphan checks, contradictions, stale claims.
 
-## Pages
+## Project Pages
 
-_None yet. Add every wiki page here with a relative Markdown link and one-line summary._
+_None yet. Link implementation pages from [project/README.md](project/README.md)._
 
-## Saved Queries
+## Knowledge Pages
 
-_None yet. Use `memoc note "<title>"` for durable analysis or query results that should become a topic._
-
-## Subdirectories
-
-- [sources/](sources/README.md) — provenance records
-- [topics/](topics/README.md) — synthesized topic pages
-- [global/](global/README.md) — project-wide principles
+_None yet. Use `memoc ingest` or `memoc note "<title>"` to create source-backed knowledge pages._
 
 ## Related Core Memory
 

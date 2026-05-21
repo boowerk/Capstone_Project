@@ -10,6 +10,7 @@ tags:
   - memoc
   - memoc/wiki
   - memoc/source
+  - memoc/knowledge-wiki
 ---
 # Sources
 
