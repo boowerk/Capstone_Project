@@ -1,3 +1,14 @@
+---
+memoc: true
+type: core
+scope: project-memory
+created: 2026-05-21T07:03:24
+updated: 2026-05-21T07:03:24
+status: active
+tags:
+  - memoc
+  - memoc/core
+---
 # Project Brief
 
 This is the shortest project summary for a fresh agent. Keep it factual and easy to scan.

@@ -1,3 +1,14 @@
+---
+memoc: true
+type: state
+scope: project-memory
+created: 2026-05-21T07:03:24
+updated: 2026-05-21T07:03:24
+status: active
+tags:
+  - memoc
+  - memoc/state
+---
 # Current Project State
 
 Last synced: 2026-05-20T18:25:00
@@ -17,12 +28,11 @@ Last synced: 2026-05-20T18:25:00
 ## Project Snapshot
 
 <!-- memoc:snapshot:start -->
-- Last synced: 2026-05-20T09:04:23
+- Last synced: 2026-05-21T07:03:24
 - Detected stack: Not detected
 
 ### Source Directories
 
-- `.claude`
 - `.dance-of-tal`
 - `.opencode`
 - `.vs`
@@ -37,7 +47,7 @@ Last synced: 2026-05-20T18:25:00
 
 ## Completed Tasks
 
-See `.memoc/log.md` for full history.
+See `.memoc/worklog/` for full shared activity history.
 
 ## Commands
 
@@ -66,4 +76,4 @@ See `.memoc/log.md` for full history.
 
 ## Change Log
 
-See `.memoc/log.md`.
+See `.memoc/worklog/` and generated `.memoc/activity.md`.

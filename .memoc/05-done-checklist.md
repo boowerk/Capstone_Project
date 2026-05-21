@@ -1,3 +1,14 @@
+---
+memoc: true
+type: core
+scope: project-memory
+created: 2026-05-21T07:03:24
+updated: 2026-05-21T07:03:24
+status: active
+tags:
+  - memoc
+  - memoc/core
+---
 # Done Checklist
 
 Run through this before saying substantial work is complete.
@@ -14,7 +25,7 @@ Run through this before saying substantial work is complete.
 - [ ] `.memoc/02-current-project-state.md` reflects the new status.
 - [ ] `.memoc/03-decisions.md` updated if a durable decision was made.
 - [ ] `.memoc/04-handoff.md` updated if work is incomplete or risky.
-- [ ] `.memoc/log.md` has a new entry for meaningful work.
+- [ ] Meaningful shared work has a `.memoc/worklog/<actor>/YYYY-MM/*.md` entry.
 - [ ] Relevant `.memoc/systems/*.md` or wiki pages updated.
 
 ## Communication

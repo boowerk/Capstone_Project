@@ -1,3 +1,14 @@
+---
+memoc: true
+type: system
+scope: project-memory
+created: 2026-05-21T07:03:24
+updated: 2026-05-21T07:03:24
+status: active
+tags:
+  - memoc
+  - memoc/system
+---
 # Systems
 
 Subsystem documentation for agents.

@@ -17,8 +17,9 @@ This file is a map, not a startup read. Start from the entry-file protocol and o
 - [Project Brief](.memoc/00-project-brief.md): short identity and direction.
 - [Workflow](.memoc/01-agent-workflow.md): update trigger matrix.
 - [Decisions](.memoc/03-decisions.md): durable decisions.
-- [Log](.memoc/log.md): append-only history.
 - [Systems](.memoc/systems/README.md): subsystem docs.
+- [Activity](.memoc/activity.md): generated worklog index.
+- [Raw Sources](.memoc/raw/README.md): immutable source material; do not read by default.
 - [Wiki](.memoc/wiki/index.md): synthesized knowledge.
 <!-- memoc:core:end -->
 

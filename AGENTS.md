@@ -12,6 +12,9 @@ This is the Codex entry file for the project.
 - [ ] Search memory first: `memoc search "<query>" --limit 5`, or wrapper fallback above if PATH fails
 - [ ] Open on demand: `02` status, `04` resume, `06` rules, `llms.txt` map
 - [ ] If memory search is not enough, search project files with `memoc grep "<query>" --limit 5` (or wrapper fallback)
+- [ ] If asked to refresh/update memoc project memory, run `memoc update` first; this refreshes managed sections, wiki links, and Obsidian tags.
+- [ ] For durable source material use `memoc ingest <path-or-url>`; for durable analysis/query results use `memoc note "<title>"`; after wiki edits run `memoc lint-wiki`.
+- [ ] In shared repos, record meaningful work with `memoc work "<title>"`; actor defaults to `MEMOC_ACTOR`, local actor, git user, git email, or OS user.
 - [ ] Keep output small: `summary`, `search --limit`, `grep --limit`, `--snippets`
 
 ## Before Finishing _(update only applicable files; skip Q&A / throwaway exploration)_
@@ -20,4 +23,7 @@ This is the Codex entry file for the project.
 - [ ] Work incomplete or risky? Update `04-handoff.md`
 - [ ] Rule/preference set? Update `06-project-rules.md`
 - [ ] Wiki/systems work? Read `skills/project-memory-maintainer/SKILL.md`
+- [ ] User asked to update memoc/project memory? Run `memoc update`, then update the smallest relevant agent-owned memory files.
+- [ ] Shared repo work? Prefer `memoc work "<title>" --from-git` over appending shared files; run `memoc activity --write` only when regenerating indexes.
+- [ ] Keep `session-summary.md` as a replace-only snapshot under 800B; move completed work to actor worklogs and resume risks to `04-handoff.md`. If it grew, run `memoc trim-summary`.
 <!-- memoc:managed:end -->

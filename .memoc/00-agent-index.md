@@ -1,3 +1,14 @@
+---
+memoc: true
+type: core
+scope: project-memory
+created: 2026-05-21T07:03:24
+updated: 2026-05-21T07:03:24
+status: active
+tags:
+  - memoc
+  - memoc/core
+---
 # Agent Index
 
 This is the fast entry map for agents. Start here, then open only the docs relevant to the task.
@@ -11,12 +22,11 @@ This is the fast entry map for agents. Start here, then open only the docs relev
 ## Project Snapshot
 
 <!-- memoc:snapshot:start -->
-- Last synced: 2026-05-20T09:04:23
+- Last synced: 2026-05-21T07:03:24
 - Detected stack: Not detected
 
 ### Source Directories
 
-- `.claude`
 - `.dance-of-tal`
 - `.opencode`
 - `.vs`
@@ -35,8 +45,11 @@ This is the fast entry map for agents. Start here, then open only the docs relev
 - [Done Checklist](05-done-checklist.md)
 - [Project Rules](06-project-rules.md)
 - [Session Summary](session-summary.md)
-- [Project Log](log.md)
+- [Activity](activity.md)
+- [Actors](actors/README.md)
+- [Worklog](worklog/README.md)
 - [Wiki Index](wiki/index.md)
+- [Raw Sources](raw/README.md)
 - [Systems Index](systems/README.md)
 
 ## System Docs
@@ -45,4 +58,8 @@ _None yet. Add entries when subsystems are documented._
 
 ## Wiki
 
-_None yet. Add entries when wiki pages are created._
+- [Wiki Index](wiki/index.md) — hub for every synthesized wiki page.
+- [Sources](wiki/sources.md) — source provenance and ingest notes.
+- [Glossary](wiki/glossary.md) — project terms and aliases.
+- [Open Questions](wiki/questions.md) — unresolved knowledge gaps.
+- [Wiki Lint](wiki/lint.md) — orphan, stale, and contradiction checks.

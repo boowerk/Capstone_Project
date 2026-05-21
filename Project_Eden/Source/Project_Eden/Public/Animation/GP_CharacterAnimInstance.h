@@ -163,6 +163,9 @@ protected:
 	bool IsStarting = false;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Chooser")
+	bool IsStopping = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Chooser")
 	bool IsPivoting = false;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Chooser")
@@ -245,6 +248,15 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MotionMatching|Databases", meta = (ClampMin = "0.0"))
 	float SprintSpeedThreshold = 650.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MotionMatching|State", meta = (ClampMin = "0.0"))
+	float StopSpeedThreshold = 140.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MotionMatching|State", meta = (ClampMin = "0.0"))
+	float TurnInPlaceMaxSpeed = 15.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MotionMatching|State", meta = (ClampMin = "0.0"))
+	float TurnInPlaceYawThreshold = 50.f;
 
 	UPROPERTY(BlueprintReadOnly, Category = "MotionMatching|State")
 	bool bWasMovingLastFrame = false;

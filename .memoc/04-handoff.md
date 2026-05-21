@@ -1,3 +1,14 @@
+---
+memoc: true
+type: state
+scope: project-memory
+created: 2026-05-21T07:03:24
+updated: 2026-05-21T07:03:24
+status: active
+tags:
+  - memoc
+  - memoc/state
+---
 # Agent Handoff
 
 Last synced: 2026-05-20T18:25:00

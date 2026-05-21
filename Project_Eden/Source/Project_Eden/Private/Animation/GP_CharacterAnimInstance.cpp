@@ -144,7 +144,7 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	bIsAnyMontagePlaying = Montage_IsPlaying(nullptr);
 	const float CurrentMaxSpeed = MovementComponent->GetMaxSpeed();
 	bIsSprinting = CurrentMaxSpeed >= SprintSpeedThreshold || GroundSpeed >= SprintSpeedThreshold;
-	const bool bIsMovingNow = GroundSpeed > IdleSpeedThreshold || bHasAcceleration;
+	const bool bIsMovingNow = GroundSpeed > IdleSpeedThreshold;
 	const bool bWasFallingLastFrame = MovementMode == E_MovementMode::InAir;
 	const E_MovementDirection PreviousDirection = MovementDirection;
 
@@ -170,6 +170,7 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 
 	// Detect movement start for Chooser to select Start animations
 	IsStarting = !bWasMovingLastFrame && bIsMovingNow && bHasAcceleration;
+	IsStopping = bWasMovingLastFrame && !bHasAcceleration && GroundSpeed > IdleSpeedThreshold && !bIsFalling;
 
 	const FVector LastDirection = LastLocalVelocityDirection.GetSafeNormal2D();
 	const FVector CurrentDirection = LocalVelocityDirection.GetSafeNormal2D();
@@ -179,7 +180,7 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	const float CurrentYaw = Character->GetActorRotation().Yaw;
 	const float DesiredYaw = Character->GetControlRotation().Yaw;
 	const float YawDelta = FMath::Abs(FMath::FindDeltaAngleDegrees(CurrentYaw, DesiredYaw));
-	ShouldTurnInPlace = !bIsMovingNow && !bIsFalling && YawDelta > 50.f;
+	ShouldTurnInPlace = !bIsFalling && GroundSpeed <= TurnInPlaceMaxSpeed && !bHasAcceleration && YawDelta > TurnInPlaceYawThreshold;
 	ShouldSpinTransition = false;
 
 	JustTraversed = false;
@@ -291,17 +292,31 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 #if !UE_BUILD_SHIPPING
 	if (GEngine)
 	{
+		const FString SelectedAnimText = bMotionMatchingResultValid
+			? (MotionMatchingSelectedAnimName.IsNone() ? TEXT("Null Asset") : MotionMatchingSelectedAnimName.ToString())
+			: TEXT("Invalid Result");
 		const FString DebugText = FString::Printf(
-			TEXT("MM Speed: %.1f | Gait: %s | State: %s | DB: %s"),
+			TEXT("MM Speed: %.1f \nGait: %s \nState: %s \nTurn:%d \nStop:%d"),
 			GroundSpeed,
 			*UEnum::GetValueAsString(Gait),
 			*UEnum::GetValueAsString(CurrentMotionMatchState),
-			*GetNameSafe(RuntimePoseSearchDatabase));
+			ShouldTurnInPlace ? 1 : 0,
+			IsStopping ? 1 : 0);
+		const FString DebugAssetText = FString::Printf(
+			TEXT("MM DB: %s \nValid:%d \nAnim: %s"),
+			*GetNameSafe(RuntimePoseSearchDatabase),
+			bMotionMatchingResultValid ? 1 : 0,
+			*SelectedAnimText);
 		GEngine->AddOnScreenDebugMessage(
 			0x4D4D4442,
 			0.f,
 			FColor::Cyan,
 			DebugText);
+		GEngine->AddOnScreenDebugMessage(
+			0x4D4D4443,
+			0.f,
+			FColor::Green,
+			DebugAssetText);
 	}
 #endif
 }
@@ -383,8 +398,14 @@ void UGP_CharacterAnimInstance::ApplyRuntimeDatabaseToMotionMatchingNode(const F
 	bool bIsResultValid = false;
 	UMotionMatchingAnimNodeLibrary::GetMotionMatchingSearchResult(MotionMatchingNode, SearchResult, bIsResultValid);
 	bMotionMatchingResultValid = bIsResultValid;
-	MotionMatchingSelectedAnimName =
-		(bIsResultValid && SearchResult.SelectedAnim)
-			? SearchResult.SelectedAnim->GetFName()
-			: NAME_None;
+	
+	// SelectedAnim으로 복구하되, 유효성 체크 강화
+	MotionMatchingSelectedAnimName = NAME_None;
+	if (bIsResultValid)
+	{
+		if (SearchResult.SelectedAnim)
+		{
+			MotionMatchingSelectedAnimName = SearchResult.SelectedAnim->GetFName();
+		}
+	}
 }
