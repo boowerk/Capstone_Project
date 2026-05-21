@@ -48,6 +48,12 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Damage|Coefficient")
 	float MaxHealthCoefficient = 0.f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Cooldown")
+	FGameplayTag CooldownTag;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Cooldown", meta = (ClampMin = "0.0"))
+	float CooldownDuration = 0.f;
+
 	/** 이 스킬이 장착될 수 있는 기본 권장 슬롯 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill")
 	FGameplayTag DefaultSlotTag;
