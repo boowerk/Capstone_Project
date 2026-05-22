@@ -20,6 +20,7 @@ History: worklog. Resume risks: 04-handoff.md.
 - `BP_GP_PlayerController` CDO defaults: forward 500, side 350, back 300; sprint forward 700, sprint side/back 350/300.
 - Directional speed profile moved to `PDA_CharacterAnimationSet.MovementSpeedProfile`.
 - Player has GAS-ready runtime multipliers: `GASMovementSpeedMultiplier`, `GASMovementSpeedScaleRatioMultiplier`, plus profile override setters.
+- Do not auto-read mesh component scale for speed. `MovementSpeedScaleRatio` is manual source-body-size ratio vs mannequin scale 1; actual mesh component scale can remain 1.
 
 ## Changed
 - `BP_GP_PlayerCharacter` CDO keeps `NormalWalkSpeed=500`, `SprintSpeed=700`, mesh scale 1.
