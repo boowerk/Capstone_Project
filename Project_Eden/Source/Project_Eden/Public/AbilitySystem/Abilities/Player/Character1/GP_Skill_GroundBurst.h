@@ -5,6 +5,8 @@
 #include "GameplayTagContainer.h"
 #include "GP_Skill_GroundBurst.generated.h"
 
+class AActor;
+
 /**
  * Bursts at a ground position in front of the player's aim direction.
  */
@@ -19,6 +21,9 @@ public:
 	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 
 protected:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS|Skill|GroundBurst|Visuals")
+	TSubclassOf<AActor> BurstVisualActorClass;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS|Skill|GroundBurst", meta = (ClampMin = "0.0"))
 	float TargetForwardOffset = 500.f;
 

@@ -2,6 +2,7 @@
 
 #include "AbilitySystemComponent.h"
 #include "AbilitySystem/Abilities/GP_SkillData.h"
+#include "GameFramework/Actor.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/Controller.h"
 #include "GameplayTags/GP_Tags.h"
@@ -63,6 +64,22 @@ void UGP_Skill_GroundBurst::ActivateAbility(const FGameplayAbilitySpecHandle Han
 		);
 
 		const FVector BurstLocation = bHitGround ? HitResult.Location : TargetLocation;
+
+		if (BurstVisualActorClass)
+		{
+			FActorSpawnParameters SpawnParams;
+			SpawnParams.Owner = Avatar;
+			SpawnParams.Instigator = Avatar;
+			SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+			Avatar->GetWorld()->SpawnActor<AActor>(
+				BurstVisualActorClass,
+				BurstLocation,
+				FRotator::ZeroRotator,
+				SpawnParams
+			);
+		}
+
 		const TArray<AActor*> HitActors = UGP_BlueprintLibrary::SphereOverlapActorsAtLocation(
 			Avatar,
 			BurstLocation,
