@@ -58,29 +58,37 @@ TArray<AActor*> UGP_BlueprintLibrary::SphereMeleeHitBoxOverlap(AActor* AvatarAct
 	TArray<AActor*> ActorsHit;
 	if (!IsValid(AvatarActor)) return ActorsHit;
 
-	UWorld* World = AvatarActor->GetWorld();
+	const FVector Forward = AvatarActor->GetActorForwardVector() * ForwardOffset;
+	const FVector HitBoxLocation = AvatarActor->GetActorLocation() + Forward + FVector(0.f, 0.f, ElevationOffset);
+
+	return SphereOverlapActorsAtLocation(AvatarActor, HitBoxLocation, Radius, AvatarActor, bDrawDebug);
+}
+
+TArray<AActor*> UGP_BlueprintLibrary::SphereOverlapActorsAtLocation(UObject* WorldContextObject, const FVector& Location, float Radius, AActor* ActorToIgnore, bool bDrawDebug)
+{
+	TArray<AActor*> ActorsHit;
+	if (!IsValid(WorldContextObject)) return ActorsHit;
+
+	UWorld* World = WorldContextObject->GetWorld();
 	if (!IsValid(World)) return ActorsHit;
 
-	TArray<AActor*> ActorToIgnore;
-	ActorToIgnore.Add(AvatarActor);
+	TArray<AActor*> ActorsToIgnore;
+	if (IsValid(ActorToIgnore))
+	{
+		ActorsToIgnore.Add(ActorToIgnore);
+	}
 
 	FCollisionQueryParams CollisionQueryParams;
-	CollisionQueryParams.AddIgnoredActors(ActorToIgnore);
+	CollisionQueryParams.AddIgnoredActors(ActorsToIgnore);
 
 	FCollisionResponseParams CollisionResponseParams;
 	CollisionResponseParams.CollisionResponse.SetAllChannels(ECR_Ignore);
 	CollisionResponseParams.CollisionResponse.SetResponse(ECC_Pawn, ECR_Block);
 
-	// 위치 계산
-	
 	TArray<FOverlapResult> OverlapResults;
 	FCollisionShape CollisionShapeSphere = FCollisionShape::MakeSphere(Radius);
-	
-	const FVector Forward = AvatarActor->GetActorForwardVector() * ForwardOffset;
-	const FVector HitBoxLocation = AvatarActor->GetActorLocation() + Forward + FVector(0.f, 0.f, ElevationOffset);
 
-	
-	World->OverlapMultiByChannel(OverlapResults, HitBoxLocation, FQuat::Identity,
+	World->OverlapMultiByChannel(OverlapResults, Location, FQuat::Identity,
 		ECC_Visibility, CollisionShapeSphere, CollisionQueryParams, CollisionResponseParams);
 
 	for (const FOverlapResult& Result : OverlapResults)
@@ -93,7 +101,7 @@ TArray<AActor*> UGP_BlueprintLibrary::SphereMeleeHitBoxOverlap(AActor* AvatarAct
 	
 	if (bDrawDebug) // UGP_Primary::DrawDebugsHitBoxOverlap에서 기능 이전함
 	{
-		DrawDebugSphere(World, HitBoxLocation, Radius, 16, FColor::Red, false, 3.f);
+		DrawDebugSphere(World, Location, Radius, 16, FColor::Red, false, 3.f);
 		for (const FOverlapResult& Result : OverlapResults)
 		{
 			if (Result.GetActor())
@@ -153,4 +161,12 @@ void UGP_BlueprintLibrary::ApplyGameplayEffectToActors(AActor* Instigator, const
 			}
 		}
 	}
+}
+
+void UGP_BlueprintLibrary::ApplyAreaGameplayEffectAtLocation(AActor* Instigator, const FVector& Location, float Radius, TSubclassOf<UGameplayEffect> EffectClass, float EffectLevel, UGP_SkillData* SkillData, bool bDrawDebug)
+{
+	if (!IsValid(Instigator) || !IsValid(EffectClass)) return;
+
+	const TArray<AActor*> HitActors = SphereOverlapActorsAtLocation(Instigator, Location, Radius, Instigator, bDrawDebug);
+	ApplyGameplayEffectToActors(Instigator, HitActors, EffectClass, EffectLevel, SkillData);
 }

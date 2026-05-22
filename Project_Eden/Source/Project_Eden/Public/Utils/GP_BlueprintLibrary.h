@@ -7,6 +7,7 @@
 #include "GP_BlueprintLibrary.generated.h"
 
 class UGP_SkillData;
+class UGameplayEffect;
 
 UENUM(BlueprintType)
 enum class EHitDirection : uint8 {
@@ -37,6 +38,10 @@ public:
 	// 구체 피격 검사
 	UFUNCTION(BlueprintCallable, Category = "Eden|Combat") 
 	static TArray<AActor*> SphereMeleeHitBoxOverlap(AActor* AvatarActor, float Radius, float ForwardOffset, float ElevationOffset, bool bDrawDebug = false);
+
+	// 지정 위치 기준 구체 피격 검사
+	UFUNCTION(BlueprintCallable, Category = "Eden|Combat", meta = (WorldContext = "WorldContextObject"))
+	static TArray<AActor*> SphereOverlapActorsAtLocation(UObject* WorldContextObject, const FVector& Location, float Radius, AActor* ActorToIgnore, bool bDrawDebug = false);
 	
 	
 	// GAS 유틸 
@@ -48,4 +53,8 @@ public:
 	// 액터배열에 게임플레이 이펙트 일괄 적용
 	UFUNCTION(BlueprintCallable, Category = "Eden|Combat|Abilities")
 	static void ApplyGameplayEffectToActors(AActor* Instigator, const TArray<AActor*>& TargetActors, TSubclassOf<UGameplayEffect> EffectClass, float EffectLevel = 1.0f, UGP_SkillData* SkillData = nullptr);
+
+	// 지정 위치 기준 범위 안의 액터들에게 게임플레이 이펙트 적용
+	UFUNCTION(BlueprintCallable, Category = "Eden|Combat|Abilities")
+	static void ApplyAreaGameplayEffectAtLocation(AActor* Instigator, const FVector& Location, float Radius, TSubclassOf<UGameplayEffect> EffectClass, float EffectLevel = 1.0f, UGP_SkillData* SkillData = nullptr, bool bDrawDebug = false);
 };
