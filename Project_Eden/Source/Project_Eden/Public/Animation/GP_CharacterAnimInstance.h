@@ -93,6 +93,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "AnimationData")
 	void SetAnimationSet(UPDA_CharacterAnimationSet* NewSet);
 
+	UFUNCTION(BlueprintCallable, Category = "MotionMatching|State")
+	bool GetShouldTurnInPlace() const { return ShouldTurnInPlace; }
+
+	UFUNCTION(BlueprintCallable, Category = "MotionMatching|State")
+	float GetTimeSinceTurnInPlaceStarted() const { return TimeSinceTurnInPlaceStarted; }
+
 	UFUNCTION(BlueprintCallable, Category = "MotionMatching", meta = (BlueprintThreadSafe))
 	void ApplyRuntimeDatabaseToMotionMatchingNode(const FAnimUpdateContext& Context, const FAnimNodeReference& Node);
 
@@ -303,6 +309,12 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, Category = "MotionMatching|State", meta = (ClampMin = "0.0"))
 	float TimeSinceMovementStopped = 0.f;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MotionMatching|State", meta = (ClampMin = "0.0"))
+	float TimeSinceTurnInPlaceStarted = 0.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MotionMatching|State", meta = (ClampMin = "0.0"))
+	float TurnInPlaceMinDuration = 0.6f;
 
 	UPROPERTY(BlueprintReadOnly, Category = "MotionMatching|State", meta = (ClampMin = "0.0"))
 	float TimeSinceStopStarted = 0.f;

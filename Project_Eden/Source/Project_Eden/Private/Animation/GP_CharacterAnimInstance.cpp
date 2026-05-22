@@ -260,13 +260,48 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 
 	IsPivoting = bPivotTriggeredThisFrame || (IsPivoting && bCanContinuePivot) || bHoldPivotState;
 
-	ShouldTurnInPlace =
+	// Update Turn In Place elapsed time
+	if (ShouldTurnInPlace)
+	{
+		TimeSinceTurnInPlaceStarted += DeltaSeconds;
+	}
+	else
+	{
+		TimeSinceTurnInPlaceStarted = 0.f;
+	}
+
+	const float ActiveTurnThreshold = ShouldTurnInPlace ? 2.0f : TurnInPlaceYawThreshold;
+
+	bool bWantTurnInPlace =
 		!bIsFalling &&
 		Speed2D <= TurnInPlaceMaxSpeed &&
 		!bHasAcceleration &&
 		TimeSinceMovementStopped >= TurnInPlaceMinIdleTime &&
 		TimeSinceLastLanded > LandedSignalDuration &&
-		YawDelta > TurnInPlaceYawThreshold;
+		YawDelta > ActiveTurnThreshold;
+
+	// Hysteresis: Keep TurnInPlace active for a minimum duration to prevent animation chattering
+	if (ShouldTurnInPlace && TimeSinceTurnInPlaceStarted < TurnInPlaceMinDuration)
+	{
+		bWantTurnInPlace = true;
+	}
+
+	// Lock: If motion matching is currently selecting a turn animation, keep TurnInPlace active
+	// so the animation doesn't get cut off in the middle of a rotation.
+	if (ShouldTurnInPlace && !MotionMatchingSelectedAnimName.IsNone())
+	{
+		const FString AnimNameStr = MotionMatchingSelectedAnimName.ToString();
+		if (AnimNameStr.Contains(TEXT("Turn")) || AnimNameStr.Contains(TEXT("turn")) || AnimNameStr.Contains(TEXT("TIP")))
+		{
+			// Reaction: Allow instant interruption if the player actually starts moving
+			if (Speed2D <= TurnInPlaceMaxSpeed && !bHasAcceleration && !bIsFalling)
+			{
+				bWantTurnInPlace = true;
+			}
+		}
+	}
+
+	ShouldTurnInPlace = bWantTurnInPlace;
 	ShouldSpinTransition =
 		bIsMovingNow &&
 		bHasAcceleration &&
@@ -290,6 +325,9 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	{
 		MovementDirection_Recent |= static_cast<uint8>(PreviousDirection);
 	}
+
+	// Update DesiredControllerYawLastUpdate to actual camera desired yaw for MM trajectory prediction
+	DesiredControllerYawLastUpdate = DesiredYaw;
 
 	bool bUsedBlueprintTrajectory = false;
 	if (const FObjectPropertyBase* CharacterTrajectoryProperty = FindFProperty<FObjectPropertyBase>(Character->GetClass(), TEXT("CharacterTrajectory")))

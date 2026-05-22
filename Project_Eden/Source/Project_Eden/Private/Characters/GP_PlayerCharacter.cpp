@@ -1,8 +1,10 @@
 #include "Characters/GP_PlayerCharacter.h"
 #include "Animation/AnimInstance.h"
+#include "Animation/GP_CharacterAnimInstance.h"
 #include "Animation/AnimMontage.h"
 #include "Animation/AnimSequenceBase.h"
 #include "Animation/BlendSpace.h"
+#include "Animation/AnimTypes.h"
 #include "Animation/PDA_CharacterAnimationSet.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -15,13 +17,13 @@
 
 AGP_PlayerCharacter::AGP_PlayerCharacter()
 {
-	PrimaryActorTick.bCanEverTick = false;
-	PrimaryActorTick.bStartWithTickEnabled = false;
+	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bStartWithTickEnabled = true;
 
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
 
 	bUseControllerRotationPitch = false;
-	bUseControllerRotationYaw = true;
+	bUseControllerRotationYaw = false;
 	bUseControllerRotationRoll = false;
 
 	GetCharacterMovement()->bOrientRotationToMovement = false;
@@ -71,7 +73,69 @@ void AGP_PlayerCharacter::BeginPlay()
 void AGP_PlayerCharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-	
+
+	// 1. 소스 메시의 루트 모션 소비 (메시 이탈 방지를 위해 매 틱 무조건 Consume)
+	FRotator RootMotionDeltaRot = FRotator::ZeroRotator;
+	if (UEFNSourceMesh && UEFNSourceMesh->IsPlayingRootMotion())
+	{
+		FRootMotionMovementParams RootMotion = UEFNSourceMesh->ConsumeRootMotion();
+		if (RootMotion.bHasRootMotion)
+		{
+			RootMotionDeltaRot = RootMotion.GetRootMotionTransform().GetRotation().Rotator();
+		}
+	}
+
+	const float SpeedSq = GetVelocity().SizeSquared2D();
+	const bool bIsStatic = SpeedSq < 225.f; // Speed < 15.f
+
+	if (bIsStatic)
+	{
+		// AnimInstance 상태 확인
+		const UGP_CharacterAnimInstance* AnimInst = Cast<UGP_CharacterAnimInstance>(UEFNSourceMesh->GetAnimInstance());
+		const bool bInTurnInPlace = AnimInst && AnimInst->GetShouldTurnInPlace();
+
+		if (bInTurnInPlace)
+		{
+			// 1. 제자리 회전(Turn In Place) 상태인 동안은 애니메이션 발 디딤 싱크를 위해 
+			//    순수하게 애니메이션의 루트 모션 회전량(RootMotionDeltaRot)을 월드 회전에 누적 적용합니다.
+			if (!RootMotionDeltaRot.IsZero())
+			{
+				AddActorWorldRotation(RootMotionDeltaRot);
+			}
+
+			// 2. 후반부 카메라 정면 원샷 스냅 정렬 (One-shot Snap to Camera)
+			//    턴이 진행되는 0.4초 동안은 오직 순수 루트 모션만으로 발을 디뎌 돌게 만들어 미끄러짐을 완전히 제거하고,
+			//    회전이 거의 마무리되는 후반부(0.4초 이후) 시점에만 고속 회전(InterpSpeed = 12.0f)을 적용해
+			//    카메라 정면 방향(Control Rotation Yaw)을 향해 1:1로 한 번에 시원하고 칼같이 밀착 정렬을 마칩니다.
+			if (AnimInst && AnimInst->GetTimeSinceTurnInPlaceStarted() > 0.4f)
+			{
+				if (const AController* PC = GetController())
+				{
+					const float TargetYaw = PC->GetControlRotation().Yaw;
+					const float CurrentYaw = GetActorRotation().Yaw;
+
+					const float NewYaw = FMath::RInterpTo(
+						FRotator(0.f, CurrentYaw, 0.f), 
+						FRotator(0.f, TargetYaw, 0.f), 
+						DeltaSeconds, 
+						12.0f
+					).Yaw;
+
+					SetActorRotation(FRotator(0.f, NewYaw, 0.f));
+				}
+			}
+		}
+		else
+		{
+			// 3. 제자리 대기(Idle) 중이며 턴인플레이스가 구동되지 않을 때는 액터 강제 회전을 100% OFF 합니다!
+			//    마우스를 미세하게 돌리는 시점에서는 액터를 절대 물리적으로 돌리지 않고 각도를 완벽 고정하여,
+			//    슬라이딩이나 발 끌림 현상(Foot Slippage)을 단 1픽셀도 허용하지 않고 지면에 완벽 접지시킵니다.
+			if (!RootMotionDeltaRot.IsZero())
+			{
+				AddActorWorldRotation(RootMotionDeltaRot);
+			}
+		}
+	}
 }
 
 void AGP_PlayerCharacter::Landed(const FHitResult& Hit)
@@ -328,18 +392,13 @@ UAnimSequenceBase* AGP_PlayerCharacter::GetJumpLoopAnimation() const { return An
 
 void AGP_PlayerCharacter::OnSprintingTagChanged(const FGameplayTag CallbackTag, int32 NewCount)
 {
-	// ASC 델리게이트를 통해 Sprint 태그 개수가 변동될 때만 한 번씩 속도를 조절
-	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
-	{
-		RefreshCurrentMaxWalkSpeed();
-	}
+	// PlayerController smooths MaxWalkSpeed toward the sprint/non-sprint target.
 }
 
 void AGP_PlayerCharacter::OnFixedTagChanged(const FGameplayTag CallbackTag, int32 NewCount)
 {
 	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
 	{
-		// Fixed 태그가 있으면(공격 중 등) 이동 방향으로의 자동 회전을 끕니다.
 		MoveComp->bOrientRotationToMovement = false;
 		MoveComp->bUseControllerDesiredRotation = false;
 	}

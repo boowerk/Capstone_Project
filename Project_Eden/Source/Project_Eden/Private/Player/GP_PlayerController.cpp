@@ -64,6 +64,9 @@ void AGP_PlayerController::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
+	UpdateMovementSpeed(DeltaSeconds);
+	UpdateCharacterRotation(DeltaSeconds);
+
 	BossRefreshAccumulator += DeltaSeconds;
 	if (BossRefreshAccumulator >= BossRefreshInterval)
 	{
@@ -118,20 +121,27 @@ void AGP_PlayerController::Input_Move(const FInputActionValue& Value)
 
 	const FVector2D MovementVector = Value.Get<FVector2D>().GetClampedToMaxSize(1.f);
 	CurrentMoveInput = MovementVector;
-	
+
+	AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetPawn());
+	const bool bFixed = PlayerCharacter &&
+		PlayerCharacter->GetAbilitySystemComponent() &&
+		PlayerCharacter->GetAbilitySystemComponent()->HasMatchingGameplayTag(GPTags::State::Status::Fixed);
+	if (UCharacterMovementComponent* MoveComp = PlayerCharacter ? PlayerCharacter->GetCharacterMovement() : nullptr)
+	{
+		MoveComp->bOrientRotationToMovement = false;
+		MoveComp->bUseControllerDesiredRotation = !MovementVector.IsNearlyZero() && !bFixed;
+	}
+
 	if (MovementVector.IsNearlyZero()) return;
-	
+
 	const FRotator YawRotation(0.f, GetControlRotation().Yaw, 0.f);
 	const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
 	const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
-	AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetPawn());
 	const bool bSprinting = PlayerCharacter && PlayerCharacter->IsSprinting();
 	if (PlayerCharacter)
 	{
-		if (UCharacterMovementComponent* MoveComp = PlayerCharacter->GetCharacterMovement())
-		{
-			MoveComp->MaxWalkSpeed = PlayerCharacter->ResolveDirectionalMoveSpeed(MovementVector, bSprinting);
-		}
+		TargetMaxWalkSpeed = PlayerCharacter->ResolveDirectionalMoveSpeed(MovementVector, bSprinting);
+		bHasTargetMaxWalkSpeed = true;
 	}
 
 	GetPawn()->AddMovementInput(ForwardDirection, MovementVector.Y);
@@ -311,6 +321,37 @@ void AGP_PlayerController::RefreshBossHUD()
 	HUDWidget->SetBossVisible(true);
 }
 
+void AGP_PlayerController::UpdateMovementSpeed(float DeltaSeconds)
+{
+	AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetPawn());
+	if (!PlayerCharacter)
+	{
+		bHasTargetMaxWalkSpeed = false;
+		return;
+	}
+
+	const bool bSprinting = PlayerCharacter->IsSprinting();
+	if (CurrentMoveInput.IsNearlyZero())
+	{
+		TargetMaxWalkSpeed = bSprinting ? PlayerCharacter->GetScaledSprintSpeed() : PlayerCharacter->GetScaledNormalWalkSpeed();
+		bHasTargetMaxWalkSpeed = true;
+	}
+	else if (!bHasTargetMaxWalkSpeed)
+	{
+		TargetMaxWalkSpeed = PlayerCharacter->ResolveDirectionalMoveSpeed(CurrentMoveInput, bSprinting);
+		bHasTargetMaxWalkSpeed = true;
+	}
+
+	if (UCharacterMovementComponent* MoveComp = PlayerCharacter->GetCharacterMovement())
+	{
+		MoveComp->MaxWalkSpeed = FMath::FInterpConstantTo(
+			MoveComp->MaxWalkSpeed,
+			TargetMaxWalkSpeed,
+			DeltaSeconds,
+			MaxWalkSpeedInterpSpeed);
+	}
+}
+
 void AGP_PlayerController::Input_TestToggleSkill()
 {
 	Server_TestToggleSkill();
@@ -368,4 +409,38 @@ void AGP_PlayerController::Server_TestToggleSkill_Implementation()
 		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Orange, TEXT("Skills Unequipped!"));
 		UE_LOG(LogTemp, Warning, TEXT("Server: WaterPuddle unequipped from Slot 1 & 2"));
 	}
+}
+
+void AGP_PlayerController::UpdateCharacterRotation(float DeltaSeconds)
+{
+	AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetPawn());
+	if (!PlayerCharacter)
+	{
+		return;
+	}
+
+	UCharacterMovementComponent* MoveComp = PlayerCharacter->GetCharacterMovement();
+	if (!MoveComp)
+	{
+		return;
+	}
+
+	const bool bFixed = PlayerCharacter->GetAbilitySystemComponent() &&
+		PlayerCharacter->GetAbilitySystemComponent()->HasMatchingGameplayTag(GPTags::State::Status::Fixed);
+
+	if (bFixed)
+	{
+		MoveComp->bUseControllerDesiredRotation = false;
+		return;
+	}
+
+	// 1. 이동 중일 때 (컨트롤러 원하는 각도 즉시 추종)
+	if (!CurrentMoveInput.IsNearlyZero())
+	{
+		MoveComp->bUseControllerDesiredRotation = true;
+		return;
+	}
+
+	// 2. 제자리(Idle)일 때
+	MoveComp->bUseControllerDesiredRotation = false; // 제자리에서는 고정하여 루트 모션 회전 허용
 }

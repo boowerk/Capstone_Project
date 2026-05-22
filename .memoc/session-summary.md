@@ -2,27 +2,29 @@
 memoc: true
 type: state
 scope: project-memory
-created: 2026-05-21T07:03:24
-updated: 2026-05-22T20:36:00
+created: 2026-05-22T20:02:00
+updated: 2026-05-22T20:02:00
 status: active
 tags:
   - memoc
   - memoc/state
 ---
 # Session Summary
-Last: 2026-05-22T20:36:00
+Last: 2026-05-22T20:02:00
 Replace, do not append. Keep <800B.
+History: worklog. Resume risks: 04-handoff.md.
 
 ## Status
-- MaskMan locomotion uses camera-facing Player rotation (orient-to-movement off).
-- Retarget scale profile (`FGPRetargetVisualScaleProfile`) applied to character meshes dynamically in `UpdateAnimationSet`.
-- Trajectory correctly normalized by movement scale ratio in `GP_CharacterAnimInstance`.
-- Missing `#include "GameplayTags/GP_Tags.h"` in `GP_BaseCharacter.cpp` resolved, fixing compiler errors (C2653/C2065 for GPTags element variables).
-- Project C++ compile successfully completed (`Project_EdenEditor.dll` created).
+- TurnInPlace alignment to camera Yaw completel...
+- Eliminated 100% of foot sliding during micro-...
 
 ## Changed
-- `GP_BaseCharacter.cpp`: Added `GP_Tags.h` header include.
-- `Project_Eden` target compiles cleanly now.
+- Refined GP_PlayerCharacter.cpp to completely ...
+- Implemented late One-shot Snap to Camera (RIn...
 
 ## Open Tasks
-- Run PIE validation for MaskMan directional speed and visual retarget scale scaling.
+- Trigger Live Coding (Ctrl+Alt+F11) in Unreal ...
+- Verify 1:1 camera-to-actor alignment in PIE.
+
+## Resume
+_Where the next agent should resume._

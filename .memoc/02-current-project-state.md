@@ -11,7 +11,7 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-05-20T18:25:00
+Last synced: 2026-05-23T00:00:00
 
 ## Current Status
 
@@ -24,7 +24,8 @@ Last synced: 2026-05-20T18:25:00
 - `GP_CharacterAnimInstance` tracks previous-frame locomotion context (`MovementMode_LastFrame`, `Gait_LastFrame`, `LastLocalVelocityDirection`, `LastVerticalVelocity`) so the stock UEFN chooser tables can be restored against named inputs instead of new ad-hoc branches.
 - `ABP_UEFNSource_Player` still keeps the enum-blend fallback graph, but chooser-driven DB selection is being moved into a new custom root chooser for MaskMan.
 - `/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/ChooserTables/CHT_MM_MaskMan_Root` is being authored with embedded `Idle`, `Run`, `Sprint`, and `InAir` nested choosers. `Walk` is intentionally omitted for now because MaskMan's default locomotion speed (`500`) should already use run-family PSDs.
-- `BP_GP_PlayerCharacter` now uses camera-facing/back-view movement: `bUseControllerRotationYaw=true`, `bOrientRotationToMovement=false`, and controller desired rotation is disabled.
+- `BP_GP_PlayerCharacter` now uses semi-fixed GameAnimationSample Strafe/Aim-style rotation: `bUseControllerRotationYaw=false`, `bOrientRotationToMovement=false`, and controller desired rotation is enabled only while movement input is active and not Fixed. Idle keeps actor yaw fixed so yaw delta can drive Turn In Place.
+- `GP_PlayerController` smooths directional/sprint `MaxWalkSpeed` changes through `MaxWalkSpeedInterpSpeed` instead of snapping immediately, giving motion matching more time to select start/stop/pivot/TIP transitions.
 - Actual movement speed now scales by input direction in `GP_PlayerController::Input_Move`; controller defaults are forward `500`, side `350`, back `300`, sprint forward `700`, sprint side/back `350/300`.
 - Character source body-size ratio can drive movement speed through `PDA_CharacterAnimationSet.MovementSpeedProfile.MovementSpeedScaleRatio` (default `1`). This is manual authoring data relative to the mannequin at scale 1, not the runtime mesh component scale. Runtime max speeds multiply by this ratio; `UGP_CharacterAnimInstance.Speed2D` divides actual speed by the ratio so chooser thresholds stay in mannequin scale-1 space.
 - Directional movement speed data is now owned by `PDA_CharacterAnimationSet.MovementSpeedProfile` and copied into `AGP_PlayerCharacter` on begin play.
@@ -33,7 +34,7 @@ Last synced: 2026-05-20T18:25:00
 ## Project Snapshot
 
 <!-- memoc:snapshot:start -->
-- Last synced: 2026-05-22T08:22:23
+- Last synced: 2026-05-22T20:02:00
 - Detected stack: Not detected
 
 ### Source Directories
