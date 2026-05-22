@@ -86,6 +86,10 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Animation|Retarget", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USkeletalMeshComponent> UEFNSourceMesh;
+
+public:
+	virtual void UpdateAnimationSet() override;
+
 protected:
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Combat|LockOn")
@@ -124,6 +128,7 @@ protected:
 	void OnSprintingTagChanged(const FGameplayTag CallbackTag, int32 NewCount);
 	void OnFixedTagChanged(const FGameplayTag CallbackTag, int32 NewCount);
 	void ApplyMovementSpeedFromAnimationSet();
+	void ApplyRetargetVisualScaleFromAnimationSet();
 	void RefreshCurrentMaxWalkSpeed();
 	const FGPDirectionalMovementSpeedProfile& GetActiveMovementSpeedProfile() const;
 	

@@ -83,6 +83,33 @@ ESourceMotionMatchState ResolveMotionMatchState(E_MovementMode MovementMode, E_M
 
 	return ESourceMotionMatchState::Walk;
 }
+
+void NormalizeTrajectoryForMovementScale(FTransformTrajectory& Trajectory, float MovementScaleRatio)
+{
+	if (FMath::IsNearlyEqual(MovementScaleRatio, 1.f) || Trajectory.Samples.IsEmpty())
+	{
+		return;
+	}
+
+	const float SafeScaleRatio = FMath::Max(MovementScaleRatio, 0.01f);
+	int32 CurrentSampleIndex = 0;
+	float ClosestTimeToCurrent = TNumericLimits<float>::Max();
+	for (int32 SampleIndex = 0; SampleIndex < Trajectory.Samples.Num(); ++SampleIndex)
+	{
+		const float TimeDistance = FMath::Abs(Trajectory.Samples[SampleIndex].TimeInSeconds);
+		if (TimeDistance < ClosestTimeToCurrent)
+		{
+			ClosestTimeToCurrent = TimeDistance;
+			CurrentSampleIndex = SampleIndex;
+		}
+	}
+
+	const FVector CurrentPosition = Trajectory.Samples[CurrentSampleIndex].Position;
+	for (FTransformTrajectorySample& Sample : Trajectory.Samples)
+	{
+		Sample.Position = CurrentPosition + ((Sample.Position - CurrentPosition) / SafeScaleRatio);
+	}
+}
 }
 
 UGP_CharacterAnimInstance::UGP_CharacterAnimInstance()
@@ -139,7 +166,7 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	const FVector WorldVelocity = Character->GetVelocity();
 	const FVector WorldAcceleration = MovementComponent->GetCurrentAcceleration();
 	const AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(Character);
-	const float MovementSpeedScaleRatio = PlayerCharacter ? PlayerCharacter->GetMovementSpeedScaleRatio() : 1.0f;
+	MovementSpeedScaleRatio = PlayerCharacter ? PlayerCharacter->GetMovementSpeedScaleRatio() : 1.0f;
 	GroundSpeed = WorldVelocity.Size2D();
 	Speed2D = GroundSpeed / MovementSpeedScaleRatio;
 	LocalVelocityDirection = Character->GetActorTransform().InverseTransformVectorNoScale(WorldVelocity).GetSafeNormal2D();
@@ -274,6 +301,7 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 				if (const FTransformTrajectory* ComponentTrajectory = TrajectoryProperty->ContainerPtrToValuePtr<FTransformTrajectory>(CharacterTrajectoryComponent))
 				{
 					GeneratedTrajectory = *ComponentTrajectory;
+					NormalizeTrajectoryForMovementScale(GeneratedTrajectory, MovementSpeedScaleRatio);
 					bUsedBlueprintTrajectory = true;
 				}
 			}
@@ -295,6 +323,7 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 			TrajectoryPredictionSamplingInterval,
 			TrajectoryPredictionCount);
 		GeneratedTrajectory = MoveTemp(UpdatedTrajectory);
+		NormalizeTrajectoryForMovementScale(GeneratedTrajectory, MovementSpeedScaleRatio);
 	}
 
 	if (PoseSearchChooser)
@@ -368,8 +397,10 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 			? (MotionMatchingSelectedAnimName.IsNone() ? TEXT("Null Asset") : MotionMatchingSelectedAnimName.ToString())
 			: TEXT("Invalid Result");
 		const FString DebugText = FString::Printf(
-			TEXT("MM Speed: %.1f \nGait: %s \nState: %s \nTurn:%d \nStop:%d \nPivot:%d \nSpin:%d \nPivotDot: %.2f \nYawRate: %.1f \nIdleT: %.2f \nStopT: %.2f \nPivotT: %.2f \nLandT: %.2f"),
+			TEXT("MM Speed2D: %.1f \nRaw Speed: %.1f \nSpeed Scale: %.2f \nGait: %s \nState: %s \nTurn:%d \nStop:%d \nPivot:%d \nSpin:%d \nPivotDot: %.2f \nYawRate: %.1f \nIdleT: %.2f \nStopT: %.2f \nPivotT: %.2f \nLandT: %.2f"),
+			Speed2D,
 			GroundSpeed,
+			MovementSpeedScaleRatio,
 			*UEnum::GetValueAsString(Gait),
 			*UEnum::GetValueAsString(CurrentMotionMatchState),
 			ShouldTurnInPlace ? 1 : 0,

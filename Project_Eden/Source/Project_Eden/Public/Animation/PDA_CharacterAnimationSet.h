@@ -37,6 +37,22 @@ struct FGPDirectionalMovementSpeedProfile
 	float MovementSpeedScaleRatio = 1.0f;
 };
 
+USTRUCT(BlueprintType)
+struct FGPRetargetVisualScaleProfile
+{
+	GENERATED_BODY()
+
+	// Desired uniform CharacterMesh0 scale in the character/capsule space.
+	// If UEFNSourceMesh is scaled, runtime compensates the child-relative scale.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Retarget", meta = (ClampMin = "0.01"))
+	float CharacterMeshScale = 1.0f;
+
+	// Desired uniform UEFNSourceMesh scale in the character/capsule space.
+	// Keep this separate from MovementSpeedScaleRatio; this is visual/retarget scale only.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Retarget", meta = (ClampMin = "0.01"))
+	float UEFNSourceMeshScale = 1.0f;
+};
+
 UCLASS(BlueprintType)
 class PROJECT_EDEN_API UPDA_CharacterAnimationSet : public UPrimaryDataAsset
 {
@@ -88,4 +104,7 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Movement|Speed")
 	FGPDirectionalMovementSpeedProfile MovementSpeedProfile;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Retarget")
+	FGPRetargetVisualScaleProfile RetargetVisualScaleProfile;
 };

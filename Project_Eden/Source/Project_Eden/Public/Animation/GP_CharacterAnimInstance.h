@@ -128,6 +128,9 @@ protected:
 	UPROPERTY(BlueprintReadOnly, Category = "Chooser")
 	float Speed2D = 0.f;
 
+	UPROPERTY(BlueprintReadOnly, Category = "Chooser")
+	float MovementSpeedScaleRatio = 1.f;
+
 	// Root chooser compatibility with the original sample's LOD branch.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Chooser")
 	float MMDatabaseLOD = 2.f;

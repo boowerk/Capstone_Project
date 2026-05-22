@@ -53,7 +53,8 @@ Last synced: 2026-05-20T18:25:00
 
 ## Completed Tasks
 
-See `.memoc/worklog/` for full shared activity history.
+- Resolved missing include `#include "GameplayTags/GP_Tags.h"` in `GP_BaseCharacter.cpp`, fixing compiler errors (C2653/C2065 for GPTags element variables) and verified clean compile of Project C++.
+- See `.memoc/worklog/` for full shared activity history.
 
 ## Commands
 

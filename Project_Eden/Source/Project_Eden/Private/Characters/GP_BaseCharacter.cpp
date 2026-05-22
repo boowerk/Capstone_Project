@@ -1,4 +1,4 @@
-﻿#include "Characters/GP_BaseCharacter.h"
+#include "Characters/GP_BaseCharacter.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystem/GP_AttributeSet.h"
 #include "Items/WeaponItemTypes.h"
@@ -6,6 +6,7 @@
 #include "Animation/PDA_CharacterAnimationSet.h"
 #include "Animation/GP_CharacterAnimInstance.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "GameplayTags/GP_Tags.h"
 
 AGP_BaseCharacter::AGP_BaseCharacter()
 {

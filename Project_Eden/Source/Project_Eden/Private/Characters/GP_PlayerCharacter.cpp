@@ -65,6 +65,7 @@ void AGP_PlayerCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 	ApplyMovementSpeedFromAnimationSet();
+	ApplyRetargetVisualScaleFromAnimationSet();
 }
 
 void AGP_PlayerCharacter::Tick(float DeltaSeconds)
@@ -279,6 +280,33 @@ void AGP_PlayerCharacter::RefreshCurrentMaxWalkSpeed()
 const FGPDirectionalMovementSpeedProfile& AGP_PlayerCharacter::GetActiveMovementSpeedProfile() const
 {
 	return bOverrideMovementSpeedProfile ? MovementSpeedProfileOverride : MovementSpeedProfile;
+}
+
+void AGP_PlayerCharacter::UpdateAnimationSet()
+{
+	Super::UpdateAnimationSet();
+	ApplyMovementSpeedFromAnimationSet();
+	ApplyRetargetVisualScaleFromAnimationSet();
+}
+
+void AGP_PlayerCharacter::ApplyRetargetVisualScaleFromAnimationSet()
+{
+	if (!AnimationSet)
+	{
+		return;
+	}
+
+	const FGPRetargetVisualScaleProfile& VisualScaleProfile = AnimationSet->RetargetVisualScaleProfile;
+	const float UEFNSourceScale = FMath::Max(VisualScaleProfile.UEFNSourceMeshScale, 0.01f);
+	if (UEFNSourceMesh)
+	{
+		UEFNSourceMesh->SetRelativeScale3D(FVector(UEFNSourceScale));
+	}
+
+	// CharacterMesh0 is attached under UEFNSourceMesh, so compensate the child-relative
+	// value to keep the authored PDA scale independent from the source mesh scale.
+	const float CharacterMeshScale = FMath::Max(VisualScaleProfile.CharacterMeshScale, 0.01f);
+	GetMesh()->SetRelativeScale3D(FVector(CharacterMeshScale / UEFNSourceScale));
 }
 
 bool AGP_PlayerCharacter::TryPerformDash()
