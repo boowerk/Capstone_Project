@@ -10,6 +10,33 @@ class UAnimSequenceBase;
 class UBlendSpace;
 class USkeletalMesh;
 
+USTRUCT(BlueprintType)
+struct FGPDirectionalMovementSpeedProfile
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Movement|Speed", meta = (ClampMin = "0.0"))
+	float NormalForwardSpeed = 500.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Movement|Speed", meta = (ClampMin = "0.0"))
+	float NormalSideSpeed = 350.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Movement|Speed", meta = (ClampMin = "0.0"))
+	float NormalBackSpeed = 300.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Movement|Speed", meta = (ClampMin = "0.0"))
+	float SprintForwardSpeed = 700.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Movement|Speed", meta = (ClampMin = "0.0"))
+	float SprintSideSpeed = 350.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Movement|Speed", meta = (ClampMin = "0.0"))
+	float SprintBackSpeed = 300.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Movement|Speed", meta = (ClampMin = "0.01"))
+	float MovementSpeedScaleRatio = 1.0f;
+};
+
 UCLASS(BlueprintType)
 class PROJECT_EDEN_API UPDA_CharacterAnimationSet : public UPrimaryDataAsset
 {
@@ -58,4 +85,7 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Locomotion")
 	TObjectPtr<UAnimMontage> SprintExitRightMontage;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Movement|Speed")
+	FGPDirectionalMovementSpeedProfile MovementSpeedProfile;
 };

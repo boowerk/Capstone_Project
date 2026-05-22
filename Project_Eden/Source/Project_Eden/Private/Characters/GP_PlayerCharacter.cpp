@@ -31,7 +31,7 @@ AGP_PlayerCharacter::AGP_PlayerCharacter()
 	GetCharacterMovement()->AirControl = 0.2f;
 	
 	// 초기 속도 세팅
-	GetCharacterMovement()->MaxWalkSpeed = NormalWalkSpeed; 
+	GetCharacterMovement()->MaxWalkSpeed = GetScaledNormalWalkSpeed(); 
 	GetCharacterMovement()->MinAnalogWalkSpeed = 20.f;
 	
 	// 물리 제동 마찰력 (추후 블루프린트에서 제어하여 슬라이딩 거리를 조절합니다)
@@ -64,10 +64,7 @@ AGP_PlayerCharacter::AGP_PlayerCharacter()
 void AGP_PlayerCharacter::BeginPlay()
 {
 	Super::BeginPlay();
-	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
-	{
-		MoveComp->MaxWalkSpeed = IsSprinting() ? GetScaledSprintSpeed() : GetScaledNormalWalkSpeed();
-	}
+	ApplyMovementSpeedFromAnimationSet();
 }
 
 void AGP_PlayerCharacter::Tick(float DeltaSeconds)
@@ -195,17 +192,93 @@ bool AGP_PlayerCharacter::IsDashing() const
 
 float AGP_PlayerCharacter::GetMovementSpeedScaleRatio() const
 {
-	return FMath::Max(MovementSpeedScaleRatio, 0.01f);
+	return FMath::Max(GetActiveMovementSpeedProfile().MovementSpeedScaleRatio * GASMovementSpeedScaleRatioMultiplier, 0.01f);
 }
 
 float AGP_PlayerCharacter::GetScaledNormalWalkSpeed() const
 {
-	return NormalWalkSpeed * GetMovementSpeedScaleRatio();
+	return GetActiveMovementSpeedProfile().NormalForwardSpeed * GetMovementSpeedScaleRatio() * FMath::Max(GASMovementSpeedMultiplier, 0.01f);
 }
 
 float AGP_PlayerCharacter::GetScaledSprintSpeed() const
 {
-	return SprintSpeed * GetMovementSpeedScaleRatio();
+	return GetActiveMovementSpeedProfile().SprintForwardSpeed * GetMovementSpeedScaleRatio() * FMath::Max(GASMovementSpeedMultiplier, 0.01f);
+}
+
+float AGP_PlayerCharacter::ResolveDirectionalMoveSpeed(const FVector2D& MoveInput, bool bSprinting) const
+{
+	const FGPDirectionalMovementSpeedProfile& Profile = GetActiveMovementSpeedProfile();
+	const FVector2D Input = MoveInput.GetSafeNormal();
+	const float ForwardAmount = Input.Y;
+	const float AbsForward = FMath::Abs(Input.Y);
+	const float AbsRight = FMath::Abs(Input.X);
+
+	float BaseSpeed = Profile.NormalForwardSpeed;
+	if (FMath::IsNearlyZero(ForwardAmount) && AbsRight > 0.f)
+	{
+		BaseSpeed = bSprinting ? Profile.SprintSideSpeed : Profile.NormalSideSpeed;
+	}
+	else if (ForwardAmount > 0.f)
+	{
+		BaseSpeed = bSprinting ? Profile.SprintForwardSpeed : Profile.NormalForwardSpeed;
+	}
+	else if (AbsRight > AbsForward)
+	{
+		BaseSpeed = bSprinting ? Profile.SprintSideSpeed : Profile.NormalSideSpeed;
+	}
+	else
+	{
+		BaseSpeed = bSprinting ? Profile.SprintBackSpeed : Profile.NormalBackSpeed;
+	}
+
+	return BaseSpeed * GetMovementSpeedScaleRatio() * FMath::Max(GASMovementSpeedMultiplier, 0.01f);
+}
+
+void AGP_PlayerCharacter::SetGASMovementSpeedMultiplier(float NewMultiplier)
+{
+	GASMovementSpeedMultiplier = FMath::Max(NewMultiplier, 0.01f);
+	RefreshCurrentMaxWalkSpeed();
+}
+
+void AGP_PlayerCharacter::SetGASMovementSpeedScaleRatioMultiplier(float NewMultiplier)
+{
+	GASMovementSpeedScaleRatioMultiplier = FMath::Max(NewMultiplier, 0.01f);
+	RefreshCurrentMaxWalkSpeed();
+}
+
+void AGP_PlayerCharacter::SetMovementSpeedProfileOverride(const FGPDirectionalMovementSpeedProfile& NewProfile)
+{
+	MovementSpeedProfileOverride = NewProfile;
+	bOverrideMovementSpeedProfile = true;
+	RefreshCurrentMaxWalkSpeed();
+}
+
+void AGP_PlayerCharacter::ClearMovementSpeedProfileOverride()
+{
+	bOverrideMovementSpeedProfile = false;
+	RefreshCurrentMaxWalkSpeed();
+}
+
+void AGP_PlayerCharacter::ApplyMovementSpeedFromAnimationSet()
+{
+	if (AnimationSet)
+	{
+		MovementSpeedProfile = AnimationSet->MovementSpeedProfile;
+	}
+	RefreshCurrentMaxWalkSpeed();
+}
+
+void AGP_PlayerCharacter::RefreshCurrentMaxWalkSpeed()
+{
+	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+	{
+		MoveComp->MaxWalkSpeed = IsSprinting() ? GetScaledSprintSpeed() : GetScaledNormalWalkSpeed();
+	}
+}
+
+const FGPDirectionalMovementSpeedProfile& AGP_PlayerCharacter::GetActiveMovementSpeedProfile() const
+{
+	return bOverrideMovementSpeedProfile ? MovementSpeedProfileOverride : MovementSpeedProfile;
 }
 
 bool AGP_PlayerCharacter::TryPerformDash()
@@ -230,7 +303,7 @@ void AGP_PlayerCharacter::OnSprintingTagChanged(const FGameplayTag CallbackTag, 
 	// ASC 델리게이트를 통해 Sprint 태그 개수가 변동될 때만 한 번씩 속도를 조절
 	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
 	{
-		MoveComp->MaxWalkSpeed = (NewCount > 0) ? GetScaledSprintSpeed() : GetScaledNormalWalkSpeed();
+		RefreshCurrentMaxWalkSpeed();
 	}
 }
 

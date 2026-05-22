@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Characters/GP_BaseCharacter.h"
+#include "Animation/PDA_CharacterAnimationSet.h"
 #include "AbilitySystemInterface.h"
 #include "GameplayTagContainer.h"
 #include "GP_PlayerCharacter.generated.h"
@@ -46,6 +47,19 @@ public:
 	float GetMovementSpeedScaleRatio() const;
 	float GetScaledNormalWalkSpeed() const;
 	float GetScaledSprintSpeed() const;
+	float ResolveDirectionalMoveSpeed(const FVector2D& MoveInput, bool bSprinting) const;
+
+	UFUNCTION(BlueprintCallable, Category = "Movement|Speed")
+	void SetGASMovementSpeedMultiplier(float NewMultiplier);
+
+	UFUNCTION(BlueprintCallable, Category = "Movement|Speed")
+	void SetGASMovementSpeedScaleRatioMultiplier(float NewMultiplier);
+
+	UFUNCTION(BlueprintCallable, Category = "Movement|Speed")
+	void SetMovementSpeedProfileOverride(const FGPDirectionalMovementSpeedProfile& NewProfile);
+
+	UFUNCTION(BlueprintCallable, Category = "Movement|Speed")
+	void ClearMovementSpeedProfileOverride();
 
 	UPDA_CharacterAnimationSet* GetAnimationSet() const { return AnimationSet; }
 	UBlendSpace* GetLocomotionBlendSpace() const;
@@ -90,19 +104,27 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment|Weapon")
 	FName DefaultWeaponId = TEXT("WP_Common_Fire_Sword");
 	
-	// 이동 속도
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Speed")
-	float NormalWalkSpeed = 500.0f; 
+	FGPDirectionalMovementSpeedProfile MovementSpeedProfile;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Speed")
-	float SprintSpeed = 700.0f;
+	bool bOverrideMovementSpeedProfile = false;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Speed", meta = (ClampMin = "0.01"))
-	float MovementSpeedScaleRatio = 1.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Speed", meta = (EditCondition = "bOverrideMovementSpeedProfile"))
+	FGPDirectionalMovementSpeedProfile MovementSpeedProfileOverride;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Speed|GAS", meta = (ClampMin = "0.01"))
+	float GASMovementSpeedMultiplier = 1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Speed|GAS", meta = (ClampMin = "0.01"))
+	float GASMovementSpeedScaleRatioMultiplier = 1.0f;
 
 	
 	// GAS 태그 이벤트 콜백
 	void OnSprintingTagChanged(const FGameplayTag CallbackTag, int32 NewCount);
 	void OnFixedTagChanged(const FGameplayTag CallbackTag, int32 NewCount);
+	void ApplyMovementSpeedFromAnimationSet();
+	void RefreshCurrentMaxWalkSpeed();
+	const FGPDirectionalMovementSpeedProfile& GetActiveMovementSpeedProfile() const;
 	
 };

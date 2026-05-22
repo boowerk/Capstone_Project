@@ -21,31 +21,6 @@ AGP_PlayerController::AGP_PlayerController()
 	PrimaryActorTick.bStartWithTickEnabled = true;
 }
 
-float AGP_PlayerController::ResolveDirectionalMoveSpeed(const FVector2D& MoveInput, bool bSprinting) const
-{
-	const FVector2D Input = MoveInput.GetSafeNormal();
-	const float ForwardAmount = Input.Y;
-	const float AbsForward = FMath::Abs(Input.Y);
-	const float AbsRight = FMath::Abs(Input.X);
-
-	if (FMath::IsNearlyZero(ForwardAmount) && AbsRight > 0.f)
-	{
-		return bSprinting ? SprintSideMoveSpeed : NormalSideMoveSpeed;
-	}
-
-	if (ForwardAmount > 0.f)
-	{
-		return bSprinting ? SprintForwardMoveSpeed : NormalForwardMoveSpeed;
-	}
-
-	if (AbsRight > AbsForward)
-	{
-		return bSprinting ? SprintSideMoveSpeed : NormalSideMoveSpeed;
-	}
-
-	return bSprinting ? SprintBackMoveSpeed : NormalBackMoveSpeed;
-}
-
 void AGP_PlayerController::BeginPlay()
 {
 	Super::BeginPlay();
@@ -151,13 +126,11 @@ void AGP_PlayerController::Input_Move(const FInputActionValue& Value)
 	const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
 	AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetPawn());
 	const bool bSprinting = PlayerCharacter && PlayerCharacter->IsSprinting();
-	const float SpeedScaleRatio = PlayerCharacter ? PlayerCharacter->GetMovementSpeedScaleRatio() : 1.0f;
-	const float DirectionalSpeed = ResolveDirectionalMoveSpeed(MovementVector, bSprinting) * SpeedScaleRatio;
 	if (PlayerCharacter)
 	{
 		if (UCharacterMovementComponent* MoveComp = PlayerCharacter->GetCharacterMovement())
 		{
-			MoveComp->MaxWalkSpeed = DirectionalSpeed;
+			MoveComp->MaxWalkSpeed = PlayerCharacter->ResolveDirectionalMoveSpeed(MovementVector, bSprinting);
 		}
 	}
 

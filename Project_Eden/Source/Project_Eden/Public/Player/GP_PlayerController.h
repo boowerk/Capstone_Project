@@ -87,26 +87,6 @@ private:
 
 	float BossRefreshAccumulator = 0.0f;
 
-	UPROPERTY(EditAnywhere, Category = "GAS|Input|Movement|Directional Speed")
-	float NormalForwardMoveSpeed = 500.0f;
-
-	UPROPERTY(EditAnywhere, Category = "GAS|Input|Movement|Directional Speed")
-	float NormalSideMoveSpeed = 350.0f;
-
-	UPROPERTY(EditAnywhere, Category = "GAS|Input|Movement|Directional Speed")
-	float NormalBackMoveSpeed = 300.0f;
-
-	UPROPERTY(EditAnywhere, Category = "GAS|Input|Movement|Directional Speed")
-	float SprintForwardMoveSpeed = 700.0f;
-
-	UPROPERTY(EditAnywhere, Category = "GAS|Input|Movement|Directional Speed")
-	float SprintSideMoveSpeed = 350.0f;
-
-	UPROPERTY(EditAnywhere, Category = "GAS|Input|Movement|Directional Speed")
-	float SprintBackMoveSpeed = 300.0f;
-
-	float ResolveDirectionalMoveSpeed(const FVector2D& MoveInput, bool bSprinting) const;
-
 	void Input_Move(const FInputActionValue& Value);
 	void Input_Look(const FInputActionValue& Value);
 	void Input_Jump();
