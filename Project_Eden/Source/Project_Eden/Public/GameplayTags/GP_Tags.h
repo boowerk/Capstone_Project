@@ -172,6 +172,8 @@ namespace GPTags
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(NetTestProjectile);
 
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(SplitShot);
+
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(GroundBurst);
 		}
 		namespace Data
 		{
