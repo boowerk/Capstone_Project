@@ -21,10 +21,11 @@ AGP_PlayerCharacter::AGP_PlayerCharacter()
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
 
 	bUseControllerRotationPitch = false;
-	bUseControllerRotationYaw = false;
+	bUseControllerRotationYaw = true;
 	bUseControllerRotationRoll = false;
 
-	GetCharacterMovement()->bOrientRotationToMovement = true;
+	GetCharacterMovement()->bOrientRotationToMovement = false;
+	GetCharacterMovement()->bUseControllerDesiredRotation = false;
 	GetCharacterMovement()->RotationRate = FRotator(0.0f, 540.0f, 0.0f);
 	GetCharacterMovement()->JumpZVelocity = 500.f;
 	GetCharacterMovement()->AirControl = 0.2f;
@@ -63,6 +64,10 @@ AGP_PlayerCharacter::AGP_PlayerCharacter()
 void AGP_PlayerCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+	{
+		MoveComp->MaxWalkSpeed = IsSprinting() ? GetScaledSprintSpeed() : GetScaledNormalWalkSpeed();
+	}
 }
 
 void AGP_PlayerCharacter::Tick(float DeltaSeconds)
@@ -188,6 +193,21 @@ bool AGP_PlayerCharacter::IsDashing() const
 	return ASC ? ASC->HasMatchingGameplayTag(GPTags::State::Movement::Dash) : false;
 }
 
+float AGP_PlayerCharacter::GetMovementSpeedScaleRatio() const
+{
+	return FMath::Max(MovementSpeedScaleRatio, 0.01f);
+}
+
+float AGP_PlayerCharacter::GetScaledNormalWalkSpeed() const
+{
+	return NormalWalkSpeed * GetMovementSpeedScaleRatio();
+}
+
+float AGP_PlayerCharacter::GetScaledSprintSpeed() const
+{
+	return SprintSpeed * GetMovementSpeedScaleRatio();
+}
+
 bool AGP_PlayerCharacter::TryPerformDash()
 {
 	if (!GetAbilitySystemComponent()) return false;
@@ -210,7 +230,7 @@ void AGP_PlayerCharacter::OnSprintingTagChanged(const FGameplayTag CallbackTag, 
 	// ASC 델리게이트를 통해 Sprint 태그 개수가 변동될 때만 한 번씩 속도를 조절
 	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
 	{
-		MoveComp->MaxWalkSpeed = (NewCount > 0) ? SprintSpeed : NormalWalkSpeed;
+		MoveComp->MaxWalkSpeed = (NewCount > 0) ? GetScaledSprintSpeed() : GetScaledNormalWalkSpeed();
 	}
 }
 
@@ -219,7 +239,8 @@ void AGP_PlayerCharacter::OnFixedTagChanged(const FGameplayTag CallbackTag, int3
 	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
 	{
 		// Fixed 태그가 있으면(공격 중 등) 이동 방향으로의 자동 회전을 끕니다.
-		MoveComp->bOrientRotationToMovement = (NewCount == 0);
+		MoveComp->bOrientRotationToMovement = false;
+		MoveComp->bUseControllerDesiredRotation = false;
 	}
 }
 

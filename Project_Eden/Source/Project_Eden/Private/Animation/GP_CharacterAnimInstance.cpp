@@ -1,5 +1,6 @@
 #include "Animation/GP_CharacterAnimInstance.h"
 #include "CharacterTrajectoryComponent.h"
+#include "Characters/GP_PlayerCharacter.h"
 #include "ChooserFunctionLibrary.h"
 #include "Engine/Engine.h"
 #include "GameFramework/Character.h"
@@ -9,7 +10,8 @@
 
 namespace
 {
-const TCHAR* DefaultPoseSearchChooserPath = TEXT("/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/ChooserTables/CHT_MM_MaskMan_Root.CHT_MM_MaskMan_Root");
+const TCHAR* DefaultPoseSearchChooserPath = TEXT("/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/ChooserTables/CHT_MM_MaskMan_Root_OriginalStyle.CHT_MM_MaskMan_Root_OriginalStyle");
+const TCHAR* DeprecatedPoseSearchChooserName = TEXT("CHT_MM_MaskMan_Root.");
 
 E_MovementDirection ResolveMovementDirection(const FVector& LocalVelocityDirection)
 {
@@ -98,7 +100,7 @@ void UGP_CharacterAnimInstance::NativeInitializeAnimation()
 		MovementComponent = Character->GetCharacterMovement();
 	}
 
-	if (!PoseSearchChooser)
+	if (!PoseSearchChooser || PoseSearchChooser->GetPathName().Contains(DeprecatedPoseSearchChooserName))
 	{
 		PoseSearchChooser = LoadObject<UChooserTable>(nullptr, DefaultPoseSearchChooserPath);
 	}
@@ -124,7 +126,7 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		SprintStopAnimation = AnimationSet->SprintStopAnimation;
 	}
 
-	if (!PoseSearchChooser)
+	if (!PoseSearchChooser || PoseSearchChooser->GetPathName().Contains(DeprecatedPoseSearchChooserName))
 	{
 		PoseSearchChooser = LoadObject<UChooserTable>(nullptr, DefaultPoseSearchChooserPath);
 	}
@@ -135,18 +137,22 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	}
 
 	const FVector WorldVelocity = Character->GetVelocity();
+	const FVector WorldAcceleration = MovementComponent->GetCurrentAcceleration();
+	const AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(Character);
+	const float MovementSpeedScaleRatio = PlayerCharacter ? PlayerCharacter->GetMovementSpeedScaleRatio() : 1.0f;
 	GroundSpeed = WorldVelocity.Size2D();
-	Speed2D = GroundSpeed;
+	Speed2D = GroundSpeed / MovementSpeedScaleRatio;
 	LocalVelocityDirection = Character->GetActorTransform().InverseTransformVectorNoScale(WorldVelocity).GetSafeNormal2D();
 	const FVector LocalAccelerationDirection =
-		Character->GetActorTransform().InverseTransformVectorNoScale(MovementComponent->GetCurrentAcceleration()).GetSafeNormal2D();
+		Character->GetActorTransform().InverseTransformVectorNoScale(WorldAcceleration).GetSafeNormal2D();
 
-	bHasAcceleration = MovementComponent->GetCurrentAcceleration().SizeSquared2D() > KINDA_SMALL_NUMBER;
+	bHasAcceleration = WorldAcceleration.SizeSquared2D() > KINDA_SMALL_NUMBER;
 	bIsFalling = MovementComponent->IsFalling();
 	bIsAnyMontagePlaying = Montage_IsPlaying(nullptr);
-	const float CurrentMaxSpeed = MovementComponent->GetMaxSpeed();
-	bIsSprinting = CurrentMaxSpeed >= SprintSpeedThreshold || GroundSpeed >= SprintSpeedThreshold;
-	const bool bIsMovingNow = GroundSpeed > IdleSpeedThreshold;
+	MMDatabaseLOD = static_cast<float>(static_cast<uint8>(MMDatabaseLODEnum));
+	const float CurrentMaxSpeed = MovementComponent->GetMaxSpeed() / MovementSpeedScaleRatio;
+	bIsSprinting = CurrentMaxSpeed >= SprintSpeedThreshold || Speed2D >= SprintSpeedThreshold;
+	const bool bIsMovingNow = Speed2D > IdleSpeedThreshold;
 	const bool bWasFallingLastFrame = MovementMode == E_MovementMode::InAir;
 	const E_MovementDirection PreviousDirection = MovementDirection;
 
@@ -175,6 +181,14 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	MovementState = bIsMovingNow ? E_MovementState::Moving : E_MovementState::Idle;
 	Gait = ResolveGait(bIsMovingNow, bIsSprinting);
 	MovementDirection = ResolveMovementDirection(LocalVelocityDirection);
+	if (bIsFalling && FMath::Abs(GetWorld()->GetGravityZ()) > UE_SMALL_NUMBER)
+	{
+		TimeToLand = FMath::Max(0.f, -Character->GetVelocity().Z / FMath::Abs(GetWorld()->GetGravityZ()));
+	}
+	else
+	{
+		TimeToLand = 0.f;
+	}
 
 	// Detect movement start for Chooser to select Start animations
 	IsStarting = !bWasMovingLastFrame && bIsMovingNow && bHasAcceleration;
@@ -187,41 +201,52 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	const bool bHoldStopState = !bHasAcceleration && !bIsFalling && TimeSinceStopStarted <= StopHoldDuration;
 	IsStopping = bStopTriggeredThisFrame || bHoldStopState;
 
-	const FVector LastDirection = LastLocalAccelerationDirection.GetSafeNormal2D();
-	const FVector CurrentDirection = LocalAccelerationDirection.GetSafeNormal2D();
-	const float DirectionDot =
-		(!LastDirection.IsNearlyZero() && !CurrentDirection.IsNearlyZero())
-			? FVector::DotProduct(LastDirection, CurrentDirection)
+	const float CurrentYaw = Character->GetActorRotation().Yaw;
+	const float DesiredYaw = Character->GetControlRotation().Yaw;
+	const float YawDelta = FMath::Abs(FMath::FindDeltaAngleDegrees(CurrentYaw, DesiredYaw));
+	const float YawRate = DeltaSeconds > UE_SMALL_NUMBER
+		? FMath::Abs(FMath::FindDeltaAngleDegrees(LastActorYaw, CurrentYaw)) / DeltaSeconds
+		: 0.f;
+	const float PivotDirectionDot =
+		(!LocalVelocityDirection.IsNearlyZero() && !LocalAccelerationDirection.IsNearlyZero())
+			? FVector::DotProduct(LocalVelocityDirection, LocalAccelerationDirection)
 			: 1.f;
 	const bool bPivotTriggeredThisFrame =
 		bIsMovingNow &&
 		bHasAcceleration &&
-		GroundSpeed >= WalkSpeedThreshold &&
-		DirectionDot < PivotDirectionDotThreshold;
+		Speed2D >= WalkSpeedThreshold &&
+		PivotDirectionDot < PivotDirectionDotThreshold;
 	if (bPivotTriggeredThisFrame)
 	{
 		TimeSincePivotStarted = 0.f;
 	}
 
-	const bool bHoldPivotState =
+	const bool bCanContinuePivot =
 		bIsMovingNow &&
 		bHasAcceleration &&
-		GroundSpeed >= WalkSpeedThreshold &&
+		Speed2D >= WalkSpeedThreshold &&
+		PivotDirectionDot < PivotExitDirectionDotThreshold;
+
+	const bool bHoldPivotState =
+		bCanContinuePivot &&
 		TimeSincePivotStarted <= PivotHoldDuration;
 
-	IsPivoting = bPivotTriggeredThisFrame || bHoldPivotState;
+	IsPivoting = bPivotTriggeredThisFrame || (IsPivoting && bCanContinuePivot) || bHoldPivotState;
 
-	const float CurrentYaw = Character->GetActorRotation().Yaw;
-	const float DesiredYaw = Character->GetControlRotation().Yaw;
-	const float YawDelta = FMath::Abs(FMath::FindDeltaAngleDegrees(CurrentYaw, DesiredYaw));
 	ShouldTurnInPlace =
 		!bIsFalling &&
-		GroundSpeed <= TurnInPlaceMaxSpeed &&
+		Speed2D <= TurnInPlaceMaxSpeed &&
 		!bHasAcceleration &&
 		TimeSinceMovementStopped >= TurnInPlaceMinIdleTime &&
 		TimeSinceLastLanded > LandedSignalDuration &&
 		YawDelta > TurnInPlaceYawThreshold;
-	ShouldSpinTransition = false;
+	ShouldSpinTransition =
+		bIsMovingNow &&
+		bHasAcceleration &&
+		Speed2D >= RunSpeedThreshold &&
+		!IsStopping &&
+		!IsPivoting &&
+		YawRate >= MovingTurnYawRateThreshold;
 
 	JustTraversed = false;
 	if (bWasFallingLastFrame && !bIsFalling)
@@ -295,17 +320,17 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		CurrentMotionMatchState = ESourceMotionMatchState::Idle;
 		RuntimePoseSearchDatabase = IdlePoseSearchDatabase;
 	}
-	else if ((GroundSpeed > WalkSpeedThreshold || bRecentlyStartedMoving) && RunPoseSearchDatabase)
+	else if ((Speed2D > WalkSpeedThreshold || bRecentlyStartedMoving) && RunPoseSearchDatabase)
 	{
 		CurrentMotionMatchState = ESourceMotionMatchState::Run;
 		RuntimePoseSearchDatabase = RunPoseSearchDatabase;
 	}
-	else if (GroundSpeed <= WalkSpeedThreshold && WalkPoseSearchDatabase)
+	else if (Speed2D <= WalkSpeedThreshold && WalkPoseSearchDatabase)
 	{
 		CurrentMotionMatchState = ESourceMotionMatchState::Walk;
 		RuntimePoseSearchDatabase = WalkPoseSearchDatabase;
 	}
-	else if (GroundSpeed <= RunSpeedThreshold && RunPoseSearchDatabase)
+	else if (Speed2D <= RunSpeedThreshold && RunPoseSearchDatabase)
 	{
 		CurrentMotionMatchState = ESourceMotionMatchState::Run;
 		RuntimePoseSearchDatabase = RunPoseSearchDatabase;
@@ -333,8 +358,8 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 
 	bWasMovingLastFrame = bIsMovingNow;
 	LastLocalVelocityDirection = LocalVelocityDirection;
-	LastLocalAccelerationDirection = LocalAccelerationDirection;
 	LastVerticalVelocity = WorldVelocity.Z;
+	LastActorYaw = CurrentYaw;
 
 #if !UE_BUILD_SHIPPING
 	if (GEngine)
@@ -343,14 +368,16 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 			? (MotionMatchingSelectedAnimName.IsNone() ? TEXT("Null Asset") : MotionMatchingSelectedAnimName.ToString())
 			: TEXT("Invalid Result");
 		const FString DebugText = FString::Printf(
-			TEXT("MM Speed: %.1f \nGait: %s \nState: %s \nTurn:%d \nStop:%d \nPivot:%d \nDirDot: %.2f \nIdleT: %.2f \nStopT: %.2f \nPivotT: %.2f \nLandT: %.2f"),
+			TEXT("MM Speed: %.1f \nGait: %s \nState: %s \nTurn:%d \nStop:%d \nPivot:%d \nSpin:%d \nPivotDot: %.2f \nYawRate: %.1f \nIdleT: %.2f \nStopT: %.2f \nPivotT: %.2f \nLandT: %.2f"),
 			GroundSpeed,
 			*UEnum::GetValueAsString(Gait),
 			*UEnum::GetValueAsString(CurrentMotionMatchState),
 			ShouldTurnInPlace ? 1 : 0,
 			IsStopping ? 1 : 0,
 			IsPivoting ? 1 : 0,
-			DirectionDot,
+			ShouldSpinTransition ? 1 : 0,
+			PivotDirectionDot,
+			YawRate,
 			TimeSinceMovementStopped,
 			TimeSinceStopStarted,
 			TimeSincePivotStarted,

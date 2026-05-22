@@ -30,6 +30,14 @@ enum class ESourceMotionMatchState : uint8
 };
 
 UENUM(BlueprintType)
+enum class EMMDatabaseLOD : uint8
+{
+	Dense = 0,
+	Sparse = 1,
+	ExtremeSparse = 2
+};
+
+UENUM(BlueprintType)
 enum class E_MovementMode : uint8
 {
 	Grounded = 0,
@@ -120,6 +128,13 @@ protected:
 	UPROPERTY(BlueprintReadOnly, Category = "Chooser")
 	float Speed2D = 0.f;
 
+	// Root chooser compatibility with the original sample's LOD branch.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Chooser")
+	float MMDatabaseLOD = 2.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Chooser")
+	EMMDatabaseLOD MMDatabaseLODEnum = EMMDatabaseLOD::ExtremeSparse;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Locomotion")
 	FVector LocalVelocityDirection;
 
@@ -183,6 +198,10 @@ protected:
 	UPROPERTY(BlueprintReadOnly, Category = "Chooser")
 	bool ShouldTurnInPlace = false;
 
+	// Original chooser uses TimeToLand in the InAir branch.
+	UPROPERTY(BlueprintReadOnly, Category = "Chooser")
+	float TimeToLand = 0.f;
+
 	UPROPERTY(BlueprintReadOnly, Category = "MotionMatching")
 	FTransformTrajectory GeneratedTrajectory;
 
@@ -241,10 +260,10 @@ protected:
 	float IdleSpeedThreshold = 10.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MotionMatching|Databases", meta = (ClampMin = "0.0"))
-	float WalkSpeedThreshold = 100.f;
+	float WalkSpeedThreshold = 200.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MotionMatching|Databases", meta = (ClampMin = "0.0"))
-	float RunSpeedThreshold = 360.f;
+	float RunSpeedThreshold = 300.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MotionMatching|Databases", meta = (ClampMin = "0.0"))
 	float SprintSpeedThreshold = 650.f;
@@ -260,6 +279,12 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MotionMatching|State", meta = (ClampMin = "-1.0", ClampMax = "1.0"))
 	float PivotDirectionDotThreshold = 0.45f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MotionMatching|State", meta = (ClampMin = "-1.0", ClampMax = "1.0"))
+	float PivotExitDirectionDotThreshold = 0.8f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MotionMatching|State", meta = (ClampMin = "0.0"))
+	float MovingTurnYawRateThreshold = 90.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MotionMatching|State", meta = (ClampMin = "0.0"))
 	float TurnInPlaceMinIdleTime = 0.2f;
@@ -298,10 +323,10 @@ protected:
 	FVector LastLocalVelocityDirection = FVector::ZeroVector;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Chooser|State")
-	FVector LastLocalAccelerationDirection = FVector::ZeroVector;
+	float LastVerticalVelocity = 0.f;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Chooser|State")
-	float LastVerticalVelocity = 0.f;
+	float LastActorYaw = 0.f;
 
 	void ApplyChosenDatabase(UPoseSearchDatabase* SelectedDatabase);
 };

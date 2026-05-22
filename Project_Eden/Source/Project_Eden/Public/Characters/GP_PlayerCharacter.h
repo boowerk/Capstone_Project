@@ -43,6 +43,10 @@ public:
 	bool TryPerformDash();
 	bool IsDashing() const;
 
+	float GetMovementSpeedScaleRatio() const;
+	float GetScaledNormalWalkSpeed() const;
+	float GetScaledSprintSpeed() const;
+
 	UPDA_CharacterAnimationSet* GetAnimationSet() const { return AnimationSet; }
 	UBlendSpace* GetLocomotionBlendSpace() const;
 	UAnimSequenceBase* GetJumpLoopAnimation() const;
@@ -88,10 +92,13 @@ protected:
 	
 	// 이동 속도
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Speed")
-	float NormalWalkSpeed = 375.0f; 
+	float NormalWalkSpeed = 500.0f; 
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Speed")
-	float SprintSpeed = 600.0f;
+	float SprintSpeed = 700.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Speed", meta = (ClampMin = "0.01"))
+	float MovementSpeedScaleRatio = 1.0f;
 
 	
 	// GAS 태그 이벤트 콜백

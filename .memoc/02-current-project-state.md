@@ -24,11 +24,14 @@ Last synced: 2026-05-20T18:25:00
 - `GP_CharacterAnimInstance` tracks previous-frame locomotion context (`MovementMode_LastFrame`, `Gait_LastFrame`, `LastLocalVelocityDirection`, `LastVerticalVelocity`) so the stock UEFN chooser tables can be restored against named inputs instead of new ad-hoc branches.
 - `ABP_UEFNSource_Player` still keeps the enum-blend fallback graph, but chooser-driven DB selection is being moved into a new custom root chooser for MaskMan.
 - `/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/ChooserTables/CHT_MM_MaskMan_Root` is being authored with embedded `Idle`, `Run`, `Sprint`, and `InAir` nested choosers. `Walk` is intentionally omitted for now because MaskMan's default locomotion speed (`500`) should already use run-family PSDs.
+- `BP_GP_PlayerCharacter` now uses camera-facing/back-view movement: `bUseControllerRotationYaw=true`, `bOrientRotationToMovement=false`, and controller desired rotation is disabled.
+- Actual movement speed now scales by input direction in `GP_PlayerController::Input_Move`; controller defaults are forward `500`, side `350`, back `300`, sprint forward `700`, sprint side/back `350/300`.
+- Character body scale can now drive movement speed through `BP_GP_PlayerCharacter.MovementSpeedScaleRatio` (default `1`). Runtime max speeds multiply by this ratio; `UGP_CharacterAnimInstance.Speed2D` divides actual speed by the ratio so chooser thresholds stay in mannequin scale-1 space.
 
 ## Project Snapshot
 
 <!-- memoc:snapshot:start -->
-- Last synced: 2026-05-21T10:55:44
+- Last synced: 2026-05-22T08:22:23
 - Detected stack: Not detected
 
 ### Source Directories
@@ -67,6 +70,7 @@ See `.memoc/worklog/` for full shared activity history.
 - New custom chooser authoring started under `/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/ChooserTables/`; `Idle`, `Run`, `Sprint`, and `InAir` nested chooser rows were seeded from the stock relaxed chooser layout, but tuned around MaskMan's run-first locomotion (`500 -> Run`, `700 -> Sprint`).
 - Runtime default chooser load path now points at `ChooserTables/CHT_MM_MaskMan_Root`, and sprint classification was split out with `SprintSpeedThreshold = 650` so base movement speed `500` stays in the run family.
 - Temporary `bUse*MotionMatch` helper flags were removed from `GP_CharacterAnimInstance`.
+- Animation threshold tuning is separate from real movement speed. For directional movement speed bugs, check `GP_PlayerController` first, not only `GP_CharacterAnimInstance`.
 - `ABP_UEFNSource_Player` CDO defaults:
   - `IdlePoseSearchDatabase = PSD_Relaxed_Stand_Idles`
   - `WalkPoseSearchDatabase = PSD_Relaxed_Stand_Walk_Loops`

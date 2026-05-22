@@ -9,6 +9,7 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "GameFramework/Character.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "GameplayTags/GP_Tags.h"
 #include "Kismet/GameplayStatics.h"
 #include "Logging/LogMacros.h"
@@ -18,6 +19,31 @@ AGP_PlayerController::AGP_PlayerController()
 {
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.bStartWithTickEnabled = true;
+}
+
+float AGP_PlayerController::ResolveDirectionalMoveSpeed(const FVector2D& MoveInput, bool bSprinting) const
+{
+	const FVector2D Input = MoveInput.GetSafeNormal();
+	const float ForwardAmount = Input.Y;
+	const float AbsForward = FMath::Abs(Input.Y);
+	const float AbsRight = FMath::Abs(Input.X);
+
+	if (FMath::IsNearlyZero(ForwardAmount) && AbsRight > 0.f)
+	{
+		return bSprinting ? SprintSideMoveSpeed : NormalSideMoveSpeed;
+	}
+
+	if (ForwardAmount > 0.f)
+	{
+		return bSprinting ? SprintForwardMoveSpeed : NormalForwardMoveSpeed;
+	}
+
+	if (AbsRight > AbsForward)
+	{
+		return bSprinting ? SprintSideMoveSpeed : NormalSideMoveSpeed;
+	}
+
+	return bSprinting ? SprintBackMoveSpeed : NormalBackMoveSpeed;
 }
 
 void AGP_PlayerController::BeginPlay()
@@ -115,7 +141,7 @@ void AGP_PlayerController::Input_Move(const FInputActionValue& Value)
 {
 	if (!IsValid(GetPawn())) return;
 
-	const FVector2D MovementVector = Value.Get<FVector2D>();
+	const FVector2D MovementVector = Value.Get<FVector2D>().GetClampedToMaxSize(1.f);
 	CurrentMoveInput = MovementVector;
 	
 	if (MovementVector.IsNearlyZero()) return;
@@ -123,6 +149,17 @@ void AGP_PlayerController::Input_Move(const FInputActionValue& Value)
 	const FRotator YawRotation(0.f, GetControlRotation().Yaw, 0.f);
 	const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
 	const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
+	AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetPawn());
+	const bool bSprinting = PlayerCharacter && PlayerCharacter->IsSprinting();
+	const float SpeedScaleRatio = PlayerCharacter ? PlayerCharacter->GetMovementSpeedScaleRatio() : 1.0f;
+	const float DirectionalSpeed = ResolveDirectionalMoveSpeed(MovementVector, bSprinting) * SpeedScaleRatio;
+	if (PlayerCharacter)
+	{
+		if (UCharacterMovementComponent* MoveComp = PlayerCharacter->GetCharacterMovement())
+		{
+			MoveComp->MaxWalkSpeed = DirectionalSpeed;
+		}
+	}
 
 	GetPawn()->AddMovementInput(ForwardDirection, MovementVector.Y);
 	GetPawn()->AddMovementInput(RightDirection, MovementVector.X);

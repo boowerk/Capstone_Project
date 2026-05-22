@@ -10,22 +10,23 @@ tags:
   - memoc/state
 ---
 # Session Summary
-Last: 2026-05-21T07:03:24
+Last: 2026-05-22T17:31:00
 Replace, do not append. Keep <800B.
 History: worklog. Resume risks: 04-handoff.md.
 
 ## Status
-- Runtime retarget path still uses UEFNSourceMe...
-- BP_GP_PlayerCharacter has a Blueprint Charact...
+- MaskMan locomotion now uses camera-facing player rotation: controller yaw drives character facing; orient-to-movement is off.
+- Actual directional movement speed scaling moved into `GP_PlayerController::Input_Move`, not just animation thresholds.
+- `BP_GP_PlayerController` CDO defaults: forward 500, side 350, back 300; sprint forward 700, sprint side/back 350/300.
+- `BP_GP_PlayerCharacter` has `MovementSpeedScaleRatio=1`; actual max speed multiplies by it while AnimBP `Speed2D` divides by it for scale-1 chooser logic.
 
 ## Changed
-- Exported /Game/Characters/UEFN_Mannequin/Anim...
-- Added chooser-facing enums and variables to U...
+- `BP_GP_PlayerCharacter` CDO keeps `NormalWalkSpeed=500`, `SprintSpeed=700`, mesh scale 1.
+- Live Coding compile succeeded after the controller directional speed edit.
 
 ## Open Tasks
-- Point runtime chooser evaluation at CHT_MM_Ma...
-- Verify in PIE that Idle / TurnInPlace / Run /...
+- PIE-check actual lateral/back speeds and chooser PSD selection after directional/scaled speed changes.
+- Tune walk-mode separately only if a real walk input/state is added.
 
 ## Resume
-- Start with GP_CharacterAnimInstance.h/.cpp; c...
-- Then finish wiring runtime to /Game/Character...
+- Start with `GP_PlayerController::Input_Move` for real movement speed issues; animation thresholds alone are not enough.
