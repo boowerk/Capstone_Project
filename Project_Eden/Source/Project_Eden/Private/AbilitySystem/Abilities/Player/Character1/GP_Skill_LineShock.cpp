@@ -1,8 +1,6 @@
 #include "AbilitySystem/Abilities/Player/Character1/GP_Skill_LineShock.h"
 
 #include "AbilitySystemComponent.h"
-#include "AbilitySystem/Abilities/GP_SkillData.h"
-#include "GameFramework/Actor.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/Controller.h"
 #include "GameplayTags/GP_Tags.h"
@@ -32,11 +30,7 @@ void UGP_Skill_LineShock::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 
 	if (HasAuthority(&ActivationInfo))
 	{
-		UGP_SkillData* SkillData = nullptr;
-		if (const FGameplayAbilitySpec* Spec = ASC->FindAbilitySpecFromHandle(Handle))
-		{
-			SkillData = Cast<UGP_SkillData>(Spec->SourceObject.Get());
-		}
+		UGP_SkillData* SkillData = GetSkillDataFromSpec(Handle, ActorInfo);
 
 		FRotator AimRotation = Avatar->GetActorRotation();
 		if (AController* Controller = Avatar->GetController())
@@ -54,20 +48,7 @@ void UGP_Skill_LineShock::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 			+ FVector::UpVector * HeightOffset;
 		const FVector BoxExtent(Range * 0.5f, Width * 0.5f, Height * 0.5f);
 
-		if (ShockVisualActorClass)
-		{
-			FActorSpawnParameters SpawnParams;
-			SpawnParams.Owner = Avatar;
-			SpawnParams.Instigator = Avatar;
-			SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-
-			Avatar->GetWorld()->SpawnActor<AActor>(
-				ShockVisualActorClass,
-				BoxCenter,
-				AimRotation,
-				SpawnParams
-			);
-		}
+		SpawnVisualActor(Avatar, ShockVisualActorClass, BoxCenter, AimRotation);
 
 		const TArray<AActor*> HitActors = UGP_BlueprintLibrary::BoxOverlapActorsAtLocation(
 			Avatar,
@@ -78,15 +59,7 @@ void UGP_Skill_LineShock::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 			bDrawDebugs
 		);
 
-		if (DamageEffectClass)
-		{
-			UGP_BlueprintLibrary::ApplyGameplayEffectToActors(Avatar, HitActors, DamageEffectClass, GetAbilityLevel(), SkillData);
-		}
-
-		if (HitEventTag.IsValid())
-		{
-			UGP_BlueprintLibrary::SendGameplayEventToActors(Avatar, HitActors, HitEventTag);
-		}
+		UGP_BlueprintLibrary::ApplyGameplayEffectAndEventToActors(Avatar, HitActors, DamageEffectClass, HitEventTag, GetAbilityLevel(), SkillData);
 	}
 
 	EndAbility(Handle, ActorInfo, ActivationInfo, true, false);

@@ -3,6 +3,8 @@
 #include "AbilitySystem/Abilities/GP_SkillData.h"
 #include "GameplayEffect.h"
 #include "GameplayTags/GP_Tags.h"
+#include "GameFramework/Actor.h"
+#include "GameFramework/Pawn.h"
 #include "Utils/GP_BlueprintLibrary.h"
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 
@@ -88,7 +90,7 @@ void UGP_SkillBase::ApplyCooldown(const FGameplayAbilitySpecHandle Handle, const
 	ApplyGameplayEffectSpecToOwner(Handle, ActorInfo, ActivationInfo, SpecHandle);
 }
 
-const UGP_SkillData* UGP_SkillBase::GetSkillDataFromSpec(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo) const
+UGP_SkillData* UGP_SkillBase::GetSkillDataFromSpec(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo) const
 {
 	UAbilitySystemComponent* ASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
 	if (!ASC)
@@ -98,6 +100,26 @@ const UGP_SkillData* UGP_SkillBase::GetSkillDataFromSpec(const FGameplayAbilityS
 
 	const FGameplayAbilitySpec* Spec = ASC->FindAbilitySpecFromHandle(Handle);
 	return Spec ? Cast<UGP_SkillData>(Spec->SourceObject.Get()) : nullptr;
+}
+
+void UGP_SkillBase::SpawnVisualActor(AActor* InstigatorActor, TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation) const
+{
+	if (!IsValid(InstigatorActor) || !VisualActorClass || !InstigatorActor->GetWorld())
+	{
+		return;
+	}
+
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.Owner = InstigatorActor;
+	SpawnParams.Instigator = Cast<APawn>(InstigatorActor);
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+	InstigatorActor->GetWorld()->SpawnActor<AActor>(
+		VisualActorClass,
+		Location,
+		Rotation,
+		SpawnParams
+	);
 }
 
 void UGP_SkillBase::PerformAreaAttack()

@@ -1,7 +1,6 @@
 #include "AbilitySystem/Abilities/Player/Character1/GP_Skill_ThrownBurst.h"
 
 #include "AbilitySystemComponent.h"
-#include "AbilitySystem/Abilities/GP_SkillData.h"
 #include "Actors/GP_AreaProjectile.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/Controller.h"
@@ -57,10 +56,7 @@ void UGP_Skill_ThrownBurst::ActivateAbility(const FGameplayAbilitySpecHandle Han
 
 		if (Projectile)
 		{
-			if (const FGameplayAbilitySpec* Spec = ASC->FindAbilitySpecFromHandle(Handle))
-			{
-				Projectile->SetSkillData(Cast<UGP_SkillData>(Spec->SourceObject.Get()));
-			}
+			Projectile->SetSkillData(GetSkillDataFromSpec(Handle, ActorInfo));
 		}
 	}
 

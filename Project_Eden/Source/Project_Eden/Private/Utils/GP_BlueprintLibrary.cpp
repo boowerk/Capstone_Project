@@ -216,6 +216,19 @@ void UGP_BlueprintLibrary::ApplyGameplayEffectToActors(AActor* Instigator, const
 	}
 }
 
+void UGP_BlueprintLibrary::ApplyGameplayEffectAndEventToActors(AActor* Instigator, const TArray<AActor*>& TargetActors, TSubclassOf<UGameplayEffect> EffectClass, FGameplayTag EventTag, float EffectLevel, UGP_SkillData* SkillData)
+{
+	if (EffectClass)
+	{
+		ApplyGameplayEffectToActors(Instigator, TargetActors, EffectClass, EffectLevel, SkillData);
+	}
+
+	if (EventTag.IsValid())
+	{
+		SendGameplayEventToActors(Instigator, TargetActors, EventTag);
+	}
+}
+
 void UGP_BlueprintLibrary::ApplyAreaGameplayEffectAtLocation(AActor* Instigator, const FVector& Location, float Radius, TSubclassOf<UGameplayEffect> EffectClass, float EffectLevel, UGP_SkillData* SkillData, bool bDrawDebug)
 {
 	if (!IsValid(Instigator) || !IsValid(EffectClass)) return;

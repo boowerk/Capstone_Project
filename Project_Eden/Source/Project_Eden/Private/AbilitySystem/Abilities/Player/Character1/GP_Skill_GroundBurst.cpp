@@ -1,8 +1,6 @@
 #include "AbilitySystem/Abilities/Player/Character1/GP_Skill_GroundBurst.h"
 
 #include "AbilitySystemComponent.h"
-#include "AbilitySystem/Abilities/GP_SkillData.h"
-#include "GameFramework/Actor.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/Controller.h"
 #include "GameplayTags/GP_Tags.h"
@@ -32,11 +30,7 @@ void UGP_Skill_GroundBurst::ActivateAbility(const FGameplayAbilitySpecHandle Han
 
 	if (HasAuthority(&ActivationInfo))
 	{
-		UGP_SkillData* SkillData = nullptr;
-		if (const FGameplayAbilitySpec* Spec = ASC->FindAbilitySpecFromHandle(Handle))
-		{
-			SkillData = Cast<UGP_SkillData>(Spec->SourceObject.Get());
-		}
+		UGP_SkillData* SkillData = GetSkillDataFromSpec(Handle, ActorInfo);
 
 		FRotator AimRotation = Avatar->GetActorRotation();
 		if (AController* Controller = Avatar->GetController())
@@ -64,21 +58,7 @@ void UGP_Skill_GroundBurst::ActivateAbility(const FGameplayAbilitySpecHandle Han
 		);
 
 		const FVector BurstLocation = bHitGround ? HitResult.Location : TargetLocation;
-
-		if (BurstVisualActorClass)
-		{
-			FActorSpawnParameters SpawnParams;
-			SpawnParams.Owner = Avatar;
-			SpawnParams.Instigator = Avatar;
-			SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-
-			Avatar->GetWorld()->SpawnActor<AActor>(
-				BurstVisualActorClass,
-				BurstLocation,
-				FRotator::ZeroRotator,
-				SpawnParams
-			);
-		}
+		SpawnVisualActor(Avatar, BurstVisualActorClass, BurstLocation);
 
 		const TArray<AActor*> HitActors = UGP_BlueprintLibrary::SphereOverlapActorsAtLocation(
 			Avatar,
@@ -88,15 +68,7 @@ void UGP_Skill_GroundBurst::ActivateAbility(const FGameplayAbilitySpecHandle Han
 			bDrawDebugs
 		);
 
-		if (DamageEffectClass)
-		{
-			UGP_BlueprintLibrary::ApplyGameplayEffectToActors(Avatar, HitActors, DamageEffectClass, GetAbilityLevel(), SkillData);
-		}
-
-		if (HitEventTag.IsValid())
-		{
-			UGP_BlueprintLibrary::SendGameplayEventToActors(Avatar, HitActors, HitEventTag);
-		}
+		UGP_BlueprintLibrary::ApplyGameplayEffectAndEventToActors(Avatar, HitActors, DamageEffectClass, HitEventTag, GetAbilityLevel(), SkillData);
 	}
 
 	EndAbility(Handle, ActorInfo, ActivationInfo, true, false);

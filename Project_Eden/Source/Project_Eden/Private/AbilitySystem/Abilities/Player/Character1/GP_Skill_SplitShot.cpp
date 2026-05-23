@@ -1,7 +1,6 @@
 #include "AbilitySystem/Abilities/Player/Character1/GP_Skill_SplitShot.h"
 
 #include "AbilitySystemComponent.h"
-#include "AbilitySystem/Abilities/GP_SkillData.h"
 #include "Actors/GP_Projectile.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/Controller.h"
@@ -30,11 +29,7 @@ void UGP_Skill_SplitShot::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 
 	if (HasAuthority(&ActivationInfo) && ProjectileClass)
 	{
-		UGP_SkillData* SkillData = nullptr;
-		if (const FGameplayAbilitySpec* Spec = ASC->FindAbilitySpecFromHandle(Handle))
-		{
-			SkillData = Cast<UGP_SkillData>(Spec->SourceObject.Get());
-		}
+		UGP_SkillData* SkillData = GetSkillDataFromSpec(Handle, ActorInfo);
 
 		FRotator AimRotation = Avatar->GetActorRotation();
 

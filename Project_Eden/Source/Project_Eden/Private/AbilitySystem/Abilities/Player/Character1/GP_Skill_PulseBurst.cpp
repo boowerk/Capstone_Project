@@ -1,8 +1,6 @@
 #include "AbilitySystem/Abilities/Player/Character1/GP_Skill_PulseBurst.h"
 
 #include "AbilitySystemComponent.h"
-#include "AbilitySystem/Abilities/GP_SkillData.h"
-#include "GameFramework/Actor.h"
 #include "GameFramework/Character.h"
 #include "GameplayTags/GP_Tags.h"
 #include "Utils/GP_BlueprintLibrary.h"
@@ -31,28 +29,10 @@ void UGP_Skill_PulseBurst::ActivateAbility(const FGameplayAbilitySpecHandle Hand
 
 	if (HasAuthority(&ActivationInfo))
 	{
-		UGP_SkillData* SkillData = nullptr;
-		if (const FGameplayAbilitySpec* Spec = ASC->FindAbilitySpecFromHandle(Handle))
-		{
-			SkillData = Cast<UGP_SkillData>(Spec->SourceObject.Get());
-		}
+		UGP_SkillData* SkillData = GetSkillDataFromSpec(Handle, ActorInfo);
 
 		const FVector BurstLocation = Avatar->GetActorLocation();
-
-		if (BurstVisualActorClass)
-		{
-			FActorSpawnParameters SpawnParams;
-			SpawnParams.Owner = Avatar;
-			SpawnParams.Instigator = Avatar;
-			SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-
-			Avatar->GetWorld()->SpawnActor<AActor>(
-				BurstVisualActorClass,
-				BurstLocation,
-				FRotator::ZeroRotator,
-				SpawnParams
-			);
-		}
+		SpawnVisualActor(Avatar, BurstVisualActorClass, BurstLocation);
 
 		const TArray<AActor*> HitActors = UGP_BlueprintLibrary::SphereOverlapActorsAtLocation(
 			Avatar,
@@ -62,15 +42,7 @@ void UGP_Skill_PulseBurst::ActivateAbility(const FGameplayAbilitySpecHandle Hand
 			bDrawDebugs
 		);
 
-		if (DamageEffectClass)
-		{
-			UGP_BlueprintLibrary::ApplyGameplayEffectToActors(Avatar, HitActors, DamageEffectClass, GetAbilityLevel(), SkillData);
-		}
-
-		if (HitEventTag.IsValid())
-		{
-			UGP_BlueprintLibrary::SendGameplayEventToActors(Avatar, HitActors, HitEventTag);
-		}
+		UGP_BlueprintLibrary::ApplyGameplayEffectAndEventToActors(Avatar, HitActors, DamageEffectClass, HitEventTag, GetAbilityLevel(), SkillData);
 	}
 
 	EndAbility(Handle, ActorInfo, ActivationInfo, true, false);

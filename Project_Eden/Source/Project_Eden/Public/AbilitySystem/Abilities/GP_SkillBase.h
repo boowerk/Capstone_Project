@@ -4,6 +4,7 @@
 #include "AbilitySystem/Abilities/GP_GameplayAbility.h"
 #include "GP_SkillBase.generated.h"
 
+class AActor;
 class UGP_SkillData;
 
 /**
@@ -47,9 +48,11 @@ protected:
 	UFUNCTION(BlueprintCallable, Category = "GAS|Skill|Mechanics")
 	void PerformAreaAttack();
 
+	void SpawnVisualActor(AActor* InstigatorActor, TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation = FRotator::ZeroRotator) const;
+
 	// 어빌리티 종료 시 호출할 정리 함수
 	UFUNCTION()
 	void OnMontageEnded(UAnimMontage* Montage, bool bInterrupted);
 
-	const UGP_SkillData* GetSkillDataFromSpec(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo) const;
+	UGP_SkillData* GetSkillDataFromSpec(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo) const;
 };

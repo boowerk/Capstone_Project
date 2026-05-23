@@ -4,7 +4,6 @@
 #include "AbilitySystem/Abilities/Player/Character1/GP_Skill_NetTestProjectile.h"
 
 #include "AbilitySystemComponent.h"
-#include "AbilitySystem/Abilities/GP_SkillData.h"
 #include "Actors/GP_Projectile.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/Character.h"
@@ -62,10 +61,7 @@ void UGP_Skill_NetTestProjectile::ActivateAbility(const FGameplayAbilitySpecHand
 
 		if (Projectile)
 		{
-			if (const FGameplayAbilitySpec* Spec = ASC->FindAbilitySpecFromHandle(Handle))
-			{
-				Projectile->SetSkillData(Cast<UGP_SkillData>(Spec->SourceObject.Get()));
-			}
+			Projectile->SetSkillData(GetSkillDataFromSpec(Handle, ActorInfo));
 		}
 	}
 
