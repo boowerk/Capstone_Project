@@ -116,6 +116,59 @@ TArray<AActor*> UGP_BlueprintLibrary::SphereOverlapActorsAtLocation(UObject* Wor
 	return ActorsHit;
 }
 
+TArray<AActor*> UGP_BlueprintLibrary::BoxOverlapActorsAtLocation(UObject* WorldContextObject, const FVector& Location, const FVector& BoxExtent, const FRotator& Rotation, AActor* ActorToIgnore, bool bDrawDebug)
+{
+	TArray<AActor*> ActorsHit;
+	if (!IsValid(WorldContextObject)) return ActorsHit;
+
+	UWorld* World = WorldContextObject->GetWorld();
+	if (!IsValid(World)) return ActorsHit;
+
+	TArray<AActor*> ActorsToIgnore;
+	if (IsValid(ActorToIgnore))
+	{
+		ActorsToIgnore.Add(ActorToIgnore);
+	}
+
+	FCollisionQueryParams CollisionQueryParams;
+	CollisionQueryParams.AddIgnoredActors(ActorsToIgnore);
+
+	FCollisionResponseParams CollisionResponseParams;
+	CollisionResponseParams.CollisionResponse.SetAllChannels(ECR_Ignore);
+	CollisionResponseParams.CollisionResponse.SetResponse(ECC_Pawn, ECR_Block);
+
+	TArray<FOverlapResult> OverlapResults;
+	const FCollisionShape CollisionShapeBox = FCollisionShape::MakeBox(BoxExtent);
+	const FQuat RotationQuat = Rotation.Quaternion();
+
+	World->OverlapMultiByChannel(OverlapResults, Location, RotationQuat,
+		ECC_Visibility, CollisionShapeBox, CollisionQueryParams, CollisionResponseParams);
+
+	for (const FOverlapResult& Result : OverlapResults)
+	{
+		if (AActor* HitActor = Result.GetActor())
+		{
+			ActorsHit.AddUnique(HitActor);
+		}
+	}
+
+	if (bDrawDebug)
+	{
+		DrawDebugBox(World, Location, BoxExtent, RotationQuat, FColor::Red, false, 3.f);
+		for (const FOverlapResult& Result : OverlapResults)
+		{
+			if (Result.GetActor())
+			{
+				FVector DebugLocation = Result.GetActor()->GetActorLocation();
+				DebugLocation.Z += 100.f;
+				DrawDebugSphere(World, DebugLocation, 30.f, 10, FColor::Green, false, 3.f);
+			}
+		}
+	}
+
+	return ActorsHit;
+}
+
 void UGP_BlueprintLibrary::SendGameplayEventToActors(AActor* Instigator, const TArray<AActor*>& TargetActors, FGameplayTag EventTag)
 {
 	if (!IsValid(Instigator)) return;

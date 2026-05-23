@@ -42,6 +42,10 @@ public:
 	// 지정 위치 기준 구체 피격 검사
 	UFUNCTION(BlueprintCallable, Category = "Eden|Combat", meta = (WorldContext = "WorldContextObject"))
 	static TArray<AActor*> SphereOverlapActorsAtLocation(UObject* WorldContextObject, const FVector& Location, float Radius, AActor* ActorToIgnore, bool bDrawDebug = false);
+
+	// 지정 위치/회전 기준 박스 피격 검사
+	UFUNCTION(BlueprintCallable, Category = "Eden|Combat", meta = (WorldContext = "WorldContextObject"))
+	static TArray<AActor*> BoxOverlapActorsAtLocation(UObject* WorldContextObject, const FVector& Location, const FVector& BoxExtent, const FRotator& Rotation, AActor* ActorToIgnore, bool bDrawDebug = false);
 	
 	
 	// GAS 유틸 
