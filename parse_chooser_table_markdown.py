@@ -203,6 +203,8 @@ def main():
             if not psd_references or psd_references[-1]["psd"] != psd_name or off - psd_references[-1]["offset"] > 8:
                 psd_references.append({"offset": off, "psd": psd_name})
 
+
+
     # 4. 컬럼 전수 스캔 및 행 데이터 복원
     candidate_props = [
         "Gait", "IsPivoting", "IsStarting", "JustLanded_Heavy", "JustLanded_Light",
@@ -341,78 +343,88 @@ def main():
 
     columns.sort(key=lambda x: x["offset"])
 
-    # 5. 서브 테이블 및 PSD 매핑 정의
-    psd_groups = [
-        ["PSD_Dense_Jumps_Far", "PSD_Dense_Stand_Idles", "PSD_Extreme_Sparse_Crouch_Idles", 
-         "PSD_Extreme_Sparse_Crouch_TurnInPlace", "PSD_Extreme_Sparse_Crouch_Walk_Loops", 
-         "PSD_Extreme_Sparse_Crouch_Walk_Pivots", "PSD_Extreme_Sparse_Crouch_Walk_Starts"],
-        ["PSD_Extreme_Sparse_Crouch_Idles", "PSD_Extreme_Sparse_Crouch_TurnInPlace"],
-        ["PSD_Extreme_Sparse_Crouch_Walk_Loops", "PSD_Extreme_Sparse_Crouch_Walk_Starts"],
-        ["PSD_Extreme_Sparse_Crouch_Walk_Starts", "PSD_Extreme_Sparse_Crouch_Walk_Pivots", 
-         "PSD_Extreme_Sparse_Crouch_Walk_Loops", "PSD_Extreme_Sparse_Crouch_Walk_Stops"],
-        ["PSD_Extreme_Sparse_Stand_Run_Starts", "PSD_Extreme_Sparse_Stand_Run_Loops"],
-        ["PSD_Extreme_Sparse_Stand_Sprint_Starts", "PSD_Extreme_Sparse_Stand_Sprint_Loops"],
-        ["PSD_Extreme_Sparse_Stand_Walk_Starts", "PSD_Extreme_Sparse_Stand_Walk_Loops"]
-    ]
 
+
+    # 5. 서브 테이블 및 PSD 매핑 정의 (CHT_MM_MaskMan_Root_OriginalStyle에 완벽 매핑)
     table_definitions = [
         {
             "id": 1,
             "name": "Base Selection Table (Grounded / Base Branch)",
-            "count": 7,
-            "col_offsets": [11796, 13358, 14928, 16488],
+            "count": 5,
+            "col_offsets": [10634, 11924, 13222, 14510],
             "col_names": ["MovementMode", "MovementState (Sub)", "MovementState", "Gait"],
-            "psds": psd_groups[0]
+            "psds": [
+                "Sub-Table #3 (Stand Idle / Turn / Stops)",
+                "Sub-Table #6 (Stand Walk Evaluation Table)",
+                "Sub-Table #4 (Stand Run Evaluation Table)",
+                "Sub-Table #5 (Stand Sprint Starts/Loops/Pivots Table)",
+                "Sub-Table #2 (In-Air (Jumps / Falls) Evaluation Table)"
+            ]
         },
+
         {
             "id": 2,
-            "name": "Crouch Idles / TurnInPlace Table",
+            "name": "In-Air (Jumps / Falls) Evaluation Table",
             "count": 2,
-            "col_offsets": [18607, 19297],
-            "col_names": ["Speed2D", "ShouldTurnInPlace"],
-            "psds": psd_groups[1]
+            "col_offsets": [16361, 17066],
+            "col_names": ["Speed2D", "JustTraversed"],
+            "psds": ["PSD_Dense_Jumps_Far", "PSD_Extreme_Sparse_Jumps"]
         },
         {
             "id": 3,
-            "name": "Crouch Walk (Type A - Basic Speed Check)",
-            "count": 2,
-            "col_offsets": [21006],
-            "col_names": ["Speed2D"],
-            "psds": psd_groups[2]
+            "name": "Stand Idle / TurnInPlace / Stops Table",
+            "count": 6,
+            "col_offsets": [18266, 19438, 19974, 20513],
+            "col_names": ["Speed2D", "JustLanded_Light", "JustLanded_Heavy", "ShouldTurnInPlace"],
+            "psds": [
+                "PSD_Dense_Stand_Idles",
+                "PSD_Sparse_Stand_Walk_Stops",
+                "PSD_Dense_Stand_Run_Stops",
+                "PSD_Dense_Stand_Idle_Lands_Light",
+                "PSD_Dense_Stand_Idle_Lands_Heavy",
+                "PSD_Dense_Stand_TurnInPlace"
+            ]
         },
         {
             "id": 4,
-            "name": "Crouch Walk (Type B - Main Crouch Walk Evaluation)",
+            "name": "Stand Run Evaluation Table",
             "count": 4,
-            "col_offsets": [22483, 23681, 24603, 25105],
-            "col_names": ["Gait", "Speed2D", "JustLanded_Light", "ShouldTurnInPlace"],
-            "psds": psd_groups[3]
+            "col_offsets": [21469, 21983, 22500, 23020, 23540, 24065],
+            "col_names": ["IsStarting", "IsPivoting", "JustTraversed", "JustLanded_Light", "JustLanded_Heavy", "IsStopping"],
+            "psds": [
+                "PSD_Extreme_Sparse_Stand_Run_Starts",
+                "PSD_Dense_Stand_Run_Loops",
+                "PSD_Sparse_Stand_Run_Pivots",
+                "PSD_Dense_Stand_Run_SpinTransition"
+            ]
         },
         {
             "id": 5,
-            "name": "Stand Run Evaluation Table",
-            "count": 2,
-            "col_offsets": [25912, 26884, 27370],
-            "col_names": ["IsStarting", "JustLanded_Light", "JustLanded_Heavy"],
-            "psds": psd_groups[4]
+            "name": "Stand Sprint Starts/Loops/Pivots Table",
+            "count": 3,
+            "col_offsets": [24959, 25465, 25977, 26489],
+            "col_names": ["IsStarting", "IsPivoting", "JustLanded_Light", "JustLanded_Heavy"],
+            "psds": [
+                "PSD_Dense_Stand_Sprint_Starts",
+                "PSD_Dense_Stand_Sprint_Loops",
+                "PSD_Sparse_Stand_Sprint_Pivots"
+            ]
         },
         {
             "id": 6,
-            "name": "Stand Sprint Starts/Loops Table",
-            "count": 2,
-            "col_offsets": [28161],
-            "col_names": ["IsStarting"],
-            "psds": psd_groups[5]
-        },
-        {
-            "id": 7,
-            "name": "Stand Walk Table",
-            "count": 2,
-            "col_offsets": [28952, 29924, 30410, 30896, 31382],
-            "col_names": ["IsStarting", "JustTraversed", "JustLanded_Light", "JustLanded_Heavy", "IsPivoting"],
-            "psds": psd_groups[6]
+            "name": "Stand Walk Evaluation Table",
+            "count": 4,
+            "col_offsets": [27392, 27906, 28423, 28943, 29463, 29988],
+            "col_names": ["IsStarting", "IsPivoting", "JustTraversed", "JustLanded_Light", "JustLanded_Heavy", "IsStopping"],
+            "psds": [
+                "PSD_Extreme_Sparse_Stand_Walk_Starts",
+                "PSD_Extreme_Sparse_Stand_Walk_Loops",
+                "PSD_Sparse_Stand_Walk_Pivots",
+                "PSD_Dense_Stand_Walk_SpinTransition"
+            ]
         }
     ]
+
 
     # 6. 마크다운 빌더
     md = []
