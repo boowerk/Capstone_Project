@@ -1,4 +1,4 @@
-﻿---
+---
 memoc: true
 type: state
 scope: project-memory

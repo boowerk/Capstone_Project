@@ -104,6 +104,8 @@ void AGP_PlayerCharacter::Tick(float DeltaSeconds)
 			AddActorWorldRotation(RootMotionDeltaRot);
 		}
 	}
+
+	UpdateConditionalMaxAcceleration(DeltaSeconds);
 }
 
 void AGP_PlayerCharacter::Landed(const FHitResult& Hit)
@@ -425,4 +427,126 @@ void AGP_PlayerCharacter::EquipSkillByClass(FGameplayTag SlotTag, TSubclassOf<UG
 	NewSpec.GetDynamicSpecSourceTags().AddTag(SlotTag); 
     
 	ASC->GiveAbility(NewSpec);
+}
+
+void AGP_PlayerCharacter::UpdateConditionalMaxAcceleration(float DeltaSeconds)
+{
+	UCharacterMovementComponent* MoveComp = GetCharacterMovement();
+	if (!MoveComp) return;
+
+	if (bIsStartAccelerationClamped)
+	{
+		StartAccelerationClampElapsed += DeltaSeconds;
+
+		if (ShouldReleaseAccelerationClamp())
+		{
+			RestoreNormalMaxAcceleration();
+		}
+		else
+		{
+			MoveComp->MaxAcceleration = StartClampMaxAcceleration;
+		}
+	}
+	else
+	{
+		if (ShouldStartAccelerationClamp())
+		{
+			NormalMaxAcceleration = MoveComp->MaxAcceleration;
+			MoveComp->MaxAcceleration = StartClampMaxAcceleration;
+			bIsStartAccelerationClamped = true;
+			StartAccelerationClampElapsed = 0.0f;
+		}
+	}
+}
+
+bool AGP_PlayerCharacter::ShouldStartAccelerationClamp() const
+{
+	UCharacterMovementComponent* MoveComp = GetCharacterMovement();
+	if (!MoveComp) return false;
+
+	// 1. 지상 상태
+	if (MoveComp->IsFalling()) return false;
+
+	// 2. 정지에 가까운 상태 (수평 속도 < 15.0f)
+	if (GetVelocity().SizeSquared2D() >= 225.0f) return false;
+
+	// 3. 이동 입력 발생 (가속 입력 > 0.0f)
+	if (MoveComp->GetCurrentAcceleration().Size() <= 0.0f) return false;
+
+	// 4. Sprint 아님
+	if (IsSprinting()) return false;
+
+	// 5. Dash 아님
+	if (IsDashing()) return false;
+
+	// 6. LockOn 아님
+	if (bIsLockOn) return false;
+
+	// 7. GAS 태그 예외 필터링 (Aiming, Combat, Fixed 상태 아닐 것)
+	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+	if (ASC)
+	{
+		FGameplayTag AimingTag = FGameplayTag::RequestGameplayTag(FName("State.Movement.Aiming"), false);
+		FGameplayTag CombatTag = FGameplayTag::RequestGameplayTag(FName("State.Status.Combat"), false);
+		FGameplayTag FixedTag = GPTags::State::Status::Fixed;
+
+		if (AimingTag.IsValid() && ASC->HasMatchingGameplayTag(AimingTag)) return false;
+		if (CombatTag.IsValid() && ASC->HasMatchingGameplayTag(CombatTag)) return false;
+		if (FixedTag.IsValid() && ASC->HasMatchingGameplayTag(FixedTag)) return false;
+	}
+
+	return true;
+}
+
+bool AGP_PlayerCharacter::ShouldReleaseAccelerationClamp() const
+{
+	UCharacterMovementComponent* MoveComp = GetCharacterMovement();
+	if (!MoveComp) return true;
+
+	// 1. 공중 상태 진입 (체공)
+	if (MoveComp->IsFalling()) return true;
+
+	// 2. 클램프 타이머 경과 (0.5초 초과)
+	if (StartAccelerationClampElapsed >= StartClampMaxDuration) return true;
+
+	// 3. 임계 속도 돌파 (수평 속도 >= 250.0f)
+	if (GetVelocity().SizeSquared2D() >= (StartClampReleaseSpeed * StartClampReleaseSpeed)) return true;
+
+	// 4. 이동 입력 사라짐
+	if (MoveComp->GetCurrentAcceleration().Size() == 0.0f) return true;
+
+	// 5. Sprint 상태 전환
+	if (IsSprinting()) return true;
+
+	// 6. Dash 상태 전환
+	if (IsDashing()) return true;
+
+	// 7. LockOn 상태 전환
+	if (bIsLockOn) return true;
+
+	// 8. GAS 전투/조준/고정 예외 인터럽트 발생
+	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+	if (ASC)
+	{
+		FGameplayTag AimingTag = FGameplayTag::RequestGameplayTag(FName("State.Movement.Aiming"), false);
+		FGameplayTag CombatTag = FGameplayTag::RequestGameplayTag(FName("State.Status.Combat"), false);
+		FGameplayTag FixedTag = GPTags::State::Status::Fixed;
+
+		if (AimingTag.IsValid() && ASC->HasMatchingGameplayTag(AimingTag)) return true;
+		if (CombatTag.IsValid() && ASC->HasMatchingGameplayTag(CombatTag)) return true;
+		if (FixedTag.IsValid() && ASC->HasMatchingGameplayTag(FixedTag)) return true;
+	}
+
+	return false;
+}
+
+void AGP_PlayerCharacter::RestoreNormalMaxAcceleration()
+{
+	UCharacterMovementComponent* MoveComp = GetCharacterMovement();
+	if (MoveComp)
+	{
+		MoveComp->MaxAcceleration = NormalMaxAcceleration;
+	}
+	bIsStartAccelerationClamped = false;
+	StartAccelerationClampElapsed = 0.0f;
 }

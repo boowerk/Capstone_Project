@@ -38,7 +38,7 @@ Last synced: 2026-05-23T00:00:00
 ## Project Snapshot
 
 <!-- memoc:snapshot:start -->
-- Last synced: 2026-05-22T20:02:00
+- Last synced: 2026-05-23T14:55:55
 - Detected stack: Not detected
 
 ### Source Directories
@@ -58,6 +58,7 @@ Last synced: 2026-05-23T00:00:00
 
 ## Completed Tasks
 
+- Resolved missing declaration `GetActiveMovementSpeedProfile` in `GP_PlayerCharacter.h`, fixing multiple C++ compilation errors and verified successful build.
 - Resolved missing include `#include "GameplayTags/GP_Tags.h"` in `GP_BaseCharacter.cpp`, fixing compiler errors (C2653/C2065 for GPTags element variables) and verified clean compile of Project C++.
 - See `.memoc/worklog/` for full shared activity history.
 

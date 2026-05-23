@@ -2,8 +2,8 @@
 memoc: true
 type: core
 scope: project-memory
-created: 2026-05-21T07:03:24
-updated: 2026-05-21T07:03:24
+created: 2026-05-23T14:55:58
+updated: 2026-05-23T14:55:58
 status: active
 tags:
   - memoc
@@ -11,17 +11,14 @@ tags:
 ---
 # Activity
 
-Shared activity index for memoc work logs.
+Generated shared activity index for memoc work logs.
 
-## How To Use
-
-- Use `memoc work "<title>"` after meaningful work so shared repos get conflict-light per-actor records.
-- Keep this file short; detailed work belongs in [worklog](worklog/README.md).
-- Actor is detected from `MEMOC_ACTOR`, `.memoc/local/actor`, git config, git email, or OS user.
+Last generated: 2026-05-23T14:55:58
 
 ## Recent Work
 
-_None yet._
+- [Resolved missing GetActiveMovementSpeedProfile declaration in GP_PlayerCharacter.h](worklog/lim/2026-05/20260523T1455-resolved-missing-getactivemovementspeedprofile-declaration-in-gp-playercharacter.md) — lim active.
+- [Tune player jump inertia](worklog/lim/2026-05/20260523T0738-tune-player-jump-inertia.md) — lim active.
 
 ## Related
 

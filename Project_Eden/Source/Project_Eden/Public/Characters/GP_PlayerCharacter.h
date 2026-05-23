@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "CoreMinimal.h"
 #include "Characters/GP_BaseCharacter.h"
@@ -48,6 +48,7 @@ public:
 	float GetScaledNormalWalkSpeed() const;
 	float GetScaledSprintSpeed() const;
 	float ResolveDirectionalMoveSpeed(const FVector2D& MoveInput, bool bSprinting) const;
+	const FGPDirectionalMovementSpeedProfile& GetActiveMovementSpeedProfile() const;
 
 	UFUNCTION(BlueprintCallable, Category = "Movement|Speed")
 	void SetGASMovementSpeedMultiplier(float NewMultiplier);
@@ -130,6 +131,30 @@ protected:
 	void ApplyMovementSpeedFromAnimationSet();
 	void ApplyRetargetVisualScaleFromAnimationSet();
 	void RefreshCurrentMaxWalkSpeed();
-	const FGPDirectionalMovementSpeedProfile& GetActiveMovementSpeedProfile() const;
 	
+	// 가속도 가변 제어 튜닝 설정값
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Tuning")
+	float StartClampMaxAcceleration = 500.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Tuning")
+	float StartClampMaxDuration = 0.5f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Tuning")
+	float StartClampReleaseSpeed = 250.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Tuning")
+	bool bDebugStartAccelerationClamp = false;
+
+private:
+	// 런타임 제어 상태 변수
+	bool bIsStartAccelerationClamped = false;
+	float StartAccelerationClampElapsed = 0.0f;
+	float NormalMaxAcceleration = 2048.0f;
+
+protected:
+	void UpdateConditionalMaxAcceleration(float DeltaSeconds);
+	bool ShouldStartAccelerationClamp() const;
+	bool ShouldReleaseAccelerationClamp() const;
+	void RestoreNormalMaxAcceleration();
+
 };
