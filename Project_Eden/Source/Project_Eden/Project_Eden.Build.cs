@@ -10,7 +10,8 @@ public class Project_Eden : ModuleRules
 	
 		PublicDependencyModuleNames.AddRange(new string[] { 
 			"Core", "CoreUObject",
-            "Engine", 
+			"Engine", 
+			"AnimGraphRuntime",
 			"HTTP", 
 			"InputCore", 
 			"EnhancedInput",
@@ -23,6 +24,9 @@ public class Project_Eden : ModuleRules
             "GameplayTags",
             "AIModule",
             "NavigationSystem",
+            "PoseSearch",
+            "MotionTrajectory",
+            "Chooser",
 			"ProceduralMeshComponent",
         });
 
@@ -38,9 +42,12 @@ public class Project_Eden : ModuleRules
 				"UnrealEd",
 				"AssetTools",
 				"AnimGraph",
+				"BlendStackEditor",
 				"BlueprintGraph",
+				"ChooserUncooked",
 				"KismetCompiler",
 				"InputEditor",
+				"PoseSearchEditor",
 			});
 		}
 

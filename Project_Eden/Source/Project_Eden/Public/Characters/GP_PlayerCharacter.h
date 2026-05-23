@@ -1,13 +1,15 @@
-﻿#pragma once
+#pragma once
 
 #include "CoreMinimal.h"
 #include "Characters/GP_BaseCharacter.h"
+#include "Animation/PDA_CharacterAnimationSet.h"
 #include "AbilitySystemInterface.h"
 #include "GameplayTagContainer.h"
 #include "GP_PlayerCharacter.generated.h"
 
 class USpringArmComponent;
 class UCameraComponent;
+class USkeletalMeshComponent;
 class UPDA_WeaponItemCollection;
 class UPDA_CharacterAnimationSet;
 class UAnimSequenceBase;
@@ -42,6 +44,24 @@ public:
 	bool TryPerformDash();
 	bool IsDashing() const;
 
+	float GetMovementSpeedScaleRatio() const;
+	float GetScaledNormalWalkSpeed() const;
+	float GetScaledSprintSpeed() const;
+	float ResolveDirectionalMoveSpeed(const FVector2D& MoveInput, bool bSprinting) const;
+	const FGPDirectionalMovementSpeedProfile& GetActiveMovementSpeedProfile() const;
+
+	UFUNCTION(BlueprintCallable, Category = "Movement|Speed")
+	void SetGASMovementSpeedMultiplier(float NewMultiplier);
+
+	UFUNCTION(BlueprintCallable, Category = "Movement|Speed")
+	void SetGASMovementSpeedScaleRatioMultiplier(float NewMultiplier);
+
+	UFUNCTION(BlueprintCallable, Category = "Movement|Speed")
+	void SetMovementSpeedProfileOverride(const FGPDirectionalMovementSpeedProfile& NewProfile);
+
+	UFUNCTION(BlueprintCallable, Category = "Movement|Speed")
+	void ClearMovementSpeedProfileOverride();
+
 	UPDA_CharacterAnimationSet* GetAnimationSet() const { return AnimationSet; }
 	UBlendSpace* GetLocomotionBlendSpace() const;
 	UAnimSequenceBase* GetJumpLoopAnimation() const;
@@ -64,6 +84,13 @@ private:
 
 	UPROPERTY(VisibleAnywhere, Category = "Camera")
 	TObjectPtr<UCameraComponent> FollowCamera;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Animation|Retarget", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<USkeletalMeshComponent> UEFNSourceMesh;
+
+public:
+	virtual void UpdateAnimationSet() override;
+
 protected:
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Combat|LockOn")
@@ -82,16 +109,52 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment|Weapon")
 	FName DefaultWeaponId = TEXT("WP_Common_Fire_Sword");
 	
-	// 이동 속도
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Speed")
-	float NormalWalkSpeed = 210.0f; 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Speed")
+	FGPDirectionalMovementSpeedProfile MovementSpeedProfile;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Speed")
-	float SprintSpeed = 420.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Speed")
+	bool bOverrideMovementSpeedProfile = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Speed", meta = (EditCondition = "bOverrideMovementSpeedProfile"))
+	FGPDirectionalMovementSpeedProfile MovementSpeedProfileOverride;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Speed|GAS", meta = (ClampMin = "0.01"))
+	float GASMovementSpeedMultiplier = 1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Speed|GAS", meta = (ClampMin = "0.01"))
+	float GASMovementSpeedScaleRatioMultiplier = 1.0f;
 
 	
 	// GAS 태그 이벤트 콜백
 	void OnSprintingTagChanged(const FGameplayTag CallbackTag, int32 NewCount);
 	void OnFixedTagChanged(const FGameplayTag CallbackTag, int32 NewCount);
+	void ApplyMovementSpeedFromAnimationSet();
+	void ApplyRetargetVisualScaleFromAnimationSet();
+	void RefreshCurrentMaxWalkSpeed();
 	
+	// 가속도 가변 제어 튜닝 설정값
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Tuning")
+	float StartClampMaxAcceleration = 500.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Tuning")
+	float StartClampMaxDuration = 0.5f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Tuning")
+	float StartClampReleaseSpeed = 250.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Tuning")
+	bool bDebugStartAccelerationClamp = false;
+
+private:
+	// 런타임 제어 상태 변수
+	bool bIsStartAccelerationClamped = false;
+	float StartAccelerationClampElapsed = 0.0f;
+	float NormalMaxAcceleration = 2048.0f;
+
+protected:
+	void UpdateConditionalMaxAcceleration(float DeltaSeconds);
+	bool ShouldStartAccelerationClamp() const;
+	bool ShouldReleaseAccelerationClamp() const;
+	void RestoreNormalMaxAcceleration();
+
 };

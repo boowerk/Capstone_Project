@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
@@ -87,6 +87,12 @@ private:
 
 	float BossRefreshAccumulator = 0.0f;
 
+	UPROPERTY(EditAnywhere, Category = "Movement|Smoothing", meta = (ClampMin = "0.0"))
+	float MaxWalkSpeedInterpSpeed = 1200.0f;
+
+	float TargetMaxWalkSpeed = 0.0f;
+	bool bHasTargetMaxWalkSpeed = false;
+
 	void Input_Move(const FInputActionValue& Value);
 	void Input_Look(const FInputActionValue& Value);
 	void Input_Jump();
@@ -110,6 +116,8 @@ private:
 
 	bool ActivateAbilityByTag(const FGameplayTag& AbilityTag) const;
 	void RefreshBossHUD();
+	void UpdateMovementSpeed(float DeltaSeconds);
+	void UpdateCharacterRotation(float DeltaSeconds);
 
 	bool bSkillsEquipped = false;
 };

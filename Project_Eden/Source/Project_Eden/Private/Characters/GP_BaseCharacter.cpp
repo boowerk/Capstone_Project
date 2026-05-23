@@ -1,4 +1,4 @@
-﻿#include "Characters/GP_BaseCharacter.h"
+#include "Characters/GP_BaseCharacter.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystem/GP_AttributeSet.h"
 #include "Items/WeaponItemTypes.h"

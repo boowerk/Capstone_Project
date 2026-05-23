@@ -1,10 +1,119 @@
 #include "Animation/GP_CharacterAnimInstance.h"
+#include "CharacterTrajectoryComponent.h"
+#include "Characters/GP_PlayerCharacter.h"
+#include "ChooserFunctionLibrary.h"
+#include "Engine/Engine.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "PoseSearch/PoseSearchDatabase.h"
+#include "UObject/UnrealType.h"
+
+namespace
+{
+const TCHAR* DefaultPoseSearchChooserPath = TEXT("/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/ChooserTables/CHT_MM_MaskMan_Root_OriginalStyle.CHT_MM_MaskMan_Root_OriginalStyle");
+const TCHAR* DeprecatedPoseSearchChooserName = TEXT("CHT_MM_MaskMan_Root.");
+
+E_MovementDirection ResolveMovementDirection(const FVector& LocalVelocityDirection)
+{
+	const FVector2D Direction2D(LocalVelocityDirection.X, LocalVelocityDirection.Y);
+	if (Direction2D.IsNearlyZero())
+	{
+		return E_MovementDirection::Forward;
+	}
+
+	const bool bForward = Direction2D.X >= 0.f;
+	const bool bRight = Direction2D.Y >= 0.f;
+	const float AbsX = FMath::Abs(Direction2D.X);
+	const float AbsY = FMath::Abs(Direction2D.Y);
+
+	if (AbsX >= AbsY * 1.5f)
+	{
+		return bForward ? E_MovementDirection::Forward : E_MovementDirection::Backward;
+	}
+
+	if (AbsY >= AbsX * 1.5f)
+	{
+		return bRight ? E_MovementDirection::Right : E_MovementDirection::Left;
+	}
+
+	if (AbsX >= AbsY)
+	{
+		return bForward ? E_MovementDirection::Forward : E_MovementDirection::Backward;
+	}
+
+	return bRight ? E_MovementDirection::Right : E_MovementDirection::Left;
+}
+
+E_Gait ResolveGait(bool bIsMoving, bool bIsSprinting)
+{
+	if (!bIsMoving)
+	{
+		return E_Gait::Walk;
+	}
+
+	if (bIsSprinting)
+	{
+		return E_Gait::Sprint;
+	}
+
+	return E_Gait::Run;
+}
+
+ESourceMotionMatchState ResolveMotionMatchState(E_MovementMode MovementMode, E_MovementState MovementState, E_Gait Gait)
+{
+	if (MovementMode == E_MovementMode::InAir)
+	{
+		return ESourceMotionMatchState::Jump;
+	}
+
+	if (MovementState == E_MovementState::Idle)
+	{
+		return ESourceMotionMatchState::Idle;
+	}
+
+	if (Gait == E_Gait::Sprint)
+	{
+		return ESourceMotionMatchState::Sprint;
+	}
+
+	if (Gait == E_Gait::Run)
+	{
+		return ESourceMotionMatchState::Run;
+	}
+
+	return ESourceMotionMatchState::Walk;
+}
+
+void NormalizeTrajectoryForMovementScale(FTransformTrajectory& Trajectory, float MovementScaleRatio)
+{
+	if (FMath::IsNearlyEqual(MovementScaleRatio, 1.f) || Trajectory.Samples.IsEmpty())
+	{
+		return;
+	}
+
+	const float SafeScaleRatio = FMath::Max(MovementScaleRatio, 0.01f);
+	int32 CurrentSampleIndex = 0;
+	float ClosestTimeToCurrent = TNumericLimits<float>::Max();
+	for (int32 SampleIndex = 0; SampleIndex < Trajectory.Samples.Num(); ++SampleIndex)
+	{
+		const float TimeDistance = FMath::Abs(Trajectory.Samples[SampleIndex].TimeInSeconds);
+		if (TimeDistance < ClosestTimeToCurrent)
+		{
+			ClosestTimeToCurrent = TimeDistance;
+			CurrentSampleIndex = SampleIndex;
+		}
+	}
+
+	const FVector CurrentPosition = Trajectory.Samples[CurrentSampleIndex].Position;
+	for (FTransformTrajectorySample& Sample : Trajectory.Samples)
+	{
+		Sample.Position = CurrentPosition + ((Sample.Position - CurrentPosition) / SafeScaleRatio);
+	}
+}
+}
 
 UGP_CharacterAnimInstance::UGP_CharacterAnimInstance()
 {
-	// 스테이트 머신의 시퀀스에서도 루트 모션이 작동하도록 설정
 	RootMotionMode = ERootMotionMode::RootMotionFromEverything;
 }
 
@@ -17,6 +126,11 @@ void UGP_CharacterAnimInstance::NativeInitializeAnimation()
 	{
 		MovementComponent = Character->GetCharacterMovement();
 	}
+
+	if (!PoseSearchChooser || PoseSearchChooser->GetPathName().Contains(DeprecatedPoseSearchChooserName))
+	{
+		PoseSearchChooser = LoadObject<UChooserTable>(nullptr, DefaultPoseSearchChooserPath);
+	}
 }
 
 void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
@@ -25,7 +139,6 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 
 	if (!Character || !MovementComponent)
 	{
-		// 유효하지 않을 경우 재시도
 		Character = Cast<ACharacter>(TryGetPawnOwner());
 		if (Character)
 		{
@@ -33,7 +146,6 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		}
 	}
 
-	// 데이터 에셋으로부터 애니메이션 캐싱 (동적 교체 지원)
 	if (AnimationSet)
 	{
 		LocomotionBlendSpace = AnimationSet->LocomotionBlendSpace;
@@ -41,19 +153,350 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		SprintStopAnimation = AnimationSet->SprintStopAnimation;
 	}
 
-	if (!Character || !MovementComponent) return;
+	if (!PoseSearchChooser || PoseSearchChooser->GetPathName().Contains(DeprecatedPoseSearchChooserName))
+	{
+		PoseSearchChooser = LoadObject<UChooserTable>(nullptr, DefaultPoseSearchChooserPath);
+	}
 
-	// 속도 및 이동 데이터 추출
-	FVector WorldVelocity = Character->GetVelocity();
+	if (!Character || !MovementComponent)
+	{
+		return;
+	}
+
+	const FVector WorldVelocity = Character->GetVelocity();
+	const FVector WorldAcceleration = MovementComponent->GetCurrentAcceleration();
+	const AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(Character);
+	MovementSpeedScaleRatio = PlayerCharacter ? PlayerCharacter->GetMovementSpeedScaleRatio() : 1.0f;
 	GroundSpeed = WorldVelocity.Size2D();
-	
-	// 캐릭터 로컬 방향으로 변환
+	Speed2D = GroundSpeed / MovementSpeedScaleRatio;
 	LocalVelocityDirection = Character->GetActorTransform().InverseTransformVectorNoScale(WorldVelocity).GetSafeNormal2D();
+	const FVector LocalAccelerationDirection =
+		Character->GetActorTransform().InverseTransformVectorNoScale(WorldAcceleration).GetSafeNormal2D();
 
-	// 상태 데이터 업데이트
-	bHasAcceleration = MovementComponent->GetCurrentAcceleration().SizeSquared2D() > KINDA_SMALL_NUMBER;
+	bHasAcceleration = WorldAcceleration.SizeSquared2D() > KINDA_SMALL_NUMBER;
 	bIsFalling = MovementComponent->IsFalling();
 	bIsAnyMontagePlaying = Montage_IsPlaying(nullptr);
+	MMDatabaseLOD = static_cast<float>(static_cast<uint8>(MMDatabaseLODEnum));
+	const float CurrentMaxSpeed = MovementComponent->GetMaxSpeed() / MovementSpeedScaleRatio;
+	bIsSprinting = CurrentMaxSpeed >= SprintSpeedThreshold || Speed2D >= SprintSpeedThreshold;
+	const bool bIsMovingNow = Speed2D > IdleSpeedThreshold;
+	const bool bWasFallingLastFrame = MovementMode == E_MovementMode::InAir;
+	const E_MovementDirection PreviousDirection = MovementDirection;
+
+	if (bIsMovingNow)
+	{
+		TimeSinceMovementStarted = bWasMovingLastFrame ? (TimeSinceMovementStarted + DeltaSeconds) : 0.f;
+		TimeSinceMovementStopped = 0.f;
+	}
+	else
+	{
+		TimeSinceMovementStarted = 0.f;
+		TimeSinceMovementStopped = bWasMovingLastFrame ? 0.f : (TimeSinceMovementStopped + DeltaSeconds);
+	}
+
+	TimeSinceLastLanded += DeltaSeconds;
+	TimeSinceStopStarted += DeltaSeconds;
+	TimeSincePivotStarted += DeltaSeconds;
+
+	const bool bRecentlyStartedMoving = bIsMovingNow && TimeSinceMovementStarted < MovementStartGraceTime;
+
+	MovementMode_LastFrame = MovementMode;
+	Gait_LastFrame = Gait;
+
+	MovementMode = bIsFalling ? E_MovementMode::InAir : E_MovementMode::Grounded;
+	Stance = Character->bIsCrouched ? E_Stance::Crouching : E_Stance::Standing;
+	MovementState = bIsMovingNow ? E_MovementState::Moving : E_MovementState::Idle;
+	Gait = ResolveGait(bIsMovingNow, bIsSprinting);
+	MovementDirection = ResolveMovementDirection(LocalVelocityDirection);
+	if (bIsFalling && FMath::Abs(GetWorld()->GetGravityZ()) > UE_SMALL_NUMBER)
+	{
+		TimeToLand = FMath::Max(0.f, -Character->GetVelocity().Z / FMath::Abs(GetWorld()->GetGravityZ()));
+	}
+	else
+	{
+		TimeToLand = 0.f;
+	}
+
+	// Detect movement start for Chooser to select Start animations
+	IsStarting = !bWasMovingLastFrame && bIsMovingNow && bHasAcceleration;
+	const bool bStopTriggeredThisFrame = bWasMovingLastFrame && !bHasAcceleration && !bIsFalling;
+	if (bStopTriggeredThisFrame)
+	{
+		TimeSinceStopStarted = 0.f;
+	}
+
+	const bool bHoldStopState = !bHasAcceleration && !bIsFalling && TimeSinceStopStarted <= StopHoldDuration;
+	IsStopping = bStopTriggeredThisFrame || bHoldStopState;
+
+	const float CurrentYaw = Character->GetActorRotation().Yaw;
+	const float DesiredYaw = Character->GetControlRotation().Yaw;
+	const float YawDelta = FMath::Abs(FMath::FindDeltaAngleDegrees(CurrentYaw, DesiredYaw));
+	const float YawRate = DeltaSeconds > UE_SMALL_NUMBER
+		? FMath::Abs(FMath::FindDeltaAngleDegrees(LastActorYaw, CurrentYaw)) / DeltaSeconds
+		: 0.f;
+	const float PivotDirectionDot =
+		(!LocalVelocityDirection.IsNearlyZero() && !LocalAccelerationDirection.IsNearlyZero())
+			? FVector::DotProduct(LocalVelocityDirection, LocalAccelerationDirection)
+			: 1.f;
+	const bool bPivotTriggeredThisFrame =
+		bIsMovingNow &&
+		bHasAcceleration &&
+		Speed2D >= WalkSpeedThreshold &&
+		PivotDirectionDot < PivotDirectionDotThreshold;
+	if (bPivotTriggeredThisFrame)
+	{
+		TimeSincePivotStarted = 0.f;
+	}
+
+	const bool bCanContinuePivot =
+		bIsMovingNow &&
+		bHasAcceleration &&
+		Speed2D >= WalkSpeedThreshold &&
+		PivotDirectionDot < PivotExitDirectionDotThreshold;
+
+	const bool bHoldPivotState =
+		bCanContinuePivot &&
+		TimeSincePivotStarted <= PivotHoldDuration;
+
+	IsPivoting = bPivotTriggeredThisFrame || (IsPivoting && bCanContinuePivot) || bHoldPivotState;
+
+	// Update Turn In Place elapsed time
+	if (ShouldTurnInPlace)
+	{
+		TimeSinceTurnInPlaceStarted += DeltaSeconds;
+	}
+	else
+	{
+		TimeSinceTurnInPlaceStarted = 0.f;
+	}
+
+	const float ActiveTurnThreshold = ShouldTurnInPlace ? 2.0f : TurnInPlaceYawThreshold;
+
+	bool bWantTurnInPlace =
+		!bIsFalling &&
+		Speed2D <= TurnInPlaceMaxSpeed &&
+		!bHasAcceleration &&
+		TimeSinceMovementStopped >= TurnInPlaceMinIdleTime &&
+		TimeSinceLastLanded > LandedSignalDuration &&
+		YawDelta > ActiveTurnThreshold;
+
+	// Hysteresis: Keep TurnInPlace active for a minimum duration to prevent animation chattering
+	if (ShouldTurnInPlace && TimeSinceTurnInPlaceStarted < TurnInPlaceMinDuration)
+	{
+		bWantTurnInPlace = true;
+	}
+
+	// Lock: If motion matching is currently selecting a turn animation, keep TurnInPlace active
+	// so the animation doesn't get cut off in the middle of a rotation.
+	if (ShouldTurnInPlace && !MotionMatchingSelectedAnimName.IsNone())
+	{
+		const FString AnimNameStr = MotionMatchingSelectedAnimName.ToString();
+		if (AnimNameStr.Contains(TEXT("Turn")) || AnimNameStr.Contains(TEXT("turn")) || AnimNameStr.Contains(TEXT("TIP")))
+		{
+			// Reaction: Allow instant interruption if the player actually starts moving
+			if (Speed2D <= TurnInPlaceMaxSpeed && !bHasAcceleration && !bIsFalling)
+			{
+				bWantTurnInPlace = true;
+			}
+		}
+	}
+
+	ShouldTurnInPlace = bWantTurnInPlace;
+	ShouldSpinTransition =
+		bIsMovingNow &&
+		bHasAcceleration &&
+		Speed2D >= RunSpeedThreshold &&
+		!IsStopping &&
+		!IsPivoting &&
+		YawRate >= MovingTurnYawRateThreshold;
+
+	JustTraversed = false;
+	if (bWasFallingLastFrame && !bIsFalling)
+	{
+		TimeSinceLastLanded = 0.f;
+	}
+
+	const bool bLandedRecently = TimeSinceLastLanded <= LandedSignalDuration;
+	JustLanded_Light = bLandedRecently && FMath::Abs(LastVerticalVelocity) < 900.f;
+	JustLanded_Heavy = bLandedRecently && FMath::Abs(LastVerticalVelocity) >= 900.f;
+
+	MovementDirection_Recent = static_cast<uint8>(MovementDirection);
+	if (PreviousDirection != MovementDirection)
+	{
+		MovementDirection_Recent |= static_cast<uint8>(PreviousDirection);
+	}
+
+	// Update DesiredControllerYawLastUpdate to actual camera desired yaw for MM trajectory prediction
+	DesiredControllerYawLastUpdate = DesiredYaw;
+
+	bool bUsedBlueprintTrajectory = false;
+	if (const FObjectPropertyBase* CharacterTrajectoryProperty = FindFProperty<FObjectPropertyBase>(Character->GetClass(), TEXT("CharacterTrajectory")))
+	{
+		if (UCharacterTrajectoryComponent* CharacterTrajectoryComponent = Cast<UCharacterTrajectoryComponent>(CharacterTrajectoryProperty->GetObjectPropertyValue_InContainer(Character)))
+		{
+			if (const FStructProperty* TrajectoryProperty = FindFProperty<FStructProperty>(UCharacterTrajectoryComponent::StaticClass(), TEXT("Trajectory")))
+			{
+				if (const FTransformTrajectory* ComponentTrajectory = TrajectoryProperty->ContainerPtrToValuePtr<FTransformTrajectory>(CharacterTrajectoryComponent))
+				{
+					GeneratedTrajectory = *ComponentTrajectory;
+					NormalizeTrajectoryForMovementScale(GeneratedTrajectory, MovementSpeedScaleRatio);
+					bUsedBlueprintTrajectory = true;
+				}
+			}
+		}
+	}
+
+	if (!bUsedBlueprintTrajectory)
+	{
+		FTransformTrajectory UpdatedTrajectory;
+		UPoseSearchTrajectoryLibrary::PoseSearchGenerateTransformTrajectory(
+			this,
+			TrajectoryData,
+			DeltaSeconds,
+			GeneratedTrajectory,
+			DesiredControllerYawLastUpdate,
+			UpdatedTrajectory,
+			TrajectoryHistorySamplingInterval,
+			TrajectoryHistoryCount,
+			TrajectoryPredictionSamplingInterval,
+			TrajectoryPredictionCount);
+		GeneratedTrajectory = MoveTemp(UpdatedTrajectory);
+		NormalizeTrajectoryForMovementScale(GeneratedTrajectory, MovementSpeedScaleRatio);
+	}
+
+	if (PoseSearchChooser)
+	{
+		if (UPoseSearchDatabase* SelectedDatabase = Cast<UPoseSearchDatabase>(
+			UChooserFunctionLibrary::EvaluateChooser(this, PoseSearchChooser, UPoseSearchDatabase::StaticClass())))
+		{
+			ApplyChosenDatabase(SelectedDatabase);
+		}
+	}
+	else if (bIsFalling && JumpPoseSearchDatabase)
+	{
+		CurrentMotionMatchState = ESourceMotionMatchState::Jump;
+		RuntimePoseSearchDatabase = JumpPoseSearchDatabase;
+	}
+	else if (bIsSprinting && bIsMovingNow && SprintPoseSearchDatabase)
+	{
+		CurrentMotionMatchState = ESourceMotionMatchState::Sprint;
+		RuntimePoseSearchDatabase = SprintPoseSearchDatabase;
+	}
+	else if (!bIsMovingNow && IdlePoseSearchDatabase)
+	{
+		CurrentMotionMatchState = ESourceMotionMatchState::Idle;
+		RuntimePoseSearchDatabase = IdlePoseSearchDatabase;
+	}
+	else if ((Speed2D > WalkSpeedThreshold || bRecentlyStartedMoving) && RunPoseSearchDatabase)
+	{
+		CurrentMotionMatchState = ESourceMotionMatchState::Run;
+		RuntimePoseSearchDatabase = RunPoseSearchDatabase;
+	}
+	else if (Speed2D <= WalkSpeedThreshold && WalkPoseSearchDatabase)
+	{
+		CurrentMotionMatchState = ESourceMotionMatchState::Walk;
+		RuntimePoseSearchDatabase = WalkPoseSearchDatabase;
+	}
+	else if (Speed2D <= RunSpeedThreshold && RunPoseSearchDatabase)
+	{
+		CurrentMotionMatchState = ESourceMotionMatchState::Run;
+		RuntimePoseSearchDatabase = RunPoseSearchDatabase;
+	}
+	else if (SprintPoseSearchDatabase)
+	{
+		CurrentMotionMatchState = ESourceMotionMatchState::Sprint;
+		RuntimePoseSearchDatabase = SprintPoseSearchDatabase;
+	}
+	else if (RunPoseSearchDatabase)
+	{
+		CurrentMotionMatchState = ESourceMotionMatchState::Run;
+		RuntimePoseSearchDatabase = RunPoseSearchDatabase;
+	}
+	else if (WalkPoseSearchDatabase)
+	{
+		CurrentMotionMatchState = ESourceMotionMatchState::Walk;
+		RuntimePoseSearchDatabase = WalkPoseSearchDatabase;
+	}
+	else
+	{
+		CurrentMotionMatchState = ESourceMotionMatchState::Idle;
+		RuntimePoseSearchDatabase = IdlePoseSearchDatabase;
+	}
+
+	bWasMovingLastFrame = bIsMovingNow;
+	LastLocalVelocityDirection = LocalVelocityDirection;
+	LastVerticalVelocity = WorldVelocity.Z;
+	LastActorYaw = CurrentYaw;
+
+#if !UE_BUILD_SHIPPING
+	if (GEngine)
+	{
+		const FString SelectedAnimText = bMotionMatchingResultValid
+			? (MotionMatchingSelectedAnimName.IsNone() ? TEXT("Null Asset") : MotionMatchingSelectedAnimName.ToString())
+			: TEXT("Invalid Result");
+		const FString DebugText = FString::Printf(
+			TEXT("MM Speed2D: %.1f \nRaw Speed: %.1f \nSpeed Scale: %.2f \nGait: %s \nState: %s \nTurn:%d \nStop:%d \nPivot:%d \nSpin:%d \nPivotDot: %.2f \nYawRate: %.1f \nIdleT: %.2f \nStopT: %.2f \nPivotT: %.2f \nLandT: %.2f"),
+			Speed2D,
+			GroundSpeed,
+			MovementSpeedScaleRatio,
+			*UEnum::GetValueAsString(Gait),
+			*UEnum::GetValueAsString(CurrentMotionMatchState),
+			ShouldTurnInPlace ? 1 : 0,
+			IsStopping ? 1 : 0,
+			IsPivoting ? 1 : 0,
+			ShouldSpinTransition ? 1 : 0,
+			PivotDirectionDot,
+			YawRate,
+			TimeSinceMovementStopped,
+			TimeSinceStopStarted,
+			TimeSincePivotStarted,
+			TimeSinceLastLanded);
+		const FString DebugAssetText = FString::Printf(
+			TEXT("MM DB: %s \nValid:%d \nAnim: %s"),
+			*GetNameSafe(RuntimePoseSearchDatabase),
+			bMotionMatchingResultValid ? 1 : 0,
+			*SelectedAnimText);
+		GEngine->AddOnScreenDebugMessage(
+			0x4D4D4442,
+			0.f,
+			FColor::Cyan,
+			DebugText);
+		GEngine->AddOnScreenDebugMessage(
+			0x4D4D4443,
+			0.f,
+			FColor::Green,
+			DebugAssetText);
+	}
+#endif
+}
+
+void UGP_CharacterAnimInstance::ApplyChosenDatabase(UPoseSearchDatabase* SelectedDatabase)
+{
+	if (!SelectedDatabase)
+	{
+		return;
+	}
+
+	RuntimePoseSearchDatabase = SelectedDatabase;
+	CurrentMotionMatchState = ResolveMotionMatchState(MovementMode, MovementState, Gait);
+
+	const FString DatabaseName = SelectedDatabase->GetName();
+	if (DatabaseName.Contains(TEXT("Sprint")))
+	{
+		SprintPoseSearchDatabase = SelectedDatabase;
+	}
+	else if (DatabaseName.Contains(TEXT("Run")))
+	{
+		RunPoseSearchDatabase = SelectedDatabase;
+	}
+	else if (DatabaseName.Contains(TEXT("Walk")))
+	{
+		WalkPoseSearchDatabase = SelectedDatabase;
+	}
+	else if (DatabaseName.Contains(TEXT("Jump")) || DatabaseName.Contains(TEXT("Land")))
+	{
+		JumpPoseSearchDatabase = SelectedDatabase;
+	}
 }
 
 void UGP_CharacterAnimInstance::SetAnimationSet(UPDA_CharacterAnimationSet* NewSet)
@@ -61,10 +504,57 @@ void UGP_CharacterAnimInstance::SetAnimationSet(UPDA_CharacterAnimationSet* NewS
 	if (NewSet)
 	{
 		AnimationSet = NewSet;
-		
-		// 캐시 즉시 갱신
 		LocomotionBlendSpace = AnimationSet->LocomotionBlendSpace;
 		JumpLoopAnimation = AnimationSet->JumpLoopAnimation;
 		SprintStopAnimation = AnimationSet->SprintStopAnimation;
+	}
+}
+
+void UGP_CharacterAnimInstance::ApplyRuntimeDatabaseToMotionMatchingNode(const FAnimUpdateContext& Context, const FAnimNodeReference& Node)
+{
+	EAnimNodeReferenceConversionResult ConversionResult = EAnimNodeReferenceConversionResult::Failed;
+	const FMotionMatchingAnimNodeReference MotionMatchingNode =
+		UMotionMatchingAnimNodeLibrary::ConvertToMotionMatchingNode(Node, ConversionResult);
+
+	if (ConversionResult != EAnimNodeReferenceConversionResult::Succeeded)
+	{
+		return;
+	}
+
+	if (RuntimePoseSearchDatabase)
+	{
+		// ForceInterrupt causes popping. Use DoNotInterrupt for smooth transitions 
+		// unless we are specifically handling a hard state change.
+		const EPoseSearchInterruptMode InterruptMode = EPoseSearchInterruptMode::DoNotInterrupt;
+
+		UMotionMatchingAnimNodeLibrary::SetDatabaseToSearch(
+			MotionMatchingNode,
+			RuntimePoseSearchDatabase,
+			InterruptMode);
+
+		LastAppliedRuntimePoseSearchDatabase = RuntimePoseSearchDatabase;
+	}
+	else
+	{
+		UMotionMatchingAnimNodeLibrary::ResetDatabasesToSearch(
+			MotionMatchingNode,
+			EPoseSearchInterruptMode::DoNotInterrupt);
+
+		LastAppliedRuntimePoseSearchDatabase = nullptr;
+	}
+
+	FPoseSearchBlueprintResult SearchResult;
+	bool bIsResultValid = false;
+	UMotionMatchingAnimNodeLibrary::GetMotionMatchingSearchResult(MotionMatchingNode, SearchResult, bIsResultValid);
+	bMotionMatchingResultValid = bIsResultValid;
+	
+	// SelectedAnim���� �����ϵ�, ��ȿ�� üũ ��ȭ
+	MotionMatchingSelectedAnimName = NAME_None;
+	if (bIsResultValid)
+	{
+		if (SearchResult.SelectedAnim)
+		{
+			MotionMatchingSelectedAnimName = SearchResult.SelectedAnim->GetFName();
+		}
 	}
 }

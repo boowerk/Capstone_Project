@@ -1,0 +1,136 @@
+Begin Object Class=/Script/Chooser.ChooserTable Name="CHT_MM_MaskMan_Root" ExportPath="/Script/Chooser.ChooserTable'/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/ChooserTables/CHT_MM_MaskMan_Root.CHT_MM_MaskMan_Root'"
+   Begin Object Class=/Script/Chooser.ChooserTable Name="Idle" ExportPath="/Script/Chooser.ChooserTable'/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/ChooserTables/CHT_MM_MaskMan_Root.CHT_MM_MaskMan_Root:Idle'"
+   End Object
+   Begin Object Class=/Script/Chooser.ChooserTable Name="InAir" ExportPath="/Script/Chooser.ChooserTable'/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/ChooserTables/CHT_MM_MaskMan_Root.CHT_MM_MaskMan_Root:InAir'"
+   End Object
+   Begin Object Class=/Script/Chooser.ChooserTable Name="Jump" ExportPath="/Script/Chooser.ChooserTable'/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/ChooserTables/CHT_MM_MaskMan_Root.CHT_MM_MaskMan_Root:Jump'"
+   End Object
+   Begin Object Class=/Script/Chooser.ChooserTable Name="Run" ExportPath="/Script/Chooser.ChooserTable'/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/ChooserTables/CHT_MM_MaskMan_Root.CHT_MM_MaskMan_Root:Run'"
+   End Object
+   Begin Object Class=/Script/Chooser.ChooserTable Name="Sprint" ExportPath="/Script/Chooser.ChooserTable'/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/ChooserTables/CHT_MM_MaskMan_Root.CHT_MM_MaskMan_Root:Sprint'"
+   End Object
+   Begin Object Class=/Script/Chooser.ChooserTable Name="Stand" ExportPath="/Script/Chooser.ChooserTable'/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/ChooserTables/CHT_MM_MaskMan_Root.CHT_MM_MaskMan_Root:Stand'"
+      Begin Object Class=/Script/Chooser.ChooserTable Name="StandSimple_0" ExportPath="/Script/Chooser.ChooserTable'/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/ChooserTables/CHT_MM_MaskMan_Root.CHT_MM_MaskMan_Root:Stand.StandSimple_0'"
+      End Object
+   End Object
+   Begin Object Name="Idle" ExportPath="/Script/Chooser.ChooserTable'/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/ChooserTables/CHT_MM_MaskMan_Root.CHT_MM_MaskMan_Root:Idle'"
+      RootChooser="/Script/Chooser.ChooserTable'CHT_MM_MaskMan_Root'"
+      ResultsStructs(0)=/Script/Chooser.AssetChooser(Asset="/Script/PoseSearch.PoseSearchDatabase'/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/Databases/Relaxed/PSD_Relaxed_Stand_Idles.PSD_Relaxed_Stand_Idles'")
+      ResultsStructs(1)=/Script/Chooser.AssetChooser(Asset="/Script/PoseSearch.PoseSearchDatabase'/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/Databases/Relaxed/PSD_Relaxed_Stand_Run_Stops.PSD_Relaxed_Stand_Run_Stops'")
+      ResultsStructs(2)=/Script/Chooser.AssetChooser(Asset="/Script/PoseSearch.PoseSearchDatabase'/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/Databases/Relaxed/PSD_Relaxed_Stand_Sprint_Stops.PSD_Relaxed_Stand_Sprint_Stops'")
+      ResultsStructs(3)=/Script/Chooser.AssetChooser(Asset="/Script/PoseSearch.PoseSearchDatabase'/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/Databases/Relaxed/PSD_Relaxed_Stand_Idle_Lands_Light.PSD_Relaxed_Stand_Idle_Lands_Light'")
+      ResultsStructs(4)=/Script/Chooser.AssetChooser(Asset="/Script/PoseSearch.PoseSearchDatabase'/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/Databases/Relaxed/PSD_Relaxed_Stand_Idle_Lands_Heavy.PSD_Relaxed_Stand_Idle_Lands_Heavy'")
+      ResultsStructs(5)=/Script/Chooser.AssetChooser(Asset="/Script/PoseSearch.PoseSearchDatabase'/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/Databases/Relaxed/PSD_Relaxed_Stand_TurnInPlace.PSD_Relaxed_Stand_TurnInPlace'")
+      DisabledRows(0)=False
+      DisabledRows(1)=False
+      DisabledRows(2)=False
+      DisabledRows(3)=False
+      DisabledRows(4)=False
+      DisabledRows(5)=False
+      EditorResultsColumnWidth=341.000000
+      ColumnsStructs(0)=/Script/Chooser.FloatRangeColumn(InputValue=/Script/Chooser.FloatContextProperty(Binding=(PropertyBindingChain=("Speed2D"),ContextIndex=0,IsBoundToRoot=False,DisplayName="Speed 2D")),bWrapInput=True,MinValue=-100000.000000,MaxValue=100000.000000,DefaultRowValue=(Min=-1000000.000000,Max=0.000000,bNoMin=True,bNoMax=False),RowValues=((Max=20.000000),(Min=100.000000,Max=550.000000),(Min=550.000000,Max=100000.000000,bNoMax=True),(Min=-100000.000000,Max=100000.000000,bNoMin=True,bNoMax=True),(Min=-100000.000000,Max=100000.000000,bNoMin=True,bNoMax=True),(Min=-100000.000000,Max=100000.000000,bNoMin=True,bNoMax=True)),bDisabled=False,EditorColumnWidth=200.000000)
+      ColumnsStructs(1)=/Script/Chooser.BoolColumn(InputValue=/Script/Chooser.BoolContextProperty(Binding=(PropertyBindingChain=("ShouldTurnInPlace"),ContextIndex=0,IsBoundToRoot=False,DisplayName="Should Turn in Place")),DefaultRowValue=MatchAny,RowValuesWithAny=(MatchFalse,MatchFalse,MatchFalse,MatchTrue,MatchFalse,MatchFalse),bDisabled=False,EditorColumnWidth=200.000000)
+      ColumnsStructs(2)=/Script/Chooser.BoolColumn(InputValue=/Script/Chooser.BoolContextProperty(Binding=(PropertyBindingChain=("JustLanded_Light"),ContextIndex=0,IsBoundToRoot=False,DisplayName="Just Landed Light")),DefaultRowValue=MatchAny,RowValuesWithAny=(MatchFalse,MatchFalse,MatchFalse,MatchFalse,MatchTrue,MatchFalse),bDisabled=False,EditorColumnWidth=200.000000)
+      ColumnsStructs(3)=/Script/Chooser.BoolColumn(InputValue=/Script/Chooser.BoolContextProperty(Binding=(PropertyBindingChain=("JustLanded_Heavy"),ContextIndex=0,IsBoundToRoot=False,DisplayName="Just Landed Heavy")),DefaultRowValue=MatchAny,RowValuesWithAny=(MatchFalse,MatchFalse,MatchFalse,MatchFalse,MatchFalse,MatchFalse),bDisabled=False,EditorColumnWidth=200.000000)
+      ColumnsStructs(4)=/Script/Chooser.EnumColumn(InputValue=/Script/Chooser.EnumContextProperty(Binding=(Enum="/Script/CoreUObject.Enum'/Script/Project_Eden.E_Gait'",PropertyBindingChain=("Gait_LastFrame"),ContextIndex=0,IsBoundToRoot=False,DisplayName="Gait Last Frame")),DefaultRowValue=(ValueName="",Comparison=MatchEqual,Value=0),RowValues=((ValueName="E_Gait::Walk",Comparison=MatchAny),(ValueName="E_Gait::Run",Value=1),(ValueName="E_Gait::Sprint",Value=2),(ValueName="E_Gait::Walk",Comparison=MatchAny),(ValueName="E_Gait::Walk",Comparison=MatchAny),(ValueName="E_Gait::Walk",Comparison=MatchAny)),bDisabled=False,EditorColumnWidth=200.000000)
+   End Object
+   Begin Object Name="InAir" ExportPath="/Script/Chooser.ChooserTable'/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/ChooserTables/CHT_MM_MaskMan_Root.CHT_MM_MaskMan_Root:InAir'"
+      RootChooser="/Script/Chooser.ChooserTable'CHT_MM_MaskMan_Root'"
+      ResultsStructs(0)=/Script/Chooser.AssetChooser(Asset="/Script/PoseSearch.PoseSearchDatabase'/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/Databases/Relaxed/PSD_Relaxed_Stand_Jumps_FromTraversal.PSD_Relaxed_Stand_Jumps_FromTraversal'")
+      ResultsStructs(1)=/Script/Chooser.AssetChooser(Asset="/Script/PoseSearch.PoseSearchDatabase'/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/Databases/Relaxed/PSD_Relaxed_Stand_WalkAndRun_Jump.PSD_Relaxed_Stand_WalkAndRun_Jump'")
+      ResultsStructs(2)=/Script/Chooser.AssetChooser(Asset="/Script/PoseSearch.PoseSearchDatabase'/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/Databases/Relaxed/PSD_Relaxed_Stand_Sprint_Jump.PSD_Relaxed_Stand_Sprint_Jump'")
+      DisabledRows(0)=False
+      DisabledRows(1)=False
+      DisabledRows(2)=False
+      EditorResultsColumnWidth=361.000000
+      ColumnsStructs(0)=/Script/Chooser.FloatRangeColumn(InputValue=/Script/Chooser.FloatContextProperty(Binding=(PropertyBindingChain=("Speed2D"),ContextIndex=0,IsBoundToRoot=False,DisplayName="Speed 2D")),bWrapInput=False,MinValue=-180.000000,MaxValue=180.000000,DefaultRowValue=(Min=-100000.000000,Max=100000.000000,bNoMin=False,bNoMax=False),RowValues=((Min=-100000.000000,Max=100000.000000,bNoMin=True,bNoMax=True),(Max=650.000000),(Min=650.000000,Max=100000.000000,bNoMax=True)),bDisabled=False,EditorColumnWidth=200.000000)
+      ColumnsStructs(1)=/Script/Chooser.BoolColumn(InputValue=/Script/Chooser.BoolContextProperty(Binding=(PropertyBindingChain=("JustTraversed"),ContextIndex=0,IsBoundToRoot=False,DisplayName="Just Traversed")),DefaultRowValue=MatchAny,RowValuesWithAny=(MatchTrue,MatchFalse,MatchFalse),bDisabled=False,EditorColumnWidth=200.000000)
+   End Object
+   Begin Object Name="Jump" ExportPath="/Script/Chooser.ChooserTable'/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/ChooserTables/CHT_MM_MaskMan_Root.CHT_MM_MaskMan_Root:Jump'"
+      RootChooser="/Script/Chooser.ChooserTable'CHT_MM_MaskMan_Root'"
+      ResultsStructs(0)=/Script/Chooser.AssetChooser(Asset="/Script/PoseSearch.PoseSearchDatabase'/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/Databases/Extreme_Sparse/PSD_Extreme_Sparse_Jumps.PSD_Extreme_Sparse_Jumps'")
+      DisabledRows(0)=False
+   End Object
+   Begin Object Name="Run" ExportPath="/Script/Chooser.ChooserTable'/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/ChooserTables/CHT_MM_MaskMan_Root.CHT_MM_MaskMan_Root:Run'"
+      RootChooser="/Script/Chooser.ChooserTable'CHT_MM_MaskMan_Root'"
+      ResultsStructs(0)=/Script/Chooser.AssetChooser(Asset="/Script/PoseSearch.PoseSearchDatabase'/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/Databases/Relaxed/PSD_Relaxed_Stand_Run_F_Loops.PSD_Relaxed_Stand_Run_F_Loops'")
+      ResultsStructs(1)=/Script/Chooser.AssetChooser(Asset="/Script/PoseSearch.PoseSearchDatabase'/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/Databases/Relaxed/PSD_Relaxed_Stand_Run_F_Starts.PSD_Relaxed_Stand_Run_F_Starts'")
+      ResultsStructs(2)=/Script/Chooser.AssetChooser(Asset="/Script/PoseSearch.PoseSearchDatabase'/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/Databases/Relaxed/PSD_Relaxed_Stand_Run_F_Turns.PSD_Relaxed_Stand_Run_F_Turns'")
+      ResultsStructs(3)=/Script/Chooser.AssetChooser(Asset="/Script/PoseSearch.PoseSearchDatabase'/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/Databases/Relaxed/PSD_Relaxed_Stand_Run_F_Pivots.PSD_Relaxed_Stand_Run_F_Pivots'")
+      ResultsStructs(4)=/Script/Chooser.AssetChooser(Asset="/Script/PoseSearch.PoseSearchDatabase'/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/Databases/Relaxed/PSD_Relaxed_Stand_Run_Lands_Light.PSD_Relaxed_Stand_Run_Lands_Light'")
+      ResultsStructs(5)=/Script/Chooser.AssetChooser(Asset="/Script/PoseSearch.PoseSearchDatabase'/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/Databases/Relaxed/PSD_Relaxed_Stand_Run_Lands_Heavy.PSD_Relaxed_Stand_Run_Lands_Heavy'")
+      DisabledRows(0)=False
+      DisabledRows(1)=False
+      DisabledRows(2)=False
+      DisabledRows(3)=False
+      DisabledRows(4)=False
+      DisabledRows(5)=False
+      ColumnsStructs(0)=/Script/Chooser.EnumColumn(InputValue=/Script/Chooser.EnumContextProperty(Binding=(Enum="/Script/CoreUObject.Enum'/Script/Project_Eden.E_MovementDirection'",PropertyBindingChain=("MovementDirection"),ContextIndex=0,IsBoundToRoot=False,DisplayName="Movement Direction")),DefaultRowValue=(ValueName="",Comparison=MatchEqual,Value=0),RowValues=((ValueName="E_MovementDirection::Forward"),(ValueName="E_MovementDirection::Forward"),(ValueName="E_MovementDirection::Forward"),(ValueName="E_MovementDirection::Forward"),(ValueName="E_MovementDirection::Forward",Comparison=MatchAny),(ValueName="E_MovementDirection::Forward",Comparison=MatchAny)),bDisabled=False,EditorColumnWidth=162.000000)
+      ColumnsStructs(1)=/Script/Chooser.EnumColumn(InputValue=/Script/Chooser.EnumContextProperty(Binding=(Enum="/Script/CoreUObject.Enum'/Script/Project_Eden.E_MovementDirection'",PropertyBindingChain=("MovementDirection"),ContextIndex=0,IsBoundToRoot=False,DisplayName="Movement Direction")),DefaultRowValue=(ValueName="",Comparison=MatchEqual,Value=0),RowValues=((ValueName="E_MovementDirection::Forward",Comparison=MatchAny),(ValueName="E_MovementDirection::Forward",Comparison=MatchAny),(ValueName="E_MovementDirection::Forward",Comparison=MatchAny),(ValueName="E_MovementDirection::Forward",Comparison=MatchAny),(ValueName="E_MovementDirection::Forward",Comparison=MatchAny),(ValueName="E_MovementDirection::Forward",Comparison=MatchAny)),bDisabled=False,EditorColumnWidth=164.000000)
+      ColumnsStructs(2)=/Script/Chooser.EnumColumn(InputValue=/Script/Chooser.EnumContextProperty(Binding=(Enum="/Script/CoreUObject.Enum'/Script/Project_Eden.E_Gait'",PropertyBindingChain=("Gait_LastFrame"),ContextIndex=0,IsBoundToRoot=False,DisplayName="Gait Last Frame")),DefaultRowValue=(ValueName="",Comparison=MatchEqual,Value=0),RowValues=((ValueName="E_Gait::Walk",Comparison=MatchAny),(ValueName="E_Gait::Walk",Comparison=MatchAny),(ValueName="E_Gait::Walk",Comparison=MatchAny),(ValueName="E_Gait::Walk",Comparison=MatchAny),(ValueName="E_Gait::Walk",Comparison=MatchAny),(ValueName="E_Gait::Walk",Comparison=MatchAny)),bDisabled=False,EditorColumnWidth=143.000000)
+      ColumnsStructs(3)=/Script/Chooser.BoolColumn(InputValue=/Script/Chooser.BoolContextProperty(Binding=(PropertyBindingChain=("IsStarting"),ContextIndex=0,IsBoundToRoot=False,DisplayName="Is Starting")),DefaultRowValue=MatchAny,RowValuesWithAny=(MatchFalse,MatchTrue,MatchFalse,MatchFalse,MatchFalse,MatchFalse),bDisabled=False,EditorColumnWidth=159.000000)
+      ColumnsStructs(4)=/Script/Chooser.BoolColumn(InputValue=/Script/Chooser.BoolContextProperty(Binding=(PropertyBindingChain=("IsPivoting"),ContextIndex=0,IsBoundToRoot=False,DisplayName="Is Pivoting")),DefaultRowValue=MatchAny,RowValuesWithAny=(MatchFalse,MatchFalse,MatchFalse,MatchTrue,MatchFalse,MatchFalse),bDisabled=False,EditorColumnWidth=160.000000)
+      ColumnsStructs(5)=/Script/Chooser.BoolColumn(InputValue=/Script/Chooser.BoolContextProperty(Binding=(PropertyBindingChain=("ShouldSpinTransition"),ContextIndex=0,IsBoundToRoot=False,DisplayName="Should Spin Transition")),DefaultRowValue=MatchAny,RowValuesWithAny=(MatchFalse,MatchFalse,MatchTrue,MatchFalse,MatchFalse,MatchFalse),bDisabled=False,EditorColumnWidth=164.000000)
+      ColumnsStructs(6)=/Script/Chooser.BoolColumn(InputValue=/Script/Chooser.BoolContextProperty(Binding=(PropertyBindingChain=("JustLanded_Light"),ContextIndex=0,IsBoundToRoot=False,DisplayName="Just Landed Light")),DefaultRowValue=MatchAny,RowValuesWithAny=(MatchFalse,MatchFalse,MatchFalse,MatchFalse,MatchTrue,MatchFalse),bDisabled=False,EditorColumnWidth=158.000000)
+      ColumnsStructs(7)=/Script/Chooser.BoolColumn(InputValue=/Script/Chooser.BoolContextProperty(Binding=(PropertyBindingChain=("JustLanded_Heavy"),ContextIndex=0,IsBoundToRoot=False,DisplayName="Just Landed Heavy")),DefaultRowValue=MatchAny,RowValuesWithAny=(MatchFalse,MatchFalse,MatchFalse,MatchFalse,MatchFalse,MatchTrue),bDisabled=False,EditorColumnWidth=174.000000)
+   End Object
+   Begin Object Name="Sprint" ExportPath="/Script/Chooser.ChooserTable'/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/ChooserTables/CHT_MM_MaskMan_Root.CHT_MM_MaskMan_Root:Sprint'"
+      RootChooser="/Script/Chooser.ChooserTable'CHT_MM_MaskMan_Root'"
+      ResultsStructs(0)=/Script/Chooser.AssetChooser(Asset="/Script/PoseSearch.PoseSearchDatabase'/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/Databases/Relaxed/PSD_Relaxed_Stand_Sprint_Loops.PSD_Relaxed_Stand_Sprint_Loops'")
+      ResultsStructs(1)=/Script/Chooser.AssetChooser(Asset="/Script/PoseSearch.PoseSearchDatabase'/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/Databases/Relaxed/PSD_Relaxed_Stand_Sprint_Starts.PSD_Relaxed_Stand_Sprint_Starts'")
+      ResultsStructs(2)=/Script/Chooser.AssetChooser(Asset="/Script/PoseSearch.PoseSearchDatabase'/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/Databases/Relaxed/PSD_Relaxed_Stand_Sprint_Turns.PSD_Relaxed_Stand_Sprint_Turns'")
+      ResultsStructs(3)=/Script/Chooser.AssetChooser(Asset="/Script/PoseSearch.PoseSearchDatabase'/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/Databases/Relaxed/PSD_Relaxed_Stand_Sprint_Lands_Light.PSD_Relaxed_Stand_Sprint_Lands_Light'")
+      ResultsStructs(4)=/Script/Chooser.AssetChooser(Asset="/Script/PoseSearch.PoseSearchDatabase'/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/Databases/Relaxed/PSD_Relaxed_Stand_Sprint_Lands_Heavy.PSD_Relaxed_Stand_Sprint_Lands_Heavy'")
+      DisabledRows(0)=False
+      DisabledRows(1)=False
+      DisabledRows(2)=False
+      DisabledRows(3)=False
+      DisabledRows(4)=False
+      ColumnsStructs(0)=/Script/Chooser.BoolColumn(InputValue=/Script/Chooser.BoolContextProperty(Binding=(PropertyBindingChain=("IsStarting"),ContextIndex=0,IsBoundToRoot=False,DisplayName="Is Starting")),DefaultRowValue=MatchAny,RowValuesWithAny=(MatchFalse,MatchTrue,MatchFalse,MatchFalse,MatchFalse),bDisabled=False,EditorColumnWidth=200.000000)
+      ColumnsStructs(1)=/Script/Chooser.BoolColumn(InputValue=/Script/Chooser.BoolContextProperty(Binding=(PropertyBindingChain=("IsPivoting"),ContextIndex=0,IsBoundToRoot=False,DisplayName="Is Pivoting")),DefaultRowValue=MatchAny,RowValuesWithAny=(MatchFalse,MatchFalse,MatchTrue,MatchFalse,MatchFalse),bDisabled=False,EditorColumnWidth=200.000000)
+      ColumnsStructs(2)=/Script/Chooser.BoolColumn(InputValue=/Script/Chooser.BoolContextProperty(Binding=(PropertyBindingChain=("JustLanded_Light"),ContextIndex=0,IsBoundToRoot=False,DisplayName="Just Landed Light")),DefaultRowValue=MatchAny,RowValuesWithAny=(MatchFalse,MatchFalse,MatchFalse,MatchTrue,MatchFalse),bDisabled=False,EditorColumnWidth=200.000000)
+      ColumnsStructs(3)=/Script/Chooser.BoolColumn(InputValue=/Script/Chooser.BoolContextProperty(Binding=(PropertyBindingChain=("JustLanded_Heavy"),ContextIndex=0,IsBoundToRoot=False,DisplayName="Just Landed Heavy")),DefaultRowValue=MatchAny,RowValuesWithAny=(MatchFalse,MatchFalse,MatchFalse,MatchFalse,MatchTrue),bDisabled=False,EditorColumnWidth=200.000000)
+   End Object
+   Begin Object Name="Stand" ExportPath="/Script/Chooser.ChooserTable'/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/ChooserTables/CHT_MM_MaskMan_Root.CHT_MM_MaskMan_Root:Stand'"
+      Begin Object Name="StandSimple_0" ExportPath="/Script/Chooser.ChooserTable'/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/ChooserTables/CHT_MM_MaskMan_Root.CHT_MM_MaskMan_Root:Stand.StandSimple_0'"
+         RootChooser="/Script/Chooser.ChooserTable'CHT_MM_MaskMan_Root'"
+      End Object
+      RootChooser="/Script/Chooser.ChooserTable'CHT_MM_MaskMan_Root'"
+      ResultsStructs(0)=/Script/Chooser.AssetChooser(Asset="/Script/PoseSearch.PoseSearchDatabase'/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/Databases/Extreme_Sparse/PSD_Extreme_Sparse_Stand_TurnInPlace.PSD_Extreme_Sparse_Stand_TurnInPlace'")
+      ResultsStructs(1)=/Script/Chooser.AssetChooser(Asset="/Script/PoseSearch.PoseSearchDatabase'/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/Databases/Extreme_Sparse/PSD_Extreme_Sparse_Stand_Idle_Lands.PSD_Extreme_Sparse_Stand_Idle_Lands'")
+      ResultsStructs(2)=/Script/Chooser.AssetChooser(Asset="/Script/PoseSearch.PoseSearchDatabase'/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/Databases/Extreme_Sparse/PSD_Extreme_Sparse_Stand_Run_Stops.PSD_Extreme_Sparse_Stand_Run_Stops'")
+      ResultsStructs(3)=/Script/Chooser.AssetChooser(Asset="/Script/PoseSearch.PoseSearchDatabase'/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/Databases/Extreme_Sparse/PSD_Extreme_Sparse_Stand_Walk_Loops.PSD_Extreme_Sparse_Stand_Walk_Loops'")
+      ResultsStructs(4)=/Script/Chooser.AssetChooser(Asset="/Script/PoseSearch.PoseSearchDatabase'/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/Databases/Extreme_Sparse/PSD_Extreme_Sparse_Stand_Run_Loops.PSD_Extreme_Sparse_Stand_Run_Loops'")
+      ResultsStructs(5)=/Script/Chooser.AssetChooser(Asset="/Script/PoseSearch.PoseSearchDatabase'/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/Databases/Extreme_Sparse/PSD_Extreme_Sparse_Stand_Run_Stops.PSD_Extreme_Sparse_Stand_Run_Stops'")
+      ResultsStructs(6)=/Script/Chooser.AssetChooser(Asset="/Script/PoseSearch.PoseSearchDatabase'/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/Databases/Extreme_Sparse/PSD_Extreme_Sparse_Stand_Sprint_Loops.PSD_Extreme_Sparse_Stand_Sprint_Loops'")
+      DisabledRows(0)=False
+      DisabledRows(1)=False
+      DisabledRows(2)=False
+      DisabledRows(3)=False
+      DisabledRows(4)=False
+      DisabledRows(5)=False
+      DisabledRows(6)=False
+      EditorResultsColumnWidth=354.000000
+      ColumnsStructs(0)=/Script/Chooser.BoolColumn(InputValue=/Script/Chooser.BoolContextProperty(Binding=(PropertyBindingChain=("ShouldTurnInPlace"),ContextIndex=0,IsBoundToRoot=False,DisplayName="Should Turn in Place")),DefaultRowValue=MatchAny,RowValuesWithAny=(MatchTrue,MatchFalse,MatchFalse,MatchFalse,MatchFalse,MatchFalse,MatchFalse),bDisabled=False,EditorColumnWidth=200.000000)
+      ColumnsStructs(1)=/Script/Chooser.FloatRangeColumn(InputValue=/Script/Chooser.FloatContextProperty(Binding=(PropertyBindingChain=("Speed2D"),ContextIndex=0,IsBoundToRoot=False,DisplayName="Speed 2D")),bWrapInput=False,MinValue=-180.000000,MaxValue=180.000000,DefaultRowValue=(Min=0.000000,Max=0.000000,bNoMin=False,bNoMax=False),RowValues=((Min=-10000.000000,Max=10000.000000,bNoMin=True,bNoMax=True),(Max=20.000000),(Min=20.000000,Max=200.000000),(Min=20.000000,Max=200.000000),(Min=200.000000,Max=650.000000),(Min=200.000000,Max=650.000000,bNoMax=True),(Min=650.000000,Max=10000.000000,bNoMax=True)),bDisabled=False,EditorColumnWidth=200.000000)
+      ColumnsStructs(2)=/Script/Chooser.BoolColumn(InputValue=/Script/Chooser.BoolContextProperty(Binding=(PropertyBindingChain=("IsStopping"),ContextIndex=0,IsBoundToRoot=False,DisplayName="Is Stopping")),DefaultRowValue=MatchAny,RowValuesWithAny=(MatchFalse,MatchFalse,MatchTrue,MatchFalse,MatchFalse,MatchTrue,MatchFalse),bDisabled=False,EditorColumnWidth=200.000000)
+      ColumnsStructs(3)=/Script/Chooser.EnumColumn(InputValue=/Script/Chooser.EnumContextProperty(Binding=(Enum="/Script/CoreUObject.Enum'/Script/Project_Eden.E_Gait'",PropertyBindingChain=("Gait"),ContextIndex=0,IsBoundToRoot=False,DisplayName="Gait")),DefaultRowValue=(ValueName="",Comparison=MatchEqual,Value=0),RowValues=((ValueName="E_Gait::Walk",Comparison=MatchAny),(ValueName="E_Gait::Walk"),(ValueName="E_Gait::Walk"),(ValueName="E_Gait::Walk"),(ValueName="E_Gait::Run",Value=1),(ValueName="E_Gait::Walk"),(ValueName="E_Gait::Sprint",Value=2)),bDisabled=True,EditorColumnWidth=200.000000)
+   End Object
+   ResultsStructs(0)=/Script/Chooser.NestedChooser(Chooser="/Script/Chooser.ChooserTable'Stand'")
+   ResultsStructs(1)=/Script/Chooser.NestedChooser(Chooser="/Script/Chooser.ChooserTable'Jump'")
+   DisabledRows(0)=False
+   DisabledRows(1)=False
+   NestedObjects(0)="/Script/Chooser.ChooserTable'Idle'"
+   NestedObjects(1)="/Script/Chooser.ChooserTable'Run'"
+   NestedObjects(2)="/Script/Chooser.ChooserTable'Sprint'"
+   NestedObjects(3)="/Script/Chooser.ChooserTable'InAir'"
+   NestedObjects(4)="/Script/Chooser.ChooserTable'Stand'"
+   NestedObjects(5)="/Script/Chooser.ChooserTable'Jump'"
+   NestedObjects(6)="/Script/Chooser.ChooserTable'Stand.StandSimple_0'"
+   NestedObjects(7)="/Script/Chooser.ChooserTable'Stand.StandSimple_0'"
+   ColumnsStructs(0)=/Script/Chooser.EnumColumn(InputValue=/Script/Chooser.EnumContextProperty(Binding=(Enum="/Script/CoreUObject.Enum'/Script/Project_Eden.E_MovementMode'",PropertyBindingChain=("MovementMode"),ContextIndex=0,IsBoundToRoot=False,DisplayName="Movement Mode")),DefaultRowValue=(ValueName="",Comparison=MatchEqual,Value=0),RowValues=((ValueName="E_MovementMode::Grounded"),(ValueName="E_MovementMode::InAir",Value=2)),bDisabled=False,EditorColumnWidth=200.000000)
+   ColumnsStructs(1)=/Script/Chooser.EnumColumn(InputValue=/Script/Chooser.EnumContextProperty(Binding=(Enum="/Script/CoreUObject.Enum'/Script/Project_Eden.E_MovementState'",PropertyBindingChain=("MovementState"),ContextIndex=0,IsBoundToRoot=False,DisplayName="Movement State")),DefaultRowValue=(ValueName="",Comparison=MatchEqual,Value=0),RowValues=((ValueName="E_MovementState::Idle",Comparison=MatchAny),(ValueName="E_MovementState::Idle",Comparison=MatchAny)),bDisabled=False,EditorColumnWidth=200.000000)
+   ColumnsStructs(2)=/Script/Chooser.EnumColumn(InputValue=/Script/Chooser.EnumContextProperty(Binding=(Enum="/Script/CoreUObject.Enum'/Script/Project_Eden.E_Gait'",PropertyBindingChain=("Gait"),ContextIndex=0,IsBoundToRoot=False,DisplayName="Gait")),DefaultRowValue=(ValueName="",Comparison=MatchEqual,Value=0),RowValues=((ValueName="E_Gait::Walk",Comparison=MatchAny),(ValueName="E_Gait::Walk",Comparison=MatchAny)),bDisabled=False,EditorColumnWidth=200.000000)
+   OutputObjectType="/Script/CoreUObject.Class'/Script/PoseSearch.PoseSearchDatabase'"
+   ContextData(0)=/Script/Chooser.ContextObjectTypeClass(Class="/Script/Engine.AnimBlueprintGeneratedClass'/Game/Characters/PlayerCharacter/ABP_UEFNSource_Player.ABP_UEFNSource_Player_C'",Direction=Read)
+End Object

@@ -35,7 +35,7 @@ public:
 
 	/** 데이터 에셋을 바탕으로 메시와 애니메이션 인스턴스를 업데이트합니다. */
 	UFUNCTION(BlueprintCallable, Category = "Animation")
-	void UpdateAnimationSet();
+	virtual void UpdateAnimationSet();
 	
 	UPROPERTY(BlueprintAssignable)
 	FASCInitialized OnASCInitialized;
