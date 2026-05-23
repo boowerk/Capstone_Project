@@ -103,6 +103,13 @@ UGP_SkillData* UGP_SkillBase::GetSkillDataFromSpec(const FGameplayAbilitySpecHan
 	return Spec ? Cast<UGP_SkillData>(Spec->SourceObject.Get()) : nullptr;
 }
 
+TSubclassOf<AActor> UGP_SkillBase::GetSkillVisualActorClass(const UGP_SkillData* SkillData, TSubclassOf<AActor> FallbackVisualActorClass) const
+{
+	return SkillData && SkillData->SkillVisualActorClass
+		? SkillData->SkillVisualActorClass
+		: FallbackVisualActorClass;
+}
+
 void UGP_SkillBase::SpawnVisualActor(AActor* InstigatorActor, TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation) const
 {
 	if (!IsValid(InstigatorActor) || !VisualActorClass || !InstigatorActor->GetWorld())

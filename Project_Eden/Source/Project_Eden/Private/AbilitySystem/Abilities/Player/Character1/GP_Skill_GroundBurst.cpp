@@ -58,7 +58,7 @@ void UGP_Skill_GroundBurst::ActivateAbility(const FGameplayAbilitySpecHandle Han
 		);
 
 		const FVector BurstLocation = bHitGround ? HitResult.Location : TargetLocation;
-		SpawnVisualActor(Avatar, BurstVisualActorClass, BurstLocation);
+		SpawnVisualActor(Avatar, GetSkillVisualActorClass(SkillData, BurstVisualActorClass), BurstLocation);
 
 		const TArray<AActor*> HitActors = UGP_BlueprintLibrary::SphereOverlapActorsAtLocation(
 			Avatar,

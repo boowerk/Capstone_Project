@@ -32,7 +32,7 @@ void UGP_Skill_PulseBurst::ActivateAbility(const FGameplayAbilitySpecHandle Hand
 		UGP_SkillData* SkillData = GetSkillDataFromSpec(Handle, ActorInfo);
 
 		const FVector BurstLocation = Avatar->GetActorLocation();
-		SpawnVisualActor(Avatar, BurstVisualActorClass, BurstLocation);
+		SpawnVisualActor(Avatar, GetSkillVisualActorClass(SkillData, BurstVisualActorClass), BurstLocation);
 
 		const TArray<AActor*> HitActors = UGP_BlueprintLibrary::SphereOverlapActorsAtLocation(
 			Avatar,

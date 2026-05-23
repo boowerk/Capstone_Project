@@ -6,6 +6,8 @@
 #include "Abilities/GameplayAbility.h"
 #include "GP_SkillData.generated.h"
 
+class AActor;
+
 UENUM(BlueprintType)
 enum class EGP_CooldownPolicy : uint8
 {
@@ -35,6 +37,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill")
 	TSubclassOf<UGameplayAbility> AbilityClass;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Visual")
+	TSubclassOf<AActor> SkillVisualActorClass;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Damage")
 	float BaseDamage = 0.f;
 
@@ -43,6 +48,9 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Damage")
 	float ToughnessDamage = 0.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Damage", meta = (Categories = "GPTags.Damage.Element"))
+	FGameplayTag PrimaryDamageElementTag;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Damage|Coefficient")
 	float AttackPowerCoefficient = 0.f;

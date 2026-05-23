@@ -48,6 +48,7 @@ protected:
 	UFUNCTION(BlueprintCallable, Category = "GAS|Skill|Mechanics")
 	void PerformAreaAttack();
 
+	TSubclassOf<AActor> GetSkillVisualActorClass(const UGP_SkillData* SkillData, TSubclassOf<AActor> FallbackVisualActorClass) const;
 	void SpawnVisualActor(AActor* InstigatorActor, TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation = FRotator::ZeroRotator) const;
 
 	// 어빌리티 종료 시 호출할 정리 함수

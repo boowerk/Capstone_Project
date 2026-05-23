@@ -48,7 +48,7 @@ void UGP_Skill_ConeSlash::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 			+ Forward * VisualForwardOffset
 			+ FVector::UpVector * VisualHeightOffset;
 
-		SpawnVisualActor(Avatar, SlashVisualActorClass, VisualLocation, AimRotation);
+		SpawnVisualActor(Avatar, GetSkillVisualActorClass(SkillData, SlashVisualActorClass), VisualLocation, AimRotation);
 
 		const TArray<AActor*> CandidateActors = UGP_BlueprintLibrary::SphereOverlapActorsAtLocation(
 			Avatar,
