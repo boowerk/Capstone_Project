@@ -140,7 +140,7 @@ protected:
 	float StartClampMaxDuration = 0.5f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Tuning")
-	float StartClampReleaseSpeed = 250.0f;
+	float StartClampReleaseSpeed = 350.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Tuning")
 	bool bDebugStartAccelerationClamp = false;
