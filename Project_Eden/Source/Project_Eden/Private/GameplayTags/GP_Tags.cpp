@@ -170,6 +170,7 @@ namespace GPTags
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(ThrownBurst, "GPTags.Cooldown.Skill.ThrownBurst", "투척 버스트 스킬 쿨다운");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(PulseBurst, "GPTags.Cooldown.Skill.PulseBurst", "펄스 버스트 스킬 쿨다운");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(LineShock, "GPTags.Cooldown.Skill.LineShock", "라인 쇼크 스킬 쿨다운");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(MineBurst, "GPTags.Cooldown.Skill.MineBurst", "마인 버스트 스킬 쿨다운");
         }
         namespace Data
         {

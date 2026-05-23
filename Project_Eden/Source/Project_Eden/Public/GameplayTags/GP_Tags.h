@@ -180,6 +180,8 @@ namespace GPTags
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(PulseBurst);
 
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(LineShock);
+
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(MineBurst);
 		}
 		namespace Data
 		{
