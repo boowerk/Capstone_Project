@@ -6,6 +6,7 @@
 #include "Animation/PDA_CharacterAnimationSet.h"
 #include "Animation/GP_CharacterAnimInstance.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "GameplayTags/GP_Tags.h"
 
 AGP_BaseCharacter::AGP_BaseCharacter()
 {
@@ -89,6 +90,22 @@ void AGP_BaseCharacter::MulticastShowDamageNumber_Implementation(int32 DamageAmo
 	SpawnDamageNumberActor(DamageAmount, Element);
 }
 
+void AGP_BaseCharacter::ShowSkillVisualActor(TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation)
+{
+	if (HasAuthority())
+	{
+		MulticastSpawnSkillVisualActor(VisualActorClass, Location, Rotation);
+		return;
+	}
+
+	SpawnSkillVisualActor(VisualActorClass, Location, Rotation);
+}
+
+void AGP_BaseCharacter::MulticastSpawnSkillVisualActor_Implementation(TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation)
+{
+	SpawnSkillVisualActor(VisualActorClass, Location, Rotation);
+}
+
 void AGP_BaseCharacter::SpawnDamageNumberActor(int32 DamageAmount, EWeaponElement Element)
 {
 	if (!IsValid(GetWorld()) || !IsValid(DamageNumberActorClass))
@@ -112,6 +129,26 @@ void AGP_BaseCharacter::SpawnDamageNumberActor(int32 DamageAmount, EWeaponElemen
 
 	// 적 위치 기준으로 월드 데미지 숫자 액터를 즉시 초기화한다.
 	DamageNumberActor->InitializeDamageNumber(DamageAmount, Element);
+}
+
+void AGP_BaseCharacter::SpawnSkillVisualActor(TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation)
+{
+	if (!IsValid(GetWorld()) || !VisualActorClass)
+	{
+		return;
+	}
+
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.Owner = this;
+	SpawnParams.Instigator = this;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+	GetWorld()->SpawnActor<AActor>(
+		VisualActorClass,
+		Location,
+		Rotation,
+		SpawnParams
+	);
 }
 
 void AGP_BaseCharacter::BindAttributeDelegates(UAbilitySystemComponent* ASC, UAttributeSet* AS)

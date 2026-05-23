@@ -1,6 +1,7 @@
 #include "AbilitySystem/Abilities/GP_SkillBase.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystem/Abilities/GP_SkillData.h"
+#include "Characters/GP_BaseCharacter.h"
 #include "GameplayEffect.h"
 #include "GameplayTags/GP_Tags.h"
 #include "GameFramework/Actor.h"
@@ -106,6 +107,12 @@ void UGP_SkillBase::SpawnVisualActor(AActor* InstigatorActor, TSubclassOf<AActor
 {
 	if (!IsValid(InstigatorActor) || !VisualActorClass || !InstigatorActor->GetWorld())
 	{
+		return;
+	}
+
+	if (AGP_BaseCharacter* BaseCharacter = Cast<AGP_BaseCharacter>(InstigatorActor))
+	{
+		BaseCharacter->ShowSkillVisualActor(VisualActorClass, Location, Rotation);
 		return;
 	}
 
