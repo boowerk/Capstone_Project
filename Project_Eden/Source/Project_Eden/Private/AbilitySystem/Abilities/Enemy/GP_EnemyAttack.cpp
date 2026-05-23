@@ -2,10 +2,28 @@
 #include "AIController.h"
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
+#include "Animation/PDA_CharacterAnimationSet.h"
+#include "Characters/GP_BaseCharacter.h"
 #include "GameFramework/Pawn.h"
 #include "GameplayEffect.h"
 #include "GameplayTags/GP_Tags.h"
-#include "Utils/GP_BlueprintLibrary.h"
+
+namespace GP_EnemyAttack_Internal
+{
+	UAnimMontage* ResolvePrimaryAttackMontage(AActor* AvatarActor, UAnimMontage* ConfiguredMontage)
+	{
+		if (IsValid(ConfiguredMontage))
+		{
+			return ConfiguredMontage;
+		}
+
+		const AGP_BaseCharacter* BaseCharacter = Cast<AGP_BaseCharacter>(AvatarActor);
+		const UPDA_CharacterAnimationSet* AnimationSet = IsValid(BaseCharacter) ? BaseCharacter->AnimationSet : nullptr;
+
+		// Enemy basic attacks follow the same data-asset animation path as player attacks when a set is assigned.
+		return IsValid(AnimationSet) ? AnimationSet->PrimaryAttackMontage.Get() : nullptr;
+	}
+}
 
 UGP_EnemyAttack::UGP_EnemyAttack()
 {
@@ -52,7 +70,7 @@ void UGP_EnemyAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 	}
 
 	// 부모의 SkillMontage 변수를 공격 몽타주로 사용
-	UAnimMontage* MontageToPlay = SkillMontage;
+	UAnimMontage* MontageToPlay = GP_EnemyAttack_Internal::ResolvePrimaryAttackMontage(AvatarActor, SkillMontage);
 
 	if (MontageToPlay)
 	{
@@ -112,7 +130,7 @@ void UGP_EnemyAttack::PerformAttackHit()
 {
 	if (bHasAppliedAttackHit) return;
 
-	// 메커니즘: 부모 클래스의 공통 공격 판정 실행 (HitBoxElevationOffset은 현재 Enemy에서만 특수하게 사용)
+	// Generic enemies keep the shared spherical hit; boss-only shapes live in derived boss ability classes.
 	PerformAreaAttack();
 
 	bHasAppliedAttackHit = true;

@@ -27,6 +27,7 @@ public class Project_Eden : ModuleRules
             "PoseSearch",
             "MotionTrajectory",
             "Chooser",
+			"ProceduralMeshComponent",
         });
 
 		PrivateDependencyModuleNames.AddRange(new string[] { 

@@ -36,6 +36,10 @@ public:
 	// 구체 피격 검사
 	UFUNCTION(BlueprintCallable, Category = "Eden|Combat") 
 	static TArray<AActor*> SphereMeleeHitBoxOverlap(AActor* AvatarActor, float Radius, float ForwardOffset, float ElevationOffset, bool bDrawDebug = false);
+
+	// 전방 부채꼴 피격 검사: 보스 휩쓸기처럼 정면 각도가 중요한 공격에서 사용합니다.
+	UFUNCTION(BlueprintCallable, Category = "Eden|Combat")
+	static TArray<AActor*> ForwardArcMeleeHitBoxOverlap(AActor* AvatarActor, float Radius, float ForwardOffset, float ArcAngleDegrees, float ElevationOffset, bool bDrawDebug = false);
 	
 	
 	// GAS 유틸 
@@ -43,6 +47,10 @@ public:
 	// 액터배열에 게임플레이 이벤트 전송
 	UFUNCTION(BlueprintCallable, Category = "Eden|Combat|Abilities")
 	static void SendGameplayEventToActors(AActor* Instigator, const TArray<AActor*>& TargetActors, FGameplayTag EventTag);
+
+	// 같은 적 진영끼리 데미지/피격 이벤트가 들어가지 않도록 공용 전투 필터를 제공합니다.
+	UFUNCTION(BlueprintPure, Category = "Eden|Combat|Abilities")
+	static bool CanApplyCombatEffect(AActor* Instigator, AActor* TargetActor);
 	
 	// 액터배열에 게임플레이 이펙트 일괄 적용
 	UFUNCTION(BlueprintCallable, Category = "Eden|Combat|Abilities")

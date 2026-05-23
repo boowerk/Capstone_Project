@@ -9,6 +9,7 @@
 #include "Animation/AnimSequenceBase.h"
 #include "Animation/BlendSpace.h"
 #include "Animation/BlendSpace1D.h"
+#include "Animation/GP_BossAnimInstance.h"
 #include "Animation/GP_FemaleAnimInstance.h"
 #include "Animation/PDA_CharacterAnimationSet.h"
 #include "AnimationGraphSchema.h"
@@ -910,6 +911,368 @@ namespace GPFemaleAnimationSetup
 	}
 }
 
+namespace GPSansBossAnimationSetup
+{
+	const FString SansMeshPath = TEXT("/Game/Asset/BossAction/Sans/Sans");
+	const FString SansSkeletonPath = TEXT("/Game/Asset/BossAction/Sans/Sans_Skeleton");
+	const FString SansIdlePath = TEXT("/Game/Asset/BossAction/Sans/Animations/Sans_Zombie_Idle_Loop");
+	const FString SansWalkPath = TEXT("/Game/Asset/BossAction/Sans/Animations/Sans_Zombie_Walk_Fwd_Loop");
+	const FString SansRunPath = TEXT("/Game/Asset/BossAction/Sans/Animations/Sans_Zombie_Run_Fwd_Loop");
+	const FString SansJumpLoopPath = TEXT("/Game/Asset/BossAction/Sans/Animations/Sans_Jump_Loop");
+	const FString SansBasicAttackPath = TEXT("/Game/Asset/BossAction/Sans/Animations/Sans_Zombie_Scratch");
+	const FString SansSweepAttackPath = TEXT("/Game/Asset/BossAction/Sans/Animations/Sans_Sword_Heavy_A");
+	const FString BlendSpacePackagePath = TEXT("/Game/Asset/BossAction/Sans/BlendSpaces");
+	const FString BlendSpaceName = TEXT("BS_Sans_Boss_Locomotion");
+	const FString AnimBlueprintPackagePath = TEXT("/Game/Asset/BossAction/Sans/AnimBlueprints");
+	const FString AnimBlueprintName = TEXT("ABP_Sans_Boss");
+	const FString AnimationSetPackagePath = TEXT("/Game/Asset/BossAction/Sans/DataAssets");
+	const FString AnimationSetName = TEXT("PDA_SansBossAnimationSet");
+	const FString MontagePackagePath = TEXT("/Game/Asset/BossAction/Sans/Montages");
+	const FString BasicAttackMontageName = TEXT("AM_Sans_Zombie_Scratch");
+	const FString SweepAttackMontageName = TEXT("AM_Sans_BossSweep");
+	const FString BossBlueprintPath = TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_Sans/BP_Boss_Sans");
+	const FName LocomotionSyncGroupName(TEXT("BossLocomotion"));
+	const float AttackMontageBlendInTime = 0.08f;
+	const float AttackMontageBlendOutTime = 0.12f;
+
+	UBlendSpace1D* CreateOrUpdateLocomotionBlendSpace(USkeleton* Skeleton, USkeletalMesh* SkeletalMesh)
+	{
+		if (!IsValid(Skeleton) || !IsValid(SkeletalMesh))
+		{
+			return nullptr;
+		}
+
+		const FString BlendSpaceObjectPath = FString::Printf(TEXT("%s/%s.%s"), *BlendSpacePackagePath, *BlendSpaceName, *BlendSpaceName);
+		UBlendSpace1D* BlendSpace = LoadObject<UBlendSpace1D>(nullptr, *BlendSpaceObjectPath);
+		if (!BlendSpace)
+		{
+			UBlendSpaceFactory1D* Factory = NewObject<UBlendSpaceFactory1D>();
+			Factory->TargetSkeleton = Skeleton;
+			Factory->PreviewSkeletalMesh = SkeletalMesh;
+
+			BlendSpace = Cast<UBlendSpace1D>(FAssetToolsModule::GetModule().Get().CreateAsset(
+				BlendSpaceName,
+				BlendSpacePackagePath,
+				UBlendSpace1D::StaticClass(),
+				Factory));
+		}
+
+		if (!IsValid(BlendSpace))
+		{
+			UE_LOG(LogTemp, Error, TEXT("Failed to create Sans boss locomotion blend space"));
+			return nullptr;
+		}
+
+		BlendSpace->Modify();
+		if (FStructProperty* BlendParametersProperty = CastField<FStructProperty>(GPFemaleAnimationSetup::FindPropertyChecked(UBlendSpace::StaticClass(), TEXT("BlendParameters"))))
+		{
+			FBlendParameter* BlendParameters = BlendParametersProperty->ContainerPtrToValuePtr<FBlendParameter>(BlendSpace);
+			BlendParameters[0].DisplayName = TEXT("Speed");
+			BlendParameters[0].Min = 0.0f;
+			BlendParameters[0].Max = 450.0f;
+			BlendParameters[0].GridNum = 4;
+			BlendParameters[0].bSnapToGrid = false;
+			BlendParameters[0].bWrapInput = false;
+		}
+
+		for (int32 SampleIndex = BlendSpace->GetNumberOfBlendSamples() - 1; SampleIndex >= 0; --SampleIndex)
+		{
+			BlendSpace->DeleteSample(SampleIndex);
+		}
+
+		UAnimSequence* Idle = GPFemaleAnimationSetup::LoadRequiredAsset<UAnimSequence>(*SansIdlePath);
+		UAnimSequence* Walk = GPFemaleAnimationSetup::LoadRequiredAsset<UAnimSequence>(*SansWalkPath);
+		UAnimSequence* Run = GPFemaleAnimationSetup::LoadRequiredAsset<UAnimSequence>(*SansRunPath);
+		if (!Idle || !Walk || !Run)
+		{
+			return nullptr;
+		}
+
+		// Sans boss locomotion mirrors the player data layout: idle, walk, and run are driven by one Speed axis.
+		BlendSpace->AddSample(Idle, FVector(0.0f, 0.0f, 0.0f));
+		BlendSpace->AddSample(Walk, FVector(180.0f, 0.0f, 0.0f));
+		BlendSpace->AddSample(Run, FVector(450.0f, 0.0f, 0.0f));
+		BlendSpace->ValidateSampleData();
+		BlendSpace->ResampleData();
+		BlendSpace->MarkPackageDirty();
+
+		return GPFemaleAnimationSetup::SaveAsset(BlendSpace) ? BlendSpace : nullptr;
+	}
+
+	UAnimMontage* CreateOrUpdateMontageFromSequence(USkeleton* Skeleton, const FString& SourceAnimationPath, const FString& MontageName, const TCHAR* LogName)
+	{
+		if (!IsValid(Skeleton))
+		{
+			return nullptr;
+		}
+
+		const FString MontageObjectPath = FString::Printf(TEXT("%s/%s.%s"), *MontagePackagePath, *MontageName, *MontageName);
+		UAnimMontage* Montage = LoadObject<UAnimMontage>(nullptr, *MontageObjectPath);
+		if (!Montage)
+		{
+			UAnimSequence* SourceAnimation = GPFemaleAnimationSetup::LoadRequiredAsset<UAnimSequence>(SourceAnimationPath);
+			if (!SourceAnimation)
+			{
+				return nullptr;
+			}
+
+			UAnimMontageFactory* Factory = NewObject<UAnimMontageFactory>();
+			Factory->TargetSkeleton = Skeleton;
+			Factory->SourceAnimation = SourceAnimation;
+
+			Montage = Cast<UAnimMontage>(FAssetToolsModule::GetModule().Get().CreateAsset(
+				MontageName,
+				MontagePackagePath,
+				UAnimMontage::StaticClass(),
+				Factory));
+		}
+
+		if (!IsValid(Montage))
+		{
+			UE_LOG(LogTemp, Error, TEXT("Failed to create %s montage"), LogName);
+			return nullptr;
+		}
+
+		Montage->Modify();
+		// Boss attack montages use the same short blends as the player attack structure.
+		Montage->BlendIn.SetBlendOption(EAlphaBlendOption::Cubic);
+		Montage->BlendIn.SetBlendTime(AttackMontageBlendInTime);
+		Montage->BlendOut.SetBlendOption(EAlphaBlendOption::Cubic);
+		Montage->BlendOut.SetBlendTime(AttackMontageBlendOutTime);
+		Montage->BlendOutTriggerTime = -1.0f;
+		Montage->MarkPackageDirty();
+
+		return GPFemaleAnimationSetup::SaveAsset(Montage) ? Montage : nullptr;
+	}
+
+	UAnimBlueprint* CreateOrUpdateAnimBlueprint(USkeleton* Skeleton, USkeletalMesh* SkeletalMesh, UBlendSpace1D* BlendSpace, UAnimSequence* JumpLoop)
+	{
+		if (!IsValid(Skeleton) || !IsValid(SkeletalMesh) || !IsValid(BlendSpace) || !IsValid(JumpLoop))
+		{
+			return nullptr;
+		}
+
+		const FString BlueprintObjectPath = FString::Printf(TEXT("%s/%s.%s"), *AnimBlueprintPackagePath, *AnimBlueprintName, *AnimBlueprintName);
+		UAnimBlueprint* AnimBlueprint = LoadObject<UAnimBlueprint>(nullptr, *BlueprintObjectPath);
+		if (!AnimBlueprint)
+		{
+			UAnimBlueprintFactory* Factory = NewObject<UAnimBlueprintFactory>();
+			Factory->ParentClass = UGP_BossAnimInstance::StaticClass();
+			Factory->TargetSkeleton = Skeleton;
+			Factory->PreviewSkeletalMesh = SkeletalMesh;
+
+			AnimBlueprint = Cast<UAnimBlueprint>(FAssetToolsModule::GetModule().Get().CreateAsset(
+				AnimBlueprintName,
+				AnimBlueprintPackagePath,
+				UAnimBlueprint::StaticClass(),
+				Factory));
+		}
+
+		if (!IsValid(AnimBlueprint))
+		{
+			UE_LOG(LogTemp, Error, TEXT("Failed to create Sans boss anim blueprint"));
+			return nullptr;
+		}
+
+		AnimBlueprint->ParentClass = UGP_BossAnimInstance::StaticClass();
+		AnimBlueprint->TargetSkeleton = Skeleton;
+
+		UEdGraph* AnimationGraph = nullptr;
+		for (UEdGraph* Graph : AnimBlueprint->FunctionGraphs)
+		{
+			if (Graph && Graph->GetSchema()->IsA(UAnimationGraphSchema::StaticClass()))
+			{
+				AnimationGraph = Graph;
+				break;
+			}
+		}
+
+		if (!AnimationGraph)
+		{
+			UE_LOG(LogTemp, Error, TEXT("Sans boss anim blueprint has no animation graph"));
+			return nullptr;
+		}
+
+		AnimationGraph->Modify();
+		UAnimGraphNode_Root* RootNode = nullptr;
+		TArray<UEdGraphNode*> ExistingNodes = AnimationGraph->Nodes;
+		for (UEdGraphNode* Node : ExistingNodes)
+		{
+			if (UAnimGraphNode_Root* CandidateRoot = Cast<UAnimGraphNode_Root>(Node))
+			{
+				RootNode = CandidateRoot;
+				continue;
+			}
+
+			AnimationGraph->RemoveNode(Node);
+		}
+
+		if (!IsValid(RootNode))
+		{
+			UE_LOG(LogTemp, Error, TEXT("Sans boss anim blueprint root node was not found"));
+			return nullptr;
+		}
+
+		FGraphNodeCreator<UAnimGraphNode_BlendSpacePlayer> BlendSpaceNodeCreator(*AnimationGraph);
+		UAnimGraphNode_BlendSpacePlayer* BlendSpaceNode = BlendSpaceNodeCreator.CreateNode();
+		BlendSpaceNode->NodePosX = -650;
+		BlendSpaceNode->NodePosY = 0;
+		BlendSpaceNode->SetAnimationAsset(BlendSpace);
+		BlendSpaceNode->Node.SetGroupName(LocomotionSyncGroupName);
+		BlendSpaceNode->Node.SetGroupRole(EAnimGroupRole::CanBeLeader);
+		BlendSpaceNode->Node.SetGroupMethod(EAnimSyncMethod::SyncGroup);
+		BlendSpaceNodeCreator.Finalize();
+		if (!GPFemaleAnimationSetup::ShowOptionalInputPin(BlendSpaceNode, TEXT("BlendSpace")))
+		{
+			return nullptr;
+		}
+
+		FGraphNodeCreator<UAnimGraphNode_SequencePlayer> JumpNodeCreator(*AnimationGraph);
+		UAnimGraphNode_SequencePlayer* JumpNode = JumpNodeCreator.CreateNode();
+		JumpNode->NodePosX = -650;
+		JumpNode->NodePosY = 240;
+		JumpNode->SetAnimationAsset(JumpLoop);
+		JumpNodeCreator.Finalize();
+		if (!GPFemaleAnimationSetup::ShowOptionalInputPin(JumpNode, TEXT("Sequence")))
+		{
+			return nullptr;
+		}
+
+		FGraphNodeCreator<UAnimGraphNode_BlendListByBool> BlendByBoolNodeCreator(*AnimationGraph);
+		UAnimGraphNode_BlendListByBool* BlendByBoolNode = BlendByBoolNodeCreator.CreateNode();
+		BlendByBoolNode->Node.AddPose();
+		BlendByBoolNode->Node.AddPose();
+		BlendByBoolNode->NodePosX = -260;
+		BlendByBoolNode->NodePosY = 120;
+		BlendByBoolNodeCreator.Finalize();
+
+		FGraphNodeCreator<UAnimGraphNode_Slot> SlotNodeCreator(*AnimationGraph);
+		UAnimGraphNode_Slot* SlotNode = SlotNodeCreator.CreateNode();
+		SlotNode->Node.SlotName = FName(TEXT("DefaultSlot"));
+		SlotNode->NodePosX = 90;
+		SlotNode->NodePosY = 120;
+		SlotNodeCreator.Finalize();
+
+		const UEdGraphSchema_K2* K2Schema = GetDefault<UEdGraphSchema_K2>();
+		// The boss graph reads the same cached animation-set fields as the player AnimBP structure.
+		UK2Node_VariableGet* LocomotionBlendSpaceNode = K2Schema->SpawnVariableGetNode(FVector2D(-980.0, -200.0), AnimationGraph, TEXT("LocomotionBlendSpace"), UGP_BossAnimInstance::StaticClass());
+		UK2Node_VariableGet* JumpLoopAssetNode = K2Schema->SpawnVariableGetNode(FVector2D(-980.0, 360.0), AnimationGraph, TEXT("JumpLoopAnimation"), UGP_BossAnimInstance::StaticClass());
+		UK2Node_VariableGet* GroundSpeedNode = K2Schema->SpawnVariableGetNode(FVector2D(-960.0, -40.0), AnimationGraph, TEXT("GroundSpeed"), UGP_BossAnimInstance::StaticClass());
+		UK2Node_VariableGet* IsFallingNode = K2Schema->SpawnVariableGetNode(FVector2D(-960.0, 240.0), AnimationGraph, TEXT("bIsFalling"), UGP_BossAnimInstance::StaticClass());
+
+		if (!LocomotionBlendSpaceNode || !JumpLoopAssetNode || !GroundSpeedNode || !IsFallingNode)
+		{
+			UE_LOG(LogTemp, Error, TEXT("Failed to spawn Sans boss anim blueprint getter nodes"));
+			return nullptr;
+		}
+
+		LocomotionBlendSpaceNode->ReconstructNode();
+		JumpLoopAssetNode->ReconstructNode();
+		GroundSpeedNode->ReconstructNode();
+		IsFallingNode->ReconstructNode();
+
+		if (!GPFemaleAnimationSetup::ConnectPins(GPFemaleAnimationSetup::FindFirstOutputPin(LocomotionBlendSpaceNode), GPFemaleAnimationSetup::FindPinChecked(BlendSpaceNode, TEXT("BlendSpace"), EGPD_Input))
+			|| !GPFemaleAnimationSetup::ConnectPins(GPFemaleAnimationSetup::FindFirstOutputPin(JumpLoopAssetNode), GPFemaleAnimationSetup::FindPinChecked(JumpNode, TEXT("Sequence"), EGPD_Input))
+			|| !GPFemaleAnimationSetup::ConnectPins(GPFemaleAnimationSetup::FindFirstOutputPin(GroundSpeedNode), GPFemaleAnimationSetup::FindPinChecked(BlendSpaceNode, TEXT("X"), EGPD_Input))
+			|| !GPFemaleAnimationSetup::ConnectPins(GPFemaleAnimationSetup::FindFirstOutputPin(IsFallingNode), GPFemaleAnimationSetup::FindPinChecked(BlendByBoolNode, TEXT("bActiveValue"), EGPD_Input))
+			|| !GPFemaleAnimationSetup::ConnectPins(GPFemaleAnimationSetup::FindPoseOutputPin(BlendSpaceNode), GPFemaleAnimationSetup::FindPinChecked(BlendByBoolNode, TEXT("BlendPose_0"), EGPD_Input))
+			|| !GPFemaleAnimationSetup::ConnectPins(GPFemaleAnimationSetup::FindPoseOutputPin(JumpNode), GPFemaleAnimationSetup::FindPinChecked(BlendByBoolNode, TEXT("BlendPose_1"), EGPD_Input))
+			|| !GPFemaleAnimationSetup::ConnectPins(GPFemaleAnimationSetup::FindPoseOutputPin(BlendByBoolNode), GPFemaleAnimationSetup::FindPinChecked(SlotNode, TEXT("Source"), EGPD_Input))
+			|| !GPFemaleAnimationSetup::ConnectPins(GPFemaleAnimationSetup::FindPoseOutputPin(SlotNode), GPFemaleAnimationSetup::FindPinChecked(RootNode, TEXT("Result"), EGPD_Input)))
+		{
+			UE_LOG(LogTemp, Error, TEXT("Failed to wire Sans boss anim blueprint graph"));
+			return nullptr;
+		}
+
+		FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(AnimBlueprint);
+		FKismetEditorUtilities::CompileBlueprint(AnimBlueprint);
+		return GPFemaleAnimationSetup::SaveAsset(AnimBlueprint) ? AnimBlueprint : nullptr;
+	}
+
+	UPDA_CharacterAnimationSet* CreateOrUpdateAnimationSet(
+		USkeletalMesh* SkeletalMesh,
+		UBlendSpace* BlendSpace,
+		UAnimSequenceBase* JumpLoop,
+		UAnimBlueprint* AnimBlueprint,
+		UAnimMontage* BasicAttackMontage,
+		UAnimMontage* SweepAttackMontage)
+	{
+		if (!IsValid(SkeletalMesh) || !IsValid(BlendSpace) || !IsValid(JumpLoop) || !IsValid(AnimBlueprint) || !IsValid(BasicAttackMontage) || !IsValid(SweepAttackMontage))
+		{
+			return nullptr;
+		}
+
+		const FString AnimationSetObjectPath = FString::Printf(TEXT("%s/%s.%s"), *AnimationSetPackagePath, *AnimationSetName, *AnimationSetName);
+		UPDA_CharacterAnimationSet* AnimationSet = LoadObject<UPDA_CharacterAnimationSet>(nullptr, *AnimationSetObjectPath);
+		if (!AnimationSet)
+		{
+			UDataAssetFactory* Factory = NewObject<UDataAssetFactory>();
+			Factory->DataAssetClass = UPDA_CharacterAnimationSet::StaticClass();
+
+			AnimationSet = Cast<UPDA_CharacterAnimationSet>(FAssetToolsModule::GetModule().Get().CreateAsset(
+				AnimationSetName,
+				AnimationSetPackagePath,
+				UPDA_CharacterAnimationSet::StaticClass(),
+				Factory));
+		}
+
+		if (!IsValid(AnimationSet))
+		{
+			UE_LOG(LogTemp, Error, TEXT("Failed to create Sans boss animation set"));
+			return nullptr;
+		}
+
+		AnimationSet->Modify();
+		AnimationSet->CharacterMesh = SkeletalMesh;
+		AnimationSet->AnimBlueprintClass = AnimBlueprint->GeneratedClass;
+		AnimationSet->LocomotionBlendSpace = BlendSpace;
+		AnimationSet->JumpLoopAnimation = JumpLoop;
+		AnimationSet->PrimaryAttackMontage = BasicAttackMontage;
+		AnimationSet->LightAttackMontages.Reset();
+		AnimationSet->LightAttackMontages.Add(BasicAttackMontage);
+		AnimationSet->HeavyAttackMontages.Reset();
+		AnimationSet->HeavyAttackMontages.Add(SweepAttackMontage);
+		AnimationSet->MarkPackageDirty();
+
+		return GPFemaleAnimationSetup::SaveAsset(AnimationSet) ? AnimationSet : nullptr;
+	}
+
+	bool AssignBossBlueprint(USkeletalMesh* SkeletalMesh, UAnimBlueprint* AnimBlueprint, UPDA_CharacterAnimationSet* AnimationSet)
+	{
+		UBlueprint* BossBlueprint = GPFemaleAnimationSetup::LoadRequiredAsset<UBlueprint>(*BossBlueprintPath);
+		if (!IsValid(BossBlueprint) || !BossBlueprint->GeneratedClass || !IsValid(SkeletalMesh) || !IsValid(AnimBlueprint) || !IsValid(AnimationSet))
+		{
+			return false;
+		}
+
+		AActor* DefaultActor = Cast<AActor>(BossBlueprint->GeneratedClass->GetDefaultObject());
+		USkeletalMeshComponent* MeshComponent = IsValid(DefaultActor) ? DefaultActor->FindComponentByClass<USkeletalMeshComponent>() : nullptr;
+		if (!IsValid(DefaultActor) || !IsValid(MeshComponent))
+		{
+			UE_LOG(LogTemp, Error, TEXT("Failed to find Sans boss blueprint mesh component"));
+			return false;
+		}
+
+		MeshComponent->Modify();
+		MeshComponent->SetSkeletalMesh(SkeletalMesh);
+		MeshComponent->SetAnimInstanceClass(AnimBlueprint->GeneratedClass);
+		MeshComponent->SetAnimationMode(EAnimationMode::AnimationBlueprint);
+
+		FObjectProperty* AnimationSetProperty = FindFProperty<FObjectProperty>(BossBlueprint->GeneratedClass, TEXT("AnimationSet"));
+		if (!AnimationSetProperty)
+		{
+			UE_LOG(LogTemp, Error, TEXT("Failed to find AnimationSet property on Sans boss blueprint"));
+			return false;
+		}
+
+		DefaultActor->Modify();
+		// The boss Blueprint points at the same data asset that abilities use for basic and sweep montages.
+		AnimationSetProperty->SetObjectPropertyValue_InContainer(DefaultActor, AnimationSet);
+		BossBlueprint->MarkPackageDirty();
+		return GPFemaleAnimationSetup::SaveAsset(BossBlueprint);
+	}
+}
+
 #endif
 
 bool UGP_AnimationSetupLibrary::CreateFemalePlayerAnimationSetup()
@@ -1039,6 +1402,74 @@ bool UGP_AnimationSetupLibrary::CreateFemalePlayerAnimationSetup()
 	return true;
 #else
 	UE_LOG(LogTemp, Warning, TEXT("CreateFemalePlayerAnimationSetup is only available in editor builds."));
+	return false;
+#endif
+}
+
+bool UGP_AnimationSetupLibrary::CreateSansBossAnimationSetup()
+{
+#if WITH_EDITOR
+	USkeletalMesh* SansMesh = GPFemaleAnimationSetup::LoadRequiredAsset<USkeletalMesh>(*GPSansBossAnimationSetup::SansMeshPath);
+	USkeleton* SansSkeleton = GPFemaleAnimationSetup::LoadRequiredAsset<USkeleton>(*GPSansBossAnimationSetup::SansSkeletonPath);
+	UAnimSequence* JumpLoop = GPFemaleAnimationSetup::LoadRequiredAsset<UAnimSequence>(*GPSansBossAnimationSetup::SansJumpLoopPath);
+	if (!SansMesh || !SansSkeleton || !JumpLoop)
+	{
+		return false;
+	}
+
+	UBlendSpace1D* BlendSpace = GPSansBossAnimationSetup::CreateOrUpdateLocomotionBlendSpace(SansSkeleton, SansMesh);
+	if (!BlendSpace)
+	{
+		return false;
+	}
+
+	UAnimMontage* BasicAttackMontage = GPSansBossAnimationSetup::CreateOrUpdateMontageFromSequence(
+		SansSkeleton,
+		GPSansBossAnimationSetup::SansBasicAttackPath,
+		GPSansBossAnimationSetup::BasicAttackMontageName,
+		TEXT("Sans zombie scratch"));
+	if (!BasicAttackMontage)
+	{
+		return false;
+	}
+
+	UAnimMontage* SweepAttackMontage = GPSansBossAnimationSetup::CreateOrUpdateMontageFromSequence(
+		SansSkeleton,
+		GPSansBossAnimationSetup::SansSweepAttackPath,
+		GPSansBossAnimationSetup::SweepAttackMontageName,
+		TEXT("Sans sword heavy A sweep"));
+	if (!SweepAttackMontage)
+	{
+		return false;
+	}
+
+	UAnimBlueprint* AnimBlueprint = GPSansBossAnimationSetup::CreateOrUpdateAnimBlueprint(SansSkeleton, SansMesh, BlendSpace, JumpLoop);
+	if (!AnimBlueprint)
+	{
+		return false;
+	}
+
+	UPDA_CharacterAnimationSet* AnimationSet = GPSansBossAnimationSetup::CreateOrUpdateAnimationSet(
+		SansMesh,
+		BlendSpace,
+		JumpLoop,
+		AnimBlueprint,
+		BasicAttackMontage,
+		SweepAttackMontage);
+	if (!AnimationSet)
+	{
+		return false;
+	}
+
+	if (!GPSansBossAnimationSetup::AssignBossBlueprint(SansMesh, AnimBlueprint, AnimationSet))
+	{
+		return false;
+	}
+
+	UE_LOG(LogTemp, Display, TEXT("Sans boss animation setup completed successfully."));
+	return true;
+#else
+	UE_LOG(LogTemp, Warning, TEXT("CreateSansBossAnimationSetup is only available in editor builds."));
 	return false;
 #endif
 }

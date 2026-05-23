@@ -35,6 +35,9 @@ public:
 	// BT services can ask perception to rescore targets after a leash state or tactical state change.
 	void RequestTargetActorReevaluation();
 
+	// Boss tactics services use this to open deterministic pattern windows while validating runtime evaluation changes.
+	bool IsBossRuntimeEvaluationTestCycleActive() const;
+
 	// Schedules a safe root re-evaluation outside BehaviorTreeComponent tick.
 	void RequestBehaviorTreeRootReevaluation();
 
@@ -109,6 +112,13 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AI|LLM")
 	bool bEnableEvaluationRefreshLoop = false;
 
+	// Local boss test mode cycles evaluation values so each boss attack pattern can be observed in play.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AI|LLM|Testing")
+	bool bEnableBossRuntimeEvaluationTestCycle = true;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AI|LLM|Testing", meta = (ClampMin = "0.25"))
+	float BossRuntimeEvaluationTestInterval = 2.5f;
+
 	UFUNCTION()
 	void HandleTargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus);
 
@@ -121,6 +131,7 @@ protected:
 	void HandleEvaluationRefreshTimerElapsed();
 	void StartEvaluationRefreshLoop();
 	void StopEvaluationRefreshLoop();
+	bool ShouldUseBossRuntimeEvaluationTestCycle() const;
 	void ResolveBehaviorAssets(APawn* InPawn, UBehaviorTree*& OutBehaviorTreeAsset, UBlackboardData*& OutBlackboardAsset) const;
 	bool ValidateSharedBlackboardSchema(UBlackboardComponent* BlackboardComponent);
 
@@ -142,6 +153,7 @@ protected:
 	bool bLeashReturnHomeActive = false;
 	bool bHasPendingBehaviorTreeRootReevaluation = false;
 	int32 PendingBehaviorTreeRootReevaluationRetryCount = 0;
+	int32 BossRuntimeEvaluationTestIndex = 0;
 	float LastEnemyEvaluationApplyTime = -1000.0f;
 	FEnemyLLMEvaluation PendingEnemyEvaluation;
 	FEnemyLLMEvaluation LastAppliedEnemyEvaluation;
