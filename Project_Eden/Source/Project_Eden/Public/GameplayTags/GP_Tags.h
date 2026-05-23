@@ -182,6 +182,8 @@ namespace GPTags
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(LineShock);
 
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(MineBurst);
+
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(ConeSlash);
 		}
 		namespace Data
 		{
