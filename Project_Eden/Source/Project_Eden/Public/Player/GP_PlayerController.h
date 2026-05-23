@@ -120,4 +120,15 @@ private:
 	void UpdateCharacterRotation(float DeltaSeconds);
 
 	bool bSkillsEquipped = false;
+
+private:
+	// --- Movement Input Smoothing ---
+	FVector SmoothedMoveWorldDirection = FVector::ZeroVector;
+	bool bHasSmoothedMoveWorldDirection = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Smoothing", meta = (AllowPrivateAccess = "true"))
+	float MoveDirectionInterpSpeed = 12.0f;
+
+	bool ShouldSmoothMoveDirection() const;
+	void ResetMoveDirectionSmoothing();
 };

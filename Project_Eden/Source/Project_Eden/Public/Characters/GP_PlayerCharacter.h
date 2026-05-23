@@ -43,6 +43,7 @@ public:
 	
 	bool TryPerformDash();
 	bool IsDashing() const;
+	bool IsLockOn() const { return bIsLockOn; }
 
 	float GetMovementSpeedScaleRatio() const;
 	float GetScaledNormalWalkSpeed() const;
