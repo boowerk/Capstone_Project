@@ -83,15 +83,7 @@ void AGP_Projectile::OnProjectileOverlap(UPrimitiveComponent* OverlappedComponen
 		TArray<AActor*> HitActors;
 		HitActors.Add(OtherActor);
 
-		if (DamageEffectClass)
-		{
-			UGP_BlueprintLibrary::ApplyGameplayEffectToActors(GetInstigator(), HitActors, DamageEffectClass, EffectLevel, SkillData);
-		}
-
-		if (HitEventTag.IsValid())
-		{
-			UGP_BlueprintLibrary::SendGameplayEventToActors(GetInstigator(), HitActors, HitEventTag);
-		}
+		UGP_BlueprintLibrary::ApplyGameplayEffectAndEventToActors(GetInstigator(), HitActors, DamageEffectClass, HitEventTag, EffectLevel, SkillData);
 	}
 
 	MulticastPlayHitEffect(GetActorLocation());

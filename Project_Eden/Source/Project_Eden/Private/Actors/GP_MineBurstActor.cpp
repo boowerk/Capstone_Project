@@ -118,15 +118,7 @@ void AGP_MineBurstActor::Explode()
 			bDrawDebug
 		);
 
-		if (DamageEffectClass)
-		{
-			UGP_BlueprintLibrary::ApplyGameplayEffectToActors(InstigatorActor, HitActors, DamageEffectClass, EffectLevel, SkillData);
-		}
-
-		if (HitEventTag.IsValid())
-		{
-			UGP_BlueprintLibrary::SendGameplayEventToActors(InstigatorActor, HitActors, HitEventTag);
-		}
+		UGP_BlueprintLibrary::ApplyGameplayEffectAndEventToActors(InstigatorActor, HitActors, DamageEffectClass, HitEventTag, EffectLevel, SkillData);
 	}
 
 	Destroy();
