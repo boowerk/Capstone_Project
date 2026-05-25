@@ -1,3 +1,15 @@
 /Project_Eden/plugins
+.claude/
+skills/
+CLAUDE.md
+Project_Eden/CLAUDE.md
 .memoc/.pending
+.memoc/log.md
+.memoc/session-summary.md
+.memoc/bin/
+.memoc/env.ps1
+.memoc/env.sh
+.memoc/boot.md
+.memoc/memoc-usage.md
+.memoc/04-handoff.md
 .memoc/local/
