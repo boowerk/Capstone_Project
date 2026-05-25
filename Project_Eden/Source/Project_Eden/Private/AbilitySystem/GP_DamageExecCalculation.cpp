@@ -2,7 +2,14 @@
 #include "AbilitySystem/GP_AttributeSet.h"
 #include "GameplayTags/GP_Tags.h"
 #include "AbilitySystemComponent.h"
+#include "HAL/IConsoleManager.h"
 #include "Math/UnrealMathUtility.h"
+
+static TAutoConsoleVariable<int32> CVarGPDamageExecLog(
+    TEXT("gp.DamageExec.Log"),
+    0,
+    TEXT("Logs GP damage execution values when non-zero."),
+    ECVF_Default);
 
 struct FGP_DamageStatics
 {
@@ -136,18 +143,33 @@ void UGP_DamageExecCalculation::Execute_Implementation(const FGameplayEffectCust
 
     // 4. 다/라. 속성 및 방어력 경감
     float Resistance_Elem = 0.0f;
-    if (Spec.GetDynamicAssetTags().HasTagExact(GPTags::Damage::Element::Pyros)) { ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().PyrosResistanceDef, EvaluationParameters, Resistance_Elem); }
-    else if (Spec.GetDynamicAssetTags().HasTagExact(GPTags::Damage::Element::Hydro)) { ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().HydroResistanceDef, EvaluationParameters, Resistance_Elem); }
-    else if (Spec.GetDynamicAssetTags().HasTagExact(GPTags::Damage::Element::Volt)) { ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().VoltResistanceDef, EvaluationParameters, Resistance_Elem); }
-    else if (Spec.GetDynamicAssetTags().HasTagExact(GPTags::Damage::Element::Aero)) { ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().AeroResistanceDef, EvaluationParameters, Resistance_Elem); }
-    else if (Spec.GetDynamicAssetTags().HasTagExact(GPTags::Damage::Element::Lux)) { ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().LuxResistanceDef, EvaluationParameters, Resistance_Elem); }
-    else if (Spec.GetDynamicAssetTags().HasTagExact(GPTags::Damage::Element::Chaos)) { ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().ChaosResistanceDef, EvaluationParameters, Resistance_Elem); }
-    else if (Spec.GetDynamicAssetTags().HasTagExact(GPTags::Damage::Element::Brute)) { ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().BruteResistanceDef, EvaluationParameters, Resistance_Elem); }
+    const TCHAR* ElementName = TEXT("None");
+    if (Spec.GetDynamicAssetTags().HasTagExact(GPTags::Damage::Element::Pyros)) { ElementName = TEXT("Pyros"); ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().PyrosResistanceDef, EvaluationParameters, Resistance_Elem); }
+    else if (Spec.GetDynamicAssetTags().HasTagExact(GPTags::Damage::Element::Hydro)) { ElementName = TEXT("Hydro"); ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().HydroResistanceDef, EvaluationParameters, Resistance_Elem); }
+    else if (Spec.GetDynamicAssetTags().HasTagExact(GPTags::Damage::Element::Volt)) { ElementName = TEXT("Volt"); ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().VoltResistanceDef, EvaluationParameters, Resistance_Elem); }
+    else if (Spec.GetDynamicAssetTags().HasTagExact(GPTags::Damage::Element::Aero)) { ElementName = TEXT("Aero"); ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().AeroResistanceDef, EvaluationParameters, Resistance_Elem); }
+    else if (Spec.GetDynamicAssetTags().HasTagExact(GPTags::Damage::Element::Lux)) { ElementName = TEXT("Lux"); ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().LuxResistanceDef, EvaluationParameters, Resistance_Elem); }
+    else if (Spec.GetDynamicAssetTags().HasTagExact(GPTags::Damage::Element::Chaos)) { ElementName = TEXT("Chaos"); ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().ChaosResistanceDef, EvaluationParameters, Resistance_Elem); }
+    else if (Spec.GetDynamicAssetTags().HasTagExact(GPTags::Damage::Element::Brute)) { ElementName = TEXT("Brute"); ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().BruteResistanceDef, EvaluationParameters, Resistance_Elem); }
 
     float K = 100.0f; 
     float ArmorMitigation = K / (K + FMath::Max(Armor, 0.0f));
     
     float Damage_Final = Damage_Modified * ArmorMitigation * (1.0f - Resistance_Elem);
+
+    if (CVarGPDamageExecLog.GetValueOnAnyThread() != 0)
+    {
+        UE_LOG(LogTemp, Log, TEXT("[DamageExec] Element=%s Base=%.2f Critical=%s CritMult=%.2f Modified=%.2f Armor=%.2f ArmorMitigation=%.3f Resistance=%.3f Final=%.2f"),
+            ElementName,
+            BaseDamage,
+            bCritical ? TEXT("true") : TEXT("false"),
+            FinalCritMult,
+            Damage_Modified,
+            Armor,
+            ArmorMitigation,
+            Resistance_Elem,
+            Damage_Final);
+    }
 
     // 5. 마. 강인도 피해 산출
     float ToughnessDamageBase = Spec.GetSetByCallerMagnitude(GPTags::Damage::Data::ToughnessBase, false, 0.0f);
