@@ -2,8 +2,8 @@
 memoc: true
 type: core
 scope: project-memory
-created: 2026-05-23T15:34:02
-updated: 2026-05-23T15:34:02
+created: 2026-05-24T07:30:34
+updated: 2026-05-24T07:30:34
 status: active
 tags:
   - memoc
@@ -22,7 +22,7 @@ This is the fast entry map for agents. Start here, then open only the docs relev
 ## Project Snapshot
 
 <!-- memoc:snapshot:start -->
-- Last synced: 2026-05-23T15:34:02
+- Last synced: 2026-05-24T07:30:33
 - Detected stack: Not detected
 
 ### Source Directories
