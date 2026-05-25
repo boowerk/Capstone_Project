@@ -1,0 +1,11 @@
+=== CHOOSER PATH VERIFICATION START ===
+Physical File: D:\Unreal Projects\Capstone_Project\Project_Eden\Content\Characters\UEFN_Mannequin\Animations\MotionMatchingData\ChooserTables\CHT_MM_MaskMan_Root.uasset
+  Size: 36994 bytes
+  Modified: 1779348237.970018
+
+Successfully loaded: CHT_MM_MaskMan_Root
+Class: ChooserTable
+Package Name: /Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/ChooserTables/CHT_MM_MaskMan_Root
+Failed to resolve filename: module 'unreal' has no attribute 'PackageName'
+
+=== CHOOSER PATH VERIFICATION END ===

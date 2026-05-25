@@ -15,5 +15,8 @@ public:
 	static bool CreateFemalePlayerAnimationSetup();
 
 	UFUNCTION(BlueprintCallable, Category = "ProjectEden|Editor")
+	static bool CreateSansBossAnimationSetup();
+
+	UFUNCTION(BlueprintCallable, Category = "ProjectEden|Editor")
 	static bool CreateDashInputSetup();
 };

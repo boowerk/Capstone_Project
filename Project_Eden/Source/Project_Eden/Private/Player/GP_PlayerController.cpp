@@ -10,6 +10,7 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "GameFramework/Character.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "GameplayTags/GP_Tags.h"
 #include "Kismet/GameplayStatics.h"
 #include "Logging/LogMacros.h"
@@ -64,6 +65,9 @@ void AGP_PlayerController::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
+	UpdateMovementSpeed(DeltaSeconds);
+	UpdateCharacterRotation(DeltaSeconds);
+
 	BossRefreshAccumulator += DeltaSeconds;
 	if (BossRefreshAccumulator >= BossRefreshInterval)
 	{
@@ -117,17 +121,67 @@ void AGP_PlayerController::Input_Move(const FInputActionValue& Value)
 {
 	if (!IsValid(GetPawn())) return;
 
-	const FVector2D MovementVector = Value.Get<FVector2D>();
+	const FVector2D MovementVector = Value.Get<FVector2D>().GetClampedToMaxSize(1.f);
 	CurrentMoveInput = MovementVector;
-	
-	if (MovementVector.IsNearlyZero()) return;
-	
+
+	AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetPawn());
+	const bool bFixed = PlayerCharacter &&
+		PlayerCharacter->GetAbilitySystemComponent() &&
+		PlayerCharacter->GetAbilitySystemComponent()->HasMatchingGameplayTag(GPTags::State::Status::Fixed);
+	if (UCharacterMovementComponent* MoveComp = PlayerCharacter ? PlayerCharacter->GetCharacterMovement() : nullptr)
+	{
+		MoveComp->bOrientRotationToMovement = false;
+		MoveComp->bUseControllerDesiredRotation = !MovementVector.IsNearlyZero() && !bFixed;
+	}
+
+	if (MovementVector.IsNearlyZero())
+	{
+		ResetMoveDirectionSmoothing();
+		return;
+	}
+
 	const FRotator YawRotation(0.f, GetControlRotation().Yaw, 0.f);
 	const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
 	const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
+	const bool bSprinting = PlayerCharacter && PlayerCharacter->IsSprinting();
+	if (PlayerCharacter)
+	{
+		TargetMaxWalkSpeed = PlayerCharacter->ResolveDirectionalMoveSpeed(MovementVector, bSprinting);
+		bHasTargetMaxWalkSpeed = true;
+	}
 
-	GetPawn()->AddMovementInput(ForwardDirection, MovementVector.Y);
-	GetPawn()->AddMovementInput(RightDirection, MovementVector.X);
+	FVector RawWorldDirection = (ForwardDirection * MovementVector.Y) + (RightDirection * MovementVector.X);
+	RawWorldDirection = RawWorldDirection.GetSafeNormal();
+
+	FVector FinalMoveDirection = RawWorldDirection;
+
+	if (ShouldSmoothMoveDirection())
+	{
+		if (!bHasSmoothedMoveWorldDirection)
+		{
+			SmoothedMoveWorldDirection = RawWorldDirection;
+			bHasSmoothedMoveWorldDirection = true;
+			FinalMoveDirection = RawWorldDirection;
+		}
+		else
+		{
+			SmoothedMoveWorldDirection = FMath::VInterpTo(
+				SmoothedMoveWorldDirection,
+				RawWorldDirection,
+				GetWorld()->GetDeltaSeconds(),
+				MoveDirectionInterpSpeed
+			);
+			SmoothedMoveWorldDirection = SmoothedMoveWorldDirection.GetSafeNormal();
+			FinalMoveDirection = SmoothedMoveWorldDirection;
+		}
+	}
+	else
+	{
+		ResetMoveDirectionSmoothing();
+		FinalMoveDirection = RawWorldDirection;
+	}
+
+	GetPawn()->AddMovementInput(FinalMoveDirection, MovementVector.Size());
 }
 
 void AGP_PlayerController::Input_Look(const FInputActionValue& Value)
@@ -302,6 +356,37 @@ void AGP_PlayerController::RefreshBossHUD()
 	HUDWidget->SetBossVisible(true);
 }
 
+void AGP_PlayerController::UpdateMovementSpeed(float DeltaSeconds)
+{
+	AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetPawn());
+	if (!PlayerCharacter)
+	{
+		bHasTargetMaxWalkSpeed = false;
+		return;
+	}
+
+	const bool bSprinting = PlayerCharacter->IsSprinting();
+	if (CurrentMoveInput.IsNearlyZero())
+	{
+		TargetMaxWalkSpeed = bSprinting ? PlayerCharacter->GetScaledSprintSpeed() : PlayerCharacter->GetScaledNormalWalkSpeed();
+		bHasTargetMaxWalkSpeed = true;
+	}
+	else if (!bHasTargetMaxWalkSpeed)
+	{
+		TargetMaxWalkSpeed = PlayerCharacter->ResolveDirectionalMoveSpeed(CurrentMoveInput, bSprinting);
+		bHasTargetMaxWalkSpeed = true;
+	}
+
+	if (UCharacterMovementComponent* MoveComp = PlayerCharacter->GetCharacterMovement())
+	{
+		MoveComp->MaxWalkSpeed = FMath::FInterpConstantTo(
+			MoveComp->MaxWalkSpeed,
+			TargetMaxWalkSpeed,
+			DeltaSeconds,
+			MaxWalkSpeedInterpSpeed);
+	}
+}
+
 void AGP_PlayerController::Input_TestToggleSkill()
 {
 	Server_TestToggleSkill();
@@ -456,4 +541,76 @@ void AGP_PlayerController::EquipTestSkillPreset(AGP_PlayerCharacter* PlayerChara
 	}
 
 	UE_LOG(LogTemp, Warning, TEXT("Server: Test preset %d equipped from data asset (%s)"), PresetIndex, *PresetName);
+}
+
+void AGP_PlayerController::UpdateCharacterRotation(float DeltaSeconds)
+{
+	AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetPawn());
+	if (!PlayerCharacter)
+	{
+		return;
+	}
+
+	UCharacterMovementComponent* MoveComp = PlayerCharacter->GetCharacterMovement();
+	if (!MoveComp)
+	{
+		return;
+	}
+
+	const bool bFixed = PlayerCharacter->GetAbilitySystemComponent() &&
+		PlayerCharacter->GetAbilitySystemComponent()->HasMatchingGameplayTag(GPTags::State::Status::Fixed);
+
+	if (bFixed)
+	{
+		MoveComp->bUseControllerDesiredRotation = false;
+		return;
+	}
+
+	// 1. 이동 중일 때 (컨트롤러 원하는 각도 즉시 추종)
+	if (!CurrentMoveInput.IsNearlyZero())
+	{
+		MoveComp->bUseControllerDesiredRotation = true;
+		return;
+	}
+
+	// 2. 제자리(Idle)일 때
+	MoveComp->bUseControllerDesiredRotation = false; // 제자리에서는 고정하여 루트 모션 회전 허용
+}
+
+bool AGP_PlayerController::ShouldSmoothMoveDirection() const
+{
+	AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetPawn());
+	if (!PC) return false;
+
+	UCharacterMovementComponent* MoveComp = PC->GetCharacterMovement();
+	if (!MoveComp) return false;
+
+	// 1. 공중 상태 예외
+	if (MoveComp->IsFalling()) return false;
+
+	// 2. LockOn 상태 예외
+	if (PC->IsLockOn()) return false;
+
+	// 3. GAS 상태 태그 체크 예외
+	UAbilitySystemComponent* ASC = PC->GetAbilitySystemComponent();
+	if (ASC)
+	{
+		FGameplayTag AimingTag = FGameplayTag::RequestGameplayTag(FName("State.Movement.Aiming"), false);
+		FGameplayTag DashTag = FGameplayTag::RequestGameplayTag(FName("State.Movement.Dash"), false);
+		FGameplayTag CombatTag = FGameplayTag::RequestGameplayTag(FName("State.Status.Combat"), false);
+		FGameplayTag FixedTag = GPTags::State::Status::Fixed;
+
+		if (AimingTag.IsValid() && ASC->HasMatchingGameplayTag(AimingTag)) return false;
+		if (DashTag.IsValid() && ASC->HasMatchingGameplayTag(DashTag)) return false;
+		if (CombatTag.IsValid() && ASC->HasMatchingGameplayTag(CombatTag)) return false;
+		if (FixedTag.IsValid() && ASC->HasMatchingGameplayTag(FixedTag)) return false;
+	}
+
+	return true;
+}
+
+void AGP_PlayerController::ResetMoveDirectionSmoothing()
+{
+	SmoothedMoveWorldDirection = FVector::ZeroVector;
+	bHasSmoothedMoveWorldDirection = false;
 }

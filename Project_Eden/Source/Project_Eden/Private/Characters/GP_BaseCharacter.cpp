@@ -1,4 +1,4 @@
-﻿#include "Characters/GP_BaseCharacter.h"
+#include "Characters/GP_BaseCharacter.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystem/GP_AttributeSet.h"
 #include "Items/WeaponItemTypes.h"
@@ -6,7 +6,9 @@
 #include "Animation/PDA_CharacterAnimationSet.h"
 #include "Animation/GP_CharacterAnimInstance.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "GameplayEffect.h"
 #include "GameplayTags/GP_Tags.h"
+#include "UObject/ConstructorHelpers.h"
 
 AGP_BaseCharacter::AGP_BaseCharacter()
 {
@@ -15,6 +17,13 @@ AGP_BaseCharacter::AGP_BaseCharacter()
 	// 대디 서버에서 보이든 안 보이든 애니메이션이 멈추지 않도록 가시성 무관 애니메이션 유지 - 슝민
 	GetMesh()->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
 	DamageNumberActorClass = AGP_DamageNumberActor::StaticClass();
+
+	// BP에서 초기화 GE를 빼먹은 캐릭터가 PIE를 크래시내지 않도록 프로젝트 기본 Attribute GE를 잡아둡니다.
+	static ConstructorHelpers::FClassFinder<UGameplayEffect> DefaultInitializeAttributesEffectFinder(TEXT("/Game/GAS_Pattern/AbilitySystem/GameplayEffects/GE_InitializeAttributes"));
+	if (DefaultInitializeAttributesEffectFinder.Succeeded())
+	{
+		InitializeAttributesEffect = DefaultInitializeAttributesEffectFinder.Class;
+	}
 
 	OnASCInitialized.AddDynamic(this, &ThisClass::BindAttributeDelegates);
 }
@@ -66,10 +75,21 @@ void AGP_BaseCharacter::GiveStartupAbilities()
 
 void AGP_BaseCharacter::InitializeAttributes() const
 {
-	checkf(IsValid(InitializeAttributesEffect), TEXT("InitializeAttributesEffect not set."));
+	TSubclassOf<UGameplayEffect> EffectClassToApply = InitializeAttributesEffect;
+	if (!IsValid(EffectClassToApply))
+	{
+		// 레거시/신규 BP가 기본값을 못 받은 경우에도 한 번 더 로드해 PIE 크래시를 막습니다.
+		EffectClassToApply = LoadClass<UGameplayEffect>(nullptr, TEXT("/Game/GAS_Pattern/AbilitySystem/GameplayEffects/GE_InitializeAttributes.GE_InitializeAttributes_C"));
+	}
+
+	if (!IsValid(EffectClassToApply))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[Character] InitializeAttributesEffect not set: %s"), *GetNameSafe(this));
+		return;
+	}
 
 	FGameplayEffectContextHandle ContextHandle = GetAbilitySystemComponent()->MakeEffectContext();
-	FGameplayEffectSpecHandle SpecHandle = GetAbilitySystemComponent()->MakeOutgoingSpec(InitializeAttributesEffect, 1.f, ContextHandle);
+	FGameplayEffectSpecHandle SpecHandle = GetAbilitySystemComponent()->MakeOutgoingSpec(EffectClassToApply, 1.f, ContextHandle);
 	GetAbilitySystemComponent()->ApplyGameplayEffectSpecToSelf(*SpecHandle.Data.Get());
 }
 

@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
@@ -99,6 +99,12 @@ private:
 
 	float BossRefreshAccumulator = 0.0f;
 
+	UPROPERTY(EditAnywhere, Category = "Movement|Smoothing", meta = (ClampMin = "0.0"))
+	float MaxWalkSpeedInterpSpeed = 1200.0f;
+
+	float TargetMaxWalkSpeed = 0.0f;
+	bool bHasTargetMaxWalkSpeed = false;
+
 	void Input_Move(const FInputActionValue& Value);
 	void Input_Look(const FInputActionValue& Value);
 	void Input_Jump();
@@ -129,7 +135,19 @@ private:
 	int32 GetTestSkillPresetCount() const;
 	void EquipTestSkillPreset(AGP_PlayerCharacter* PlayerCharacter, int32 PresetIndex);
 	void RefreshBossHUD();
+	void UpdateMovementSpeed(float DeltaSeconds);
+	void UpdateCharacterRotation(float DeltaSeconds);
 
 	bool bSkillsEquipped = false;
 	int32 TestSkillPresetIndex = 0;
+
+	// --- Movement Input Smoothing ---
+	FVector SmoothedMoveWorldDirection = FVector::ZeroVector;
+	bool bHasSmoothedMoveWorldDirection = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Smoothing", meta = (AllowPrivateAccess = "true"))
+	float MoveDirectionInterpSpeed = 12.0f;
+
+	bool ShouldSmoothMoveDirection() const;
+	void ResetMoveDirectionSmoothing();
 };

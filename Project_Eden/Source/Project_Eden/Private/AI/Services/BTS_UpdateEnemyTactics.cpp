@@ -4,6 +4,7 @@
 #include "AI/Data/EnemyBlackboardKeys.h"
 #include "AI/Data/EnemyLLMEvaluation.h"
 #include "AI/Debug/EnemyAIDebugUtils.h"
+#include "AI/Tasks/BossAttackPatternSelector.h"
 #include "AI/Tasks/EnemyBTTaskCommon.h"
 #include "AIController.h"
 #include "AbilitySystem/GP_AttributeSet.h"
@@ -231,6 +232,7 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldBossPhaseTransition, false);
 		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossHeavyAttack, false);
 		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossAreaAttack, false);
+		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossSweepAttack, false);
 		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanSummonAdds, false);
 
 		if (!bPreviousShouldReturnHome)
@@ -277,6 +279,7 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldBossPhaseTransition, false);
 		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossHeavyAttack, false);
 		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossAreaAttack, false);
+		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossSweepAttack, false);
 		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanSummonAdds, false);
 
 		if (bPreviousShouldRetreat || bPreviousCanAttack || bPreviousShouldReposition || bPreviousShouldChase || bPreviousShouldReturnHome)
@@ -371,8 +374,6 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 	{
 		constexpr float BossPhaseTwoHealthRatio = 0.66f;
 		constexpr float BossPhaseThreeHealthRatio = 0.33f;
-		constexpr float BossHeavyAttackRange = 650.0f;
-		constexpr float BossAreaAttackRange = 1400.0f;
 		constexpr float BossAreaAttackInterval = 8.0f;
 		constexpr float BossAreaAttackWindow = 1.2f;
 		constexpr float BossSummonInterval = 18.0f;
@@ -382,21 +383,42 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardInt(BlackboardComponent, EnemyBlackboardKeys::BossPhase, BossPhase);
 
 		const float WorldTimeSeconds = OwnerComp.GetWorld() != nullptr ? OwnerComp.GetWorld()->GetTimeSeconds() : 0.0f;
-		const bool bShouldBossPhaseTransition = PreviousBossPhase > 0 && PreviousBossPhase != BossPhase;
-		const bool bCanUseBossHeavyAttack = !bShouldBossPhaseTransition && bCanAttack && DistanceToTarget <= BossHeavyAttackRange;
-		const bool bCanUseBossAreaAttack = !bShouldBossPhaseTransition
+		const bool bBasicAttackCanReach = FGPBossAttackPatternRanges::IsWithinReach(DistanceToTarget, FGPBossAttackPatternRanges::BasicAttackReach);
+		const bool bSweepAttackCanReach = FGPBossAttackPatternRanges::IsWithinReach(DistanceToTarget, FGPBossAttackPatternRanges::SweepAttackReach);
+		const bool bAreaAttackCanReach = FGPBossAttackPatternRanges::IsWithinReach(DistanceToTarget, FGPBossAttackPatternRanges::AreaAttackReach);
+		bool bShouldBossPhaseTransition = PreviousBossPhase > 0 && PreviousBossPhase != BossPhase;
+		bool bCanUseBossHeavyAttack = !bShouldBossPhaseTransition && bHasLineOfSight && bBasicAttackCanReach;
+		bool bCanUseBossAreaAttack = !bShouldBossPhaseTransition
 			&& BossPhase >= 2
 			&& bHasLineOfSight
-			&& DistanceToTarget <= BossAreaAttackRange
+			&& bAreaAttackCanReach
 			&& BTS_UpdateEnemyTactics_Internal::IsPatternWindowOpen(WorldTimeSeconds, BossAreaAttackInterval, BossAreaAttackWindow);
-		const bool bCanSummonAdds = !bShouldBossPhaseTransition
+		bool bCanUseBossSweepAttack = !bShouldBossPhaseTransition
+			&& bHasLineOfSight
+			// 공격 태스크에서 실시간 평가 점수로 기본 공격/휘둘러치기 중 하나를 고른다.
+			&& bSweepAttackCanReach;
+		bool bCanSummonAdds = !bShouldBossPhaseTransition
 			&& BossPhase >= 3
+			&& (bBasicAttackCanReach || bSweepAttackCanReach || bAreaAttackCanReach)
 			&& BTS_UpdateEnemyTactics_Internal::IsPatternWindowOpen(WorldTimeSeconds, BossSummonInterval, BossSummonWindow);
-		const bool bBossPatternRequestsAttack = bShouldBossPhaseTransition || bCanSummonAdds || bCanUseBossAreaAttack || bCanUseBossHeavyAttack;
+
+		if (IsValid(EnemyAIController) && EnemyAIController->IsBossRuntimeEvaluationTestCycleActive() && bHasLineOfSight)
+		{
+			const bool bTestAreaWindow = bModePrefersHold && PreferredRange <= 250.0f;
+			// Test cycle maps the current evaluation mode to one pattern, but still refuses attacks outside hit reach.
+			bShouldBossPhaseTransition = false;
+			bCanUseBossHeavyAttack = bModePrefersHold && !bTestAreaWindow && bBasicAttackCanReach;
+			bCanUseBossAreaAttack = bTestAreaWindow && bAreaAttackCanReach;
+			bCanUseBossSweepAttack = bModePrefersPressure && bSweepAttackCanReach;
+			bCanSummonAdds = bModeForcesRetreat && (bBasicAttackCanReach || bSweepAttackCanReach || bAreaAttackCanReach);
+		}
+
+		const bool bBossPatternRequestsAttack = bShouldBossPhaseTransition || bCanSummonAdds || bCanUseBossAreaAttack || bCanUseBossSweepAttack || bCanUseBossHeavyAttack;
 
 		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldBossPhaseTransition, bShouldBossPhaseTransition);
 		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossHeavyAttack, bCanUseBossHeavyAttack);
 		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossAreaAttack, bCanUseBossAreaAttack);
+		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossSweepAttack, bCanUseBossSweepAttack);
 		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanSummonAdds, bCanSummonAdds);
 
 		if (bBossPatternRequestsAttack)
@@ -406,10 +428,22 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 			bShouldRetreat = false;
 			bShouldReposition = false;
 			bShouldChase = false;
+			BTS_UpdateEnemyTactics_Internal::SetCombatStateTag(BlackboardComponent, GPTags::AI::State::Combat);
 			BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bCanAttack, true);
 			BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldRetreat, false);
 			BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldReposition, false);
 			BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldChase, false);
+		}
+		else if (!bShouldReposition)
+		{
+			// Bosses chase until at least one authored attack hitbox can reach the target.
+			bCanAttack = false;
+			bShouldRetreat = false;
+			bShouldChase = true;
+			BTS_UpdateEnemyTactics_Internal::SetCombatStateTag(BlackboardComponent, GPTags::AI::State::Chasing);
+			BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bCanAttack, false);
+			BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldRetreat, false);
+			BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldChase, true);
 		}
 	}
 

@@ -19,15 +19,15 @@ protected:
 	virtual void OnSearchStart(FBehaviorTreeSearchData& SearchData) override;
 	virtual FString GetStaticServiceDescription() const override;
 
-	// 보스 체력이 이 비율 이하가 되면 2페이즈 패턴을 열어준다.
+	// 보스 체력이 이 비율 이하가 되면 2페이즈 패턴을 연다.
 	UPROPERTY(EditAnywhere, Category = "AI|Boss", meta = (ClampMin = "0.0", ClampMax = "1.0"))
 	float PhaseTwoHealthRatio = 0.66f;
 
-	// 보스 체력이 이 비율 이하가 되면 3페이즈 패턴과 소환 패턴을 열어준다.
+	// 보스 체력이 이 비율 이하가 되면 3페이즈 패턴과 소환 패턴을 연다.
 	UPROPERTY(EditAnywhere, Category = "AI|Boss", meta = (ClampMin = "0.0", ClampMax = "1.0"))
 	float PhaseThreeHealthRatio = 0.33f;
 
-	// 근접 공격 가능 상태에서 이 거리 안이면 강공격 후보가 된다.
+	// 근접 거리 안에서는 보스 공격 분기가 유지되도록 한다.
 	UPROPERTY(EditAnywhere, Category = "AI|Boss", meta = (ClampMin = "0.0", Units = "cm"))
 	float HeavyAttackRange = 650.0f;
 
@@ -35,14 +35,18 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "AI|Boss", meta = (ClampMin = "0.0", Units = "cm"))
 	float AreaAttackRange = 1400.0f;
 
-	// 광역 공격은 Ability 쿨다운과 별개로 BT 선택 빈도를 제한한다.
+	// 이 거리 안에서 공격할 수 있으면 공격 태스크가 기본 공격/휘둘러치기를 랜덤 선택한다.
+	UPROPERTY(EditAnywhere, Category = "AI|Boss", meta = (ClampMin = "0.0", Units = "cm"))
+	float SweepAttackRange = 900.0f;
+
+	// 광역 공격은 랜덤 기본/휘둘러치기보다 우선하는 별도 패턴으로 유지한다.
 	UPROPERTY(EditAnywhere, Category = "AI|Boss", meta = (ClampMin = "0.1", Units = "s"))
 	float AreaAttackInterval = 8.0f;
 
 	UPROPERTY(EditAnywhere, Category = "AI|Boss", meta = (ClampMin = "0.0", Units = "s"))
 	float AreaAttackWindow = 1.2f;
 
-	// 3페이즈 소환 패턴도 주기적 선택 창을 둬서 매 틱 반복 선택을 피한다.
+	// 3페이즈 이후 소환 패턴의 선택 주기와 창을 설정한다.
 	UPROPERTY(EditAnywhere, Category = "AI|Boss", meta = (ClampMin = "0.1", Units = "s"))
 	float SummonInterval = 18.0f;
 

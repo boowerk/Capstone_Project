@@ -26,6 +26,10 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "AI")
 	bool bFaceTargetBeforeAttack = true;
 
+	// 보스가 휘둘러치기 가능 상태일 때 기본 공격 대신 휘둘러치기를 선택할 확률입니다.
+	UPROPERTY(EditAnywhere, Category = "AI|Boss", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float BossSweepAttackChance = 0.5f;
+
 	virtual EBTNodeResult::Type ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory) override;
 	virtual FString GetStaticDescription() const override;
 };

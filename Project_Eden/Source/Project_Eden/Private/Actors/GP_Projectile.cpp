@@ -69,6 +69,8 @@ void AGP_Projectile::OnProjectileOverlap(UPrimitiveComponent* OverlappedComponen
 
 	// (기존과 동일하게 데미지 적용, 이벤트 전송, 파괴 처리 로직)
 	if (!IsValid(OtherActor) || OtherActor == GetInstigator() || OtherActor == this) return;
+	// Friendly enemies should not consume, destroy, or react to enemy projectiles.
+	if (!UGP_BlueprintLibrary::CanApplyCombatEffect(GetInstigator(), OtherActor)) return;
 
 	if (bHasHit)
 	{
