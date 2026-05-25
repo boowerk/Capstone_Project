@@ -31,6 +31,7 @@ void UGP_Skill_LineShock::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 	if (HasAuthority(&ActivationInfo))
 	{
 		UGP_SkillData* SkillData = GetSkillDataFromSpec(Handle, ActorInfo);
+		const FGameplayTag TechElementTag = GetCurrentTechElementTag(ActorInfo);
 
 		FRotator AimRotation = Avatar->GetActorRotation();
 		if (AController* Controller = Avatar->GetController())
@@ -48,7 +49,7 @@ void UGP_Skill_LineShock::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 			+ FVector::UpVector * HeightOffset;
 		const FVector BoxExtent(Range * 0.5f, Width * 0.5f, Height * 0.5f);
 
-		SpawnVisualActor(Avatar, GetSkillVisualActorClass(SkillData, ShockVisualActorClass), BoxCenter, AimRotation);
+		SpawnVisualActor(Avatar, GetSkillVisualActorClass(SkillData, ShockVisualActorClass, TechElementTag), BoxCenter, AimRotation);
 
 		const TArray<AActor*> HitActors = UGP_BlueprintLibrary::BoxOverlapActorsAtLocation(
 			Avatar,

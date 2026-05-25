@@ -6,6 +6,7 @@
 #include "GameplayTags/GP_Tags.h"
 #include "GameFramework/Actor.h"
 #include "GameFramework/Pawn.h"
+#include "Player/GP_PlayerState.h"
 #include "Utils/GP_BlueprintLibrary.h"
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 
@@ -103,11 +104,45 @@ UGP_SkillData* UGP_SkillBase::GetSkillDataFromSpec(const FGameplayAbilitySpecHan
 	return Spec ? Cast<UGP_SkillData>(Spec->SourceObject.Get()) : nullptr;
 }
 
-TSubclassOf<AActor> UGP_SkillBase::GetSkillVisualActorClass(const UGP_SkillData* SkillData, TSubclassOf<AActor> FallbackVisualActorClass) const
+FGameplayTag UGP_SkillBase::GetCurrentTechElementTag(const FGameplayAbilityActorInfo* ActorInfo) const
 {
-	return SkillData && SkillData->SkillVisualActorClass
-		? SkillData->SkillVisualActorClass
-		: FallbackVisualActorClass;
+	const AActor* OwnerActor = ActorInfo ? ActorInfo->OwnerActor.Get() : nullptr;
+	if (const AGP_PlayerState* PlayerState = Cast<AGP_PlayerState>(OwnerActor))
+	{
+		return PlayerState->GetCurrentTechElementTag();
+	}
+
+	const APawn* AvatarPawn = ActorInfo ? Cast<APawn>(ActorInfo->AvatarActor.Get()) : nullptr;
+	if (AvatarPawn)
+	{
+		if (const AGP_PlayerState* PlayerState = AvatarPawn->GetPlayerState<AGP_PlayerState>())
+		{
+			return PlayerState->GetCurrentTechElementTag();
+		}
+	}
+
+	return FGameplayTag();
+}
+
+TSubclassOf<AActor> UGP_SkillBase::GetSkillVisualActorClass(const UGP_SkillData* SkillData, TSubclassOf<AActor> FallbackVisualActorClass, FGameplayTag ElementTag) const
+{
+	if (SkillData && ElementTag.IsValid())
+	{
+		for (const FGP_ElementVisualActorEntry& Entry : SkillData->ElementVisualActorClasses)
+		{
+			if (Entry.ElementTag.MatchesTagExact(ElementTag) && Entry.VisualActorClass)
+			{
+				return Entry.VisualActorClass;
+			}
+		}
+	}
+
+	if (SkillData && SkillData->SkillVisualActorClass)
+	{
+		return SkillData->SkillVisualActorClass;
+	}
+
+	return FallbackVisualActorClass;
 }
 
 void UGP_SkillBase::SpawnVisualActor(AActor* InstigatorActor, TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation) const

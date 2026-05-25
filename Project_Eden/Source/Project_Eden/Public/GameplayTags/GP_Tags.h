@@ -142,6 +142,21 @@ namespace GPTags
 		}
 	}
 
+	// [5] Tech : run-level player tech choices
+	namespace Tech
+	{
+		namespace Element
+		{
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Pyros);
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Hydro);
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Volt);
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Aero);
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Lux);
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Chaos);
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Brute);
+		}
+	}
+
 	// [6] Event : 일회성 이벤트 트리거
 	namespace Event
 	{

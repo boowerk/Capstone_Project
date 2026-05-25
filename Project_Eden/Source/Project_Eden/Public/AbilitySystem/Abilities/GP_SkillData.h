@@ -8,6 +8,18 @@
 
 class AActor;
 
+USTRUCT(BlueprintType)
+struct FGP_ElementVisualActorEntry
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Visual", meta = (Categories = "GPTags.Tech.Element"))
+	FGameplayTag ElementTag;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Visual")
+	TSubclassOf<AActor> VisualActorClass;
+};
+
 UENUM(BlueprintType)
 enum class EGP_CooldownPolicy : uint8
 {
@@ -40,6 +52,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Visual")
 	TSubclassOf<AActor> SkillVisualActorClass;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Visual")
+	TArray<FGP_ElementVisualActorEntry> ElementVisualActorClasses;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Damage")
 	float BaseDamage = 0.f;
 
@@ -48,9 +63,6 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Damage")
 	float ToughnessDamage = 0.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Damage", meta = (Categories = "GPTags.Damage.Element"))
-	FGameplayTag PrimaryDamageElementTag;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Damage|Coefficient")
 	float AttackPowerCoefficient = 0.f;

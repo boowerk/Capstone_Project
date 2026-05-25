@@ -139,6 +139,21 @@ namespace GPTags
         }
     }
 
+    // [5] Tech : run-level player tech choices
+    namespace Tech
+    {
+        namespace Element
+        {
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Pyros, "GPTags.Tech.Element.Pyros", "이번 판 화염 테크");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Hydro, "GPTags.Tech.Element.Hydro", "이번 판 물 테크");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Volt, "GPTags.Tech.Element.Volt", "이번 판 전격 테크");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Aero, "GPTags.Tech.Element.Aero", "이번 판 바람 테크");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Lux, "GPTags.Tech.Element.Lux", "이번 판 빛 테크");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Chaos, "GPTags.Tech.Element.Chaos", "이번 판 혼돈 테크");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Brute, "GPTags.Tech.Element.Brute", "이번 판 강타 테크");
+        }
+    }
+
     // [6] Event : 일회성 이벤트 트리거
     namespace Event
     {

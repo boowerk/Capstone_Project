@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "AbilitySystem/Abilities/GP_GameplayAbility.h"
+#include "GameplayTagContainer.h"
 #include "GP_SkillBase.generated.h"
 
 class AActor;
@@ -48,7 +49,8 @@ protected:
 	UFUNCTION(BlueprintCallable, Category = "GAS|Skill|Mechanics")
 	void PerformAreaAttack();
 
-	TSubclassOf<AActor> GetSkillVisualActorClass(const UGP_SkillData* SkillData, TSubclassOf<AActor> FallbackVisualActorClass) const;
+	FGameplayTag GetCurrentTechElementTag(const FGameplayAbilityActorInfo* ActorInfo) const;
+	TSubclassOf<AActor> GetSkillVisualActorClass(const UGP_SkillData* SkillData, TSubclassOf<AActor> FallbackVisualActorClass, FGameplayTag ElementTag = FGameplayTag()) const;
 	void SpawnVisualActor(AActor* InstigatorActor, TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation = FRotator::ZeroRotator) const;
 
 	// 어빌리티 종료 시 호출할 정리 함수
