@@ -8,6 +8,45 @@
 #include "AbilitySystem/Abilities/GP_SkillData.h"
 #include "GameplayEffect.h"
 #include "GameplayTags/GP_Tags.h"
+#include "GameFramework/Pawn.h"
+#include "Player/GP_PlayerState.h"
+
+namespace
+{
+FGameplayTag GetCurrentTechElementTagFromActor(const AActor* Actor)
+{
+	if (const APawn* Pawn = Cast<APawn>(Actor))
+	{
+		if (const AGP_PlayerState* PlayerState = Pawn->GetPlayerState<AGP_PlayerState>())
+		{
+			return PlayerState->GetCurrentTechElementTag();
+		}
+	}
+
+	if (const APawn* InstigatorPawn = Actor ? Actor->GetInstigator() : nullptr)
+	{
+		if (const AGP_PlayerState* PlayerState = InstigatorPawn->GetPlayerState<AGP_PlayerState>())
+		{
+			return PlayerState->GetCurrentTechElementTag();
+		}
+	}
+
+	return FGameplayTag();
+}
+
+FGameplayTag ConvertTechElementToDamageElement(FGameplayTag TechElementTag)
+{
+	if (TechElementTag.MatchesTagExact(GPTags::Tech::Element::Pyros)) { return GPTags::Damage::Element::Pyros; }
+	if (TechElementTag.MatchesTagExact(GPTags::Tech::Element::Hydro)) { return GPTags::Damage::Element::Hydro; }
+	if (TechElementTag.MatchesTagExact(GPTags::Tech::Element::Volt)) { return GPTags::Damage::Element::Volt; }
+	if (TechElementTag.MatchesTagExact(GPTags::Tech::Element::Aero)) { return GPTags::Damage::Element::Aero; }
+	if (TechElementTag.MatchesTagExact(GPTags::Tech::Element::Lux)) { return GPTags::Damage::Element::Lux; }
+	if (TechElementTag.MatchesTagExact(GPTags::Tech::Element::Chaos)) { return GPTags::Damage::Element::Chaos; }
+	if (TechElementTag.MatchesTagExact(GPTags::Tech::Element::Brute)) { return GPTags::Damage::Element::Brute; }
+
+	return FGameplayTag();
+}
+}
 
 EHitDirection UGP_BlueprintLibrary::GetHitDirection(const FVector& TargetForward, const FVector& ToInstigator)
 {
@@ -199,6 +238,12 @@ void UGP_BlueprintLibrary::ApplyGameplayEffectToActors(AActor* Instigator, const
 			FGameplayEffectSpecHandle SpecHandle = InstigatorASC->MakeOutgoingSpec(EffectClass, EffectLevel, ContextHandle);
 			if (SpecHandle.IsValid())
 			{
+				const FGameplayTag DamageElementTag = ConvertTechElementToDamageElement(GetCurrentTechElementTagFromActor(Instigator));
+				if (DamageElementTag.IsValid())
+				{
+					SpecHandle.Data->DynamicAssetTags.AddTag(DamageElementTag);
+				}
+
 				if (SkillData)
 				{
 					SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Data::Base, SkillData->BaseDamage);
