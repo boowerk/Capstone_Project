@@ -127,7 +127,9 @@ void UGP_CharacterAnimInstance::NativeInitializeAnimation()
 		MovementComponent = Character->GetCharacterMovement();
 	}
 
-	if (!PoseSearchChooser || PoseSearchChooser->GetPathName().Contains(DeprecatedPoseSearchChooserName))
+	const AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(Character);
+	if (PlayerCharacter && PlayerCharacter->GetUEFNSourceAnimInstance() == this &&
+		(!PoseSearchChooser || PoseSearchChooser->GetPathName().Contains(DeprecatedPoseSearchChooserName)))
 	{
 		PoseSearchChooser = LoadObject<UChooserTable>(nullptr, DefaultPoseSearchChooserPath);
 	}
@@ -136,6 +138,12 @@ void UGP_CharacterAnimInstance::NativeInitializeAnimation()
 void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 {
 	Super::NativeUpdateAnimation(DeltaSeconds);
+
+	if (MotionMatchingSuppressTimeRemaining > 0.f)
+	{
+		MotionMatchingSuppressTimeRemaining = FMath::Max(0.f, MotionMatchingSuppressTimeRemaining - DeltaSeconds);
+		return;
+	}
 
 	if (!Character || !MovementComponent)
 	{
@@ -146,18 +154,6 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		}
 	}
 
-	if (AnimationSet)
-	{
-		LocomotionBlendSpace = AnimationSet->LocomotionBlendSpace;
-		JumpLoopAnimation = AnimationSet->JumpLoopAnimation;
-		SprintStopAnimation = AnimationSet->SprintStopAnimation;
-	}
-
-	if (!PoseSearchChooser || PoseSearchChooser->GetPathName().Contains(DeprecatedPoseSearchChooserName))
-	{
-		PoseSearchChooser = LoadObject<UChooserTable>(nullptr, DefaultPoseSearchChooserPath);
-	}
-
 	if (!Character || !MovementComponent)
 	{
 		return;
@@ -166,6 +162,12 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	const FVector WorldVelocity = Character->GetVelocity();
 	const FVector WorldAcceleration = MovementComponent->GetCurrentAcceleration();
 	const AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(Character);
+	const bool bCanUseRuntimePoseSearchChooser = PlayerCharacter && PlayerCharacter->GetUEFNSourceAnimInstance() == this;
+	if (bCanUseRuntimePoseSearchChooser &&
+		(!PoseSearchChooser || PoseSearchChooser->GetPathName().Contains(DeprecatedPoseSearchChooserName)))
+	{
+		PoseSearchChooser = LoadObject<UChooserTable>(nullptr, DefaultPoseSearchChooserPath);
+	}
 	MovementSpeedScaleRatio = PlayerCharacter ? PlayerCharacter->GetMovementSpeedScaleRatio() : 1.0f;
 	GroundSpeed = WorldVelocity.Size2D();
 	Speed2D = GroundSpeed / MovementSpeedScaleRatio;
@@ -364,7 +366,7 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		NormalizeTrajectoryForMovementScale(GeneratedTrajectory, MovementSpeedScaleRatio);
 	}
 
-	if (PoseSearchChooser)
+	if (bCanUseRuntimePoseSearchChooser && PoseSearchChooser)
 	{
 		if (UPoseSearchDatabase* SelectedDatabase = Cast<UPoseSearchDatabase>(
 			UChooserFunctionLibrary::EvaluateChooser(this, PoseSearchChooser, UPoseSearchDatabase::StaticClass())))
@@ -429,16 +431,19 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	LastActorYaw = CurrentYaw;
 
 #if !UE_BUILD_SHIPPING
-	if (GEngine)
+	if (GEngine && PlayerCharacter && PlayerCharacter->IsLocallyControlled() && GetSkelMeshComponent() == PlayerCharacter->GetMesh())
 	{
 		const FString SelectedAnimText = bMotionMatchingResultValid
 			? (MotionMatchingSelectedAnimName.IsNone() ? TEXT("Null Asset") : MotionMatchingSelectedAnimName.ToString())
 			: TEXT("Invalid Result");
 		const FString DebugText = FString::Printf(
-			TEXT("MM Speed2D: %.1f \nRaw Speed: %.1f \nSpeed Scale: %.2f \nGait: %s \nState: %s \nTurn:%d \nStop:%d \nPivot:%d \nSpin:%d \nPivotDot: %.2f \nYawRate: %.1f \nIdleT: %.2f \nStopT: %.2f \nPivotT: %.2f \nLandT: %.2f"),
+			TEXT("DBG v2 Mesh: %s \nMM Speed2D: %.1f \nRaw Speed: %.1f \nSpeed Scale: %.2f \nProfile Scale: %.2f \nMaxWalk: %.1f \nGait: %s \nState: %s \nTurn:%d \nStop:%d \nPivot:%d \nSpin:%d \nPivotDot: %.2f \nYawRate: %.1f \nIdleT: %.2f \nStopT: %.2f \nPivotT: %.2f \nLandT: %.2f"),
+			*GetNameSafe(GetSkelMeshComponent()),
 			Speed2D,
 			GroundSpeed,
 			MovementSpeedScaleRatio,
+			PlayerCharacter ? PlayerCharacter->GetActiveMovementSpeedProfile().MovementSpeedScaleRatio : 1.0f,
+			MovementComponent ? MovementComponent->MaxWalkSpeed : 0.0f,
 			*UEnum::GetValueAsString(Gait),
 			*UEnum::GetValueAsString(CurrentMotionMatchState),
 			ShouldTurnInPlace ? 1 : 0,
@@ -504,10 +509,17 @@ void UGP_CharacterAnimInstance::SetAnimationSet(UPDA_CharacterAnimationSet* NewS
 	if (NewSet)
 	{
 		AnimationSet = NewSet;
-		LocomotionBlendSpace = AnimationSet->LocomotionBlendSpace;
-		JumpLoopAnimation = AnimationSet->JumpLoopAnimation;
-		SprintStopAnimation = AnimationSet->SprintStopAnimation;
 	}
+}
+
+void UGP_CharacterAnimInstance::SetMovementSpeedScaleRatio(float NewRatio)
+{
+	MovementSpeedScaleRatio = FMath::Max(NewRatio, 0.01f);
+}
+
+void UGP_CharacterAnimInstance::SuppressMotionMatchingUpdate(float Duration)
+{
+	MotionMatchingSuppressTimeRemaining = FMath::Max(MotionMatchingSuppressTimeRemaining, Duration);
 }
 
 void UGP_CharacterAnimInstance::ApplyRuntimeDatabaseToMotionMatchingNode(const FAnimUpdateContext& Context, const FAnimNodeReference& Node)

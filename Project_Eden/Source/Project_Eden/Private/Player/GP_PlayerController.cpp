@@ -94,7 +94,7 @@ void AGP_PlayerController::SetupInputComponent()
 	check(MoveAction);
 	check(LookAction);
 	EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &ThisClass::Input_Move);
-	EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Completed, this, &ThisClass::Input_Move);
+	EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Completed, this, &ThisClass::Input_MoveCompleted);
 	EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ThisClass::Input_Look);
 	if (JumpAction)
 	{
@@ -113,7 +113,9 @@ void AGP_PlayerController::SetupInputComponent()
 	if (SkillSlot2Action) EnhancedInputComponent->BindAction(SkillSlot2Action, ETriggerEvent::Triggered, this, &ThisClass::Input_SkillSlot2);
 	if (UltimateAction) EnhancedInputComponent->BindAction(UltimateAction, ETriggerEvent::Triggered, this, &ThisClass::Input_UltimateSkill);
 	if (TestToggleSkillAction) EnhancedInputComponent->BindAction(TestToggleSkillAction, ETriggerEvent::Started, this, &ThisClass::Input_TestToggleSkill);
+	// Keep both debug bindings after the PR merge so neither test preset rotation nor White Void input is dropped.
 	if (RotateTestSkillAction) EnhancedInputComponent->BindAction(RotateTestSkillAction, ETriggerEvent::Started, this, &ThisClass::Input_RotateTestSkill);
+	if (WhiteVoidToggleAction) EnhancedInputComponent->BindAction(WhiteVoidToggleAction, ETriggerEvent::Started, this, &ThisClass::Input_ToggleWhiteVoid);
 }
 
 
@@ -165,13 +167,19 @@ void AGP_PlayerController::Input_Move(const FInputActionValue& Value)
 		}
 		else
 		{
-			SmoothedMoveWorldDirection = FMath::VInterpTo(
-				SmoothedMoveWorldDirection,
-				RawWorldDirection,
-				GetWorld()->GetDeltaSeconds(),
-				MoveDirectionInterpSpeed
-			);
-			SmoothedMoveWorldDirection = SmoothedMoveWorldDirection.GetSafeNormal();
+			if (FVector::DotProduct(SmoothedMoveWorldDirection, RawWorldDirection) < 0.5f)
+			{
+				SmoothedMoveWorldDirection = RawWorldDirection;
+			}
+			else
+			{
+				SmoothedMoveWorldDirection = FMath::VInterpTo(
+					SmoothedMoveWorldDirection,
+					RawWorldDirection,
+					GetWorld()->GetDeltaSeconds(),
+					MoveDirectionInterpSpeed
+				).GetSafeNormal();
+			}
 			FinalMoveDirection = SmoothedMoveWorldDirection;
 		}
 	}
@@ -182,6 +190,19 @@ void AGP_PlayerController::Input_Move(const FInputActionValue& Value)
 	}
 
 	GetPawn()->AddMovementInput(FinalMoveDirection, MovementVector.Size());
+}
+
+void AGP_PlayerController::Input_MoveCompleted(const FInputActionValue& Value)
+{
+	CurrentMoveInput = FVector2D::ZeroVector;
+	ResetMoveDirectionSmoothing();
+	if (AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetPawn()))
+	{
+		if (UCharacterMovementComponent* MoveComp = PlayerCharacter->GetCharacterMovement())
+		{
+			MoveComp->bUseControllerDesiredRotation = false;
+		}
+	}
 }
 
 void AGP_PlayerController::Input_Look(const FInputActionValue& Value)
@@ -395,6 +416,14 @@ void AGP_PlayerController::Input_TestToggleSkill()
 void AGP_PlayerController::Input_RotateTestSkill()
 {
 	Server_RotateTestSkill();
+}
+
+void AGP_PlayerController::Input_ToggleWhiteVoid()
+{
+	if (AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetPawn()))
+	{
+		PlayerCharacter->ToggleWhiteVoid();
+	}
 }
 
 bool AGP_PlayerController::Server_TestToggleSkill_Validate()

@@ -13,3 +13,19 @@ Project_Eden/CLAUDE.md
 .memoc/memoc-usage.md
 .memoc/04-handoff.md
 .memoc/local/
+
+# Visual Studio
+.vs/
+*.sln
+*.slnx
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+ProjectSettings.json
+
+# Unreal Engine Build/Intermediate
+/Project_Eden/Binaries/
+/Project_Eden/Intermediate/
+/Project_Eden/Saved/
+/Project_Eden/DerivedDataCache/

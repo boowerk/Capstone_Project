@@ -1,4 +1,7 @@
 #include "Characters/GP_PlayerCharacter.h"
+#include "Actors/GP_WhiteVoidSetActor.h"
+#include "Actors/GP_WhiteVoidSetComponent.h"
+#include "Animation/GP_CharacterAnimInstance.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/GP_CharacterAnimInstance.h"
 #include "Animation/AnimMontage.h"
@@ -7,13 +10,20 @@
 #include "Animation/AnimTypes.h"
 #include "Animation/PDA_CharacterAnimationSet.h"
 #include "Camera/CameraComponent.h"
+#include "Camera/PlayerCameraManager.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "CharacterTrajectoryComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/PlayerController.h"
 #include "GameFramework/SpringArmComponent.h"
+#include "Kismet/GameplayStatics.h"
+#include "Net/UnrealNetwork.h"
 #include "Player/GP_PlayerState.h"
 #include "AbilitySystemComponent.h"
 #include "GameplayTags/GP_Tags.h"
+#include "TimerManager.h"
+#include "UObject/UnrealType.h"
 
 AGP_PlayerCharacter::AGP_PlayerCharacter()
 {
@@ -65,6 +75,8 @@ AGP_PlayerCharacter::AGP_PlayerCharacter()
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>("FollowCamera");
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
 	FollowCamera->bUsePawnControlRotation = false;
+
+	WhiteVoidSetClass = AGP_WhiteVoidSetActor::StaticClass();
 	
 	// 태그 추가 함수 추가후 호출 예정지
 }
@@ -74,6 +86,10 @@ void AGP_PlayerCharacter::BeginPlay()
 	Super::BeginPlay();
 	ApplyMovementSpeedFromAnimationSet();
 	ApplyRetargetVisualScaleFromAnimationSet();
+	if (bAutoSpawnWhiteVoidSet)
+	{
+		EnsureWhiteVoidSetExists();
+	}
 }
 
 void AGP_PlayerCharacter::Tick(float DeltaSeconds)
@@ -82,19 +98,51 @@ void AGP_PlayerCharacter::Tick(float DeltaSeconds)
 
 	// 1. 소스 메시의 루트 모션 소비 (메시 이탈 방지를 위해 매 틱 무조건 Consume)
 	FRotator RootMotionDeltaRot = FRotator::ZeroRotator;
+	FVector RootMotionDeltaTranslation = FVector::ZeroVector;
+	LastUEFNSourceRootMotionVelocity = FVector::ZeroVector;
+
+	const bool bFallbackMontageActive = IsPlayingUEFNSourceFallbackMontage();
+	if (bApplyUEFNSourceFallbackRootMotion && !bFallbackMontageActive)
+	{
+		bApplyUEFNSourceFallbackRootMotion = false;
+		ActiveUEFNSourceFallbackMontage = nullptr;
+	}
 	if (UEFNSourceMesh && UEFNSourceMesh->IsPlayingRootMotion())
 	{
 		FRootMotionMovementParams RootMotion = UEFNSourceMesh->ConsumeRootMotion();
 		if (RootMotion.bHasRootMotion)
 		{
-			RootMotionDeltaRot = RootMotion.GetRootMotionTransform().GetRotation().Rotator();
+			const FTransform RootMotionTransform = RootMotion.GetRootMotionTransform();
+			RootMotionDeltaRot = RootMotionTransform.GetRotation().Rotator();
+			RootMotionDeltaTranslation = RootMotionTransform.GetTranslation();
 		}
 	}
 
 	const float SpeedSq = GetVelocity().SizeSquared2D();
 	const bool bIsStatic = SpeedSq < 225.f; // Speed < 15.f
 
-	if (bIsStatic)
+	if (bApplyUEFNSourceFallbackRootMotion && bFallbackMontageActive)
+	{
+		UCharacterMovementComponent* MoveComp = GetCharacterMovement();
+		if (MoveComp && MoveComp->UpdatedComponent && (!RootMotionDeltaTranslation.IsNearlyZero() || !RootMotionDeltaRot.IsZero()))
+		{
+			const float TranslationYawOffset = AnimationSet ? AnimationSet->SourceRootMotionTranslationYawOffset : 0.0f;
+			const FVector CorrectedTranslation = FRotator(0.0f, TranslationYawOffset, 0.0f).RotateVector(RootMotionDeltaTranslation) * GetMovementSpeedScaleRatio();
+			const FVector WorldDelta = GetActorTransform().TransformVectorNoScale(CorrectedTranslation);
+			const FQuat TargetRotation = RootMotionDeltaRot.IsZero()
+				? MoveComp->UpdatedComponent->GetComponentQuat()
+				: RootMotionDeltaRot.Quaternion() * MoveComp->UpdatedComponent->GetComponentQuat();
+
+			FHitResult MoveHit;
+			MoveComp->SafeMoveUpdatedComponent(WorldDelta, TargetRotation, true, MoveHit);
+
+			if (DeltaSeconds > KINDA_SMALL_NUMBER)
+			{
+				LastUEFNSourceRootMotionVelocity = WorldDelta / DeltaSeconds;
+			}
+		}
+	}
+	else if (bIsStatic)
 	{
 		// 1. 제자리 대기 및 회전 시: 모션 매칭 애니메이션이 주도하는 순수 루트 모션 회전량만 100% 반영
 		//    C++ 측의 인위적인 수동 RInterpTo 보간 개입을 전면 차단하여 발 미끄러짐과 튕김 현상을 완벽히 근절하고,
@@ -108,9 +156,69 @@ void AGP_PlayerCharacter::Tick(float DeltaSeconds)
 	UpdateConditionalMaxAcceleration(DeltaSeconds);
 }
 
+UAnimInstance* AGP_PlayerCharacter::GetUEFNSourceAnimInstance() const
+{
+	return UEFNSourceMesh ? UEFNSourceMesh->GetAnimInstance() : nullptr;
+}
+
+float AGP_PlayerCharacter::PlayUEFNSourceFallbackMontage(UAnimMontage* Montage, float PlayRate)
+{
+	UAnimInstance* SourceAnimInstance = GetUEFNSourceAnimInstance();
+	if (!IsValid(SourceAnimInstance) || !IsValid(Montage))
+	{
+		return 0.0f;
+	}
+
+	if (IsValid(ActiveUEFNSourceFallbackMontage))
+	{
+		SourceAnimInstance->Montage_Stop(0.1f, ActiveUEFNSourceFallbackMontage);
+	}
+
+	const float PlayedDuration = SourceAnimInstance->Montage_Play(Montage, PlayRate);
+	if (PlayedDuration > 0.0f)
+	{
+		ActiveUEFNSourceFallbackMontage = Montage;
+		bApplyUEFNSourceFallbackRootMotion = true;
+		LastUEFNSourceRootMotionVelocity = FVector::ZeroVector;
+	}
+
+	return PlayedDuration;
+}
+
+bool AGP_PlayerCharacter::IsPlayingUEFNSourceFallbackMontage() const
+{
+	UAnimInstance* SourceAnimInstance = GetUEFNSourceAnimInstance();
+	return IsValid(SourceAnimInstance)
+		&& IsValid(ActiveUEFNSourceFallbackMontage)
+		&& SourceAnimInstance->Montage_IsPlaying(ActiveUEFNSourceFallbackMontage);
+}
+
 void AGP_PlayerCharacter::Landed(const FHitResult& Hit)
 {
 	Super::Landed(Hit);
+}
+
+void AGP_PlayerCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(AGP_PlayerCharacter, bIsInWhiteVoid);
+}
+
+void AGP_PlayerCharacter::StopUEFNSourceFallbackMontage(float BlendOutTime)
+{
+	UAnimInstance* SourceAnimInstance = GetUEFNSourceAnimInstance();
+	if (IsValid(SourceAnimInstance))
+	{
+		if (IsValid(ActiveUEFNSourceFallbackMontage))
+		{
+			SourceAnimInstance->Montage_Stop(BlendOutTime, ActiveUEFNSourceFallbackMontage);
+		}
+		// 방어 코드: 슬롯명 미스매칭이나 몽타주 매칭 어긋남 대비하여 전체 활성 몽타주 강제 정지 처리
+		SourceAnimInstance->Montage_Stop(BlendOutTime, nullptr);
+	}
+	bApplyUEFNSourceFallbackRootMotion = false;
+	ActiveUEFNSourceFallbackMontage = nullptr;
 }
 
 // ==========================================
@@ -279,6 +387,7 @@ void AGP_PlayerCharacter::SetGASMovementSpeedScaleRatioMultiplier(float NewMulti
 {
 	GASMovementSpeedScaleRatioMultiplier = FMath::Max(NewMultiplier, 0.01f);
 	RefreshCurrentMaxWalkSpeed();
+	PushMovementSpeedScaleRatioToAnimInstances();
 }
 
 void AGP_PlayerCharacter::SetMovementSpeedProfileOverride(const FGPDirectionalMovementSpeedProfile& NewProfile)
@@ -286,12 +395,14 @@ void AGP_PlayerCharacter::SetMovementSpeedProfileOverride(const FGPDirectionalMo
 	MovementSpeedProfileOverride = NewProfile;
 	bOverrideMovementSpeedProfile = true;
 	RefreshCurrentMaxWalkSpeed();
+	PushMovementSpeedScaleRatioToAnimInstances();
 }
 
 void AGP_PlayerCharacter::ClearMovementSpeedProfileOverride()
 {
 	bOverrideMovementSpeedProfile = false;
 	RefreshCurrentMaxWalkSpeed();
+	PushMovementSpeedScaleRatioToAnimInstances();
 }
 
 void AGP_PlayerCharacter::ApplyMovementSpeedFromAnimationSet()
@@ -301,6 +412,7 @@ void AGP_PlayerCharacter::ApplyMovementSpeedFromAnimationSet()
 		MovementSpeedProfile = AnimationSet->MovementSpeedProfile;
 	}
 	RefreshCurrentMaxWalkSpeed();
+	PushMovementSpeedScaleRatioToAnimInstances();
 }
 
 void AGP_PlayerCharacter::RefreshCurrentMaxWalkSpeed()
@@ -308,6 +420,22 @@ void AGP_PlayerCharacter::RefreshCurrentMaxWalkSpeed()
 	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
 	{
 		MoveComp->MaxWalkSpeed = IsSprinting() ? GetScaledSprintSpeed() : GetScaledNormalWalkSpeed();
+	}
+}
+
+void AGP_PlayerCharacter::PushMovementSpeedScaleRatioToAnimInstances()
+{
+	const float ScaleRatio = GetMovementSpeedScaleRatio();
+	if (UGP_CharacterAnimInstance* AnimInstance = Cast<UGP_CharacterAnimInstance>(GetMesh()->GetAnimInstance()))
+	{
+		AnimInstance->SetMovementSpeedScaleRatio(ScaleRatio);
+	}
+	if (UEFNSourceMesh)
+	{
+		if (UGP_CharacterAnimInstance* SourceAnimInstance = Cast<UGP_CharacterAnimInstance>(UEFNSourceMesh->GetAnimInstance()))
+		{
+			SourceAnimInstance->SetMovementSpeedScaleRatio(ScaleRatio);
+		}
 	}
 }
 
@@ -355,9 +483,271 @@ bool AGP_PlayerCharacter::TryPerformDash()
 	return GetAbilitySystemComponent()->TryActivateAbilitiesByTag(DashTag);
 }
 
+void AGP_PlayerCharacter::ToggleWhiteVoid()
+{
+	SetWhiteVoidState(!bIsInWhiteVoid);
+}
 
-UBlendSpace* AGP_PlayerCharacter::GetLocomotionBlendSpace() const { return AnimationSet ? AnimationSet->LocomotionBlendSpace : nullptr; }
-UAnimSequenceBase* AGP_PlayerCharacter::GetJumpLoopAnimation() const { return AnimationSet ? AnimationSet->JumpLoopAnimation : nullptr; }
+void AGP_PlayerCharacter::EnterWhiteVoid()
+{
+	SetWhiteVoidState(true);
+}
+
+void AGP_PlayerCharacter::ExitWhiteVoid()
+{
+	SetWhiteVoidState(false);
+}
+
+void AGP_PlayerCharacter::ServerSetWhiteVoid_Implementation(bool bNewInWhiteVoid)
+{
+	SetWhiteVoidState(bNewInWhiteVoid);
+}
+
+void AGP_PlayerCharacter::SetWhiteVoidState(bool bNewInWhiteVoid)
+{
+	if (bIsInWhiteVoid == bNewInWhiteVoid)
+	{
+		return;
+	}
+
+	// Standalone/listen server: this path is authoritative immediately.
+	// Dedicated server: clients call the RPC below; the server owns the final replicated movement.
+	// Owning clients also run the transition locally so camera lag is off on the visible frame.
+	if (!HasAuthority())
+	{
+		ServerSetWhiteVoid(bNewInWhiteVoid);
+	}
+
+	PerformWhiteVoidTransition(bNewInWhiteVoid);
+}
+
+void AGP_PlayerCharacter::PerformWhiteVoidTransition(bool bNewInWhiteVoid)
+{
+	if (bNewInWhiteVoid)
+	{
+		EnsureWhiteVoidSetExists();
+	}
+
+	CacheWhiteVoidTransitionState();
+
+	if (CameraBoom && !bPreserveCameraLagStateOnTransition)
+	{
+		CameraBoom->bEnableCameraLag = false;
+		CameraBoom->bEnableCameraRotationLag = false;
+	}
+
+	if (bStopMovementOnTransition)
+	{
+		if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+		{
+			MoveComp->StopMovementImmediately();
+			MoveComp->Velocity = FVector::ZeroVector;
+			MoveComp->ClearAccumulatedForces();
+		}
+	}
+
+	const FVector TargetLocation = ResolveWhiteVoidTargetLocation(bNewInWhiteVoid);
+	const FRotator TargetRotation = GetActorRotation();
+	const FVector WorldOffset = TargetLocation - GetActorLocation();
+
+	// SpringArm keeps previous lag targets internally. Shift those cached targets by the
+	// same delta as the teleport so existing lag/drag offset is preserved in the new space
+	// instead of interpolating from the old world's height.
+	if (CameraBoom)
+	{
+		CameraBoom->ApplyWorldOffset(WorldOffset, false);
+	}
+
+	TeleportTo(TargetLocation, TargetRotation, false, true);
+
+	if (AController* OwningController = GetController())
+	{
+		OwningController->SetControlRotation(StoredWhiteVoidControlRotation);
+	}
+
+	if (FollowCamera && bForceCameraCutOnTransition)
+	{
+		FollowCamera->NotifyCameraCut();
+	}
+	if (bResetMotionTrajectoryOnTransition)
+	{
+		ResetMotionTrajectoryAfterWhiteVoidTransition();
+	}
+	SuppressMotionMatchingForWhiteVoidTransition();
+	if (bForceCameraCutOnTransition)
+	{
+		if (APlayerController* PlayerController = Cast<APlayerController>(GetController()))
+		{
+			if (PlayerController->PlayerCameraManager)
+			{
+				PlayerController->PlayerCameraManager->SetGameCameraCutThisFrame();
+			}
+		}
+	}
+
+	bIsInWhiteVoid = bNewInWhiteVoid;
+
+	if (CameraBoom)
+	{
+		CameraBoom->UpdateComponentToWorld();
+	}
+	if (FollowCamera)
+	{
+		FollowCamera->UpdateComponentToWorld();
+	}
+
+	if (!bPreserveCameraLagStateOnTransition)
+	{
+		FTimerHandle RestoreLagTimerHandle;
+		GetWorldTimerManager().SetTimer(RestoreLagTimerHandle, this, &ThisClass::RestoreWhiteVoidCameraLag, 0.05f, false);
+	}
+
+	if (bDebugWhiteVoidTransition)
+	{
+		UE_LOG(LogTemp, Log, TEXT("White Void %s: %s -> %s"),
+			bNewInWhiteVoid ? TEXT("Enter") : TEXT("Exit"),
+			*GetName(),
+			*TargetLocation.ToString());
+	}
+}
+
+void AGP_PlayerCharacter::CacheWhiteVoidTransitionState()
+{
+	if (CameraBoom)
+	{
+		bStoredCameraLagEnabled = CameraBoom->bEnableCameraLag;
+		bStoredCameraRotationLagEnabled = CameraBoom->bEnableCameraRotationLag;
+	}
+
+	if (!bIsInWhiteVoid)
+	{
+		StoredWhiteVoidOriginLocation = GetActorLocation();
+		StoredWhiteVoidOriginRotation = GetActorRotation();
+		bHasStoredWhiteVoidOrigin = true;
+	}
+
+	if (const AController* OwningController = GetController())
+	{
+		StoredWhiteVoidControlRotation = OwningController->GetControlRotation();
+	}
+	else
+	{
+		StoredWhiteVoidControlRotation = GetActorRotation();
+	}
+}
+
+void AGP_PlayerCharacter::RestoreWhiteVoidCameraLag()
+{
+	if (!CameraBoom)
+	{
+		return;
+	}
+
+	CameraBoom->bEnableCameraLag = bStoredCameraLagEnabled;
+	CameraBoom->bEnableCameraRotationLag = bStoredCameraRotationLagEnabled;
+}
+
+FVector AGP_PlayerCharacter::ResolveWhiteVoidTargetLocation(bool bNewInWhiteVoid) const
+{
+	if (bNewInWhiteVoid)
+	{
+		FVector TargetLocation = bUseFixedWhiteVoidEntryLocation
+			? WhiteVoidEntryLocation
+			: StoredWhiteVoidOriginLocation + WhiteVoidOffset;
+		if (const UCapsuleComponent* Capsule = GetCapsuleComponent())
+		{
+			const float FloorTopZ = (bUseFixedWhiteVoidEntryLocation ? WhiteVoidEntryLocation.Z : StoredWhiteVoidOriginLocation.Z + WhiteVoidOffset.Z)
+				+ WhiteVoidFloorTopZOffset;
+			TargetLocation.Z = FloorTopZ + Capsule->GetScaledCapsuleHalfHeight();
+		}
+		return TargetLocation;
+	}
+
+	if (bHasStoredWhiteVoidOrigin)
+	{
+		return StoredWhiteVoidOriginLocation;
+	}
+
+	return GetActorLocation() - WhiteVoidOffset;
+}
+
+void AGP_PlayerCharacter::EnsureWhiteVoidSetExists()
+{
+	if (!GetWorld() || !WhiteVoidSetClass)
+	{
+		return;
+	}
+
+	TArray<AActor*> ExistingSets;
+	UGameplayStatics::GetAllActorsOfClass(this, WhiteVoidSetClass, ExistingSets);
+
+	AGP_WhiteVoidSetActor* WhiteVoidSet = ExistingSets.Num() > 0 ? Cast<AGP_WhiteVoidSetActor>(ExistingSets[0]) : nullptr;
+	if (!WhiteVoidSet)
+	{
+		FActorSpawnParameters SpawnParams;
+		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		SpawnParams.Owner = this;
+		WhiteVoidSet = GetWorld()->SpawnActor<AGP_WhiteVoidSetActor>(WhiteVoidSetClass, FTransform::Identity, SpawnParams);
+	}
+
+	if (WhiteVoidSet && WhiteVoidSet->WhiteVoidSetComponent)
+	{
+		WhiteVoidSet->WhiteVoidSetComponent->WhiteVoidOffset = bUseFixedWhiteVoidEntryLocation ? WhiteVoidEntryLocation : WhiteVoidOffset;
+		WhiteVoidSet->RebuildWhiteVoidSet();
+	}
+}
+
+void AGP_PlayerCharacter::ResetMotionTrajectoryAfterWhiteVoidTransition()
+{
+	UActorComponent* TrajectoryComponent = FindComponentByClass<UCharacterTrajectoryComponent>();
+	if (!TrajectoryComponent)
+	{
+		return;
+	}
+
+	const FVector CurrentMeshLocation = GetMesh() ? GetMesh()->GetComponentLocation() : GetActorLocation();
+
+	if (FStructProperty* TrajectoryProperty = FindFProperty<FStructProperty>(TrajectoryComponent->GetClass(), TEXT("Trajectory")))
+	{
+		if (FTransformTrajectory* Trajectory = TrajectoryProperty->ContainerPtrToValuePtr<FTransformTrajectory>(TrajectoryComponent))
+		{
+			for (FTransformTrajectorySample& Sample : Trajectory->Samples)
+			{
+				Sample.Position = CurrentMeshLocation;
+			}
+		}
+	}
+
+	if (FArrayProperty* HistoryProperty = FindFProperty<FArrayProperty>(TrajectoryComponent->GetClass(), TEXT("TranslationHistory")))
+	{
+		FScriptArrayHelper HistoryHelper(HistoryProperty, HistoryProperty->ContainerPtrToValuePtr<void>(TrajectoryComponent));
+		if (CastField<FStructProperty>(HistoryProperty->Inner))
+		{
+			for (int32 Index = 0; Index < HistoryHelper.Num(); ++Index)
+			{
+				*reinterpret_cast<FVector*>(HistoryHelper.GetRawPtr(Index)) = CurrentMeshLocation;
+			}
+		}
+	}
+}
+
+void AGP_PlayerCharacter::SuppressMotionMatchingForWhiteVoidTransition() const
+{
+	if (WhiteVoidMotionMatchingSuppressDuration <= 0.f)
+	{
+		return;
+	}
+
+	if (UGP_CharacterAnimInstance* AnimInstance = Cast<UGP_CharacterAnimInstance>(GetMesh() ? GetMesh()->GetAnimInstance() : nullptr))
+	{
+		AnimInstance->SuppressMotionMatchingUpdate(WhiteVoidMotionMatchingSuppressDuration);
+	}
+
+	if (UGP_CharacterAnimInstance* SourceAnimInstance = Cast<UGP_CharacterAnimInstance>(GetUEFNSourceAnimInstance()))
+	{
+		SourceAnimInstance->SuppressMotionMatchingUpdate(WhiteVoidMotionMatchingSuppressDuration);
+	}
+}
 
 
 void AGP_PlayerCharacter::OnSprintingTagChanged(const FGameplayTag CallbackTag, int32 NewCount)
@@ -446,6 +836,27 @@ void AGP_PlayerCharacter::UpdateConditionalMaxAcceleration(float DeltaSeconds)
 	UCharacterMovementComponent* MoveComp = GetCharacterMovement();
 	if (!MoveComp) return;
 
+	MoveInputReversalGraceTimeRemaining = FMath::Max(0.0f, MoveInputReversalGraceTimeRemaining - DeltaSeconds);
+
+	FVector CurrentMoveInputDirection = MoveComp->GetLastInputVector().GetSafeNormal2D();
+	if (CurrentMoveInputDirection.IsNearlyZero())
+	{
+		CurrentMoveInputDirection = MoveComp->GetCurrentAcceleration().GetSafeNormal2D();
+	}
+
+	if (!CurrentMoveInputDirection.IsNearlyZero())
+	{
+		if (!LastMoveInputDirection.IsNearlyZero() && FVector::DotProduct(LastMoveInputDirection, CurrentMoveInputDirection) < -0.5f)
+		{
+			MoveInputReversalGraceTimeRemaining = 0.2f;
+			if (bIsStartAccelerationClamped)
+			{
+				RestoreNormalMaxAcceleration();
+			}
+		}
+		LastMoveInputDirection = CurrentMoveInputDirection;
+	}
+
 	if (bIsStartAccelerationClamped)
 	{
 		StartAccelerationClampElapsed += DeltaSeconds;
@@ -484,6 +895,15 @@ bool AGP_PlayerCharacter::ShouldStartAccelerationClamp() const
 
 	// 3. 이동 입력 발생 (가속 입력 > 0.0f)
 	if (MoveComp->GetCurrentAcceleration().Size() <= 0.0f) return false;
+
+	if (MoveInputReversalGraceTimeRemaining > 0.0f) return false;
+
+	const FVector Velocity2D = GetVelocity().GetSafeNormal2D();
+	const FVector Acceleration2D = MoveComp->GetCurrentAcceleration().GetSafeNormal2D();
+	if (!Velocity2D.IsNearlyZero() && !Acceleration2D.IsNearlyZero() && FVector::DotProduct(Velocity2D, Acceleration2D) < 0.0f)
+	{
+		return false;
+	}
 
 	// 4. Sprint 아님
 	if (IsSprinting()) return false;
