@@ -50,10 +50,6 @@ namespace GPFemaleAnimationSetup
 	const FString FemaleWalkPath = TEXT("/Game/Asset/CharacterAction/female/Animations/femaleWalk_Loop");
 	const FString FemaleJogPath = TEXT("/Game/Asset/CharacterAction/female/Animations/femaleJog_Fwd_Loop");
 	const FString FemaleSprintPath = TEXT("/Game/Asset/CharacterAction/female/Animations/femaleSprint_Loop");
-	const FString FemaleSprintEnterLeftPath = TEXT("/Game/Asset/CharacterAction/female/Animations/femaleSprint_Enter_L");
-	const FString FemaleSprintEnterRightPath = TEXT("/Game/Asset/CharacterAction/female/Animations/femaleSprint_Enter_R");
-	const FString FemaleSprintExitLeftPath = TEXT("/Game/Asset/CharacterAction/female/Animations/femaleSprint_Exit_L");
-	const FString FemaleSprintExitRightPath = TEXT("/Game/Asset/CharacterAction/female/Animations/femaleSprint_Exit_R");
 	const FString FemaleJumpLoopPath = TEXT("/Game/Asset/CharacterAction/female/Animations/femaleJump_Loop");
 	// 기본 공격도 루트모션 몽타주를 사용한다.
 	const FString FemaleSwordAttackPath = TEXT("/Game/Asset/CharacterAction/female/Animations/femaleSword_Attack_RM");
@@ -71,7 +67,6 @@ namespace GPFemaleAnimationSetup
 		TEXT("/Game/Asset/CharacterAction/female/Animations/femaleSword_Heavy_C"),
 		TEXT("/Game/Asset/CharacterAction/female/Animations/femaleSword_Heavy_D")
 	};
-	const FString FemaleJumpLandMontagePath = TEXT("/Game/Asset/CharacterAction/female/Montages/AM_Female_Jump_Land");
 	// 구르기는 루트모션 몽타주를 사용해서 애니메이션 전진량으로 이동한다.
 	const FString FemaleDashMontagePath = TEXT("/Game/Asset/CharacterAction/female/Montages/AM_Female_Roll_RM");
 
@@ -97,17 +92,9 @@ namespace GPFemaleAnimationSetup
 		TEXT("AM_Female_Heavy_C"),
 		TEXT("AM_Female_Heavy_D")
 	};
-	const FString SprintEnterLeftMontageName = TEXT("AM_Female_Sprint_Enter_L");
-	const FString SprintEnterRightMontageName = TEXT("AM_Female_Sprint_Enter_R");
-	const FString SprintExitLeftMontageName = TEXT("AM_Female_Sprint_Exit_L");
-	const FString SprintExitRightMontageName = TEXT("AM_Female_Sprint_Exit_R");
 	const FName LocomotionSyncGroupName(TEXT("Locomotion"));
 	const float LocomotionInputSmoothingTime = 0.12f;
 	const float LocomotionSampleWeightSpeed = 8.0f;
-	const float SprintEnterMontageBlendInTime = 0.18f;
-	const float SprintEnterMontageBlendOutTime = 0.28f;
-	const float SprintExitMontageBlendInTime = 0.14f;
-	const float SprintExitMontageBlendOutTime = 0.22f;
 	const float AttackMontageBlendInTime = 0.08f;
 	const float AttackMontageBlendOutTime = 0.12f;
 	const FString PlayerBlueprintPath = TEXT("/Game/Characters/PlayerCharacter/BP_GP_PlayerCharacter");
@@ -477,17 +464,11 @@ namespace GPFemaleAnimationSetup
 
 	UPDA_CharacterAnimationSet* CreateOrUpdateFemaleAnimationSet(
 		USkeletalMesh* SkeletalMesh,
-		UBlendSpace* BlendSpace,
-		UAnimSequenceBase* JumpLoop,
 		UAnimMontage* PrimaryMontage,
 		const TArray<UAnimMontage*>& LightAttackMontages,
-		const TArray<UAnimMontage*>& HeavyAttackMontages,
-		UAnimMontage* SprintEnterLeftMontage,
-		UAnimMontage* SprintEnterRightMontage,
-		UAnimMontage* SprintExitLeftMontage,
-		UAnimMontage* SprintExitRightMontage)
+		const TArray<UAnimMontage*>& HeavyAttackMontages)
 	{
-		if (!IsValid(SkeletalMesh) || !IsValid(BlendSpace) || !IsValid(JumpLoop) || !IsValid(PrimaryMontage) || LightAttackMontages.Num() == 0 || HeavyAttackMontages.Num() == 0 || !IsValid(SprintEnterLeftMontage) || !IsValid(SprintEnterRightMontage) || !IsValid(SprintExitLeftMontage) || !IsValid(SprintExitRightMontage))
+		if (!IsValid(SkeletalMesh) || !IsValid(PrimaryMontage) || LightAttackMontages.Num() == 0 || HeavyAttackMontages.Num() == 0)
 		{
 			return nullptr;
 		}
@@ -509,8 +490,7 @@ namespace GPFemaleAnimationSetup
 		}
 
 		UAnimMontage* DashMontage = LoadRequiredAsset<UAnimMontage>(*FemaleDashMontagePath);
-		UAnimMontage* LandingMontage = LoadRequiredAsset<UAnimMontage>(*FemaleJumpLandMontagePath);
-		if (!IsValid(DashMontage) || !IsValid(LandingMontage))
+		if (!IsValid(DashMontage))
 		{
 			return nullptr;
 		}
@@ -538,9 +518,6 @@ namespace GPFemaleAnimationSetup
 
 		AnimationSet->Modify();
 		AnimationSet->CharacterMesh = SkeletalMesh;
-		AnimationSet->LocomotionBlendSpace = BlendSpace;
-		AnimationSet->JumpLoopAnimation = JumpLoop;
-		AnimationSet->LandingMontage = LandingMontage;
 		AnimationSet->DashMontage = DashMontage;
 		AnimationSet->PrimaryAttackMontage = PrimaryMontage;
 		AnimationSet->LightAttackMontages.Reset();
@@ -553,10 +530,6 @@ namespace GPFemaleAnimationSetup
 		{
 			AnimationSet->HeavyAttackMontages.Add(AttackMontage);
 		}
-		AnimationSet->SprintEnterLeftMontage = SprintEnterLeftMontage;
-		AnimationSet->SprintEnterRightMontage = SprintEnterRightMontage;
-		AnimationSet->SprintExitLeftMontage = SprintExitLeftMontage;
-		AnimationSet->SprintExitRightMontage = SprintExitRightMontage;
 		AnimationSet->MarkPackageDirty();
 
 		if (!SaveAsset(AnimationSet))
@@ -1225,8 +1198,6 @@ namespace GPSansBossAnimationSetup
 		AnimationSet->Modify();
 		AnimationSet->CharacterMesh = SkeletalMesh;
 		AnimationSet->AnimBlueprintClass = AnimBlueprint->GeneratedClass;
-		AnimationSet->LocomotionBlendSpace = BlendSpace;
-		AnimationSet->JumpLoopAnimation = JumpLoop;
 		AnimationSet->PrimaryAttackMontage = BasicAttackMontage;
 		AnimationSet->LightAttackMontages.Reset();
 		AnimationSet->LightAttackMontages.Add(BasicAttackMontage);
@@ -1318,65 +1289,11 @@ bool UGP_AnimationSetupLibrary::CreateFemalePlayerAnimationSetup()
 		return false;
 	}
 
-	UAnimMontage* SprintEnterLeftMontage = GPFemaleAnimationSetup::CreateOrUpdateSprintTransitionMontage(
-		FemaleSkeleton,
-		GPFemaleAnimationSetup::FemaleSprintEnterLeftPath,
-		GPFemaleAnimationSetup::SprintEnterLeftMontageName,
-		GPFemaleAnimationSetup::SprintEnterMontageBlendInTime,
-		GPFemaleAnimationSetup::SprintEnterMontageBlendOutTime,
-		TEXT("female sprint enter left"));
-	if (!SprintEnterLeftMontage)
-	{
-		return false;
-	}
-
-	UAnimMontage* SprintEnterRightMontage = GPFemaleAnimationSetup::CreateOrUpdateSprintTransitionMontage(
-		FemaleSkeleton,
-		GPFemaleAnimationSetup::FemaleSprintEnterRightPath,
-		GPFemaleAnimationSetup::SprintEnterRightMontageName,
-		GPFemaleAnimationSetup::SprintEnterMontageBlendInTime,
-		GPFemaleAnimationSetup::SprintEnterMontageBlendOutTime,
-		TEXT("female sprint enter right"));
-	if (!SprintEnterRightMontage)
-	{
-		return false;
-	}
-
-	UAnimMontage* SprintExitLeftMontage = GPFemaleAnimationSetup::CreateOrUpdateSprintTransitionMontage(
-		FemaleSkeleton,
-		GPFemaleAnimationSetup::FemaleSprintExitLeftPath,
-		GPFemaleAnimationSetup::SprintExitLeftMontageName,
-		GPFemaleAnimationSetup::SprintExitMontageBlendInTime,
-		GPFemaleAnimationSetup::SprintExitMontageBlendOutTime,
-		TEXT("female sprint exit left"));
-	if (!SprintExitLeftMontage)
-	{
-		return false;
-	}
-
-	UAnimMontage* SprintExitRightMontage = GPFemaleAnimationSetup::CreateOrUpdateSprintTransitionMontage(
-		FemaleSkeleton,
-		GPFemaleAnimationSetup::FemaleSprintExitRightPath,
-		GPFemaleAnimationSetup::SprintExitRightMontageName,
-		GPFemaleAnimationSetup::SprintExitMontageBlendInTime,
-		GPFemaleAnimationSetup::SprintExitMontageBlendOutTime,
-		TEXT("female sprint exit right"));
-	if (!SprintExitRightMontage)
-	{
-		return false;
-	}
-
 	UPDA_CharacterAnimationSet* AnimationSet = GPFemaleAnimationSetup::CreateOrUpdateFemaleAnimationSet(
 		FemaleMesh,
-		BlendSpace,
-		JumpLoop,
 		PrimaryMontage,
 		LightAttackMontages,
-		HeavyAttackMontages,
-		SprintEnterLeftMontage,
-		SprintEnterRightMontage,
-		SprintExitLeftMontage,
-		SprintExitRightMontage);
+		HeavyAttackMontages);
 	if (!AnimationSet)
 	{
 		return false;

@@ -1,4 +1,4 @@
-﻿// GP_Primary.h 수정본
+// GP_Primary.h 수정본
 #pragma once
 
 #include "CoreMinimal.h"
@@ -22,6 +22,7 @@ public:
     virtual void InputPressed(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo) override;
 
 protected:
+	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
 	/** Primary 특유의 수직 오프셋 (부모 클래스 확장 시 통합 고려) */
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Skill|Values")
 	float HitBoxElevationOffset = 20.0f;

@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "AbilitySystem/Abilities/GP_GameplayAbility.h"
+#include "TimerManager.h"
 #include "GP_Dash.generated.h"
 
 UCLASS()
@@ -14,6 +15,8 @@ public:
 	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 
 protected:
+	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
+
 	UFUNCTION()
 	void OnDashActionEnd(FGameplayEventData Payload);
 
@@ -22,4 +25,8 @@ protected:
 
 	UFUNCTION()
 	void OnMontageInterrupted();
+
+private:
+	FTimerHandle FallbackMontageEndTimerHandle;
+	FTimerHandle FallbackActionEndTimerHandle;
 };

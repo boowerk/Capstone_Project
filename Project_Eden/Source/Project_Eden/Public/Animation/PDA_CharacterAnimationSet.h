@@ -6,8 +6,6 @@
 #include "PDA_CharacterAnimationSet.generated.h"
 
 class UAnimMontage;
-class UAnimSequenceBase;
-class UBlendSpace;
 class USkeletalMesh;
 
 USTRUCT(BlueprintType)
@@ -66,17 +64,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Visual")
 	TSubclassOf<UAnimInstance> AnimBlueprintClass;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Locomotion")
-	TObjectPtr<UBlendSpace> LocomotionBlendSpace;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Locomotion")
-	TObjectPtr<UAnimSequenceBase> SprintStopAnimation;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Air")
-	TObjectPtr<UAnimSequenceBase> JumpLoopAnimation;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Air")
-	TObjectPtr<UAnimMontage> LandingMontage;
+	// Runtime motion matching owns locomotion and air loops. Add a jump animation montage here if jump actions need one later.
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Action")
 	TObjectPtr<UAnimMontage> DashMontage;
@@ -90,17 +78,20 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Action")
 	TArray<TObjectPtr<UAnimMontage>> HeavyAttackMontages; // Heavy combo order: A, B, C, D.
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Locomotion")
-	TObjectPtr<UAnimMontage> SprintEnterLeftMontage;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Runtime Retarget Fallback")
+	TObjectPtr<UAnimMontage> SourceDashMontage;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Locomotion")
-	TObjectPtr<UAnimMontage> SprintEnterRightMontage;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Runtime Retarget Fallback")
+	TObjectPtr<UAnimMontage> SourcePrimaryAttackMontage;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Locomotion")
-	TObjectPtr<UAnimMontage> SprintExitLeftMontage;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Runtime Retarget Fallback")
+	TArray<TObjectPtr<UAnimMontage>> SourceLightAttackMontages; // Source skeleton fallback order: A, B, C, D.
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Locomotion")
-	TObjectPtr<UAnimMontage> SprintExitRightMontage;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Runtime Retarget Fallback")
+	TArray<TObjectPtr<UAnimMontage>> SourceHeavyAttackMontages; // Source skeleton fallback order: A, B, C, D.
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Runtime Retarget Fallback")
+	float SourceRootMotionTranslationYawOffset = -90.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Movement|Speed")
 	FGPDirectionalMovementSpeedProfile MovementSpeedProfile;

@@ -93,6 +93,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "AnimationData")
 	void SetAnimationSet(UPDA_CharacterAnimationSet* NewSet);
 
+	void SetMovementSpeedScaleRatio(float NewRatio);
+
 	UFUNCTION(BlueprintCallable, Category = "MotionMatching|State")
 	bool GetShouldTurnInPlace() const { return ShouldTurnInPlace; }
 
@@ -107,8 +109,7 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AnimationData")
 	TObjectPtr<UPDA_CharacterAnimationSet> AnimationSet;
 
-	// === Runtime Cached Assets (AnimGraph에서 직접 사용) ===
-	
+	// Kept only so legacy AnimBP graphs do not lose variable bindings; runtime motion matching owns locomotion playback.
 	UPROPERTY(BlueprintReadOnly, Category = "AnimationData|Cached")
 	TObjectPtr<UBlendSpace> LocomotionBlendSpace;
 
