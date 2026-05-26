@@ -55,19 +55,24 @@ void UGP_Primary::StartComboSequence()
 	}
 
 	UPDA_CharacterAnimationSet* AnimSet = PC->GetAnimationSet();
-	if (!IsValid(AnimSet) || AnimSet->LightAttackMontages.IsEmpty())
+	if (!IsValid(AnimSet) || (AnimSet->LightAttackMontages.IsEmpty() && AnimSet->SourceLightAttackMontages.IsEmpty()))
 	{
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 		return;
 	}
 
 	UAnimMontage* MontageToPlay = nullptr;
+	UAnimMontage* SourceMontageToPlay = nullptr;
 	if (AnimSet->LightAttackMontages.IsValidIndex(CurrentComboIndex))
 	{
 		MontageToPlay = AnimSet->LightAttackMontages[CurrentComboIndex];
 	}
+	if (AnimSet->SourceLightAttackMontages.IsValidIndex(CurrentComboIndex))
+	{
+		SourceMontageToPlay = AnimSet->SourceLightAttackMontages[CurrentComboIndex];
+	}
 
-	if (!IsValid(MontageToPlay))
+	if (!IsValid(MontageToPlay) && !IsValid(SourceMontageToPlay))
 	{
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 		return;
@@ -106,10 +111,17 @@ void UGP_Primary::StartComboSequence()
 	WaitEndTask->EventReceived.AddDynamic(this, &ThisClass::OnActionEndEventReceived);
 	WaitEndTask->ReadyForActivation();
 
-	MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(this, NAME_None, MontageToPlay, 1.0f);
-	MontageTask->OnCompleted.AddDynamic(this, &ThisClass::OnMontageCompleted);
-	MontageTask->OnInterrupted.AddDynamic(this, &ThisClass::OnMontageInterrupted);
-	MontageTask->ReadyForActivation();
+	if (IsValid(MontageToPlay))
+	{
+		MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(this, NAME_None, MontageToPlay, 1.0f);
+		MontageTask->OnCompleted.AddDynamic(this, &ThisClass::OnMontageCompleted);
+		MontageTask->OnInterrupted.AddDynamic(this, &ThisClass::OnMontageInterrupted);
+		MontageTask->ReadyForActivation();
+	}
+	else if (PC->PlayUEFNSourceFallbackMontage(SourceMontageToPlay, 1.0f) <= 0.0f)
+	{
+		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+	}
 }
 
 void UGP_Primary::ClearExistingTasks()
@@ -141,7 +153,13 @@ void UGP_Primary::OnActionEndEventReceived(FGameplayEventData Payload)
 		return;
 	}
 
-	int32 MaxCombo = PC->GetAnimationSet()->LightAttackMontages.Num();
+	const UPDA_CharacterAnimationSet* AnimSet = PC->GetAnimationSet();
+	int32 MaxCombo = FMath::Max(AnimSet->LightAttackMontages.Num(), AnimSet->SourceLightAttackMontages.Num());
+	if (MaxCombo <= 0)
+	{
+		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+		return;
+	}
 
 	if (bHasQueuedNextAttack)
 	{

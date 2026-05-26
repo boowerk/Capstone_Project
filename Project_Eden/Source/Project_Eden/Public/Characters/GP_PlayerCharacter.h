@@ -10,6 +10,8 @@
 class USpringArmComponent;
 class UCameraComponent;
 class USkeletalMeshComponent;
+class UAnimInstance;
+class UAnimMontage;
 class UPDA_WeaponItemCollection;
 class UPDA_CharacterAnimationSet;
 class UAnimSequenceBase;
@@ -64,6 +66,10 @@ public:
 	void ClearMovementSpeedProfileOverride();
 
 	UPDA_CharacterAnimationSet* GetAnimationSet() const { return AnimationSet; }
+	UAnimInstance* GetUEFNSourceAnimInstance() const;
+	float PlayUEFNSourceFallbackMontage(UAnimMontage* Montage, float PlayRate = 1.0f);
+	bool IsPlayingUEFNSourceFallbackMontage() const;
+	FVector GetLastUEFNSourceRootMotionVelocity() const { return LastUEFNSourceRootMotionVelocity; }
 	
 	/** [데이터 에셋 기반] 런타임 스킬 교체 함수 (bIgnoreRestrictions로 로그라이크식 예외 지원) */
 	UFUNCTION(BlueprintCallable, Category = "GAS|Combat")
@@ -86,6 +92,12 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Animation|Retarget", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USkeletalMeshComponent> UEFNSourceMesh;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UAnimMontage> ActiveUEFNSourceFallbackMontage;
+
+	bool bApplyUEFNSourceFallbackRootMotion = false;
+	FVector LastUEFNSourceRootMotionVelocity = FVector::ZeroVector;
 
 public:
 	virtual void UpdateAnimationSet() override;
@@ -130,6 +142,7 @@ protected:
 	void ApplyMovementSpeedFromAnimationSet();
 	void ApplyRetargetVisualScaleFromAnimationSet();
 	void RefreshCurrentMaxWalkSpeed();
+	void PushMovementSpeedScaleRatioToAnimInstances();
 	
 	// 가속도 가변 제어 튜닝 설정값
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Tuning")

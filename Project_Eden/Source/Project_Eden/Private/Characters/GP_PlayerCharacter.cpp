@@ -82,19 +82,51 @@ void AGP_PlayerCharacter::Tick(float DeltaSeconds)
 
 	// 1. 소스 메시의 루트 모션 소비 (메시 이탈 방지를 위해 매 틱 무조건 Consume)
 	FRotator RootMotionDeltaRot = FRotator::ZeroRotator;
+	FVector RootMotionDeltaTranslation = FVector::ZeroVector;
+	LastUEFNSourceRootMotionVelocity = FVector::ZeroVector;
+
+	const bool bFallbackMontageActive = IsPlayingUEFNSourceFallbackMontage();
+	if (bApplyUEFNSourceFallbackRootMotion && !bFallbackMontageActive)
+	{
+		bApplyUEFNSourceFallbackRootMotion = false;
+		ActiveUEFNSourceFallbackMontage = nullptr;
+	}
 	if (UEFNSourceMesh && UEFNSourceMesh->IsPlayingRootMotion())
 	{
 		FRootMotionMovementParams RootMotion = UEFNSourceMesh->ConsumeRootMotion();
 		if (RootMotion.bHasRootMotion)
 		{
-			RootMotionDeltaRot = RootMotion.GetRootMotionTransform().GetRotation().Rotator();
+			const FTransform RootMotionTransform = RootMotion.GetRootMotionTransform();
+			RootMotionDeltaRot = RootMotionTransform.GetRotation().Rotator();
+			RootMotionDeltaTranslation = RootMotionTransform.GetTranslation();
 		}
 	}
 
 	const float SpeedSq = GetVelocity().SizeSquared2D();
 	const bool bIsStatic = SpeedSq < 225.f; // Speed < 15.f
 
-	if (bIsStatic)
+	if (bApplyUEFNSourceFallbackRootMotion && bFallbackMontageActive)
+	{
+		UCharacterMovementComponent* MoveComp = GetCharacterMovement();
+		if (MoveComp && MoveComp->UpdatedComponent && (!RootMotionDeltaTranslation.IsNearlyZero() || !RootMotionDeltaRot.IsZero()))
+		{
+			const float TranslationYawOffset = AnimationSet ? AnimationSet->SourceRootMotionTranslationYawOffset : 0.0f;
+			const FVector CorrectedTranslation = FRotator(0.0f, TranslationYawOffset, 0.0f).RotateVector(RootMotionDeltaTranslation);
+			const FVector WorldDelta = GetActorTransform().TransformVectorNoScale(CorrectedTranslation);
+			const FQuat TargetRotation = RootMotionDeltaRot.IsZero()
+				? MoveComp->UpdatedComponent->GetComponentQuat()
+				: RootMotionDeltaRot.Quaternion() * MoveComp->UpdatedComponent->GetComponentQuat();
+
+			FHitResult MoveHit;
+			MoveComp->SafeMoveUpdatedComponent(WorldDelta, TargetRotation, true, MoveHit);
+
+			if (DeltaSeconds > KINDA_SMALL_NUMBER)
+			{
+				LastUEFNSourceRootMotionVelocity = WorldDelta / DeltaSeconds;
+			}
+		}
+	}
+	else if (bIsStatic)
 	{
 		// 1. 제자리 대기 및 회전 시: 모션 매칭 애니메이션이 주도하는 순수 루트 모션 회전량만 100% 반영
 		//    C++ 측의 인위적인 수동 RInterpTo 보간 개입을 전면 차단하여 발 미끄러짐과 튕김 현상을 완벽히 근절하고,
@@ -106,6 +138,43 @@ void AGP_PlayerCharacter::Tick(float DeltaSeconds)
 	}
 
 	UpdateConditionalMaxAcceleration(DeltaSeconds);
+}
+
+UAnimInstance* AGP_PlayerCharacter::GetUEFNSourceAnimInstance() const
+{
+	return UEFNSourceMesh ? UEFNSourceMesh->GetAnimInstance() : nullptr;
+}
+
+float AGP_PlayerCharacter::PlayUEFNSourceFallbackMontage(UAnimMontage* Montage, float PlayRate)
+{
+	UAnimInstance* SourceAnimInstance = GetUEFNSourceAnimInstance();
+	if (!IsValid(SourceAnimInstance) || !IsValid(Montage))
+	{
+		return 0.0f;
+	}
+
+	if (IsValid(ActiveUEFNSourceFallbackMontage))
+	{
+		SourceAnimInstance->Montage_Stop(0.1f, ActiveUEFNSourceFallbackMontage);
+	}
+
+	const float PlayedDuration = SourceAnimInstance->Montage_Play(Montage, PlayRate);
+	if (PlayedDuration > 0.0f)
+	{
+		ActiveUEFNSourceFallbackMontage = Montage;
+		bApplyUEFNSourceFallbackRootMotion = true;
+		LastUEFNSourceRootMotionVelocity = FVector::ZeroVector;
+	}
+
+	return PlayedDuration;
+}
+
+bool AGP_PlayerCharacter::IsPlayingUEFNSourceFallbackMontage() const
+{
+	UAnimInstance* SourceAnimInstance = GetUEFNSourceAnimInstance();
+	return IsValid(SourceAnimInstance)
+		&& IsValid(ActiveUEFNSourceFallbackMontage)
+		&& SourceAnimInstance->Montage_IsPlaying(ActiveUEFNSourceFallbackMontage);
 }
 
 void AGP_PlayerCharacter::Landed(const FHitResult& Hit)
@@ -279,6 +348,7 @@ void AGP_PlayerCharacter::SetGASMovementSpeedScaleRatioMultiplier(float NewMulti
 {
 	GASMovementSpeedScaleRatioMultiplier = FMath::Max(NewMultiplier, 0.01f);
 	RefreshCurrentMaxWalkSpeed();
+	PushMovementSpeedScaleRatioToAnimInstances();
 }
 
 void AGP_PlayerCharacter::SetMovementSpeedProfileOverride(const FGPDirectionalMovementSpeedProfile& NewProfile)
@@ -286,12 +356,14 @@ void AGP_PlayerCharacter::SetMovementSpeedProfileOverride(const FGPDirectionalMo
 	MovementSpeedProfileOverride = NewProfile;
 	bOverrideMovementSpeedProfile = true;
 	RefreshCurrentMaxWalkSpeed();
+	PushMovementSpeedScaleRatioToAnimInstances();
 }
 
 void AGP_PlayerCharacter::ClearMovementSpeedProfileOverride()
 {
 	bOverrideMovementSpeedProfile = false;
 	RefreshCurrentMaxWalkSpeed();
+	PushMovementSpeedScaleRatioToAnimInstances();
 }
 
 void AGP_PlayerCharacter::ApplyMovementSpeedFromAnimationSet()
@@ -301,6 +373,7 @@ void AGP_PlayerCharacter::ApplyMovementSpeedFromAnimationSet()
 		MovementSpeedProfile = AnimationSet->MovementSpeedProfile;
 	}
 	RefreshCurrentMaxWalkSpeed();
+	PushMovementSpeedScaleRatioToAnimInstances();
 }
 
 void AGP_PlayerCharacter::RefreshCurrentMaxWalkSpeed()
@@ -308,6 +381,22 @@ void AGP_PlayerCharacter::RefreshCurrentMaxWalkSpeed()
 	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
 	{
 		MoveComp->MaxWalkSpeed = IsSprinting() ? GetScaledSprintSpeed() : GetScaledNormalWalkSpeed();
+	}
+}
+
+void AGP_PlayerCharacter::PushMovementSpeedScaleRatioToAnimInstances()
+{
+	const float ScaleRatio = GetMovementSpeedScaleRatio();
+	if (UGP_CharacterAnimInstance* AnimInstance = Cast<UGP_CharacterAnimInstance>(GetMesh()->GetAnimInstance()))
+	{
+		AnimInstance->SetMovementSpeedScaleRatio(ScaleRatio);
+	}
+	if (UEFNSourceMesh)
+	{
+		if (UGP_CharacterAnimInstance* SourceAnimInstance = Cast<UGP_CharacterAnimInstance>(UEFNSourceMesh->GetAnimInstance()))
+		{
+			SourceAnimInstance->SetMovementSpeedScaleRatio(ScaleRatio);
+		}
 	}
 }
 
@@ -468,6 +557,13 @@ bool AGP_PlayerCharacter::ShouldStartAccelerationClamp() const
 
 	// 3. 이동 입력 발생 (가속 입력 > 0.0f)
 	if (MoveComp->GetCurrentAcceleration().Size() <= 0.0f) return false;
+
+	const FVector Velocity2D = GetVelocity().GetSafeNormal2D();
+	const FVector Acceleration2D = MoveComp->GetCurrentAcceleration().GetSafeNormal2D();
+	if (!Velocity2D.IsNearlyZero() && !Acceleration2D.IsNearlyZero() && FVector::DotProduct(Velocity2D, Acceleration2D) < 0.0f)
+	{
+		return false;
+	}
 
 	// 4. Sprint 아님
 	if (IsSprinting()) return false;

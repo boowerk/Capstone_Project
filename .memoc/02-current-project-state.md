@@ -31,6 +31,19 @@ Last synced: 2026-05-23T00:00:00
 - Character source body-size ratio can drive movement speed through `PDA_CharacterAnimationSet.MovementSpeedProfile.MovementSpeedScaleRatio` (default `1`). This is manual authoring data relative to the mannequin at scale 1, not the runtime mesh component scale. Runtime max speeds multiply by this ratio; `UGP_CharacterAnimInstance.Speed2D` divides actual speed by the ratio so chooser thresholds stay in mannequin scale-1 space.
 - Directional movement speed data is now owned by `PDA_CharacterAnimationSet.MovementSpeedProfile` and copied into `AGP_PlayerCharacter` on begin play.
 - `PDA_CharacterAnimationSet` no longer owns legacy locomotion blendspace, sprint-stop, jump-loop, landing montage, or sprint enter/exit montage slots; runtime motion matching owns locomotion/air playback, with only a comment placeholder for a future jump animation montage.
+- `PDA_CharacterAnimationSet` now has source-skeleton fallback montage slots (`SourceDashMontage`, source primary/light/heavy arrays). Player Dash/Primary prefer authored PDA target montages, then fall back to UEFNSource montage playback when target montage slots are empty.
+- `AGP_PlayerCharacter` gates UEFNSource root-motion translation application to active fallback montages only, moves the capsule through `SafeMoveUpdatedComponent`, and exposes last fallback root-motion velocity for future inertia handoff.
+- `ABP_UEFNSource_Player` now routes `Pose History -> DefaultSlot -> Output Pose`, allowing UEFNSource fallback montages to evaluate through the source AnimGraph. `GP_Dash` also clears fallback dash via montage-duration timer if no `ActionEnd` notify/event arrives.
+- `PDA_CharacterAnimationSet.SourceRootMotionTranslationYawOffset` defaults to `-90`; `AGP_PlayerCharacter` applies it only to fallback source root-motion translation before converting to world space.
+- The attempted `UEFNSourceMeshScale` multiplier on consumed fallback root-motion translation was reverted because it made runtime movement/debug speed worse.
+- The attempted `UGP_CharacterAnimInstance` fallback-root-motion velocity override was reverted; speed/debug context is back to `Character->GetVelocity()`.
+- The attempted actor-location-delta debug speed display was reverted because it jittered while idle; on-screen speed display is back to `GroundSpeed` / `Speed2D`.
+- Player movement input smoothing now snaps immediately when desired direction opposes the current smoothed direction. MoveAction `Completed` is handled by a reset-only function instead of re-entering `Input_Move`.
+- Speed debug display is emitted only by the anim instance whose owning skeletal mesh is `Character->GetMesh()`; this prevents `UEFNSourceMesh` from overwriting the same on-screen debug key.
+- Speed debug is additionally gated to the locally controlled player pawn, preventing stale transient PIE/world instances from overwriting the same on-screen debug key.
+- `UGP_CharacterAnimInstance` reads the final `AGP_PlayerCharacter::GetMovementSpeedScaleRatio()` and `AGP_PlayerCharacter` pushes scale ratio changes into both target and UEFN source anim instances when movement profiles/GAS scale change.
+- Source-only pose-search chooser load/evaluation is gated to the UEFNSource anim instance; target retarget ABP and boss ABPs no longer feed `CHT_MM_MaskMan_Root_OriginalStyle` with incompatible context objects.
+- Move direction smoothing snaps on strong direction changes (`dot < 0.5`) to avoid lingering several steps in the previous direction.
 - `AGP_PlayerCharacter` exposes GAS-ready hooks: `SetGASMovementSpeedMultiplier`, `SetGASMovementSpeedScaleRatioMultiplier`, `SetMovementSpeedProfileOverride`, and `ClearMovementSpeedProfileOverride`.
 - 제자리 회전(Turn In Place) 동작을 0.6초에서 1.0초로 연장하였고, 회전이 강제 유지(Hysteresis)되는 도중에도 이동 가속(`bHasAcceleration`), 공중 상태(`bIsFalling`), 회전 임계 속도 초과(`Speed2D > TurnInPlaceMaxSpeed`) 등 다른 애니메이션 상태 조건이 감지되면 회전이 즉시 turn=0 (`ShouldTurnInPlace = false`)으로 중단되도록 구현하였습니다.
 - C++ 코드의 인위적인 수동 정렬 개입(`RInterpTo`)을 **100% 전면 삭제**하여 회전 튕김 및 발 슬립 현상을 완전히 해결하고, 제자리 상태에서는 오로지 모션 매칭 애니메이션이 주도하는 순수 루트 모션 회전량(`AddActorWorldRotation(RootMotionDeltaRot)`)만 반영하도록 원상 복구하였습니다.
@@ -72,7 +85,7 @@ Last synced: 2026-05-23T00:00:00
 
 ## Notes
 
-- Minimal source AnimGraph is `Motion Matching -> Pose History -> Output Pose`.
+- Minimal source AnimGraph is `Motion Matching -> Pose History -> DefaultSlot -> Output Pose`.
 - `GeneratedTrajectory` is connected to `Pose History.TransformTrajectory` in `ABP_UEFNSource_Player`.
 - `ABP_UEFNSource_Player` CDO now uses `PSD_Relaxed_Stand_Walk_F_Loops` for `WalkPoseSearchDatabase` instead of the broader `PSD_Relaxed_Stand_Walk_Loops`.
 - `GP_CharacterAnimInstance` exposes `CurrentMotionMatchState` and still computes `RuntimePoseSearchDatabase` as state/debug data.

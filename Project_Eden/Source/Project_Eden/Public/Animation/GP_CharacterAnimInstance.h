@@ -93,6 +93,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "AnimationData")
 	void SetAnimationSet(UPDA_CharacterAnimationSet* NewSet);
 
+	void SetMovementSpeedScaleRatio(float NewRatio);
+
 	UFUNCTION(BlueprintCallable, Category = "MotionMatching|State")
 	bool GetShouldTurnInPlace() const { return ShouldTurnInPlace; }
 

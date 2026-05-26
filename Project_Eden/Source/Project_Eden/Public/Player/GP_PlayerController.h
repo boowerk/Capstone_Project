@@ -131,4 +131,5 @@ private:
 
 	bool ShouldSmoothMoveDirection() const;
 	void ResetMoveDirectionSmoothing();
+	void Input_MoveCompleted(const FInputActionValue& Value);
 };

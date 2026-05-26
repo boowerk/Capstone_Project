@@ -78,6 +78,21 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Action")
 	TArray<TObjectPtr<UAnimMontage>> HeavyAttackMontages; // Heavy combo order: A, B, C, D.
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Runtime Retarget Fallback")
+	TObjectPtr<UAnimMontage> SourceDashMontage;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Runtime Retarget Fallback")
+	TObjectPtr<UAnimMontage> SourcePrimaryAttackMontage;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Runtime Retarget Fallback")
+	TArray<TObjectPtr<UAnimMontage>> SourceLightAttackMontages; // Source skeleton fallback order: A, B, C, D.
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Runtime Retarget Fallback")
+	TArray<TObjectPtr<UAnimMontage>> SourceHeavyAttackMontages; // Source skeleton fallback order: A, B, C, D.
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Runtime Retarget Fallback")
+	float SourceRootMotionTranslationYawOffset = -90.0f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Movement|Speed")
 	FGPDirectionalMovementSpeedProfile MovementSpeedProfile;
 

@@ -93,7 +93,7 @@ void AGP_PlayerController::SetupInputComponent()
 	check(MoveAction);
 	check(LookAction);
 	EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &ThisClass::Input_Move);
-	EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Completed, this, &ThisClass::Input_Move);
+	EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Completed, this, &ThisClass::Input_MoveCompleted);
 	EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ThisClass::Input_Look);
 	if (JumpAction)
 	{
@@ -163,13 +163,19 @@ void AGP_PlayerController::Input_Move(const FInputActionValue& Value)
 		}
 		else
 		{
-			SmoothedMoveWorldDirection = FMath::VInterpTo(
-				SmoothedMoveWorldDirection,
-				RawWorldDirection,
-				GetWorld()->GetDeltaSeconds(),
-				MoveDirectionInterpSpeed
-			);
-			SmoothedMoveWorldDirection = SmoothedMoveWorldDirection.GetSafeNormal();
+			if (FVector::DotProduct(SmoothedMoveWorldDirection, RawWorldDirection) < 0.5f)
+			{
+				SmoothedMoveWorldDirection = RawWorldDirection;
+			}
+			else
+			{
+				SmoothedMoveWorldDirection = FMath::VInterpTo(
+					SmoothedMoveWorldDirection,
+					RawWorldDirection,
+					GetWorld()->GetDeltaSeconds(),
+					MoveDirectionInterpSpeed
+				).GetSafeNormal();
+			}
 			FinalMoveDirection = SmoothedMoveWorldDirection;
 		}
 	}
@@ -180,6 +186,19 @@ void AGP_PlayerController::Input_Move(const FInputActionValue& Value)
 	}
 
 	GetPawn()->AddMovementInput(FinalMoveDirection, MovementVector.Size());
+}
+
+void AGP_PlayerController::Input_MoveCompleted(const FInputActionValue& Value)
+{
+	CurrentMoveInput = FVector2D::ZeroVector;
+	ResetMoveDirectionSmoothing();
+	if (AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetPawn()))
+	{
+		if (UCharacterMovementComponent* MoveComp = PlayerCharacter->GetCharacterMovement())
+		{
+			MoveComp->bUseControllerDesiredRotation = false;
+		}
+	}
 }
 
 void AGP_PlayerController::Input_Look(const FInputActionValue& Value)
