@@ -2,7 +2,14 @@
 #include "AbilitySystem/GP_AttributeSet.h"
 #include "GameplayTags/GP_Tags.h"
 #include "AbilitySystemComponent.h"
+#include "HAL/IConsoleManager.h"
 #include "Math/UnrealMathUtility.h"
+
+static TAutoConsoleVariable<int32> CVarGPDamageExecLog(
+    TEXT("gp.DamageExec.Log"),
+    0,
+    TEXT("Logs GP damage execution values when non-zero."),
+    ECVF_Default);
 
 struct FGP_DamageStatics
 {
@@ -108,22 +115,23 @@ void UGP_DamageExecCalculation::Execute_Implementation(const FGameplayEffectCust
     float BaseDamage = 0.f;
     
     // SetByCaller에서 스킬 계수 가져오기
-    float C_atk = Spec.GetSetByCallerMagnitude(FGameplayTag::RequestGameplayTag(FName("Damage.Coef.Atk")), false, 1.0f);
-    float C_def = Spec.GetSetByCallerMagnitude(FGameplayTag::RequestGameplayTag(FName("Damage.Coef.Def")), false, 0.0f);
-    float C_hp  = Spec.GetSetByCallerMagnitude(FGameplayTag::RequestGameplayTag(FName("Damage.Coef.Hp")), false, 0.0f);
+    float Base = Spec.GetSetByCallerMagnitude(GPTags::Damage::Data::Base, false, 0.0f);
+    float C_atk = Spec.GetSetByCallerMagnitude(GPTags::Damage::Coef::Atk, false, 1.0f);
+    float C_def = Spec.GetSetByCallerMagnitude(GPTags::Damage::Coef::Def, false, 0.0f);
+    float C_hp  = Spec.GetSetByCallerMagnitude(GPTags::Damage::Coef::Hp, false, 0.0f);
     
     // [기존/신규 로직 통합] 물리/마법 분기
     if (Spec.GetDynamicAssetTags().HasTagExact(GPTags::Damage::Type::Magical))
     {
-        float M_atk = Spec.GetSetByCallerMagnitude(FGameplayTag::RequestGameplayTag(FName("Damage.Coef.M_Atk")), false, 1.0f);
-        float BaseSpell = Spec.GetSetByCallerMagnitude(FGameplayTag::RequestGameplayTag(FName("Damage.BaseSpell")), false, 0.0f);
+        float M_atk = Spec.GetSetByCallerMagnitude(GPTags::Damage::Coef::M_Atk, false, 1.0f);
+        float BaseSpell = Spec.GetSetByCallerMagnitude(GPTags::Damage::Data::BaseSpell, false, 0.0f);
         // 마법력(MagicPower) 우선 참조
         BaseDamage = (MagicPower * M_atk) + (AttackPower * 0.2f) + BaseSpell; 
     }
     else
     {
         // 물리 공식 적용
-        BaseDamage = (AttackPower * C_atk) + (Armor * C_def) + (MaxHealth * C_hp); 
+        BaseDamage = Base + (AttackPower * C_atk) + (Armor * C_def) + (MaxHealth * C_hp);
     }
 
     // 3. 나. 공격 수정치 적용 (치명타 및 피해 증가)
@@ -135,21 +143,36 @@ void UGP_DamageExecCalculation::Execute_Implementation(const FGameplayEffectCust
 
     // 4. 다/라. 속성 및 방어력 경감
     float Resistance_Elem = 0.0f;
-    if (Spec.GetDynamicAssetTags().HasTagExact(GPTags::Damage::Element::Pyros)) { ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().PyrosResistanceDef, EvaluationParameters, Resistance_Elem); }
-    else if (Spec.GetDynamicAssetTags().HasTagExact(GPTags::Damage::Element::Hydro)) { ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().HydroResistanceDef, EvaluationParameters, Resistance_Elem); }
-    else if (Spec.GetDynamicAssetTags().HasTagExact(GPTags::Damage::Element::Volt)) { ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().VoltResistanceDef, EvaluationParameters, Resistance_Elem); }
-    else if (Spec.GetDynamicAssetTags().HasTagExact(GPTags::Damage::Element::Aero)) { ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().AeroResistanceDef, EvaluationParameters, Resistance_Elem); }
-    else if (Spec.GetDynamicAssetTags().HasTagExact(GPTags::Damage::Element::Lux)) { ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().LuxResistanceDef, EvaluationParameters, Resistance_Elem); }
-    else if (Spec.GetDynamicAssetTags().HasTagExact(GPTags::Damage::Element::Chaos)) { ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().ChaosResistanceDef, EvaluationParameters, Resistance_Elem); }
-    else if (Spec.GetDynamicAssetTags().HasTagExact(GPTags::Damage::Element::Brute)) { ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().BruteResistanceDef, EvaluationParameters, Resistance_Elem); }
+    const TCHAR* ElementName = TEXT("None");
+    if (Spec.GetDynamicAssetTags().HasTagExact(GPTags::Damage::Element::Pyros)) { ElementName = TEXT("Pyros"); ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().PyrosResistanceDef, EvaluationParameters, Resistance_Elem); }
+    else if (Spec.GetDynamicAssetTags().HasTagExact(GPTags::Damage::Element::Hydro)) { ElementName = TEXT("Hydro"); ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().HydroResistanceDef, EvaluationParameters, Resistance_Elem); }
+    else if (Spec.GetDynamicAssetTags().HasTagExact(GPTags::Damage::Element::Volt)) { ElementName = TEXT("Volt"); ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().VoltResistanceDef, EvaluationParameters, Resistance_Elem); }
+    else if (Spec.GetDynamicAssetTags().HasTagExact(GPTags::Damage::Element::Aero)) { ElementName = TEXT("Aero"); ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().AeroResistanceDef, EvaluationParameters, Resistance_Elem); }
+    else if (Spec.GetDynamicAssetTags().HasTagExact(GPTags::Damage::Element::Lux)) { ElementName = TEXT("Lux"); ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().LuxResistanceDef, EvaluationParameters, Resistance_Elem); }
+    else if (Spec.GetDynamicAssetTags().HasTagExact(GPTags::Damage::Element::Chaos)) { ElementName = TEXT("Chaos"); ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().ChaosResistanceDef, EvaluationParameters, Resistance_Elem); }
+    else if (Spec.GetDynamicAssetTags().HasTagExact(GPTags::Damage::Element::Brute)) { ElementName = TEXT("Brute"); ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().BruteResistanceDef, EvaluationParameters, Resistance_Elem); }
 
     float K = 100.0f; 
     float ArmorMitigation = K / (K + FMath::Max(Armor, 0.0f));
     
     float Damage_Final = Damage_Modified * ArmorMitigation * (1.0f - Resistance_Elem);
 
+    if (CVarGPDamageExecLog.GetValueOnAnyThread() != 0)
+    {
+        UE_LOG(LogTemp, Log, TEXT("[DamageExec] Element=%s Base=%.2f Critical=%s CritMult=%.2f Modified=%.2f Armor=%.2f ArmorMitigation=%.3f Resistance=%.3f Final=%.2f"),
+            ElementName,
+            BaseDamage,
+            bCritical ? TEXT("true") : TEXT("false"),
+            FinalCritMult,
+            Damage_Modified,
+            Armor,
+            ArmorMitigation,
+            Resistance_Elem,
+            Damage_Final);
+    }
+
     // 5. 마. 강인도 피해 산출
-    float ToughnessDamageBase = Spec.GetSetByCallerMagnitude(FGameplayTag::RequestGameplayTag(FName("Damage.ToughnessBase")), false, 0.0f);
+    float ToughnessDamageBase = Spec.GetSetByCallerMagnitude(GPTags::Damage::Data::ToughnessBase, false, 0.0f);
 
     OutExecutionOutput.AddOutputModifier(FGameplayModifierEvaluatedData(UGP_AttributeSet::GetDamageAttribute(), EGameplayModOp::Additive, Damage_Final));
     OutExecutionOutput.AddOutputModifier(FGameplayModifierEvaluatedData(UGP_AttributeSet::GetToughnessDamageAttribute(), EGameplayModOp::Additive, ToughnessDamageBase));

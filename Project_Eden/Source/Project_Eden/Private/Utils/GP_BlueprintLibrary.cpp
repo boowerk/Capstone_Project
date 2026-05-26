@@ -5,8 +5,49 @@
 #include "Engine/OverlapResult.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
+#include "AbilitySystem/Abilities/GP_SkillData.h"
 #include "Characters/GP_EnemyCharacter.h"
 #include "GameplayEffect.h"
+#include "GameplayTags/GP_Tags.h"
+#include "GameFramework/Pawn.h"
+#include "Player/GP_PlayerState.h"
+
+namespace
+{
+FGameplayTag GetCurrentTechElementTagFromActor(const AActor* Actor)
+{
+	if (const APawn* Pawn = Cast<APawn>(Actor))
+	{
+		if (const AGP_PlayerState* PlayerState = Pawn->GetPlayerState<AGP_PlayerState>())
+		{
+			return PlayerState->GetCurrentTechElementTag();
+		}
+	}
+
+	if (const APawn* InstigatorPawn = Actor ? Actor->GetInstigator() : nullptr)
+	{
+		if (const AGP_PlayerState* PlayerState = InstigatorPawn->GetPlayerState<AGP_PlayerState>())
+		{
+			return PlayerState->GetCurrentTechElementTag();
+		}
+	}
+
+	return FGameplayTag();
+}
+
+FGameplayTag ConvertTechElementToDamageElement(FGameplayTag TechElementTag)
+{
+	if (TechElementTag.MatchesTagExact(GPTags::Tech::Element::Pyros)) { return GPTags::Damage::Element::Pyros; }
+	if (TechElementTag.MatchesTagExact(GPTags::Tech::Element::Hydro)) { return GPTags::Damage::Element::Hydro; }
+	if (TechElementTag.MatchesTagExact(GPTags::Tech::Element::Volt)) { return GPTags::Damage::Element::Volt; }
+	if (TechElementTag.MatchesTagExact(GPTags::Tech::Element::Aero)) { return GPTags::Damage::Element::Aero; }
+	if (TechElementTag.MatchesTagExact(GPTags::Tech::Element::Lux)) { return GPTags::Damage::Element::Lux; }
+	if (TechElementTag.MatchesTagExact(GPTags::Tech::Element::Chaos)) { return GPTags::Damage::Element::Chaos; }
+	if (TechElementTag.MatchesTagExact(GPTags::Tech::Element::Brute)) { return GPTags::Damage::Element::Brute; }
+
+	return FGameplayTag();
+}
+}
 
 EHitDirection UGP_BlueprintLibrary::GetHitDirection(const FVector& TargetForward, const FVector& ToInstigator)
 {
@@ -57,29 +98,37 @@ TArray<AActor*> UGP_BlueprintLibrary::SphereMeleeHitBoxOverlap(AActor* AvatarAct
 	TArray<AActor*> ActorsHit;
 	if (!IsValid(AvatarActor)) return ActorsHit;
 
-	UWorld* World = AvatarActor->GetWorld();
+	const FVector Forward = AvatarActor->GetActorForwardVector() * ForwardOffset;
+	const FVector HitBoxLocation = AvatarActor->GetActorLocation() + Forward + FVector(0.f, 0.f, ElevationOffset);
+
+	return SphereOverlapActorsAtLocation(AvatarActor, HitBoxLocation, Radius, AvatarActor, bDrawDebug);
+}
+
+TArray<AActor*> UGP_BlueprintLibrary::SphereOverlapActorsAtLocation(UObject* WorldContextObject, const FVector& Location, float Radius, AActor* ActorToIgnore, bool bDrawDebug)
+{
+	TArray<AActor*> ActorsHit;
+	if (!IsValid(WorldContextObject)) return ActorsHit;
+
+	UWorld* World = WorldContextObject->GetWorld();
 	if (!IsValid(World)) return ActorsHit;
 
-	TArray<AActor*> ActorToIgnore;
-	ActorToIgnore.Add(AvatarActor);
+	TArray<AActor*> ActorsToIgnore;
+	if (IsValid(ActorToIgnore))
+	{
+		ActorsToIgnore.Add(ActorToIgnore);
+	}
 
 	FCollisionQueryParams CollisionQueryParams;
-	CollisionQueryParams.AddIgnoredActors(ActorToIgnore);
+	CollisionQueryParams.AddIgnoredActors(ActorsToIgnore);
 
 	FCollisionResponseParams CollisionResponseParams;
 	CollisionResponseParams.CollisionResponse.SetAllChannels(ECR_Ignore);
 	CollisionResponseParams.CollisionResponse.SetResponse(ECC_Pawn, ECR_Block);
 
-	// 위치 계산
-	
 	TArray<FOverlapResult> OverlapResults;
 	FCollisionShape CollisionShapeSphere = FCollisionShape::MakeSphere(Radius);
-	
-	const FVector Forward = AvatarActor->GetActorForwardVector() * ForwardOffset;
-	const FVector HitBoxLocation = AvatarActor->GetActorLocation() + Forward + FVector(0.f, 0.f, ElevationOffset);
 
-	
-	World->OverlapMultiByChannel(OverlapResults, HitBoxLocation, FQuat::Identity,
+	World->OverlapMultiByChannel(OverlapResults, Location, FQuat::Identity,
 		ECC_Visibility, CollisionShapeSphere, CollisionQueryParams, CollisionResponseParams);
 
 	for (const FOverlapResult& Result : OverlapResults)
@@ -87,7 +136,7 @@ TArray<AActor*> UGP_BlueprintLibrary::SphereMeleeHitBoxOverlap(AActor* AvatarAct
 		if (AActor* HitActor = Result.GetActor())
 		{
 			// Keep friendly enemies out of the hit list before any ability-specific follow-up logic runs.
-			if (CanApplyCombatEffect(AvatarActor, HitActor))
+			if (CanApplyCombatEffect(ActorToIgnore, HitActor))
 			{
 				ActorsHit.AddUnique(HitActor);
 			}
@@ -96,7 +145,60 @@ TArray<AActor*> UGP_BlueprintLibrary::SphereMeleeHitBoxOverlap(AActor* AvatarAct
 	
 	if (bDrawDebug) // UGP_Primary::DrawDebugsHitBoxOverlap에서 기능 이전함
 	{
-		DrawDebugSphere(World, HitBoxLocation, Radius, 16, FColor::Red, false, 3.f);
+		DrawDebugSphere(World, Location, Radius, 16, FColor::Red, false, 3.f);
+		for (const FOverlapResult& Result : OverlapResults)
+		{
+			if (Result.GetActor())
+			{
+				FVector DebugLocation = Result.GetActor()->GetActorLocation();
+				DebugLocation.Z += 100.f;
+				DrawDebugSphere(World, DebugLocation, 30.f, 10, FColor::Green, false, 3.f);
+			}
+		}
+	}
+
+	return ActorsHit;
+}
+
+TArray<AActor*> UGP_BlueprintLibrary::BoxOverlapActorsAtLocation(UObject* WorldContextObject, const FVector& Location, const FVector& BoxExtent, const FRotator& Rotation, AActor* ActorToIgnore, bool bDrawDebug)
+{
+	TArray<AActor*> ActorsHit;
+	if (!IsValid(WorldContextObject)) return ActorsHit;
+
+	UWorld* World = WorldContextObject->GetWorld();
+	if (!IsValid(World)) return ActorsHit;
+
+	TArray<AActor*> ActorsToIgnore;
+	if (IsValid(ActorToIgnore))
+	{
+		ActorsToIgnore.Add(ActorToIgnore);
+	}
+
+	FCollisionQueryParams CollisionQueryParams;
+	CollisionQueryParams.AddIgnoredActors(ActorsToIgnore);
+
+	FCollisionResponseParams CollisionResponseParams;
+	CollisionResponseParams.CollisionResponse.SetAllChannels(ECR_Ignore);
+	CollisionResponseParams.CollisionResponse.SetResponse(ECC_Pawn, ECR_Block);
+
+	TArray<FOverlapResult> OverlapResults;
+	const FCollisionShape CollisionShapeBox = FCollisionShape::MakeBox(BoxExtent);
+	const FQuat RotationQuat = Rotation.Quaternion();
+
+	World->OverlapMultiByChannel(OverlapResults, Location, RotationQuat,
+		ECC_Visibility, CollisionShapeBox, CollisionQueryParams, CollisionResponseParams);
+
+	for (const FOverlapResult& Result : OverlapResults)
+	{
+		if (AActor* HitActor = Result.GetActor())
+		{
+			ActorsHit.AddUnique(HitActor);
+		}
+	}
+
+	if (bDrawDebug)
+	{
+		DrawDebugBox(World, Location, BoxExtent, RotationQuat, FColor::Red, false, 3.f);
 		for (const FOverlapResult& Result : OverlapResults)
 		{
 			if (Result.GetActor())
@@ -214,7 +316,7 @@ bool UGP_BlueprintLibrary::CanApplyCombatEffect(AActor* Instigator, AActor* Targ
 	return !(Instigator->IsA<AGP_EnemyCharacter>() && TargetActor->IsA<AGP_EnemyCharacter>());
 }
 
-void UGP_BlueprintLibrary::ApplyGameplayEffectToActors(AActor* Instigator, const TArray<AActor*>& TargetActors, TSubclassOf<UGameplayEffect> EffectClass, float EffectLevel)
+void UGP_BlueprintLibrary::ApplyGameplayEffectToActors(AActor* Instigator, const TArray<AActor*>& TargetActors, TSubclassOf<UGameplayEffect> EffectClass, float EffectLevel, UGP_SkillData* SkillData)
 {
 	if (!IsValid(Instigator) || !IsValid(EffectClass)) return;
 
@@ -235,7 +337,48 @@ void UGP_BlueprintLibrary::ApplyGameplayEffectToActors(AActor* Instigator, const
 			ContextHandle.AddInstigator(Instigator, Instigator);
 			
 			FGameplayEffectSpecHandle SpecHandle = InstigatorASC->MakeOutgoingSpec(EffectClass, EffectLevel, ContextHandle);
-			InstigatorASC->ApplyGameplayEffectSpecToTarget(*SpecHandle.Data.Get(), TargetASC);
+			if (SpecHandle.IsValid())
+			{
+				const FGameplayTag DamageElementTag = ConvertTechElementToDamageElement(GetCurrentTechElementTagFromActor(Instigator));
+				if (DamageElementTag.IsValid())
+				{
+					SpecHandle.Data->DynamicAssetTags.AddTag(DamageElementTag);
+				}
+
+				if (SkillData)
+				{
+					SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Data::Base, SkillData->BaseDamage);
+					SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Data::BaseSpell, SkillData->BaseSpellDamage);
+					SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Data::ToughnessBase, SkillData->ToughnessDamage);
+					SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Coef::Atk, SkillData->AttackPowerCoefficient);
+					SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Coef::M_Atk, SkillData->MagicPowerCoefficient);
+					SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Coef::Def, SkillData->DefenseCoefficient);
+					SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Coef::Hp, SkillData->MaxHealthCoefficient);
+				}
+
+				InstigatorASC->ApplyGameplayEffectSpecToTarget(*SpecHandle.Data.Get(), TargetASC);
+			}
 		}
 	}
+}
+
+void UGP_BlueprintLibrary::ApplyGameplayEffectAndEventToActors(AActor* Instigator, const TArray<AActor*>& TargetActors, TSubclassOf<UGameplayEffect> EffectClass, FGameplayTag EventTag, float EffectLevel, UGP_SkillData* SkillData)
+{
+	if (EffectClass)
+	{
+		ApplyGameplayEffectToActors(Instigator, TargetActors, EffectClass, EffectLevel, SkillData);
+	}
+
+	if (EventTag.IsValid())
+	{
+		SendGameplayEventToActors(Instigator, TargetActors, EventTag);
+	}
+}
+
+void UGP_BlueprintLibrary::ApplyAreaGameplayEffectAtLocation(AActor* Instigator, const FVector& Location, float Radius, TSubclassOf<UGameplayEffect> EffectClass, float EffectLevel, UGP_SkillData* SkillData, bool bDrawDebug)
+{
+	if (!IsValid(Instigator) || !IsValid(EffectClass)) return;
+
+	const TArray<AActor*> HitActors = SphereOverlapActorsAtLocation(Instigator, Location, Radius, Instigator, bDrawDebug);
+	ApplyGameplayEffectToActors(Instigator, HitActors, EffectClass, EffectLevel, SkillData);
 }

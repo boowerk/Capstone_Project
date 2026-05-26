@@ -2,8 +2,10 @@
 
 #include "CoreMinimal.h"
 #include "AbilitySystem/Abilities/GP_GameplayAbility.h"
+#include "GameplayTagContainer.h"
 #include "GP_SkillBase.generated.h"
 
+class AActor;
 class UGP_SkillData;
 
 /**
@@ -18,6 +20,9 @@ class PROJECT_EDEN_API UGP_SkillBase : public UGP_GameplayAbility
 public:
 	UGP_SkillBase();
 
+	virtual bool CheckCooldown(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
+	virtual void ApplyCooldown(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo) const override;
+
 protected:
 	// 블루프린트에서 설정 수치
 	
@@ -26,6 +31,9 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Skill|Values")
 	TSubclassOf<UGameplayEffect> DamageEffectClass;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS|Skill|Cooldown")
+	TSubclassOf<UGameplayEffect> GenericCooldownEffectClass;
 
 	// 공격 반경
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Skill|Values")
@@ -41,7 +49,13 @@ protected:
 	UFUNCTION(BlueprintCallable, Category = "GAS|Skill|Mechanics")
 	void PerformAreaAttack();
 
+	FGameplayTag GetCurrentTechElementTag(const FGameplayAbilityActorInfo* ActorInfo) const;
+	TSubclassOf<AActor> GetSkillVisualActorClass(const UGP_SkillData* SkillData, TSubclassOf<AActor> FallbackVisualActorClass, FGameplayTag ElementTag = FGameplayTag()) const;
+	void SpawnVisualActor(AActor* InstigatorActor, TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation = FRotator::ZeroRotator) const;
+
 	// 어빌리티 종료 시 호출할 정리 함수
 	UFUNCTION()
 	void OnMontageEnded(UAnimMontage* Montage, bool bInterrupted);
+
+	UGP_SkillData* GetSkillDataFromSpec(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo) const;
 };

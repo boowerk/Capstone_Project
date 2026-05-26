@@ -2,6 +2,7 @@
 
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
+#include "AbilitySystem/Abilities/GP_TestSkillSet.h"
 #include "Blueprint/UserWidget.h"
 #include "Characters/GP_EnemyCharacter.h"
 #include "Characters/GP_PlayerCharacter.h"
@@ -112,6 +113,8 @@ void AGP_PlayerController::SetupInputComponent()
 	if (SkillSlot2Action) EnhancedInputComponent->BindAction(SkillSlot2Action, ETriggerEvent::Triggered, this, &ThisClass::Input_SkillSlot2);
 	if (UltimateAction) EnhancedInputComponent->BindAction(UltimateAction, ETriggerEvent::Triggered, this, &ThisClass::Input_UltimateSkill);
 	if (TestToggleSkillAction) EnhancedInputComponent->BindAction(TestToggleSkillAction, ETriggerEvent::Started, this, &ThisClass::Input_TestToggleSkill);
+	// Keep both debug bindings after the PR merge so neither test preset rotation nor White Void input is dropped.
+	if (RotateTestSkillAction) EnhancedInputComponent->BindAction(RotateTestSkillAction, ETriggerEvent::Started, this, &ThisClass::Input_RotateTestSkill);
 	if (WhiteVoidToggleAction) EnhancedInputComponent->BindAction(WhiteVoidToggleAction, ETriggerEvent::Started, this, &ThisClass::Input_ToggleWhiteVoid);
 }
 
@@ -315,7 +318,6 @@ void AGP_PlayerController::Input_UltimateSkill()
 	ActivateAbilityByTag(GPTags::Ability::Skill::Ultimate);
 }
 
-
 bool AGP_PlayerController::ActivateAbilityByTag(const FGameplayTag& AbilityTag) const
 {
 	UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn());
@@ -411,6 +413,11 @@ void AGP_PlayerController::Input_TestToggleSkill()
 	Server_TestToggleSkill();
 }
 
+void AGP_PlayerController::Input_RotateTestSkill()
+{
+	Server_RotateTestSkill();
+}
+
 void AGP_PlayerController::Input_ToggleWhiteVoid()
 {
 	if (AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetPawn()))
@@ -471,6 +478,98 @@ void AGP_PlayerController::Server_TestToggleSkill_Implementation()
 		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Orange, TEXT("Skills Unequipped!"));
 		UE_LOG(LogTemp, Warning, TEXT("Server: WaterPuddle unequipped from Slot 1 & 2"));
 	}
+}
+
+bool AGP_PlayerController::Server_RotateTestSkill_Validate()
+{
+	return true;
+}
+
+void AGP_PlayerController::Server_RotateTestSkill_Implementation()
+{
+	// 여기서 프리셋 순환 장착
+	AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetPawn());
+	if (!PC) return;
+
+	UAbilitySystemComponent* ASC = PC->GetAbilitySystemComponent();
+	if (!ASC) return;
+
+	const int32 PresetCount = GetTestSkillPresetCount();
+	if (PresetCount <= 0)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Server: TestSkillSet is not assigned or has no presets"));
+		return;
+	}
+
+	ClearTestSkillSlots(ASC);
+	EquipTestSkillPreset(PC, TestSkillPresetIndex);
+
+	TestSkillPresetIndex = (TestSkillPresetIndex + 1) % PresetCount;
+}
+
+
+void AGP_PlayerController::ClearTestSkillSlots(UAbilitySystemComponent* ASC)
+{
+	if (!ASC) return;
+
+	const TArray<FGameplayTag> SlotTags = { GPTags::Ability::Skill::Slot01, GPTags::Ability::Skill::Slot02 };
+	TArray<FGameplayAbilitySpecHandle> HandlesToRemove;
+
+	for (const FGameplayAbilitySpec& Spec : ASC->GetActivatableAbilities())
+	{
+		for (const FGameplayTag& SlotTag : SlotTags)
+		{
+			if (Spec.GetDynamicSpecSourceTags().HasTagExact(SlotTag))
+			{
+				HandlesToRemove.Add(Spec.Handle);
+			}
+		}
+	}
+
+	for (const FGameplayAbilitySpecHandle& Handle : HandlesToRemove)
+	{
+		ASC->ClearAbility(Handle);
+	}
+}
+
+int32 AGP_PlayerController::GetTestSkillPresetCount() const
+{
+	if (TestSkillSet && !TestSkillSet->Presets.IsEmpty())
+	{
+		return TestSkillSet->Presets.Num();
+	}
+
+	return 0;
+}
+
+void AGP_PlayerController::EquipTestSkillPreset(AGP_PlayerCharacter* PlayerCharacter, int32 PresetIndex)
+{
+	if (!PlayerCharacter) return;
+
+	if (!TestSkillSet || !TestSkillSet->Presets.IsValidIndex(PresetIndex)) return;
+
+	const FGP_TestSkillPreset& Preset = TestSkillSet->Presets[PresetIndex];
+
+	if (Preset.Slot01Skill)
+	{
+		PlayerCharacter->EquipSkill(Preset.Slot01Skill, GPTags::Ability::Skill::Slot01, true);
+	}
+
+	if (Preset.Slot02Skill)
+	{
+		PlayerCharacter->EquipSkill(Preset.Slot02Skill, GPTags::Ability::Skill::Slot02, true);
+	}
+
+	const FString PresetName = Preset.PresetName.IsEmpty()
+		? FString::Printf(TEXT("Preset %d"), PresetIndex)
+		: Preset.PresetName.ToString();
+
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Cyan, FString::Printf(TEXT("%s equipped"), *PresetName));
+	}
+
+	UE_LOG(LogTemp, Warning, TEXT("Server: Test preset %d equipped from data asset (%s)"), PresetIndex, *PresetName);
 }
 
 void AGP_PlayerController::UpdateCharacterRotation(float DeltaSeconds)
@@ -544,4 +643,3 @@ void AGP_PlayerController::ResetMoveDirectionSmoothing()
 	SmoothedMoveWorldDirection = FVector::ZeroVector;
 	bHasSmoothedMoveWorldDirection = false;
 }
-

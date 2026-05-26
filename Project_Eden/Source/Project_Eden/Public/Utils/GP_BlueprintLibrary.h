@@ -6,6 +6,8 @@
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "GP_BlueprintLibrary.generated.h"
 
+class UGP_SkillData;
+class UGameplayEffect;
 
 UENUM(BlueprintType)
 enum class EHitDirection : uint8 {
@@ -37,6 +39,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Eden|Combat") 
 	static TArray<AActor*> SphereMeleeHitBoxOverlap(AActor* AvatarActor, float Radius, float ForwardOffset, float ElevationOffset, bool bDrawDebug = false);
 
+	// 지정 위치 기준 구체 피격 검사
+	UFUNCTION(BlueprintCallable, Category = "Eden|Combat", meta = (WorldContext = "WorldContextObject"))
+	static TArray<AActor*> SphereOverlapActorsAtLocation(UObject* WorldContextObject, const FVector& Location, float Radius, AActor* ActorToIgnore, bool bDrawDebug = false);
+
+	// 지정 위치/회전 기준 박스 피격 검사
+	UFUNCTION(BlueprintCallable, Category = "Eden|Combat", meta = (WorldContext = "WorldContextObject"))
+	static TArray<AActor*> BoxOverlapActorsAtLocation(UObject* WorldContextObject, const FVector& Location, const FVector& BoxExtent, const FRotator& Rotation, AActor* ActorToIgnore, bool bDrawDebug = false);
+
 	// 전방 부채꼴 피격 검사: 보스 휩쓸기처럼 정면 각도가 중요한 공격에서 사용합니다.
 	UFUNCTION(BlueprintCallable, Category = "Eden|Combat")
 	static TArray<AActor*> ForwardArcMeleeHitBoxOverlap(AActor* AvatarActor, float Radius, float ForwardOffset, float ArcAngleDegrees, float ElevationOffset, bool bDrawDebug = false);
@@ -54,5 +64,13 @@ public:
 	
 	// 액터배열에 게임플레이 이펙트 일괄 적용
 	UFUNCTION(BlueprintCallable, Category = "Eden|Combat|Abilities")
-	static void ApplyGameplayEffectToActors(AActor* Instigator, const TArray<AActor*>& TargetActors, TSubclassOf<UGameplayEffect> EffectClass, float EffectLevel = 1.0f);
+	static void ApplyGameplayEffectToActors(AActor* Instigator, const TArray<AActor*>& TargetActors, TSubclassOf<UGameplayEffect> EffectClass, float EffectLevel = 1.0f, UGP_SkillData* SkillData = nullptr);
+
+	// 액터배열에 게임플레이 이펙트 적용 후 이벤트 전송
+	UFUNCTION(BlueprintCallable, Category = "Eden|Combat|Abilities")
+	static void ApplyGameplayEffectAndEventToActors(AActor* Instigator, const TArray<AActor*>& TargetActors, TSubclassOf<UGameplayEffect> EffectClass, FGameplayTag EventTag, float EffectLevel = 1.0f, UGP_SkillData* SkillData = nullptr);
+
+	// 지정 위치 기준 범위 안의 액터들에게 게임플레이 이펙트 적용
+	UFUNCTION(BlueprintCallable, Category = "Eden|Combat|Abilities")
+	static void ApplyAreaGameplayEffectAtLocation(AActor* Instigator, const FVector& Location, float Radius, TSubclassOf<UGameplayEffect> EffectClass, float EffectLevel = 1.0f, UGP_SkillData* SkillData = nullptr, bool bDrawDebug = false);
 };

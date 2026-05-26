@@ -62,31 +62,41 @@ void AGP_Projectile::BeginPlay()
 
 void AGP_Projectile::OnProjectileOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
+	if (!HasAuthority())
+	{
+		return;
+	}
+
 	// (기존과 동일하게 데미지 적용, 이벤트 전송, 파괴 처리 로직)
 	if (!IsValid(OtherActor) || OtherActor == GetInstigator() || OtherActor == this) return;
 	// Friendly enemies should not consume, destroy, or react to enemy projectiles.
 	if (!UGP_BlueprintLibrary::CanApplyCombatEffect(GetInstigator(), OtherActor)) return;
 
-	if (HasAuthority() && GetInstigator())
+	if (bHasHit)
+	{
+		return;
+	}
+
+	bHasHit = true;
+
+
+	if (GetInstigator())
 	{
 		TArray<AActor*> HitActors;
 		HitActors.Add(OtherActor);
 
-		if (DamageEffectClass)
-		{
-			UGP_BlueprintLibrary::ApplyGameplayEffectToActors(GetInstigator(), HitActors, DamageEffectClass, EffectLevel);
-		}
-
-		if (HitEventTag.IsValid())
-		{
-			UGP_BlueprintLibrary::SendGameplayEventToActors(GetInstigator(), HitActors, HitEventTag);
-		}
+		UGP_BlueprintLibrary::ApplyGameplayEffectAndEventToActors(GetInstigator(), HitActors, DamageEffectClass, HitEventTag, EffectLevel, SkillData);
 	}
 
-	BP_OnHitEffect(GetActorLocation());
+	MulticastPlayHitEffect(GetActorLocation());
 
 	if (bDestroyOnHit)
 	{
 		Destroy();
 	}
+}
+
+void AGP_Projectile::MulticastPlayHitEffect_Implementation(const FVector& ImpactLocation)
+{
+	BP_OnHitEffect(ImpactLocation);
 }

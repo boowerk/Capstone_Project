@@ -77,6 +77,19 @@ namespace GPTags
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Chaos, "GPTags.Damage.Element.Chaos", "혼돈 속성 (Chaos)");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Brute, "GPTags.Damage.Element.Brute", "물리/강타 속성 (Brute)");
         }
+        namespace Coef
+        {
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Atk, "Damage.Coef.Atk", "SetByCaller 공격력 계수");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Def, "Damage.Coef.Def", "SetByCaller 대상 방어력 계수");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Hp, "Damage.Coef.Hp", "SetByCaller 대상 최대 체력 계수");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(M_Atk, "Damage.Coef.M_Atk", "SetByCaller 마법력 계수");
+        }
+        namespace Data
+        {
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Base, "Damage.Base", "SetByCaller 물리/공통 기본 데미지");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(BaseSpell, "Damage.BaseSpell", "SetByCaller 마법 기본 데미지");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(ToughnessBase, "Damage.ToughnessBase", "SetByCaller 강인도 기본 데미지");
+        }
     }
 
     // [3] State : 캐릭터 상태, 버프, 디버프
@@ -127,6 +140,21 @@ namespace GPTags
         }
     }
 
+    // [5] Tech : run-level player tech choices
+    namespace Tech
+    {
+        namespace Element
+        {
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Pyros, "GPTags.Tech.Element.Pyros", "이번 판 화염 테크");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Hydro, "GPTags.Tech.Element.Hydro", "이번 판 물 테크");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Volt, "GPTags.Tech.Element.Volt", "이번 판 전격 테크");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Aero, "GPTags.Tech.Element.Aero", "이번 판 바람 테크");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Lux, "GPTags.Tech.Element.Lux", "이번 판 빛 테크");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Chaos, "GPTags.Tech.Element.Chaos", "이번 판 혼돈 테크");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Brute, "GPTags.Tech.Element.Brute", "이번 판 강타 테크");
+        }
+    }
+
     // [6] Event : 일회성 이벤트 트리거
     namespace Event
     {
@@ -152,6 +180,18 @@ namespace GPTags
         namespace Skill
         {
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(WaterPuddle, "GPTags.Cooldown.Skill.WaterPuddle", "물웅덩이 스킬 쿨다운");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(NetTestProjectile, "GPTags.Cooldown.Skill.NetTestProjectile", "테스트 프로젝타일 스킬 쿨다운");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(SplitShot, "GPTags.Cooldown.Skill.SplitShot", "스플릿샷 스킬 쿨다운");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(GroundBurst, "GPTags.Cooldown.Skill.GroundBurst", "그라운드 버스트 스킬 쿨다운");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(ThrownBurst, "GPTags.Cooldown.Skill.ThrownBurst", "투척 버스트 스킬 쿨다운");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(PulseBurst, "GPTags.Cooldown.Skill.PulseBurst", "펄스 버스트 스킬 쿨다운");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(LineShock, "GPTags.Cooldown.Skill.LineShock", "라인 쇼크 스킬 쿨다운");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(MineBurst, "GPTags.Cooldown.Skill.MineBurst", "마인 버스트 스킬 쿨다운");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(ConeSlash, "GPTags.Cooldown.Skill.ConeSlash", "콘 슬래시 스킬 쿨다운");
+        }
+        namespace Data
+        {
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Duration, "GPTags.Cooldown.Data.Duration", "SetByCaller 쿨다운 시간");
         }
     }
     

@@ -81,6 +81,19 @@ namespace GPTags
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Chaos);			// 혼돈 속성		Chaos	0
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Brute);			// 물리 속성		Brute	0
 		}
+		namespace Coef
+		{
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Atk);			// 공격력 계수
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Def);			// 대상 방어력 계수
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Hp);				// 대상 최대 체력 계수
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(M_Atk);			// 마법력 계수
+		}
+		namespace Data
+		{
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Base);			// 물리/공통 기본 데미지
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(BaseSpell);		// 마법 기본 데미지
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(ToughnessBase);	// 강인도 기본 데미지
+		}
 	}
 
 	// [3] State : 캐릭터 상태, 버프, 디버프
@@ -130,6 +143,21 @@ namespace GPTags
 		}
 	}
 
+	// [5] Tech : run-level player tech choices
+	namespace Tech
+	{
+		namespace Element
+		{
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Pyros);
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Hydro);
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Volt);
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Aero);
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Lux);
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Chaos);
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Brute);
+		}
+	}
+
 	// [6] Event : 일회성 이벤트 트리거
 	namespace Event
 	{
@@ -156,6 +184,26 @@ namespace GPTags
 		namespace Skill
 		{
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(WaterPuddle);
+			
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(NetTestProjectile);
+
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(SplitShot);
+
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(GroundBurst);
+
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(ThrownBurst);
+
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(PulseBurst);
+
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(LineShock);
+
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(MineBurst);
+
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(ConeSlash);
+		}
+		namespace Data
+		{
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Duration);
 		}
 	}
 	

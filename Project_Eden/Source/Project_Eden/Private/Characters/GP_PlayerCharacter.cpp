@@ -781,8 +781,7 @@ void AGP_PlayerCharacter::EquipSkill(UGP_SkillData* NewSkillData, FGameplayTag S
 		}
 	}
 
-	EquipSkillByClass(SlotTag, NewSkillData->AbilityClass);
-
+	if (!GiveAbilityToSlot(SlotTag, NewSkillData->AbilityClass, NewSkillData)) return;
 	// 교환 성공 알림 방송 (UI 연동용)
 	if (OnSkillEquipped.IsBound())
 	{
@@ -792,8 +791,27 @@ void AGP_PlayerCharacter::EquipSkill(UGP_SkillData* NewSkillData, FGameplayTag S
 
 void AGP_PlayerCharacter::EquipSkillByClass(FGameplayTag SlotTag, TSubclassOf<UGameplayAbility> NewAbilityClass)
 {
+	GiveAbilityToSlot(SlotTag, NewAbilityClass);
+}
+
+bool AGP_PlayerCharacter::GiveAbilityToSlot(FGameplayTag SlotTag, TSubclassOf<UGameplayAbility> AbilityClass, UObject* SourceObject)
+{
 	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
-	if (!ASC || !NewAbilityClass || !HasAuthority()) return;
+	if (!ASC || !AbilityClass || !HasAuthority()) return false;
+
+	ClearAbilitySlot(SlotTag);
+
+	FGameplayAbilitySpec NewSpec(AbilityClass, 1, INDEX_NONE, SourceObject);
+	NewSpec.GetDynamicSpecSourceTags().AddTag(SlotTag);
+
+	ASC->GiveAbility(NewSpec);
+	return true;
+}
+
+void AGP_PlayerCharacter::ClearAbilitySlot(FGameplayTag SlotTag)
+{
+	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+	if (!ASC || !HasAuthority()) return;
 
 	// 1. 기존 해당 슬롯에 있던 어빌리티 제거 (중복 방지)
 	const TArray<FGameplayAbilitySpec>& Specs = ASC->GetActivatableAbilities();
@@ -811,12 +829,6 @@ void AGP_PlayerCharacter::EquipSkillByClass(FGameplayTag SlotTag, TSubclassOf<UG
 	{
 		ASC->ClearAbility(Handle);
 	}
-
-	// 2. 새 어빌리티 부여
-	FGameplayAbilitySpec NewSpec(NewAbilityClass);
-	NewSpec.GetDynamicSpecSourceTags().AddTag(SlotTag); 
-    
-	ASC->GiveAbility(NewSpec);
 }
 
 void AGP_PlayerCharacter::UpdateConditionalMaxAcceleration(float DeltaSeconds)

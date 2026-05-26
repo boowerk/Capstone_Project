@@ -89,3 +89,4 @@ DerivedDataCache/*
 *.delta.pdb
 *.delta.dtb
 *.binlog
+.memoc/.pending

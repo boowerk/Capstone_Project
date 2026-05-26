@@ -38,12 +38,34 @@ bool AGP_PlayerState::EquipWeaponFromCollection(UPDA_WeaponItemCollection* Weapo
 	return true;
 }
 
+void AGP_PlayerState::SetCurrentTechElementTag(FGameplayTag NewElementTag)
+{
+	if (!HasAuthority())
+	{
+		ServerSetCurrentTechElementTag(NewElementTag);
+		return;
+	}
+
+	CurrentTechElementTag = NewElementTag;
+	ForceNetUpdate();
+}
+
+void AGP_PlayerState::ServerSetCurrentTechElementTag_Implementation(FGameplayTag NewElementTag)
+{
+	SetCurrentTechElementTag(NewElementTag);
+}
+
 void AGP_PlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	
+
+	DOREPLIFETIME(AGP_PlayerState, CurrentTechElementTag);
 }
 
 void AGP_PlayerState::OnRep_EquippedWeaponData()
+{
+}
+
+void AGP_PlayerState::OnRep_CurrentTechElementTag()
 {
 }
