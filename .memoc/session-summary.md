@@ -10,7 +10,7 @@ tags:
   - memoc/state
 ---
 # Session Summary
-Last: 2026-05-26T19:33:00
+Last: 2026-05-26T20:01:00
 Replace, do not append. Keep <800B.
 
 ## Status
@@ -28,6 +28,8 @@ Replace, do not append. Keep <800B.
 - Runtime PIE verify: active player `CharacterMesh0`/`UEFNSourceMesh` scale=1.22, raw=427, MM=350; stale `/Engine/Transient.World_0` remains player=false and is ignored by debug.
 - `PoseSearchChooser` default load/evaluation is gated to the UEFNSource anim instance only; target `ABP_MaskMan_Player`/boss no longer feed the source-only chooser after Live Coding patch_5.
 - Opposite-direction start acceleration clamp now skips when current velocity and acceleration oppose, reducing reversal linger.
+- User confirmed left/right reversal improved after commit/build.
+- Fallback UEFNSource root-motion montage translation now multiplies by `GetMovementSpeedScaleRatio()` after source yaw correction, restoring PDA movement scale effect without using visual `UEFNSourceMeshScale`.
 
 ## Changed
 - `PDA_CharacterAnimationSet.h`
@@ -37,5 +39,5 @@ Replace, do not append. Keep <800B.
 - `ABP_UEFNSource_Player.uasset`
 
 ## Open Tasks
-- User re-test dash/reversal in PIE after patch_5.
-- Full UBT build still needs editor/Live Coding closed; Live Coding compile succeeded.
+- Re-test fallback dash/roll distance with `MovementSpeedScaleRatio`.
+- UBT blocked while Live Coding active; Live Coding compile succeeded.

@@ -111,7 +111,7 @@ void AGP_PlayerCharacter::Tick(float DeltaSeconds)
 		if (MoveComp && MoveComp->UpdatedComponent && (!RootMotionDeltaTranslation.IsNearlyZero() || !RootMotionDeltaRot.IsZero()))
 		{
 			const float TranslationYawOffset = AnimationSet ? AnimationSet->SourceRootMotionTranslationYawOffset : 0.0f;
-			const FVector CorrectedTranslation = FRotator(0.0f, TranslationYawOffset, 0.0f).RotateVector(RootMotionDeltaTranslation);
+			const FVector CorrectedTranslation = FRotator(0.0f, TranslationYawOffset, 0.0f).RotateVector(RootMotionDeltaTranslation) * GetMovementSpeedScaleRatio();
 			const FVector WorldDelta = GetActorTransform().TransformVectorNoScale(CorrectedTranslation);
 			const FQuat TargetRotation = RootMotionDeltaRot.IsZero()
 				? MoveComp->UpdatedComponent->GetComponentQuat()
