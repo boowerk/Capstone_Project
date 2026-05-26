@@ -69,6 +69,7 @@ public:
 	UAnimInstance* GetUEFNSourceAnimInstance() const;
 	float PlayUEFNSourceFallbackMontage(UAnimMontage* Montage, float PlayRate = 1.0f);
 	bool IsPlayingUEFNSourceFallbackMontage() const;
+	void StopUEFNSourceFallbackMontage(float BlendOutTime = 0.2f);
 	FVector GetLastUEFNSourceRootMotionVelocity() const { return LastUEFNSourceRootMotionVelocity; }
 	
 	/** [데이터 에셋 기반] 런타임 스킬 교체 함수 (bIgnoreRestrictions로 로그라이크식 예외 지원) */

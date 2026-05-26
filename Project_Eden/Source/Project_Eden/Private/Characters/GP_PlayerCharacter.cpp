@@ -182,6 +182,22 @@ void AGP_PlayerCharacter::Landed(const FHitResult& Hit)
 	Super::Landed(Hit);
 }
 
+void AGP_PlayerCharacter::StopUEFNSourceFallbackMontage(float BlendOutTime)
+{
+	UAnimInstance* SourceAnimInstance = GetUEFNSourceAnimInstance();
+	if (IsValid(SourceAnimInstance))
+	{
+		if (IsValid(ActiveUEFNSourceFallbackMontage))
+		{
+			SourceAnimInstance->Montage_Stop(BlendOutTime, ActiveUEFNSourceFallbackMontage);
+		}
+		// 방어 코드: 슬롯명 미스매칭이나 몽타주 매칭 어긋남 대비하여 전체 활성 몽타주 강제 정지 처리
+		SourceAnimInstance->Montage_Stop(BlendOutTime, nullptr);
+	}
+	bApplyUEFNSourceFallbackRootMotion = false;
+	ActiveUEFNSourceFallbackMontage = nullptr;
+}
+
 // ==========================================
 // GAS 및 초기화 로직
 // ==========================================

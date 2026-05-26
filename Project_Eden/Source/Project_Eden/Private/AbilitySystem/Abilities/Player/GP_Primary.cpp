@@ -1,4 +1,4 @@
-﻿#include "AbilitySystem/Abilities/Player/GP_Primary.h"
+#include "AbilitySystem/Abilities/Player/GP_Primary.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "Characters/GP_PlayerCharacter.h"
 #include "GameplayTags/GP_Tags.h"
@@ -194,4 +194,16 @@ void UGP_Primary::OnAttackHitEventReceived(FGameplayEventData Payload)
 {
 	// 메커니즘: 부모 클래스의 공통 공격 판정 실행
 	PerformAreaAttack();
+}
+
+void UGP_Primary::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
+{
+	ClearExistingTasks();
+
+	if (AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo()))
+	{
+		PC->StopUEFNSourceFallbackMontage(0.2f);
+	}
+
+	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }

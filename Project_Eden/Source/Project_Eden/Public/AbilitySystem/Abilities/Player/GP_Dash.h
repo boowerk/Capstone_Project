@@ -28,4 +28,5 @@ protected:
 
 private:
 	FTimerHandle FallbackMontageEndTimerHandle;
+	FTimerHandle FallbackActionEndTimerHandle;
 };

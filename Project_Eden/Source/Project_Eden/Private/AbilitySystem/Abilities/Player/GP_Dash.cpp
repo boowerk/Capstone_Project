@@ -1,11 +1,42 @@
-﻿#include "AbilitySystem/Abilities/Player/GP_Dash.h"
+#include "AbilitySystem/Abilities/Player/GP_Dash.h"
 
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
+#include "Animation/GP_AnimNotify_SendGameplayEvent.h"
 #include "Characters/GP_PlayerCharacter.h"
 #include "GameplayTags/GP_Tags.h"
 #include "Animation/PDA_CharacterAnimationSet.h"
 #include "TimerManager.h"
+
+namespace
+{
+float FindFirstGameplayEventNotifyTime(const UAnimMontage* Montage, const FGameplayTag& EventTag)
+{
+	if (!IsValid(Montage) || !EventTag.IsValid())
+	{
+		return -1.0f;
+	}
+
+	for (const FAnimNotifyEvent& NotifyEvent : Montage->Notifies)
+	{
+		if (const UGP_AnimNotify_SendGameplayEvent* EventNotify = Cast<UGP_AnimNotify_SendGameplayEvent>(NotifyEvent.Notify))
+		{
+			if (EventNotify->GameplayEventTag == EventTag)
+			{
+				return NotifyEvent.GetTime();
+			}
+		}
+
+		const FString NotifyName = NotifyEvent.NotifyName.ToString();
+		if (NotifyName.Equals(TEXT("ActionEnd"), ESearchCase::IgnoreCase) || NotifyName.Equals(EventTag.ToString(), ESearchCase::IgnoreCase))
+		{
+			return NotifyEvent.GetTime();
+		}
+	}
+
+	return -1.0f;
+}
+}
 
 UGP_Dash::UGP_Dash()
 {
@@ -107,6 +138,17 @@ void UGP_Dash::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FG
 				&ThisClass::OnMontageCompleted,
 				FallbackDuration,
 				false);
+
+			const float ActionEndTime = FindFirstGameplayEventNotifyTime(SourceDashMontage, GPTags::Event::Player::ActionEnd);
+			if (ActionEndTime >= 0.0f && ActionEndTime < FallbackDuration)
+			{
+				World->GetTimerManager().SetTimer(
+					FallbackActionEndTimerHandle,
+					this,
+					&ThisClass::OnMontageCompleted,
+					ActionEndTime,
+					false);
+			}
 		}
 	}
 	
@@ -125,6 +167,12 @@ void UGP_Dash::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGamepl
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(FallbackMontageEndTimerHandle);
+		World->GetTimerManager().ClearTimer(FallbackActionEndTimerHandle);
+	}
+
+	if (AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo()))
+	{
+		PC->StopUEFNSourceFallbackMontage(0.2f);
 	}
 
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
