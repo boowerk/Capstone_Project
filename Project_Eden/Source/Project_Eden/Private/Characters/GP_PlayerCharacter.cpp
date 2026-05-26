@@ -519,6 +519,27 @@ void AGP_PlayerCharacter::UpdateConditionalMaxAcceleration(float DeltaSeconds)
 	UCharacterMovementComponent* MoveComp = GetCharacterMovement();
 	if (!MoveComp) return;
 
+	MoveInputReversalGraceTimeRemaining = FMath::Max(0.0f, MoveInputReversalGraceTimeRemaining - DeltaSeconds);
+
+	FVector CurrentMoveInputDirection = MoveComp->GetLastInputVector().GetSafeNormal2D();
+	if (CurrentMoveInputDirection.IsNearlyZero())
+	{
+		CurrentMoveInputDirection = MoveComp->GetCurrentAcceleration().GetSafeNormal2D();
+	}
+
+	if (!CurrentMoveInputDirection.IsNearlyZero())
+	{
+		if (!LastMoveInputDirection.IsNearlyZero() && FVector::DotProduct(LastMoveInputDirection, CurrentMoveInputDirection) < -0.5f)
+		{
+			MoveInputReversalGraceTimeRemaining = 0.2f;
+			if (bIsStartAccelerationClamped)
+			{
+				RestoreNormalMaxAcceleration();
+			}
+		}
+		LastMoveInputDirection = CurrentMoveInputDirection;
+	}
+
 	if (bIsStartAccelerationClamped)
 	{
 		StartAccelerationClampElapsed += DeltaSeconds;
@@ -557,6 +578,8 @@ bool AGP_PlayerCharacter::ShouldStartAccelerationClamp() const
 
 	// 3. 이동 입력 발생 (가속 입력 > 0.0f)
 	if (MoveComp->GetCurrentAcceleration().Size() <= 0.0f) return false;
+
+	if (MoveInputReversalGraceTimeRemaining > 0.0f) return false;
 
 	const FVector Velocity2D = GetVelocity().GetSafeNormal2D();
 	const FVector Acceleration2D = MoveComp->GetCurrentAcceleration().GetSafeNormal2D();

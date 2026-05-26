@@ -162,6 +162,8 @@ private:
 	bool bIsStartAccelerationClamped = false;
 	float StartAccelerationClampElapsed = 0.0f;
 	float NormalMaxAcceleration = 2048.0f;
+	FVector LastMoveInputDirection = FVector::ZeroVector;
+	float MoveInputReversalGraceTimeRemaining = 0.0f;
 
 protected:
 	void UpdateConditionalMaxAcceleration(float DeltaSeconds);
