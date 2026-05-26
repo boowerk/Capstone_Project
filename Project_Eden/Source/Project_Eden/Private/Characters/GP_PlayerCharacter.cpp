@@ -356,10 +356,6 @@ bool AGP_PlayerCharacter::TryPerformDash()
 }
 
 
-UBlendSpace* AGP_PlayerCharacter::GetLocomotionBlendSpace() const { return AnimationSet ? AnimationSet->LocomotionBlendSpace : nullptr; }
-UAnimSequenceBase* AGP_PlayerCharacter::GetJumpLoopAnimation() const { return AnimationSet ? AnimationSet->JumpLoopAnimation : nullptr; }
-
-
 void AGP_PlayerCharacter::OnSprintingTagChanged(const FGameplayTag CallbackTag, int32 NewCount)
 {
 	// PlayerController smooths MaxWalkSpeed toward the sprint/non-sprint target.

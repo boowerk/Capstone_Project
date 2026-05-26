@@ -30,6 +30,7 @@ Last synced: 2026-05-20T18:25:00
 - Seeded the new nested chooser rows from the stock relaxed chooser patterns, but tuned them for MaskMan's run-first locomotion (`500 -> Run`, `700 -> Sprint`) and preserved `TurnInPlace` in the idle cluster.
 - Changed player movement to camera-facing/back-view style and added real directional movement speed scaling in `GP_PlayerController::Input_Move`.
 - Moved directional speed values into `PDA_CharacterAnimationSet.MovementSpeedProfile`; player copies the PDA profile and applies GAS-ready runtime multipliers/overrides.
+- Removed legacy PDA animation slots for locomotion blendspace, sprint stop, jump loop, landing montage, and sprint enter/exit montages because runtime motion matching now owns those paths.
 
 ## Next Steps
 
@@ -73,6 +74,7 @@ _None yet._
 
 - PIE/runtime playback against the new `CHT_MM_MaskMan_Root`.
 - Whether `MovementDirection_Recent` can be exposed cleanly enough to use distinctly from `MovementDirection` in the new `Run` chooser.
+- Full C++ build after PDA slot cleanup; UHT header parsing completed, but UBT stopped because Live Coding was active.
 
 ## Resume Notes
 

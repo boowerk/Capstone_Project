@@ -107,8 +107,7 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AnimationData")
 	TObjectPtr<UPDA_CharacterAnimationSet> AnimationSet;
 
-	// === Runtime Cached Assets (AnimGraph에서 직접 사용) ===
-	
+	// Kept only so legacy AnimBP graphs do not lose variable bindings; runtime motion matching owns locomotion playback.
 	UPROPERTY(BlueprintReadOnly, Category = "AnimationData|Cached")
 	TObjectPtr<UBlendSpace> LocomotionBlendSpace;
 

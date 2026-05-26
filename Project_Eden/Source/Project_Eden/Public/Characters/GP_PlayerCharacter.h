@@ -64,8 +64,6 @@ public:
 	void ClearMovementSpeedProfileOverride();
 
 	UPDA_CharacterAnimationSet* GetAnimationSet() const { return AnimationSet; }
-	UBlendSpace* GetLocomotionBlendSpace() const;
-	UAnimSequenceBase* GetJumpLoopAnimation() const;
 	
 	/** [데이터 에셋 기반] 런타임 스킬 교체 함수 (bIgnoreRestrictions로 로그라이크식 예외 지원) */
 	UFUNCTION(BlueprintCallable, Category = "GAS|Combat")

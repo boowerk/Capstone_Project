@@ -10,16 +10,18 @@ tags:
   - memoc/state
 ---
 # Session Summary
-Last: 2026-05-24T00:35:00
+Last: 2026-05-26T00:00:00
 Replace, do not append. Keep <800B.
 
 ## Status
-- Fixed AGP_PlayerCharacter compilation errors.
-- Created Diagonal_Path_Curvature_Analysis.md artifact.
+- Removed obsolete locomotion/air/sprint-transition animation slots from `PDA_CharacterAnimationSet` for runtime motion matching.
+- Cleaned C++ references that copied old PDA locomotion/jump assets into anim instances/player getters.
 
 ## Changed
-- `GP_PlayerCharacter.h` (Added GetActiveMovementSpeedProfile declaration)
-- Created `Diagonal_Path_Curvature_Analysis.md` (Movement analysis)
+- `PDA_CharacterAnimationSet.h`
+- `GP_CharacterAnimInstance.{h,cpp}`
+- `GP_PlayerCharacter.{h,cpp}`
+- `GP_AnimationSetupLibrary.cpp`
 
 ## Open Tasks
-- Review Candidate Fixes for diagonal path curvature transition.
+- Full Editor build blocked by active Live Coding; UHT header parsing completed.

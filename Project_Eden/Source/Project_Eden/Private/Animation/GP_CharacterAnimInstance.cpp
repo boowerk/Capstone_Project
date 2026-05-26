@@ -146,13 +146,6 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		}
 	}
 
-	if (AnimationSet)
-	{
-		LocomotionBlendSpace = AnimationSet->LocomotionBlendSpace;
-		JumpLoopAnimation = AnimationSet->JumpLoopAnimation;
-		SprintStopAnimation = AnimationSet->SprintStopAnimation;
-	}
-
 	if (!PoseSearchChooser || PoseSearchChooser->GetPathName().Contains(DeprecatedPoseSearchChooserName))
 	{
 		PoseSearchChooser = LoadObject<UChooserTable>(nullptr, DefaultPoseSearchChooserPath);
@@ -504,9 +497,6 @@ void UGP_CharacterAnimInstance::SetAnimationSet(UPDA_CharacterAnimationSet* NewS
 	if (NewSet)
 	{
 		AnimationSet = NewSet;
-		LocomotionBlendSpace = AnimationSet->LocomotionBlendSpace;
-		JumpLoopAnimation = AnimationSet->JumpLoopAnimation;
-		SprintStopAnimation = AnimationSet->SprintStopAnimation;
 	}
 }
 
