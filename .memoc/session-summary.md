@@ -10,16 +10,16 @@ tags:
   - memoc/state
 ---
 # Session Summary
-Last: 2026-05-26T20:45:00
+Last: 2026-05-26T22:30:00
 Replace, do not append. Keep <800B.
 
 ## Status
 - Tech element flow works: PlayerState tech tag drives skill VFX and elemental damage/resistance.
-- Added `GP_TechSelectWidget` C++ parent. User built `WBP_TestTechSelect` with 7 element buttons and test PlayerController toggle.
+- `DA_Skill_ThrownBurst` and `DA_Skill_MineBurst` now have `ElementVisualActorClasses` filled for Pyros/Hydro/Volt/Aero/Lux/Chaos/Brute using `GPTags.Tech.Element.*`.
 
 ## Changed
-- `GP_TechSelectWidget` auto-binds `Button_Pyros/Hydro/Volt/Aero/Lux/Chaos/Brute`.
-- Test controller currently opens/closes widget from raw keyboard `K` event.
+- Element visual classes point to `/Game/Actors/GroundBurstImpact/BP_GroundBurstImpact_<Element>_C`.
+- Existing `SkillVisualActorClass` fallbacks were left unchanged.
 
 ## Open Tasks
 - Later replace raw `K` keyboard event with Enhanced Input `IA_ToggleTechSelect` in PlayerController.

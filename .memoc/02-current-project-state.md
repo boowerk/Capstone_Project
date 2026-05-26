@@ -59,6 +59,7 @@ Last synced: 2026-05-23T00:00:00
 - Created `Diagonal_Path_Curvature_Analysis.md` containing diagnostic details on the forward-to-diagonal trajectory angularity.
 - Resolved missing declaration `GetActiveMovementSpeedProfile` in `GP_PlayerCharacter.h`, fixing multiple C++ compilation errors and verified successful build.
 - Resolved missing include `#include "GameplayTags/GP_Tags.h"` in `GP_BaseCharacter.cpp`, fixing compiler errors (C2653/C2065 for GPTags element variables) and verified clean compile of Project C++.
+- Updated `DA_Skill_ThrownBurst` and `DA_Skill_MineBurst` so `ElementVisualActorClasses` maps `GPTags.Tech.Element.Pyros/Hydro/Volt/Aero/Lux/Chaos/Brute` to matching `/Game/Actors/GroundBurstImpact/BP_GroundBurstImpact_<Element>_C` actor Blueprint classes; `SkillVisualActorClass` fallbacks were not changed.
 - See `.memoc/worklog/` for full shared activity history.
 
 ## Commands
