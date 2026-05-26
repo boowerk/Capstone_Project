@@ -139,6 +139,12 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 {
 	Super::NativeUpdateAnimation(DeltaSeconds);
 
+	if (MotionMatchingSuppressTimeRemaining > 0.f)
+	{
+		MotionMatchingSuppressTimeRemaining = FMath::Max(0.f, MotionMatchingSuppressTimeRemaining - DeltaSeconds);
+		return;
+	}
+
 	if (!Character || !MovementComponent)
 	{
 		Character = Cast<ACharacter>(TryGetPawnOwner());
@@ -509,6 +515,11 @@ void UGP_CharacterAnimInstance::SetAnimationSet(UPDA_CharacterAnimationSet* NewS
 void UGP_CharacterAnimInstance::SetMovementSpeedScaleRatio(float NewRatio)
 {
 	MovementSpeedScaleRatio = FMath::Max(NewRatio, 0.01f);
+}
+
+void UGP_CharacterAnimInstance::SuppressMotionMatchingUpdate(float Duration)
+{
+	MotionMatchingSuppressTimeRemaining = FMath::Max(MotionMatchingSuppressTimeRemaining, Duration);
 }
 
 void UGP_CharacterAnimInstance::ApplyRuntimeDatabaseToMotionMatchingNode(const FAnimUpdateContext& Context, const FAnimNodeReference& Node)

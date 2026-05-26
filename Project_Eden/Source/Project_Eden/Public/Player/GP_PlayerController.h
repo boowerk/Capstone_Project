@@ -68,6 +68,9 @@ private:
 	TObjectPtr<UInputAction> TestToggleSkillAction;
 
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Tests")
+	TObjectPtr<UInputAction> WhiteVoidToggleAction;
+
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Tests")
 	TSubclassOf<class UGameplayAbility> WaterPuddleAbilityClass;
 	
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
@@ -110,6 +113,7 @@ private:
 	void Input_SkillSlot2();
 	void Input_UltimateSkill();
 	void Input_TestToggleSkill();
+	void Input_ToggleWhiteVoid();
 
 	UFUNCTION(Server, Reliable, WithValidation)
 	void Server_TestToggleSkill();
