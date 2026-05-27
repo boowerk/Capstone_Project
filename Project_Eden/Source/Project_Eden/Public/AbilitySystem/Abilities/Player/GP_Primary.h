@@ -42,6 +42,9 @@ private:
 	TObjectPtr<UAbilityTask_WaitGameplayEvent> WaitHitTask;
 
 	UPROPERTY()
+	TObjectPtr<UAbilityTask_WaitGameplayEvent> WaitLegacyPrimaryHitTask;
+
+	UPROPERTY()
 	TObjectPtr<UAbilityTask_WaitGameplayEvent> WaitComboTask;
 
 	UPROPERTY()
@@ -50,6 +53,9 @@ private:
 	void StartComboSequence();
 	int32 GetNextComboIndex(int32 MaxComboCount);
 	void ClearExistingTasks();
+
+	// Some migrated primary montages still send the ability tag as their hit notify, so each swing guards against duplicate hit events.
+	bool bHasAppliedCurrentAttackHit = false;
 
 	UFUNCTION()
 	void OnMontageCompleted();

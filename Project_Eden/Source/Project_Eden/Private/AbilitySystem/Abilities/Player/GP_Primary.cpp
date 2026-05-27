@@ -46,6 +46,7 @@ void UGP_Primary::StartComboSequence()
 {
 	bHasQueuedNextAttack = false;
 	bIsComboWindowOpen = false;
+	bHasAppliedCurrentAttackHit = false;
 
 	AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo());
 	if (!IsValid(PC))
@@ -103,6 +104,11 @@ void UGP_Primary::StartComboSequence()
 	WaitHitTask->EventReceived.AddDynamic(this, &ThisClass::OnAttackHitEventReceived);
 	WaitHitTask->ReadyForActivation();
 
+	// Compatibility for migrated montages that still use the primary ability tag as the hit-frame event.
+	WaitLegacyPrimaryHitTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(this, GPTags::Ability::Skill::Primary);
+	WaitLegacyPrimaryHitTask->EventReceived.AddDynamic(this, &ThisClass::OnAttackHitEventReceived);
+	WaitLegacyPrimaryHitTask->ReadyForActivation();
+
 	WaitComboTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(this, GPTags::Event::Player::ComboEnable);
 	WaitComboTask->EventReceived.AddDynamic(this, &ThisClass::OnComboEnableEventReceived);
 	WaitComboTask->ReadyForActivation();
@@ -128,6 +134,7 @@ void UGP_Primary::ClearExistingTasks()
 {
 	if (MontageTask) { MontageTask->EndTask(); MontageTask = nullptr; }
 	if (WaitHitTask) { WaitHitTask->EndTask(); WaitHitTask = nullptr; }
+	if (WaitLegacyPrimaryHitTask) { WaitLegacyPrimaryHitTask->EndTask(); WaitLegacyPrimaryHitTask = nullptr; }
 	if (WaitComboTask) { WaitComboTask->EndTask(); WaitComboTask = nullptr; }
 	if (WaitEndTask) { WaitEndTask->EndTask(); WaitEndTask = nullptr; }
 }
@@ -192,6 +199,13 @@ void UGP_Primary::OnMontageInterrupted()
 
 void UGP_Primary::OnAttackHitEventReceived(FGameplayEventData Payload)
 {
+	if (bHasAppliedCurrentAttackHit)
+	{
+		return;
+	}
+
+	bHasAppliedCurrentAttackHit = true;
+
 	// 메커니즘: 부모 클래스의 공통 공격 판정 실행
 	PerformAreaAttack();
 }
