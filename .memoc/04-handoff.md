@@ -11,7 +11,15 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-05-20T18:25:00
+Last synced: 2026-05-26T20:45:00
+
+## Current Tech UI Handoff
+
+- Tech selection UI test path exists: `GP_TechSelectWidget` C++ parent + `WBP_TestTechSelect` child.
+- Widget buttons must keep exact names for auto-bind: `Button_Pyros`, `Button_Hydro`, `Button_Volt`, `Button_Aero`, `Button_Lux`, `Button_Chaos`, `Button_Brute`.
+- User made test PlayerController toggle widget with raw keyboard `K`; this works for now.
+- Later production pass: replace raw `K` event with Enhanced Input action `IA_ToggleTechSelect` and map it in the player input context.
+- Keep test PlayerController/GameMode separate from main BP to reduce team merge conflicts until feature is stable.
 
 ## What Changed
 
