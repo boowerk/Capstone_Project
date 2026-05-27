@@ -142,7 +142,6 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	if (MotionMatchingSuppressTimeRemaining > 0.f)
 	{
 		MotionMatchingSuppressTimeRemaining = FMath::Max(0.f, MotionMatchingSuppressTimeRemaining - DeltaSeconds);
-		return;
 	}
 
 	if (!Character || !MovementComponent)
@@ -533,6 +532,18 @@ void UGP_CharacterAnimInstance::ApplyRuntimeDatabaseToMotionMatchingNode(const F
 		return;
 	}
 
+	if (MotionMatchingSuppressTimeRemaining > 0.f)
+	{
+		UMotionMatchingAnimNodeLibrary::ResetDatabasesToSearch(
+			MotionMatchingNode,
+			EPoseSearchInterruptMode::DoNotInterrupt);
+
+		LastAppliedRuntimePoseSearchDatabase = nullptr;
+		bMotionMatchingResultValid = false;
+		MotionMatchingSelectedAnimName = NAME_None;
+		return;
+	}
+
 	if (RuntimePoseSearchDatabase)
 	{
 		// ForceInterrupt causes popping. Use DoNotInterrupt for smooth transitions 
@@ -560,7 +571,7 @@ void UGP_CharacterAnimInstance::ApplyRuntimeDatabaseToMotionMatchingNode(const F
 	UMotionMatchingAnimNodeLibrary::GetMotionMatchingSearchResult(MotionMatchingNode, SearchResult, bIsResultValid);
 	bMotionMatchingResultValid = bIsResultValid;
 	
-	// SelectedAnim���� �����ϵ�, ��ȿ�� üũ ��ȭ
+	// SelectedAnim이 유효한지 체크 강화
 	MotionMatchingSelectedAnimName = NAME_None;
 	if (bIsResultValid)
 	{

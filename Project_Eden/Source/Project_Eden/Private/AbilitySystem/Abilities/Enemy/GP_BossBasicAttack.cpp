@@ -17,7 +17,7 @@ UGP_BossBasicAttack::UGP_BossBasicAttack()
 	HitBoxElevationOffset = 40.0f;
 	bUseGameplayEventForHitTiming = false;
 
-	static ConstructorHelpers::FClassFinder<UGameplayEffect> DamageEffectFinder(TEXT("/Game/GAS_Pattern/AbilitySystem/GameplayEffects/GE_PrimaryDamage"));
+	static ConstructorHelpers::FClassFinder<UGameplayEffect> DamageEffectFinder(TEXT("/Game/GAS_Pattern/AbilitySystem/GameplayEffects/Damage/GE_PrimaryDamage"));
 	if (DamageEffectFinder.Succeeded())
 	{
 		DamageEffectClass = DamageEffectFinder.Class;

@@ -185,12 +185,18 @@ void UGP_SkillBase::PerformAreaAttack()
 		bDrawDebugs);
 
 	// 2. 이펙트 배달: 찾은 적들에게 데미지 이펙트 적용
-	if (HasAuthority(&CurrentActivationInfo) && DamageEffectClass)
+	TSubclassOf<UGameplayEffect> ResolvedDamageEffectClass = DamageEffectClass;
+	if (!ResolvedDamageEffectClass)
+	{
+		ResolvedDamageEffectClass = LoadClass<UGameplayEffect>(nullptr, TEXT("/Game/GAS_Pattern/AbilitySystem/GameplayEffects/Damage/GE_PrimaryDamage.GE_PrimaryDamage_C"));
+	}
+
+	if (HasAuthority(&CurrentActivationInfo) && ResolvedDamageEffectClass)
 	{
 		UGP_BlueprintLibrary::ApplyGameplayEffectToActors(
 			Avatar,
 			HitActors,
-			DamageEffectClass,
+			ResolvedDamageEffectClass,
 			GetAbilityLevel());
 	}
 

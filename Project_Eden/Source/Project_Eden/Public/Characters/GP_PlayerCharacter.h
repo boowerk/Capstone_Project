@@ -153,7 +153,7 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "White Void", meta = (AllowPrivateAccess = "true"))
 	bool bDebugWhiteVoidTransition = false;
 
-	UPROPERTY(BlueprintReadOnly, Replicated, Category = "White Void", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_IsInWhiteVoid, Category = "White Void", meta = (AllowPrivateAccess = "true"))
 	bool bIsInWhiteVoid = false;
 
 	bool bHasStoredWhiteVoidOrigin = false;
@@ -163,12 +163,17 @@ private:
 	bool bStoredCameraLagEnabled = false;
 	bool bStoredCameraRotationLagEnabled = false;
 
+	FTimerHandle RestoreLagTimerHandle;
+
 	UFUNCTION(Server, Reliable)
 	void ServerSetWhiteVoid(bool bNewInWhiteVoid);
 
+	UFUNCTION()
+	void OnRep_IsInWhiteVoid();
+
 	void SetWhiteVoidState(bool bNewInWhiteVoid);
 	void PerformWhiteVoidTransition(bool bNewInWhiteVoid);
-	void CacheWhiteVoidTransitionState();
+	void CacheWhiteVoidTransitionState(bool bCacheCameraLag = true);
 	void RestoreWhiteVoidCameraLag();
 	FVector ResolveWhiteVoidTargetLocation(bool bNewInWhiteVoid) const;
 	void EnsureWhiteVoidSetExists();

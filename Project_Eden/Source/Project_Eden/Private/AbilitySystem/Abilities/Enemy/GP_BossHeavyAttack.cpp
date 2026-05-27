@@ -18,7 +18,7 @@ UGP_BossHeavyAttack::UGP_BossHeavyAttack()
 
 	// Sans does not have a dedicated heavy montage yet, so this branch falls back to the boss AnimationSet scratch montage.
 
-	static ConstructorHelpers::FClassFinder<UGameplayEffect> DamageEffectFinder(TEXT("/Game/GAS_Pattern/AbilitySystem/GameplayEffects/GE_PrimaryDamage"));
+	static ConstructorHelpers::FClassFinder<UGameplayEffect> DamageEffectFinder(TEXT("/Game/GAS_Pattern/AbilitySystem/GameplayEffects/Damage/GE_PrimaryDamage"));
 	if (DamageEffectFinder.Succeeded())
 	{
 		DamageEffectClass = DamageEffectFinder.Class;

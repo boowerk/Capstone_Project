@@ -367,12 +367,17 @@ void AGP_PlayerController::RefreshBossHUD()
 
 	if (!ClosestBoss)
 	{
+		if (CurrentBossEnemy)
+		{
+			HUDWidget->ClearBossASC();
+		}
 		CurrentBossEnemy = nullptr;
 		HUDWidget->SetBossVisible(false);
 		return;
 	}
 
 	CurrentBossEnemy = ClosestBoss;
+	HUDWidget->BindBossToASC(CurrentBossEnemy->GetAbilitySystemComponent());
 	HUDWidget->SetBossText(CurrentBossEnemy->GetBossDisplayName());
 	HUDWidget->SetBossVisible(true);
 }
