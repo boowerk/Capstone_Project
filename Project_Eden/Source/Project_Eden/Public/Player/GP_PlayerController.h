@@ -70,11 +70,15 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Tests")
 	TObjectPtr<UInputAction> TestToggleSkillAction;
 
+	// Test utility inputs are kept separate so skill preset rotation and White Void toggling can coexist.
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Tests")
 	TObjectPtr<UInputAction> RotateTestSkillAction;
 
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Tests")
 	TObjectPtr<UGP_TestSkillSet> TestSkillSet;
+
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Tests")
+	TObjectPtr<UInputAction> WhiteVoidToggleAction;
 
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Tests")
 	TSubclassOf<class UGameplayAbility> WaterPuddleAbilityClass;
@@ -123,6 +127,7 @@ private:
 	void Input_UltimateSkill();
 	void Input_TestToggleSkill();
 	void Input_RotateTestSkill();
+	void Input_ToggleWhiteVoid();
 
 	UFUNCTION(Server, Reliable, WithValidation)
 	void Server_TestToggleSkill();

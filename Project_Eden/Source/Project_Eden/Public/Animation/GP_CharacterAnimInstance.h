@@ -95,6 +95,8 @@ public:
 
 	void SetMovementSpeedScaleRatio(float NewRatio);
 
+	void SuppressMotionMatchingUpdate(float Duration);
+
 	UFUNCTION(BlueprintCallable, Category = "MotionMatching|State")
 	bool GetShouldTurnInPlace() const { return ShouldTurnInPlace; }
 
@@ -259,6 +261,9 @@ protected:
 
 	UPROPERTY(Transient, BlueprintReadOnly, Category = "MotionMatching|State")
 	TObjectPtr<UPoseSearchDatabase> LastAppliedRuntimePoseSearchDatabase;
+
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "MotionMatching|State")
+	float MotionMatchingSuppressTimeRemaining = 0.f;
 
 	UPROPERTY(Transient, BlueprintReadOnly, Category = "MotionMatching|Debug")
 	bool bMotionMatchingResultValid = false;

@@ -113,7 +113,9 @@ void AGP_PlayerController::SetupInputComponent()
 	if (SkillSlot2Action) EnhancedInputComponent->BindAction(SkillSlot2Action, ETriggerEvent::Triggered, this, &ThisClass::Input_SkillSlot2);
 	if (UltimateAction) EnhancedInputComponent->BindAction(UltimateAction, ETriggerEvent::Triggered, this, &ThisClass::Input_UltimateSkill);
 	if (TestToggleSkillAction) EnhancedInputComponent->BindAction(TestToggleSkillAction, ETriggerEvent::Started, this, &ThisClass::Input_TestToggleSkill);
+	// Keep both debug bindings after the PR merge so neither test preset rotation nor White Void input is dropped.
 	if (RotateTestSkillAction) EnhancedInputComponent->BindAction(RotateTestSkillAction, ETriggerEvent::Started, this, &ThisClass::Input_RotateTestSkill);
+	if (WhiteVoidToggleAction) EnhancedInputComponent->BindAction(WhiteVoidToggleAction, ETriggerEvent::Started, this, &ThisClass::Input_ToggleWhiteVoid);
 }
 
 
@@ -414,6 +416,14 @@ void AGP_PlayerController::Input_TestToggleSkill()
 void AGP_PlayerController::Input_RotateTestSkill()
 {
 	Server_RotateTestSkill();
+}
+
+void AGP_PlayerController::Input_ToggleWhiteVoid()
+{
+	if (AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetPawn()))
+	{
+		PlayerCharacter->ToggleWhiteVoid();
+	}
 }
 
 bool AGP_PlayerController::Server_TestToggleSkill_Validate()

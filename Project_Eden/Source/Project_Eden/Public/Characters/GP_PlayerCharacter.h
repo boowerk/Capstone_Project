@@ -9,6 +9,7 @@
 
 class USpringArmComponent;
 class UCameraComponent;
+class AGP_WhiteVoidSetActor;
 class USkeletalMeshComponent;
 class UAnimInstance;
 class UAnimMontage;
@@ -31,6 +32,7 @@ public:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void Landed(const FHitResult& Hit) override;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 	virtual UAttributeSet* GetAttributeSet() const override;
@@ -46,6 +48,18 @@ public:
 	bool TryPerformDash();
 	bool IsDashing() const;
 	bool IsLockOn() const { return bIsLockOn; }
+
+	UFUNCTION(BlueprintCallable, Category = "White Void")
+	void ToggleWhiteVoid();
+
+	UFUNCTION(BlueprintCallable, Category = "White Void")
+	void EnterWhiteVoid();
+
+	UFUNCTION(BlueprintCallable, Category = "White Void")
+	void ExitWhiteVoid();
+
+	UFUNCTION(BlueprintPure, Category = "White Void")
+	bool IsInWhiteVoid() const { return bIsInWhiteVoid; }
 
 	float GetMovementSpeedScaleRatio() const;
 	float GetScaledNormalWalkSpeed() const;
@@ -102,6 +116,64 @@ private:
 
 	bool bApplyUEFNSourceFallbackRootMotion = false;
 	FVector LastUEFNSourceRootMotionVelocity = FVector::ZeroVector;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "White Void", meta = (AllowPrivateAccess = "true"))
+	FVector WhiteVoidOffset = FVector(0.0, 0.0, -10000.0);
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "White Void", meta = (AllowPrivateAccess = "true"))
+	float WhiteVoidFloorTopZOffset = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "White Void", meta = (AllowPrivateAccess = "true"))
+	FVector WhiteVoidEntryLocation = FVector(0.0, 0.0, -10000.0);
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "White Void", meta = (AllowPrivateAccess = "true"))
+	bool bUseFixedWhiteVoidEntryLocation = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "White Void", meta = (AllowPrivateAccess = "true"))
+	bool bStopMovementOnTransition = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "White Void", meta = (AllowPrivateAccess = "true"))
+	bool bResetMotionTrajectoryOnTransition = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "White Void", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float WhiteVoidMotionMatchingSuppressDuration = 0.03f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "White Void", meta = (AllowPrivateAccess = "true"))
+	bool bPreserveCameraLagStateOnTransition = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "White Void", meta = (AllowPrivateAccess = "true"))
+	bool bForceCameraCutOnTransition = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "White Void", meta = (AllowPrivateAccess = "true"))
+	bool bAutoSpawnWhiteVoidSet = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "White Void", meta = (AllowPrivateAccess = "true"))
+	TSubclassOf<AGP_WhiteVoidSetActor> WhiteVoidSetClass;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "White Void", meta = (AllowPrivateAccess = "true"))
+	bool bDebugWhiteVoidTransition = false;
+
+	UPROPERTY(BlueprintReadOnly, Replicated, Category = "White Void", meta = (AllowPrivateAccess = "true"))
+	bool bIsInWhiteVoid = false;
+
+	bool bHasStoredWhiteVoidOrigin = false;
+	FVector StoredWhiteVoidOriginLocation = FVector::ZeroVector;
+	FRotator StoredWhiteVoidOriginRotation = FRotator::ZeroRotator;
+	FRotator StoredWhiteVoidControlRotation = FRotator::ZeroRotator;
+	bool bStoredCameraLagEnabled = false;
+	bool bStoredCameraRotationLagEnabled = false;
+
+	UFUNCTION(Server, Reliable)
+	void ServerSetWhiteVoid(bool bNewInWhiteVoid);
+
+	void SetWhiteVoidState(bool bNewInWhiteVoid);
+	void PerformWhiteVoidTransition(bool bNewInWhiteVoid);
+	void CacheWhiteVoidTransitionState();
+	void RestoreWhiteVoidCameraLag();
+	FVector ResolveWhiteVoidTargetLocation(bool bNewInWhiteVoid) const;
+	void EnsureWhiteVoidSetExists();
+	void ResetMotionTrajectoryAfterWhiteVoidTransition();
+	void SuppressMotionMatchingForWhiteVoidTransition() const;
 
 public:
 	virtual void UpdateAnimationSet() override;
