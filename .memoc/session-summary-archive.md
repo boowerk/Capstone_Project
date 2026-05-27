@@ -230,3 +230,67 @@ Replace, do not append. Keep <800B.
 ## Open Tasks
 - Re-test fallback dash roll ends at source montage `ActionEnd` timing.
 - Live Coding compile succeeded.
+
+## [2026-05-26T18:17:18] archived summary (1371B)
+
+---
+memoc: true
+type: state
+scope: project-memory
+created: 2026-05-26T11:35:43
+updated: 2026-05-26T11:35:43
+status: active
+tags:
+  - memoc
+  - memoc/state
+---
+# Session Summary
+Last: 2026-05-26T11:35:43
+Replace, do not append. Keep <800B.
+History: worklog. Resume risks: 04-handoff.md.
+
+## Status
+- White Void transition C++ is implemented on `AGP_PlayerCharacter`; BP-callable Toggle/Enter/Exit are exposed.
+- Runtime setup creates `GP_WhiteVoidSetActor` with white floor, sky sphere, light, and post process; input asset `IA_WhiteVoidToggle` is mapped to `O`.
+- Last MCP PIE check found the original Plane floor could allow falling; source patched to use a Box floor with Z offset. Directional Light was replaced with bounded local Point Light to avoid changing the main world's lighting. User rebuild needed.
+
+## Changed
+- Added White Void actor/component classes, player transition logic, PlayerController input hook, and Enhanced Input/BP asset wiring.
+
+## Open Tasks
+- Rebuild after latest floor patch, then rerun PIE: press `O`, verify enter/exit preserves camera framing and no falling occurs.
+- Confirm original world lighting remains unchanged before entering White Void.
+
+## Resume
+- After rebuild, use MCP PIE to verify `BP_GP_PlayerCharacter_C_0` toggles between original Z and `WhiteVoidOffset` Z, and `GP_WhiteVoidSetActor` floor aligns under the capsule.
+
+## [2026-05-26T18:18:06] archived summary (1230B)
+
+---
+memoc: true
+type: state
+scope: project-memory
+created: 2026-05-26T18:17:18
+updated: 2026-05-26T18:17:18
+status: active
+tags:
+  - memoc
+  - memoc/state
+---
+# Session Summary
+Last: 2026-05-26T18:17:18
+Replace, do not append. Keep <800B.
+History: worklog. Resume risks: 04-handoff.md.
+
+## Status
+- White Void transition system is successfully refactored and optimized.
+- Completed replication sync, early return issue in animBP, memory-safe reflection for MM trajectory, and component creation cleanup.
+
+## Changed
+- GP_PlayerCharacter: Added `OnRep_IsInWhiteVoid()` for multi-play simulated proxy sync; used member `RestoreLagTimerHandle` with clearing protection.
+- GP_CharacterAnimInstance: Removed overall early return from `NativeUpdateAnimation`; gated suppression specifically to Pose Search evaluation inside `ApplyRuntimeDatabaseToMotionMatchingNode`.
+- GP_WhiteVoidSetComponent: Removed obsolete `AddInstanceComponent` for standard runtime spawning flow.
+- ResetMotionTrajectory: Added reflection-based struct check protecting against future `TranslationHistory` definition changes.
+
+## Open Tasks
+- Run project build to verify compile, then launch PIE to test multi-play replicated transition and camera/MM smoothing.
