@@ -139,9 +139,9 @@ void UGP_AttributeSet::PreAttributeChange(const FGameplayAttribute& Attribute, f
 
 void UGP_AttributeSet::OnRep_AttributesInitialized()
 {
-	if (!bAttributesInitialized)
+	if (bAttributesInitialized)
 	{
-		bAttributesInitialized = true;
+		// Replication applies the bool before OnRep runs, so broadcast when the received state is initialized.
 		OnAttributesInitialized.Broadcast();
 	}
 }

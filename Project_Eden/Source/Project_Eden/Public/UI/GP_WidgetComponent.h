@@ -19,22 +19,33 @@ class PROJECT_EDEN_API UGP_WidgetComponent : public UWidgetComponent
 public:
 protected:
 	virtual void BeginPlay() override;
-	UPROPERTY(EditAnywhere)
-    	TMap<FGameplayAttribute, FGameplayAttribute> AttributeMap;
+
+	// Maps a displayed attribute to its max attribute, for example Health -> MaxHealth.
+	UPROPERTY(EditAnywhere, Category = "GAS|Attributes")
+	TMap<FGameplayAttribute, FGameplayAttribute> AttributeMap;
+
+	// Toggle this in the widget component details to verify that enemy health UI receives GAS updates.
+	UPROPERTY(EditAnywhere, Category = "Debug|Health")
+	bool bDebugAttributeChanges = false;
+
+	UPROPERTY(EditAnywhere, Category = "Debug|Health", meta = (EditCondition = "bDebugAttributeChanges", ClampMin = "0.1", Units = "s"))
+	float DebugAttributeMessageDuration = 1.5f;
 
 private:
 	TWeakObjectPtr<AGP_BaseCharacter> GASCharacter;
 	TWeakObjectPtr<UGP_AbilitySystemComponent> AbilitySystemComponent;
 	TWeakObjectPtr<UGP_AttributeSet> AttributeSet;
+	bool bBoundAttributeChanges = false;
 
 	void InitAbilitySystemData();
 	bool IsASCInitialized() const;
 	void InitializeAttributeDelegate();
+	void DebugLogAttributeUpdate(const TTuple<FGameplayAttribute, FGameplayAttribute>& Pair, float NewValue, float NewMaxValue) const;
 
 	UFUNCTION()
 	void OnASCInitialized(UAbilitySystemComponent* ASC, UAttributeSet* AS);
 	
 	UFUNCTION()
 	void BindToAttributeChanges();
-	void BindWidgetToAttributeChanges(UWidget* WidgetObject, const TTuple<FGameplayAttribute, FGameplayAttribute>& Pair) const;
+	bool BindWidgetToAttributeChanges(UWidget* WidgetObject, const TTuple<FGameplayAttribute, FGameplayAttribute>& Pair) const;
 };
