@@ -176,6 +176,9 @@ void UGP_SkillBase::PerformAreaAttack()
 	AActor* Avatar = GetAvatarActorFromActorInfo();
 	if (!Avatar) return;
 
+	// SkillData is carried through the granted ability spec and must reach the GE spec for SetByCaller damage.
+	UGP_SkillData* SkillData = GetSkillDataFromSpec(CurrentSpecHandle, CurrentActorInfo);
+
 	// 1. 메커니즘: C++에서 정의된 유틸리티 라이브러리를 사용하여 범위 판정 수행
 	TArray<AActor*> HitActors = UGP_BlueprintLibrary::SphereMeleeHitBoxOverlap(
 		Avatar,
@@ -191,7 +194,8 @@ void UGP_SkillBase::PerformAreaAttack()
 			Avatar,
 			HitActors,
 			DamageEffectClass,
-			GetAbilityLevel());
+			GetAbilityLevel(),
+			SkillData);
 	}
 
 	// 3. (옵션) 피격 반응 태그 전송 등 공통 로직 처리
