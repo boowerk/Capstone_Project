@@ -271,6 +271,9 @@ protected:
 	UPROPERTY(Transient, BlueprintReadOnly, Category = "MotionMatching|Debug")
 	FName MotionMatchingSelectedAnimName = NAME_None;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MotionMatching|Debug")
+	bool bEnableDebugLog = false;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MotionMatching|Databases", meta = (ClampMin = "0.0"))
 	float IdleSpeedThreshold = 10.f;
 

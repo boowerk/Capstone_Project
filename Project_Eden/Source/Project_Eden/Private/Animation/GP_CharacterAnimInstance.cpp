@@ -430,7 +430,7 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	LastActorYaw = CurrentYaw;
 
 #if !UE_BUILD_SHIPPING
-	if (GEngine && PlayerCharacter && PlayerCharacter->IsLocallyControlled() && GetSkelMeshComponent() == PlayerCharacter->GetMesh())
+	if (bEnableDebugLog && GEngine && PlayerCharacter && PlayerCharacter->IsLocallyControlled() && GetSkelMeshComponent() == PlayerCharacter->GetMesh())
 	{
 		const FString SelectedAnimText = bMotionMatchingResultValid
 			? (MotionMatchingSelectedAnimName.IsNone() ? TEXT("Null Asset") : MotionMatchingSelectedAnimName.ToString())
