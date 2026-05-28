@@ -12,8 +12,10 @@
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameplayTags/GP_Tags.h"
+#include "InputCoreTypes.h"
 #include "Kismet/GameplayStatics.h"
 #include "Logging/LogMacros.h"
+#include "UI/GP_CharacterStatsMenuWidget.h"
 #include "UI/GP_PlayerHUDWidget.h"
 
 AGP_PlayerController::AGP_PlayerController()
@@ -116,6 +118,16 @@ void AGP_PlayerController::SetupInputComponent()
 	// Keep both debug bindings after the PR merge so neither test preset rotation nor White Void input is dropped.
 	if (RotateTestSkillAction) EnhancedInputComponent->BindAction(RotateTestSkillAction, ETriggerEvent::Started, this, &ThisClass::Input_RotateTestSkill);
 	if (WhiteVoidToggleAction) EnhancedInputComponent->BindAction(WhiteVoidToggleAction, ETriggerEvent::Started, this, &ThisClass::Input_ToggleWhiteVoid);
+
+	// CharacterStatsMenuAction을 지정하지 않아도 Tab으로 능력치 메뉴 뼈대를 바로 테스트할 수 있게 fallback을 둡니다.
+	if (CharacterStatsMenuAction)
+	{
+		EnhancedInputComponent->BindAction(CharacterStatsMenuAction, ETriggerEvent::Started, this, &ThisClass::Input_ToggleCharacterStatsMenu);
+	}
+	else
+	{
+		InputComponent->BindKey(EKeys::Tab, IE_Pressed, this, &ThisClass::Input_ToggleCharacterStatsMenu);
+	}
 }
 
 
@@ -382,6 +394,74 @@ void AGP_PlayerController::RefreshBossHUD()
 	HUDWidget->SetBossVisible(true);
 }
 
+bool AGP_PlayerController::EnsureCharacterStatsMenuWidget()
+{
+	if (IsValid(CharacterStatsMenuWidget))
+	{
+		return true;
+	}
+
+	if (!CharacterStatsMenuWidgetClass)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("CharacterStatsMenuWidgetClass is not set on %s. Assign a Widget Blueprint based on GP_CharacterStatsMenuWidget."), *GetName());
+		return false;
+	}
+
+	// 메뉴 WBP는 한 번 생성해두고 열고 닫을 때 Visibility만 바꿔 GAS 바인딩을 유지합니다.
+	CharacterStatsMenuWidget = CreateWidget<UGP_CharacterStatsMenuWidget>(this, CharacterStatsMenuWidgetClass);
+	if (!IsValid(CharacterStatsMenuWidget))
+	{
+		return false;
+	}
+
+	CharacterStatsMenuWidget->AddToViewport(50);
+	CharacterStatsMenuWidget->SetVisibility(ESlateVisibility::Collapsed);
+	return true;
+}
+
+void AGP_PlayerController::OpenCharacterStatsMenu()
+{
+	if (!EnsureCharacterStatsMenuWidget())
+	{
+		return;
+	}
+
+	CharacterStatsMenuWidget->InitializeForCharacter(Cast<AGP_BaseCharacter>(GetPawn()));
+	CharacterStatsMenuWidget->SetVisibility(ESlateVisibility::Visible);
+	bIsCharacterStatsMenuOpen = true;
+	ApplyCharacterStatsMenuInputMode(true);
+}
+
+void AGP_PlayerController::CloseCharacterStatsMenu()
+{
+	if (IsValid(CharacterStatsMenuWidget))
+	{
+		CharacterStatsMenuWidget->SetVisibility(ESlateVisibility::Collapsed);
+	}
+
+	bIsCharacterStatsMenuOpen = false;
+	ApplyCharacterStatsMenuInputMode(false);
+}
+
+void AGP_PlayerController::ApplyCharacterStatsMenuInputMode(bool bMenuOpen)
+{
+	bShowMouseCursor = bMenuOpen;
+	SetIgnoreMoveInput(bMenuOpen);
+	SetIgnoreLookInput(bMenuOpen);
+
+	if (bMenuOpen)
+	{
+		FInputModeGameAndUI InputMode;
+		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+		InputMode.SetHideCursorDuringCapture(false);
+		SetInputMode(InputMode);
+	}
+	else
+	{
+		SetInputMode(FInputModeGameOnly());
+	}
+}
+
 void AGP_PlayerController::UpdateMovementSpeed(float DeltaSeconds)
 {
 	AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetPawn());
@@ -428,6 +508,18 @@ void AGP_PlayerController::Input_ToggleWhiteVoid()
 	if (AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetPawn()))
 	{
 		PlayerCharacter->ToggleWhiteVoid();
+	}
+}
+
+void AGP_PlayerController::Input_ToggleCharacterStatsMenu()
+{
+	if (bIsCharacterStatsMenuOpen)
+	{
+		CloseCharacterStatsMenu();
+	}
+	else
+	{
+		OpenCharacterStatsMenu();
 	}
 }
 

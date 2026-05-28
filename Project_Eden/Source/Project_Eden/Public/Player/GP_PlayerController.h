@@ -7,6 +7,7 @@
 class AGP_PlayerCharacter;
 class UAbilitySystemComponent;
 class AGP_EnemyCharacter;
+class UGP_CharacterStatsMenuWidget;
 class UGP_TestSkillSet;
 class UGP_PlayerHUDWidget;
 class UInputAction;
@@ -92,6 +93,15 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UGP_PlayerHUDWidget> HUDWidget;
 
+	UPROPERTY(EditDefaultsOnly, Category = "UI|Character Menu")
+	TSubclassOf<UGP_CharacterStatsMenuWidget> CharacterStatsMenuWidgetClass;
+
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|UI")
+	TObjectPtr<UInputAction> CharacterStatsMenuAction;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UGP_CharacterStatsMenuWidget> CharacterStatsMenuWidget;
+
 	UPROPERTY(Transient)
 	TObjectPtr<AGP_EnemyCharacter> CurrentBossEnemy;
 
@@ -128,6 +138,7 @@ private:
 	void Input_TestToggleSkill();
 	void Input_RotateTestSkill();
 	void Input_ToggleWhiteVoid();
+	void Input_ToggleCharacterStatsMenu();
 
 	UFUNCTION(Server, Reliable, WithValidation)
 	void Server_TestToggleSkill();
@@ -140,11 +151,16 @@ private:
 	int32 GetTestSkillPresetCount() const;
 	void EquipTestSkillPreset(AGP_PlayerCharacter* PlayerCharacter, int32 PresetIndex);
 	void RefreshBossHUD();
+	bool EnsureCharacterStatsMenuWidget();
+	void OpenCharacterStatsMenu();
+	void CloseCharacterStatsMenu();
+	void ApplyCharacterStatsMenuInputMode(bool bMenuOpen);
 	void UpdateMovementSpeed(float DeltaSeconds);
 	void UpdateCharacterRotation(float DeltaSeconds);
 
 	bool bSkillsEquipped = false;
 	int32 TestSkillPresetIndex = 0;
+	bool bIsCharacterStatsMenuOpen = false;
 
 	// --- Movement Input Smoothing ---
 	FVector SmoothedMoveWorldDirection = FVector::ZeroVector;
