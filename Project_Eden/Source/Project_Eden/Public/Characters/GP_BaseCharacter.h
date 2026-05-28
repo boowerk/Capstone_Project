@@ -46,6 +46,7 @@ public:
 protected:
 	void GiveStartupAbilities();
 	void InitializeAttributes() const;
+	virtual TSubclassOf<UGameplayEffect> ResolveInitializeAttributesEffect() const;
 
 	UPROPERTY(EditDefaultsOnly, Category = "UI|Damage")
 	TSubclassOf<AGP_DamageNumberActor> DamageNumberActorClass;

@@ -12,6 +12,29 @@
 #include "GameplayTags/GP_Tags.h"
 #include "UObject/ConstructorHelpers.h"
 
+namespace
+{
+TSubclassOf<UGameplayEffect> LoadInitializeAttributesEffectFallback()
+{
+	// The Attribute folder path is the current GAS layout; the root path stays as a legacy fallback for older assets.
+	static const TCHAR* FallbackEffectPaths[] =
+	{
+		TEXT("/Game/GAS_Pattern/AbilitySystem/GameplayEffects/Attribute/GE_InitializeAttributes.GE_InitializeAttributes_C"),
+		TEXT("/Game/GAS_Pattern/AbilitySystem/GameplayEffects/GE_InitializeAttributes.GE_InitializeAttributes_C")
+	};
+
+	for (const TCHAR* EffectPath : FallbackEffectPaths)
+	{
+		if (TSubclassOf<UGameplayEffect> EffectClass = LoadClass<UGameplayEffect>(nullptr, EffectPath))
+		{
+			return EffectClass;
+		}
+	}
+
+	return nullptr;
+}
+}
+
 AGP_BaseCharacter::AGP_BaseCharacter()
 {
 	PrimaryActorTick.bCanEverTick = false;
@@ -21,10 +44,20 @@ AGP_BaseCharacter::AGP_BaseCharacter()
 	DamageNumberActorClass = AGP_DamageNumberActor::StaticClass();
 
 	// BP에서 초기화 GE를 빼먹은 캐릭터가 PIE를 크래시내지 않도록 프로젝트 기본 Attribute GE를 잡아둡니다.
-	static ConstructorHelpers::FClassFinder<UGameplayEffect> DefaultInitializeAttributesEffectFinder(TEXT("/Game/GAS_Pattern/AbilitySystem/GameplayEffects/GE_InitializeAttributes"));
-	if (DefaultInitializeAttributesEffectFinder.Succeeded())
+	// Prefer the current Attribute GE path so enemies and bosses initialize through the same GAS fallback as their UI.
+	static ConstructorHelpers::FClassFinder<UGameplayEffect> AttributeInitializeAttributesEffectFinder(TEXT("/Game/GAS_Pattern/AbilitySystem/GameplayEffects/Attribute/GE_InitializeAttributes"));
+	if (AttributeInitializeAttributesEffectFinder.Succeeded())
 	{
-		InitializeAttributesEffect = DefaultInitializeAttributesEffectFinder.Class;
+		InitializeAttributesEffect = AttributeInitializeAttributesEffectFinder.Class;
+	}
+	else
+	{
+		// Legacy projects may still keep the initialization GE in the old root gameplay effects folder.
+		static ConstructorHelpers::FClassFinder<UGameplayEffect> LegacyInitializeAttributesEffectFinder(TEXT("/Game/GAS_Pattern/AbilitySystem/GameplayEffects/GE_InitializeAttributes"));
+		if (LegacyInitializeAttributesEffectFinder.Succeeded())
+		{
+			InitializeAttributesEffect = LegacyInitializeAttributesEffectFinder.Class;
+		}
 	}
 
 	OnASCInitialized.AddDynamic(this, &ThisClass::BindAttributeDelegates);
@@ -77,7 +110,7 @@ void AGP_BaseCharacter::GiveStartupAbilities()
 
 void AGP_BaseCharacter::InitializeAttributes() const
 {
-	TSubclassOf<UGameplayEffect> EffectClassToApply = InitializeAttributesEffect;
+	TSubclassOf<UGameplayEffect> EffectClassToApply = ResolveInitializeAttributesEffect();
 	if (!IsValid(EffectClassToApply))
 	{
 		// 레거시/신규 BP가 기본값을 못 받은 경우에도 한 번 더 로드해 PIE 크래시를 막습니다.
@@ -92,7 +125,23 @@ void AGP_BaseCharacter::InitializeAttributes() const
 
 	FGameplayEffectContextHandle ContextHandle = GetAbilitySystemComponent()->MakeEffectContext();
 	FGameplayEffectSpecHandle SpecHandle = GetAbilitySystemComponent()->MakeOutgoingSpec(EffectClassToApply, 1.f, ContextHandle);
+	if (!SpecHandle.IsValid())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[Character] Failed to create initialize attribute GE spec: %s Effect=%s"), *GetNameSafe(this), *GetNameSafe(EffectClassToApply));
+		return;
+	}
+
 	GetAbilitySystemComponent()->ApplyGameplayEffectSpecToSelf(*SpecHandle.Data.Get());
+}
+
+TSubclassOf<UGameplayEffect> AGP_BaseCharacter::ResolveInitializeAttributesEffect() const
+{
+	if (IsValid(InitializeAttributesEffect))
+	{
+		return InitializeAttributesEffect;
+	}
+
+	return LoadInitializeAttributesEffectFallback();
 }
 
 void AGP_BaseCharacter::ShowDamageNumber(int32 DamageAmount, EWeaponElement Element)

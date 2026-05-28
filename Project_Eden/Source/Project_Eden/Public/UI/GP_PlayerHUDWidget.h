@@ -12,6 +12,19 @@ class UWidget;
 class UAbilitySystemComponent;
 class UGP_AttributeSet;
 
+struct FGPAttributeDelegateBinding
+{
+	FGPAttributeDelegateBinding() = default;
+	FGPAttributeDelegateBinding(const FGameplayAttribute& InAttribute, const FDelegateHandle& InHandle)
+		: Attribute(InAttribute)
+		, Handle(InHandle)
+	{
+	}
+
+	FGameplayAttribute Attribute;
+	FDelegateHandle Handle;
+};
+
 UCLASS()
 class PROJECT_EDEN_API UGP_PlayerHUDWidget : public UUserWidget
 {
@@ -45,8 +58,11 @@ protected:
 
 private:
 	void RefreshPreview();
-	void BindAttributeWidgetToASC(UAbilitySystemComponent* InASC, UGP_AttributeWidget* Widget, UGP_AttributeSet* AttributeSet, TArray<FDelegateHandle>& DelegateHandles);
-	void RemoveAttributeDelegateHandles(TWeakObjectPtr<UAbilitySystemComponent>& BoundASC, TArray<FDelegateHandle>& DelegateHandles);
+	void BindAttributeWidgetToASC(UAbilitySystemComponent* InASC, UGP_AttributeWidget* Widget, UGP_AttributeSet* AttributeSet, TArray<FGPAttributeDelegateBinding>& DelegateHandles);
+	void RemoveAttributeDelegateHandles(TWeakObjectPtr<UAbilitySystemComponent>& BoundASC, TArray<FGPAttributeDelegateBinding>& DelegateHandles);
+	void EnsureBossHealthAttributes(UGP_AttributeWidget* Widget) const;
+	UGP_AttributeWidget* ResolveAttributeWidgetFromWidget(UWidget* WidgetObject) const;
+	UGP_AttributeWidget* ResolveAttributeWidgetByName(const FName WidgetName) const;
 	UGP_AttributeWidget* ResolveBossHealthBar() const;
 	
 	UFUNCTION()
@@ -84,6 +100,6 @@ private:
 
 	TWeakObjectPtr<UAbilitySystemComponent> BoundPlayerASC;
 	TWeakObjectPtr<UAbilitySystemComponent> BoundBossASC;
-	TArray<FDelegateHandle> PlayerAttributeDelegateHandles;
-	TArray<FDelegateHandle> BossAttributeDelegateHandles;
+	TArray<FGPAttributeDelegateBinding> PlayerAttributeDelegateHandles;
+	TArray<FGPAttributeDelegateBinding> BossAttributeDelegateHandles;
 };
