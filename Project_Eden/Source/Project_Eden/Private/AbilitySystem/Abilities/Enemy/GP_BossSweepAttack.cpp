@@ -48,7 +48,7 @@ UGP_BossSweepAttack::UGP_BossSweepAttack()
 
 	// Sans sweep animation is resolved from the boss AnimationSet so the setup commandlet can create the montage first.
 
-	static ConstructorHelpers::FClassFinder<UGameplayEffect> DamageEffectFinder(TEXT("/Game/GAS_Pattern/AbilitySystem/GameplayEffects/GE_PrimaryDamage"));
+	static ConstructorHelpers::FClassFinder<UGameplayEffect> DamageEffectFinder(TEXT("/Game/GAS_Pattern/AbilitySystem/GameplayEffects/Damage/GE_PrimaryDamage"));
 	if (DamageEffectFinder.Succeeded())
 	{
 		DamageEffectClass = DamageEffectFinder.Class;
@@ -261,12 +261,18 @@ void UGP_BossSweepAttack::PerformBossSweepHit()
 		BossSweepHitBoxElevationOffset,
 		bDrawDebugs);
 
-	if (HasAuthority(&CurrentActivationInfo) && DamageEffectClass)
+	TSubclassOf<UGameplayEffect> ResolvedDamageEffectClass = DamageEffectClass;
+	if (!ResolvedDamageEffectClass)
+	{
+		ResolvedDamageEffectClass = LoadClass<UGameplayEffect>(nullptr, TEXT("/Game/GAS_Pattern/AbilitySystem/GameplayEffects/Damage/GE_PrimaryDamage.GE_PrimaryDamage_C"));
+	}
+
+	if (HasAuthority(&CurrentActivationInfo) && ResolvedDamageEffectClass)
 	{
 		UGP_BlueprintLibrary::ApplyGameplayEffectToActors(
 			AvatarActor,
 			HitActors,
-			DamageEffectClass,
+			ResolvedDamageEffectClass,
 			GetAbilityLevel());
 	}
 

@@ -202,7 +202,7 @@ void AGP_PlayerCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-	DOREPLIFETIME(AGP_PlayerCharacter, bIsInWhiteVoid);
+	DOREPLIFETIME_CONDITION(AGP_PlayerCharacter, bIsInWhiteVoid, COND_SkipOwner);
 }
 
 void AGP_PlayerCharacter::StopUEFNSourceFallbackMontage(float BlendOutTime)
@@ -503,6 +503,11 @@ void AGP_PlayerCharacter::ServerSetWhiteVoid_Implementation(bool bNewInWhiteVoid
 	SetWhiteVoidState(bNewInWhiteVoid);
 }
 
+void AGP_PlayerCharacter::OnRep_IsInWhiteVoid()
+{
+	PerformWhiteVoidTransition(bIsInWhiteVoid);
+}
+
 void AGP_PlayerCharacter::SetWhiteVoidState(bool bNewInWhiteVoid)
 {
 	if (bIsInWhiteVoid == bNewInWhiteVoid)
@@ -523,12 +528,18 @@ void AGP_PlayerCharacter::SetWhiteVoidState(bool bNewInWhiteVoid)
 
 void AGP_PlayerCharacter::PerformWhiteVoidTransition(bool bNewInWhiteVoid)
 {
+	const bool bHadPendingLagRestore = GetWorldTimerManager().IsTimerActive(RestoreLagTimerHandle);
+	if (bHadPendingLagRestore)
+	{
+		GetWorldTimerManager().ClearTimer(RestoreLagTimerHandle);
+	}
+
 	if (bNewInWhiteVoid)
 	{
 		EnsureWhiteVoidSetExists();
 	}
 
-	CacheWhiteVoidTransitionState();
+	CacheWhiteVoidTransitionState(!bHadPendingLagRestore);
 
 	if (CameraBoom && !bPreserveCameraLagStateOnTransition)
 	{
@@ -598,7 +609,6 @@ void AGP_PlayerCharacter::PerformWhiteVoidTransition(bool bNewInWhiteVoid)
 
 	if (!bPreserveCameraLagStateOnTransition)
 	{
-		FTimerHandle RestoreLagTimerHandle;
 		GetWorldTimerManager().SetTimer(RestoreLagTimerHandle, this, &ThisClass::RestoreWhiteVoidCameraLag, 0.05f, false);
 	}
 
@@ -611,9 +621,9 @@ void AGP_PlayerCharacter::PerformWhiteVoidTransition(bool bNewInWhiteVoid)
 	}
 }
 
-void AGP_PlayerCharacter::CacheWhiteVoidTransitionState()
+void AGP_PlayerCharacter::CacheWhiteVoidTransitionState(bool bCacheCameraLag)
 {
-	if (CameraBoom)
+	if (CameraBoom && bCacheCameraLag)
 	{
 		bStoredCameraLagEnabled = CameraBoom->bEnableCameraLag;
 		bStoredCameraRotationLagEnabled = CameraBoom->bEnableCameraRotationLag;
@@ -709,11 +719,14 @@ void AGP_PlayerCharacter::ResetMotionTrajectoryAfterWhiteVoidTransition()
 
 	if (FStructProperty* TrajectoryProperty = FindFProperty<FStructProperty>(TrajectoryComponent->GetClass(), TEXT("Trajectory")))
 	{
-		if (FTransformTrajectory* Trajectory = TrajectoryProperty->ContainerPtrToValuePtr<FTransformTrajectory>(TrajectoryComponent))
+		if (TrajectoryProperty->Struct == FTransformTrajectory::StaticStruct())
 		{
-			for (FTransformTrajectorySample& Sample : Trajectory->Samples)
+			if (FTransformTrajectory* Trajectory = TrajectoryProperty->ContainerPtrToValuePtr<FTransformTrajectory>(TrajectoryComponent))
 			{
-				Sample.Position = CurrentMeshLocation;
+				for (FTransformTrajectorySample& Sample : Trajectory->Samples)
+				{
+					Sample.Position = CurrentMeshLocation;
+				}
 			}
 		}
 	}
@@ -721,11 +734,24 @@ void AGP_PlayerCharacter::ResetMotionTrajectoryAfterWhiteVoidTransition()
 	if (FArrayProperty* HistoryProperty = FindFProperty<FArrayProperty>(TrajectoryComponent->GetClass(), TEXT("TranslationHistory")))
 	{
 		FScriptArrayHelper HistoryHelper(HistoryProperty, HistoryProperty->ContainerPtrToValuePtr<void>(TrajectoryComponent));
-		if (CastField<FStructProperty>(HistoryProperty->Inner))
+		if (FStructProperty* StructProperty = CastField<FStructProperty>(HistoryProperty->Inner))
 		{
+			UScriptStruct* InnerStruct = StructProperty->Struct;
+			FStructProperty* PositionProperty = InnerStruct ? CastField<FStructProperty>(InnerStruct->FindPropertyByName(TEXT("Position"))) : nullptr;
+
+			const UScriptStruct* VectorStruct = TBaseStructure<FVector>::Get();
+
 			for (int32 Index = 0; Index < HistoryHelper.Num(); ++Index)
 			{
-				*reinterpret_cast<FVector*>(HistoryHelper.GetRawPtr(Index)) = CurrentMeshLocation;
+				uint8* ValuePtr = HistoryHelper.GetRawPtr(Index);
+				if (PositionProperty && PositionProperty->Struct == VectorStruct)
+				{
+					FVector* PosPtr = PositionProperty->ContainerPtrToValuePtr<FVector>(ValuePtr);
+					if (PosPtr)
+					{
+						*PosPtr = CurrentMeshLocation;
+					}
+				}
 			}
 		}
 	}

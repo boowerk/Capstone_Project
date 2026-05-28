@@ -176,9 +176,6 @@ void UGP_SkillBase::PerformAreaAttack()
 	AActor* Avatar = GetAvatarActorFromActorInfo();
 	if (!Avatar) return;
 
-	// SkillData is carried through the granted ability spec and must reach the GE spec for SetByCaller damage.
-	UGP_SkillData* SkillData = GetSkillDataFromSpec(CurrentSpecHandle, CurrentActorInfo);
-
 	// 1. 메커니즘: C++에서 정의된 유틸리티 라이브러리를 사용하여 범위 판정 수행
 	TArray<AActor*> HitActors = UGP_BlueprintLibrary::SphereMeleeHitBoxOverlap(
 		Avatar,
@@ -188,14 +185,19 @@ void UGP_SkillBase::PerformAreaAttack()
 		bDrawDebugs);
 
 	// 2. 이펙트 배달: 찾은 적들에게 데미지 이펙트 적용
-	if (HasAuthority(&CurrentActivationInfo) && DamageEffectClass)
+	TSubclassOf<UGameplayEffect> ResolvedDamageEffectClass = DamageEffectClass;
+	if (!ResolvedDamageEffectClass)
+	{
+		ResolvedDamageEffectClass = LoadClass<UGameplayEffect>(nullptr, TEXT("/Game/GAS_Pattern/AbilitySystem/GameplayEffects/Damage/GE_PrimaryDamage.GE_PrimaryDamage_C"));
+	}
+
+	if (HasAuthority(&CurrentActivationInfo) && ResolvedDamageEffectClass)
 	{
 		UGP_BlueprintLibrary::ApplyGameplayEffectToActors(
 			Avatar,
 			HitActors,
-			DamageEffectClass,
-			GetAbilityLevel(),
-			SkillData);
+			ResolvedDamageEffectClass,
+			GetAbilityLevel());
 	}
 
 	// 3. (옵션) 피격 반응 태그 전송 등 공통 로직 처리
