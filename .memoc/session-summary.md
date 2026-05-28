@@ -6,17 +6,17 @@ status: active
 tags: [memoc, memoc/state]
 ---
 # Session Summary
-Last: 2026-05-27T15:40:00+09:00
+Last: 2026-05-28T16:40:00+09:00
 Replace, do not append. Keep <800B.
 History: worklog. Resume risks: 04-handoff.md.
 
 ## Status
-- GAS damage path fixed to `/Damage/GE_PrimaryDamage`; player HUD and hit events verified by user.
-- Boss HUD now expects `WBP_PlayerHUDWidget.BossBar` as `UGP_AttributeWidget`/`WBP_BossBar` with Health/MaxHealth.
+- EventMap twilight sky pass applied through Unreal MCP and saved.
+- Verified screenshot: `Project_Eden/Saved/Screenshots/twilight_sky_test.png`.
 
 ## Changed
-- `GP_PlayerHUDWidget`: boss/player ASC delegate binding, name fallback, idempotent boss rebinding.
-- `GP_PlayerController`: refresh rebinds current boss ASC.
+- `PostProcessVolume_1`: unbound, Lumen GI/reflections, manual exposure 11.25, lower contrast, weak bloom, blue/purple/warm grade.
+- `DirectionalLight_0`, `SkyAtmosphere_0`, `VolumetricCloud_0`, `SkyLight_0`, `ExponentialHeightFog_2`: warm low sun, denser atmospheric scattering, realtime skylight, volumetric fog.
 
 ## Resume
-- Latest Live Coding stuck in UBA low-memory loop; ask user to rebuild/restart editor.
+- Screenshot reads very warm/bright; next art pass may lower exposure or skylight/fog brightness.
