@@ -122,6 +122,10 @@ void UGP_CharacterAnimInstance::NativeInitializeAnimation()
 	Super::NativeInitializeAnimation();
 
 	Character = Cast<ACharacter>(TryGetPawnOwner());
+	if (!Character)
+	{
+		Character = Cast<ACharacter>(GetOwningActor());
+	}
 	if (Character)
 	{
 		MovementComponent = Character->GetCharacterMovement();
@@ -147,6 +151,10 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	if (!Character || !MovementComponent)
 	{
 		Character = Cast<ACharacter>(TryGetPawnOwner());
+		if (!Character)
+		{
+			Character = Cast<ACharacter>(GetOwningActor());
+		}
 		if (Character)
 		{
 			MovementComponent = Character->GetCharacterMovement();
@@ -180,7 +188,8 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	MMDatabaseLOD = static_cast<float>(static_cast<uint8>(MMDatabaseLODEnum));
 	const float CurrentMaxSpeed = MovementComponent->GetMaxSpeed() / MovementSpeedScaleRatio;
 	bIsSprinting = CurrentMaxSpeed >= SprintSpeedThreshold || Speed2D >= SprintSpeedThreshold;
-	const bool bIsMovingNow = Speed2D > IdleSpeedThreshold;
+	const bool bWantsGroundMovement = bHasAcceleration && !bIsFalling;
+	const bool bIsMovingNow = Speed2D > IdleSpeedThreshold || bWantsGroundMovement;
 	const bool bWasFallingLastFrame = MovementMode == E_MovementMode::InAir;
 	const E_MovementDirection PreviousDirection = MovementDirection;
 
@@ -219,7 +228,7 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	}
 
 	// Detect movement start for Chooser to select Start animations
-	IsStarting = !bWasMovingLastFrame && bIsMovingNow && bHasAcceleration;
+	IsStarting = !bWasMovingLastFrame && bWantsGroundMovement;
 	const bool bStopTriggeredThisFrame = bWasMovingLastFrame && !bHasAcceleration && !bIsFalling;
 	if (bStopTriggeredThisFrame)
 	{
@@ -430,13 +439,14 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	LastActorYaw = CurrentYaw;
 
 #if !UE_BUILD_SHIPPING
-	if (bEnableDebugLog && GEngine && PlayerCharacter && PlayerCharacter->IsLocallyControlled() && GetSkelMeshComponent() == PlayerCharacter->GetMesh())
+	const bool bIsUEFNSourceAnimInstance = PlayerCharacter && PlayerCharacter->GetUEFNSourceAnimInstance() == this;
+	if (GEngine && PlayerCharacter && PlayerCharacter->IsLocallyControlled() && bIsUEFNSourceAnimInstance)
 	{
 		const FString SelectedAnimText = bMotionMatchingResultValid
 			? (MotionMatchingSelectedAnimName.IsNone() ? TEXT("Null Asset") : MotionMatchingSelectedAnimName.ToString())
 			: TEXT("Invalid Result");
 		const FString DebugText = FString::Printf(
-			TEXT("DBG v2 Mesh: %s \nMM Speed2D: %.1f \nRaw Speed: %.1f \nSpeed Scale: %.2f \nProfile Scale: %.2f \nMaxWalk: %.1f \nGait: %s \nState: %s \nTurn:%d \nStop:%d \nPivot:%d \nSpin:%d \nPivotDot: %.2f \nYawRate: %.1f \nIdleT: %.2f \nStopT: %.2f \nPivotT: %.2f \nLandT: %.2f"),
+			TEXT("DBG v3 Mesh: %s (UEFNSource) \nMM Speed2D: %.1f \nRaw Speed: %.1f \nSpeed Scale: %.2f \nProfile Scale: %.2f \nMaxWalk: %.1f \nGait: %s \nState: %s \nTurn:%d \nStop:%d \nPivot:%d \nSpin:%d \nPivotDot: %.2f \nYawRate: %.1f \nIdleT: %.2f \nStopT: %.2f \nPivotT: %.2f \nLandT: %.2f"),
 			*GetNameSafe(GetSkelMeshComponent()),
 			Speed2D,
 			GroundSpeed,
@@ -456,17 +466,18 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 			TimeSincePivotStarted,
 			TimeSinceLastLanded);
 		const FString DebugAssetText = FString::Printf(
-			TEXT("MM DB: %s \nValid:%d \nAnim: %s"),
+			TEXT("MM DB: %s \nApplied DB: %s \nValid:%d \nAnim: %s"),
 			*GetNameSafe(RuntimePoseSearchDatabase),
+			*GetNameSafe(LastAppliedRuntimePoseSearchDatabase),
 			bMotionMatchingResultValid ? 1 : 0,
 			*SelectedAnimText);
 		GEngine->AddOnScreenDebugMessage(
-			0x4D4D4442,
+			0x4D4D4452,
 			0.f,
 			FColor::Cyan,
 			DebugText);
 		GEngine->AddOnScreenDebugMessage(
-			0x4D4D4443,
+			0x4D4D4453,
 			0.f,
 			FColor::Green,
 			DebugAssetText);
