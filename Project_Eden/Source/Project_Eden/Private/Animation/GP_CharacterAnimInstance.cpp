@@ -281,17 +281,16 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	}
 
 	const float ActiveTurnThreshold = ShouldTurnInPlace ? 2.0f : TurnInPlaceYawThreshold;
+	const bool bCanKeepTurnInPlace = !bIsFalling && Speed2D <= TurnInPlaceMaxSpeed && !bHasAcceleration;
 
 	bool bWantTurnInPlace =
-		!bIsFalling &&
-		Speed2D <= TurnInPlaceMaxSpeed &&
-		!bHasAcceleration &&
+		bCanKeepTurnInPlace &&
 		TimeSinceMovementStopped >= TurnInPlaceMinIdleTime &&
 		TimeSinceLastLanded > LandedSignalDuration &&
 		YawDelta > ActiveTurnThreshold;
 
 	// Hysteresis: Keep TurnInPlace active for a minimum duration to prevent animation chattering
-	if (ShouldTurnInPlace && TimeSinceTurnInPlaceStarted < TurnInPlaceMinDuration)
+	if (ShouldTurnInPlace && bCanKeepTurnInPlace && TimeSinceTurnInPlaceStarted < TurnInPlaceMinDuration)
 	{
 		bWantTurnInPlace = true;
 	}
@@ -304,7 +303,7 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		if (AnimNameStr.Contains(TEXT("Turn")) || AnimNameStr.Contains(TEXT("turn")) || AnimNameStr.Contains(TEXT("TIP")))
 		{
 			// Reaction: Allow instant interruption if the player actually starts moving
-			if (Speed2D <= TurnInPlaceMaxSpeed && !bHasAcceleration && !bIsFalling)
+			if (bCanKeepTurnInPlace)
 			{
 				bWantTurnInPlace = true;
 			}
@@ -318,6 +317,7 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		Speed2D >= RunSpeedThreshold &&
 		!IsStopping &&
 		!IsPivoting &&
+		!ShouldTurnInPlace &&
 		YawRate >= MovingTurnYawRateThreshold;
 
 	JustTraversed = false;
