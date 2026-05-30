@@ -72,13 +72,13 @@ void UGP_Dash::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FG
 		return;
 	}
 
-	// 애니메이션 세트 - 대시 몽타주
+	// 애니메이션 세트 - 구르기(Dash) 몽타주
 	UAnimMontage* DashMontage = nullptr;
 	UAnimMontage* SourceDashMontage = nullptr;
 	if (UPDA_CharacterAnimationSet* AnimSet = PC->GetAnimationSet())
 	{
-		DashMontage = AnimSet->DashMontage;
-		SourceDashMontage = AnimSet->SourceDashMontage;
+		DashMontage = AnimSet->RollMontages.Roll_RM;
+		SourceDashMontage = AnimSet->SourceRollMontages.Roll_RM;
 	}
 
 	if (!IsValid(DashMontage) && !IsValid(SourceDashMontage))
