@@ -106,7 +106,7 @@ void AGP_MineBurstActor::Explode()
 	bHasExploded = true;
 	const FVector ImpactLocation = GetActorLocation();
 
-	MulticastSpawnImpactVisual(ImpactLocation);
+	MulticastSpawnImpactVisual(ImpactLocation, ImpactVisualActorClass);
 
 	if (AActor* InstigatorActor = GetInstigator())
 	{
@@ -124,9 +124,9 @@ void AGP_MineBurstActor::Explode()
 	Destroy();
 }
 
-void AGP_MineBurstActor::MulticastSpawnImpactVisual_Implementation(const FVector& ImpactLocation)
+void AGP_MineBurstActor::MulticastSpawnImpactVisual_Implementation(const FVector& ImpactLocation, TSubclassOf<AActor> VisualActorClass)
 {
-	if (!ImpactVisualActorClass)
+	if (!VisualActorClass)
 	{
 		return;
 	}
@@ -137,7 +137,7 @@ void AGP_MineBurstActor::MulticastSpawnImpactVisual_Implementation(const FVector
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
 	GetWorld()->SpawnActor<AActor>(
-		ImpactVisualActorClass,
+		VisualActorClass,
 		ImpactLocation,
 		FRotator::ZeroRotator,
 		SpawnParams

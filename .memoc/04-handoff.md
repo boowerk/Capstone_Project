@@ -21,6 +21,16 @@ Last synced: 2026-05-26T20:45:00
 - Later production pass: replace raw `K` event with Enhanced Input action `IA_ToggleTechSelect` and map it in the player input context.
 - Keep test PlayerController/GameMode separate from main BP to reduce team merge conflicts until feature is stable.
 
+## Projectile VFX Handoff
+
+- `UGP_SkillData` now has `SpawnActorClass`. Projectile-style GAs prefer this value and fallback to their old BP class variable when empty.
+- `FGP_ElementVisualActorEntry` now has `ProjectileVisualSystem` for one Niagara system per element entry.
+- `AGP_Projectile` and `AGP_AreaProjectile` replicate this system and call `BP_OnProjectileVisualSystemChanged`.
+- Projectile BPs must implement that BP event and set their Niagara component asset from the event parameter.
+- DA entries with no projectile VFX keep the existing BP/default visual because null visual systems are ignored.
+- `ThrownBurst`, `MineBurst`, `NetTestProjectile`, and `SplitShot` read spawn actors from SkillData first.
+- `ThrownBurst`, `NetTestProjectile`, and `SplitShot` pass projectile VFX from SkillData; `MineBurst` has no projectile VFX use yet.
+
 ## What Changed
 
 - Created `/Game/Characters/PlayerCharacter/ABP_UEFNSource_Player` for the UEFN mannequin skeleton.

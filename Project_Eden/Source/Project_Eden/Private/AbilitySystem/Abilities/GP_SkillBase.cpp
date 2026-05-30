@@ -145,6 +145,34 @@ TSubclassOf<AActor> UGP_SkillBase::GetSkillVisualActorClass(const UGP_SkillData*
 	return FallbackVisualActorClass;
 }
 
+TSubclassOf<AActor> UGP_SkillBase::GetSkillSpawnActorClass(const UGP_SkillData* SkillData, TSubclassOf<AActor> FallbackActorClass) const
+{
+	if (SkillData && SkillData->SpawnActorClass)
+	{
+		return SkillData->SpawnActorClass;
+	}
+
+	return FallbackActorClass;
+}
+
+UNiagaraSystem* UGP_SkillBase::GetProjectileVisualSystem(const UGP_SkillData* SkillData, FGameplayTag ElementTag) const
+{
+	if (!SkillData || !ElementTag.IsValid())
+	{
+		return nullptr;
+	}
+
+	for (const FGP_ElementVisualActorEntry& Entry : SkillData->ElementVisualActorClasses)
+	{
+		if (Entry.ElementTag.MatchesTagExact(ElementTag))
+		{
+			return Entry.ProjectileVisualSystem;
+		}
+	}
+
+	return nullptr;
+}
+
 void UGP_SkillBase::SpawnVisualActor(AActor* InstigatorActor, TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation) const
 {
 	if (!IsValid(InstigatorActor) || !VisualActorClass || !InstigatorActor->GetWorld())

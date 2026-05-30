@@ -1,6 +1,7 @@
 #include "AbilitySystem/Abilities/Player/Character1/GP_Skill_MineBurst.h"
 
 #include "AbilitySystemComponent.h"
+#include "AbilitySystem/Abilities/GP_SkillData.h"
 #include "Actors/GP_MineBurstActor.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/Controller.h"
@@ -20,8 +21,10 @@ void UGP_Skill_MineBurst::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 
 	ACharacter* Avatar = Cast<ACharacter>(ActorInfo->AvatarActor.Get());
 	UAbilitySystemComponent* ASC = ActorInfo->AbilitySystemComponent.Get();
+	UGP_SkillData* SkillData = GetSkillDataFromSpec(Handle, ActorInfo);
+	const TSubclassOf<AActor> SpawnActorClass = GetSkillSpawnActorClass(SkillData, MineActorClass);
 
-	if (!Avatar || !ASC || !MineActorClass || !CommitAbility(Handle, ActorInfo, ActivationInfo))
+	if (!Avatar || !ASC || !SpawnActorClass || !CommitAbility(Handle, ActorInfo, ActivationInfo))
 	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
@@ -29,7 +32,7 @@ void UGP_Skill_MineBurst::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 
 	if (HasAuthority(&ActivationInfo))
 	{
-		UGP_SkillData* SkillData = GetSkillDataFromSpec(Handle, ActorInfo);
+		const FGameplayTag TechElementTag = GetCurrentTechElementTag(ActorInfo);
 
 		FRotator AimRotation = Avatar->GetActorRotation();
 		if (AController* Controller = Avatar->GetController())
@@ -63,16 +66,22 @@ void UGP_Skill_MineBurst::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 		SpawnParams.Instigator = Avatar;
 		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
-		AGP_MineBurstActor* MineActor = Avatar->GetWorld()->SpawnActor<AGP_MineBurstActor>(
-			MineActorClass,
+		AActor* SpawnedActor = Avatar->GetWorld()->SpawnActor<AActor>(
+			SpawnActorClass,
 			MineLocation,
 			FRotator::ZeroRotator,
 			SpawnParams
 		);
+		AGP_MineBurstActor* MineActor = Cast<AGP_MineBurstActor>(SpawnedActor);
 
 		if (MineActor)
 		{
 			MineActor->SetSkillData(SkillData);
+			MineActor->SetImpactVisualActorClass(GetSkillVisualActorClass(SkillData, nullptr, TechElementTag));
+		}
+		else if (SpawnedActor)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("%s expected AGP_MineBurstActor but spawned %s."), *GetNameSafe(this), *GetNameSafe(SpawnedActor));
 		}
 	}
 

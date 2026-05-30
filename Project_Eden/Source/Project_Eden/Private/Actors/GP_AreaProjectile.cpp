@@ -5,6 +5,7 @@
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "GameplayEffect.h"
 #include "GameplayTags/GP_Tags.h"
+#include "Net/UnrealNetwork.h"
 #include "Utils/GP_BlueprintLibrary.h"
 
 AGP_AreaProjectile::AGP_AreaProjectile()
@@ -40,6 +41,10 @@ void AGP_AreaProjectile::BeginPlay()
 	Super::BeginPlay();
 
 	SetLifeSpan(ProjectileLifeSpan);
+	if (ProjectileVisualSystem)
+	{
+		BP_OnProjectileVisualSystemChanged(ProjectileVisualSystem);
+	}
 
 	if (CollisionComponent)
 	{
@@ -50,6 +55,32 @@ void AGP_AreaProjectile::BeginPlay()
 		{
 			CollisionComponent->IgnoreActorWhenMoving(GetInstigator(), true);
 		}
+	}
+}
+
+void AGP_AreaProjectile::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(AGP_AreaProjectile, ProjectileVisualSystem);
+}
+
+void AGP_AreaProjectile::SetProjectileVisualSystem(UNiagaraSystem* InProjectileVisualSystem)
+{
+	if (!InProjectileVisualSystem)
+	{
+		return;
+	}
+
+	ProjectileVisualSystem = InProjectileVisualSystem;
+	BP_OnProjectileVisualSystemChanged(ProjectileVisualSystem);
+}
+
+void AGP_AreaProjectile::OnRep_ProjectileVisualSystem()
+{
+	if (ProjectileVisualSystem)
+	{
+		BP_OnProjectileVisualSystemChanged(ProjectileVisualSystem);
 	}
 }
 
@@ -88,7 +119,7 @@ void AGP_AreaProjectile::Explode(const FVector& ImpactLocation)
 
 	bHasExploded = true;
 
-	MulticastSpawnImpactVisual(ImpactLocation);
+	MulticastSpawnImpactVisual(ImpactLocation, ImpactVisualActorClass);
 
 	if (AActor* InstigatorActor = GetInstigator())
 	{
@@ -106,9 +137,9 @@ void AGP_AreaProjectile::Explode(const FVector& ImpactLocation)
 	Destroy();
 }
 
-void AGP_AreaProjectile::MulticastSpawnImpactVisual_Implementation(const FVector& ImpactLocation)
+void AGP_AreaProjectile::MulticastSpawnImpactVisual_Implementation(const FVector& ImpactLocation, TSubclassOf<AActor> VisualActorClass)
 {
-	if (!ImpactVisualActorClass)
+	if (!VisualActorClass)
 	{
 		return;
 	}
@@ -119,7 +150,7 @@ void AGP_AreaProjectile::MulticastSpawnImpactVisual_Implementation(const FVector
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
 	GetWorld()->SpawnActor<AActor>(
-		ImpactVisualActorClass,
+		VisualActorClass,
 		ImpactLocation,
 		FRotator::ZeroRotator,
 		SpawnParams

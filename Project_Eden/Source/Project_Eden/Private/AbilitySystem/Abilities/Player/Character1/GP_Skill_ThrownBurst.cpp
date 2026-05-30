@@ -1,6 +1,7 @@
 #include "AbilitySystem/Abilities/Player/Character1/GP_Skill_ThrownBurst.h"
 
 #include "AbilitySystemComponent.h"
+#include "AbilitySystem/Abilities/GP_SkillData.h"
 #include "Actors/GP_AreaProjectile.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/Controller.h"
@@ -20,8 +21,10 @@ void UGP_Skill_ThrownBurst::ActivateAbility(const FGameplayAbilitySpecHandle Han
 
 	ACharacter* Avatar = Cast<ACharacter>(ActorInfo->AvatarActor.Get());
 	UAbilitySystemComponent* ASC = ActorInfo->AbilitySystemComponent.Get();
+	UGP_SkillData* SkillData = GetSkillDataFromSpec(Handle, ActorInfo);
+	const TSubclassOf<AActor> SpawnActorClass = GetSkillSpawnActorClass(SkillData, ProjectileClass);
 
-	if (!Avatar || !ASC || !ProjectileClass || !CommitAbility(Handle, ActorInfo, ActivationInfo))
+	if (!Avatar || !ASC || !SpawnActorClass || !CommitAbility(Handle, ActorInfo, ActivationInfo))
 	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
@@ -29,6 +32,8 @@ void UGP_Skill_ThrownBurst::ActivateAbility(const FGameplayAbilitySpecHandle Han
 
 	if (HasAuthority(&ActivationInfo))
 	{
+		const FGameplayTag TechElementTag = GetCurrentTechElementTag(ActorInfo);
+
 		FRotator SpawnRotation = Avatar->GetActorRotation();
 		if (AController* Controller = Avatar->GetController())
 		{
@@ -47,16 +52,23 @@ void UGP_Skill_ThrownBurst::ActivateAbility(const FGameplayAbilitySpecHandle Han
 		SpawnParams.Instigator = Avatar;
 		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
-		AGP_AreaProjectile* Projectile = Avatar->GetWorld()->SpawnActor<AGP_AreaProjectile>(
-			ProjectileClass,
+		AActor* SpawnedActor = Avatar->GetWorld()->SpawnActor<AActor>(
+			SpawnActorClass,
 			SpawnLocation,
 			SpawnRotation,
 			SpawnParams
 		);
+		AGP_AreaProjectile* Projectile = Cast<AGP_AreaProjectile>(SpawnedActor);
 
 		if (Projectile)
 		{
-			Projectile->SetSkillData(GetSkillDataFromSpec(Handle, ActorInfo));
+			Projectile->SetSkillData(SkillData);
+			Projectile->SetImpactVisualActorClass(GetSkillVisualActorClass(SkillData, nullptr, TechElementTag));
+			Projectile->SetProjectileVisualSystem(GetProjectileVisualSystem(SkillData, TechElementTag));
+		}
+		else if (SpawnedActor)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("%s expected AGP_AreaProjectile but spawned %s."), *GetNameSafe(this), *GetNameSafe(SpawnedActor));
 		}
 	}
 

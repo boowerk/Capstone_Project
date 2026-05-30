@@ -10,6 +10,7 @@ class UShapeComponent;
 class UProjectileMovementComponent;
 class UGameplayEffect;
 class UGP_SkillData;
+class UNiagaraSystem;
 
 UCLASS()
 class PROJECT_EDEN_API AGP_Projectile : public AActor
@@ -20,9 +21,11 @@ public:
 	AGP_Projectile();
 
 	void SetSkillData(UGP_SkillData* InSkillData) { SkillData = InSkillData; }
+	void SetProjectileVisualSystem(UNiagaraSystem* InProjectileVisualSystem);
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	// 1. C++에서 기본으로 생성할 빈 루트 컴포넌트
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Eden|Projectile")
@@ -54,6 +57,15 @@ protected:
 
 	UPROPERTY(BlueprintReadWrite, Category = "Eden|GAS", meta = (ExposeOnSpawn = "true"))
 	TObjectPtr<UGP_SkillData> SkillData;
+
+	UPROPERTY(ReplicatedUsing = OnRep_ProjectileVisualSystem, BlueprintReadOnly, Category = "Eden|Projectile|Visual")
+	TObjectPtr<UNiagaraSystem> ProjectileVisualSystem;
+
+	UFUNCTION()
+	void OnRep_ProjectileVisualSystem();
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "Eden|Projectile|Visual")
+	void BP_OnProjectileVisualSystemChanged(UNiagaraSystem* NewProjectileVisualSystem);
 
 	// 이름 변경 (OnSphereOverlap -> OnProjectileOverlap)
 	UFUNCTION()

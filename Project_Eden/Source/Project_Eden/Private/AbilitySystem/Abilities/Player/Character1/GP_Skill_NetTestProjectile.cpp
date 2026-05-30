@@ -4,6 +4,7 @@
 #include "AbilitySystem/Abilities/Player/Character1/GP_Skill_NetTestProjectile.h"
 
 #include "AbilitySystemComponent.h"
+#include "AbilitySystem/Abilities/GP_SkillData.h"
 #include "Actors/GP_Projectile.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/Character.h"
@@ -22,6 +23,8 @@ void UGP_Skill_NetTestProjectile::ActivateAbility(const FGameplayAbilitySpecHand
 
 	ACharacter* Avatar = Cast<ACharacter>(ActorInfo->AvatarActor.Get());
 	UAbilitySystemComponent* ASC = ActorInfo->AbilitySystemComponent.Get();
+	UGP_SkillData* SkillData = GetSkillDataFromSpec(Handle, ActorInfo);
+	const TSubclassOf<AActor> SpawnActorClass = GetSkillSpawnActorClass(SkillData, ProjectileClass);
 
 	if (!Avatar || !ASC || !CommitAbility(Handle, ActorInfo, ActivationInfo))
 	{
@@ -29,8 +32,10 @@ void UGP_Skill_NetTestProjectile::ActivateAbility(const FGameplayAbilitySpecHand
 		return;
 	}
 
-	if (HasAuthority(&ActivationInfo) && ProjectileClass)
+	if (HasAuthority(&ActivationInfo) && SpawnActorClass)
 	{
+		const FGameplayTag TechElementTag = GetCurrentTechElementTag(ActorInfo);
+
 		FRotator SpawnRotation = Avatar->GetActorRotation();
 
 		if (AController* Controller = Avatar->GetController())
@@ -52,16 +57,22 @@ void UGP_Skill_NetTestProjectile::ActivateAbility(const FGameplayAbilitySpecHand
 			ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
 		// --- 스폰 ---
-		AGP_Projectile* Projectile = Avatar->GetWorld()->SpawnActor<AGP_Projectile>(
-			ProjectileClass,
+		AActor* SpawnedActor = Avatar->GetWorld()->SpawnActor<AActor>(
+			SpawnActorClass,
 			SpawnLocation,
 			SpawnRotation,
 			SpawnParams
 		);
+		AGP_Projectile* Projectile = Cast<AGP_Projectile>(SpawnedActor);
 
 		if (Projectile)
 		{
-			Projectile->SetSkillData(GetSkillDataFromSpec(Handle, ActorInfo));
+			Projectile->SetSkillData(SkillData);
+			Projectile->SetProjectileVisualSystem(GetProjectileVisualSystem(SkillData, TechElementTag));
+		}
+		else if (SpawnedActor)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("%s expected AGP_Projectile but spawned %s."), *GetNameSafe(this), *GetNameSafe(SpawnedActor));
 		}
 	}
 

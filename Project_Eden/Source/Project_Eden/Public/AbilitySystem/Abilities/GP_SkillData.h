@@ -7,6 +7,7 @@
 #include "GP_SkillData.generated.h"
 
 class AActor;
+class UNiagaraSystem;
 
 USTRUCT(BlueprintType)
 struct FGP_ElementVisualActorEntry
@@ -18,6 +19,9 @@ struct FGP_ElementVisualActorEntry
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Visual")
 	TSubclassOf<AActor> VisualActorClass;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Visual")
+	TObjectPtr<UNiagaraSystem> ProjectileVisualSystem;
 };
 
 UENUM(BlueprintType)
@@ -54,6 +58,9 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Visual")
 	TArray<FGP_ElementVisualActorEntry> ElementVisualActorClasses;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Actor")
+	TSubclassOf<AActor> SpawnActorClass;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Damage")
 	float BaseDamage = 0.f;
