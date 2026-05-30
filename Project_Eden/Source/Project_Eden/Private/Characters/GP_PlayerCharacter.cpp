@@ -139,6 +139,10 @@ void AGP_PlayerCharacter::Tick(float DeltaSeconds)
 			if (DeltaSeconds > KINDA_SMALL_NUMBER)
 			{
 				LastUEFNSourceRootMotionVelocity = WorldDelta / DeltaSeconds;
+				if (!LastUEFNSourceRootMotionVelocity.IsNearlyZero())
+				{
+					LastNonZeroUEFNSourceRootMotionVelocity = LastUEFNSourceRootMotionVelocity;
+				}
 			}
 		}
 	}
@@ -180,6 +184,7 @@ float AGP_PlayerCharacter::PlayUEFNSourceFallbackMontage(UAnimMontage* Montage, 
 		ActiveUEFNSourceFallbackMontage = Montage;
 		bApplyUEFNSourceFallbackRootMotion = true;
 		LastUEFNSourceRootMotionVelocity = FVector::ZeroVector;
+		LastNonZeroUEFNSourceRootMotionVelocity = FVector::ZeroVector;
 	}
 
 	return PlayedDuration;
@@ -205,7 +210,7 @@ void AGP_PlayerCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
 	DOREPLIFETIME_CONDITION(AGP_PlayerCharacter, bIsInWhiteVoid, COND_SkipOwner);
 }
 
-void AGP_PlayerCharacter::StopUEFNSourceFallbackMontage(float BlendOutTime)
+void AGP_PlayerCharacter::StopUEFNSourceFallbackMontage(float BlendOutTime, bool bApplyRootMotionInertia)
 {
 	UAnimInstance* SourceAnimInstance = GetUEFNSourceAnimInstance();
 	if (IsValid(SourceAnimInstance))
@@ -217,8 +222,22 @@ void AGP_PlayerCharacter::StopUEFNSourceFallbackMontage(float BlendOutTime)
 		// 방어 코드: 슬롯명 미스매칭이나 몽타주 매칭 어긋남 대비하여 전체 활성 몽타주 강제 정지 처리
 		SourceAnimInstance->Montage_Stop(BlendOutTime, nullptr);
 	}
+
+	if (bApplyRootMotionInertia)
+	{
+		if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+		{
+			const FVector HandoffVelocity = LastNonZeroUEFNSourceRootMotionVelocity * FMath::Max(FallbackRootMotionInertiaScale, 0.0f);
+			if (HandoffVelocity.SizeSquared2D() >= FallbackRootMotionInertiaMinSpeed * FallbackRootMotionInertiaMinSpeed)
+			{
+				MoveComp->Velocity = HandoffVelocity;
+			}
+		}
+	}
+
 	bApplyUEFNSourceFallbackRootMotion = false;
 	ActiveUEFNSourceFallbackMontage = nullptr;
+	LastNonZeroUEFNSourceRootMotionVelocity = FVector::ZeroVector;
 }
 
 // ==========================================

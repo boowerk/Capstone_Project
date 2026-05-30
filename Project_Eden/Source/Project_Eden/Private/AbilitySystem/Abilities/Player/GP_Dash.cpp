@@ -172,7 +172,7 @@ void UGP_Dash::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGamepl
 
 	if (AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo()))
 	{
-		PC->StopUEFNSourceFallbackMontage(0.2f);
+		PC->StopUEFNSourceFallbackMontage(0.2f, !bWasCancelled);
 	}
 
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);

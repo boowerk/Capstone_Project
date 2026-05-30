@@ -15,6 +15,7 @@ Last synced: 2026-05-23T00:00:00
 
 ## Current Status
 
+- DashSlash skill now exists as `UGP_Skill_DashSlash` plus `/Game/GAS_Pattern/AbilitySystem/Abilities/PlayerAbilities/Character1/GA_Skill_DashSlash` and `/Game/GAS_Pattern/AbilitySystem/SkillData/DA_Skill_DashSlash`. It plays `PDA_CharacterAnimationSet.SwordMontages.Dash_RM`, falls back to `SourceSwordMontages.Dash_RM`, and uses `GPTags.Cooldown.Skill.DashSlash` as a C++ cooldown fallback when the DA cooldown tag is blank.
 - `UGP_CharacterAnimInstance` now treats ground acceleration input as movement intent before `Speed2D` crosses `IdleSpeedThreshold`, so short idle-to-walk taps can select start/move motion instead of dragging the idle pose while the capsule accelerates.
 - Motion matching debug can now print from the `UEFNSource` anim instance with separate screen keys from the target mesh, including runtime DB, applied DB, result validity, and selected animation.
 - `UGP_Primary::StartComboSequence` no longer rotates the player toward current movement input before starting a combo montage, so primary attacks use the character's current forward direction only.
