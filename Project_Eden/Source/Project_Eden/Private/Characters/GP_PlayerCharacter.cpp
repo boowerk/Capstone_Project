@@ -225,6 +225,9 @@ bool AGP_PlayerCharacter::IsPlayingUEFNSourceFallbackMontage() const
 
 void AGP_PlayerCharacter::SetActionRootMotionInputCancelEnabled(bool bEnabled)
 {
+	UE_LOG(LogTemp, Warning, TEXT("[ActionEndTrace][Character] SetInputCancelEnabled=%d Actor=%s"),
+		bEnabled ? 1 : 0,
+		*GetName());
 	bActionRootMotionInputCancelEnabled = bEnabled;
 }
 
@@ -257,6 +260,11 @@ void AGP_PlayerCharacter::BeginActionMotionTracking()
 
 void AGP_PlayerCharacter::StopActionMotionTracking()
 {
+	UE_LOG(LogTemp, Warning, TEXT("[ActionEndTrace][Character] StopActionMotionTracking Actor=%s Track=%d CarrySpeed=%.1f CurrentSpeed=%.1f"),
+		*GetName(),
+		bTrackActionMotion ? 1 : 0,
+		ActionMotionCarryVelocity.Size2D(),
+		CurrentActionMotionVelocity.Size2D());
 	bTrackActionMotion = false;
 	ActionMotionCarryVelocity = FVector::ZeroVector;
 	LastActionCarryActualDelta = FVector::ZeroVector;
@@ -471,6 +479,15 @@ void AGP_PlayerCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
 void AGP_PlayerCharacter::StopUEFNSourceFallbackMontage(float BlendOutTime)
 {
 	UAnimInstance* SourceAnimInstance = GetUEFNSourceAnimInstance();
+	const float SourcePosition = IsValid(SourceAnimInstance) && IsValid(ActiveUEFNSourceFallbackMontage)
+		? SourceAnimInstance->Montage_GetPosition(ActiveUEFNSourceFallbackMontage)
+		: -1.0f;
+	UE_LOG(LogTemp, Warning, TEXT("[ActionEndTrace][Character] StopFallbackMontage Actor=%s Montage=%s Pos=%.3f ApplyRM=%d Blend=%.2f"),
+		*GetName(),
+		*GetNameSafe(ActiveUEFNSourceFallbackMontage),
+		SourcePosition,
+		bApplyUEFNSourceFallbackRootMotion ? 1 : 0,
+		BlendOutTime);
 	if (IsValid(SourceAnimInstance))
 	{
 		if (IsValid(ActiveUEFNSourceFallbackMontage))
@@ -542,6 +559,10 @@ void AGP_PlayerCharacter::AddMovementInput(FVector WorldDirection, float ScaleVa
 	{
 		if (bActionRootMotionInputCancelEnabled && FMath::Abs(ScaleValue) > KINDA_SMALL_NUMBER && !WorldDirection.IsNearlyZero())
 		{
+			UE_LOG(LogTemp, Warning, TEXT("[ActionEndTrace][Character] MoveCancelBroadcast Actor=%s Scale=%.3f Dir=%s"),
+				*GetName(),
+				ScaleValue,
+				*WorldDirection.ToCompactString());
 			bActionRootMotionInputCancelEnabled = false;
 			OnActionRootMotionCancelInput.Broadcast();
 			if (!ASC->HasMatchingGameplayTag(GPTags::State::Status::Fixed))

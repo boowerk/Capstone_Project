@@ -174,6 +174,10 @@ void UGP_Dash::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FG
 
 void UGP_Dash::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
+	UE_LOG(LogTemp, Warning, TEXT("[ActionEndTrace][Dash] EndAbility Cancelled=%d ActiveTarget=%s"),
+		bWasCancelled ? 1 : 0,
+		*GetNameSafe(ActiveDashMontage));
+
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(FallbackMontageEndTimerHandle);
@@ -214,6 +218,7 @@ void UGP_Dash::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGamepl
 
 void UGP_Dash::OnDashActionEnd(FGameplayEventData Payload)
 {
+	UE_LOG(LogTemp, Warning, TEXT("[ActionEndTrace][Dash] ActionEndEvent EnableInputCancel"));
 	if (AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo()))
 	{
 		PC->SetActionRootMotionInputCancelEnabled(true);
@@ -222,6 +227,7 @@ void UGP_Dash::OnDashActionEnd(FGameplayEventData Payload)
 
 void UGP_Dash::OnFallbackActionEnd()
 {
+	UE_LOG(LogTemp, Warning, TEXT("[ActionEndTrace][Dash] FallbackActionEndTimer EnableInputCancel"));
 	if (AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo()))
 	{
 		PC->SetActionRootMotionInputCancelEnabled(true);
@@ -230,15 +236,18 @@ void UGP_Dash::OnFallbackActionEnd()
 
 void UGP_Dash::OnActionRootMotionCancelInput()
 {
+	UE_LOG(LogTemp, Warning, TEXT("[ActionEndTrace][Dash] InputCancelDelegate EndAbility"));
 	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 }
 
 void UGP_Dash::OnMontageCompleted()
 {
+	UE_LOG(LogTemp, Warning, TEXT("[ActionEndTrace][Dash] MontageCompleted EndAbility"));
 	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 }
 
 void UGP_Dash::OnMontageInterrupted()
 {
+	UE_LOG(LogTemp, Warning, TEXT("[ActionEndTrace][Dash] MontageInterrupted EndAbility"));
 	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 }

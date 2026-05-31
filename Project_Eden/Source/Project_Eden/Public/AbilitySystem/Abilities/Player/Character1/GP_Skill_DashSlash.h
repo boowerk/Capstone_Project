@@ -89,5 +89,8 @@ private:
 	void OnMontageCompleted();
 
 	UFUNCTION()
+	void OnMontageBlendOut();
+
+	UFUNCTION()
 	void OnMontageInterrupted();
 };

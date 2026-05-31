@@ -212,7 +212,7 @@ void UGP_Skill_DashSlash::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 		}
 
 		MontageTask->OnCompleted.AddDynamic(this, &ThisClass::OnMontageCompleted);
-		MontageTask->OnBlendOut.AddDynamic(this, &ThisClass::OnMontageCompleted);
+		MontageTask->OnBlendOut.AddDynamic(this, &ThisClass::OnMontageBlendOut);
 		MontageTask->OnInterrupted.AddDynamic(this, &ThisClass::OnMontageInterrupted);
 		MontageTask->OnCancelled.AddDynamic(this, &ThisClass::OnMontageInterrupted);
 		MontageTask->ReadyForActivation();
@@ -265,6 +265,23 @@ void UGP_Skill_DashSlash::EndAbility(const FGameplayAbilitySpecHandle Handle,
                                      bool bReplicateEndAbility,
                                      bool bWasCancelled)
 {
+	UAnimMontage* ActiveMontage = nullptr;
+	float ActiveMontagePosition = -1.0f;
+	if (AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo()))
+	{
+		if (UAnimInstance* AnimInstance = PC->GetMesh() ? PC->GetMesh()->GetAnimInstance() : nullptr)
+		{
+			ActiveMontage = AnimInstance->GetCurrentActiveMontage();
+			ActiveMontagePosition = IsValid(ActiveMontage) ? AnimInstance->Montage_GetPosition(ActiveMontage) : -1.0f;
+		}
+	}
+	UE_LOG(LogTemp, Warning, TEXT("[ActionEndTrace][DashSlash] EndAbility Cancelled=%d ActiveMontage=%s Pos=%.3f Hit=%d MovementUnlocked=%d"),
+		bWasCancelled ? 1 : 0,
+		*GetNameSafe(ActiveMontage),
+		ActiveMontagePosition,
+		bHasAppliedAttackHit ? 1 : 0,
+		bMovementControlUnlocked ? 1 : 0);
+
 	UnlockMovementControl();
 	ClearExistingTasks();
 
@@ -375,6 +392,7 @@ void UGP_Skill_DashSlash::OnAttackHitEventReceived(FGameplayEventData Payload)
 
 void UGP_Skill_DashSlash::OnActionEndEventReceived(FGameplayEventData Payload)
 {
+	UE_LOG(LogTemp, Warning, TEXT("[ActionEndTrace][DashSlash] ActionEndEvent UnlockOnly"));
 	UnlockMovementControl();
 
 	if (!bHasAppliedAttackHit)
@@ -385,6 +403,7 @@ void UGP_Skill_DashSlash::OnActionEndEventReceived(FGameplayEventData Payload)
 
 void UGP_Skill_DashSlash::OnFallbackActionEnd()
 {
+	UE_LOG(LogTemp, Warning, TEXT("[ActionEndTrace][DashSlash] FallbackActionEndTimer UnlockOnly"));
 	UnlockMovementControl();
 
 	if (!bHasAppliedAttackHit)
@@ -395,6 +414,7 @@ void UGP_Skill_DashSlash::OnFallbackActionEnd()
 
 void UGP_Skill_DashSlash::OnMontageCompleted()
 {
+	UE_LOG(LogTemp, Warning, TEXT("[ActionEndTrace][DashSlash] MontageCompleted EndAbility"));
 	if (!bHasAppliedAttackHit)
 	{
 		PerformDashSlashHit();
@@ -403,7 +423,13 @@ void UGP_Skill_DashSlash::OnMontageCompleted()
 	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 }
 
+void UGP_Skill_DashSlash::OnMontageBlendOut()
+{
+	UE_LOG(LogTemp, Warning, TEXT("[ActionEndTrace][DashSlash] MontageBlendOut LogOnly"));
+}
+
 void UGP_Skill_DashSlash::OnMontageInterrupted()
 {
+	UE_LOG(LogTemp, Warning, TEXT("[ActionEndTrace][DashSlash] MontageInterrupted EndAbility"));
 	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 }
