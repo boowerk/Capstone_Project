@@ -21,6 +21,7 @@ class UBlendSpace;
 class UGP_SkillData;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnSkillEquipped, FGameplayTag, SlotTag, UGP_SkillData*, SkillData);
+DECLARE_MULTICAST_DELEGATE(FOnActionRootMotionCancelInput);
 
 UCLASS()
 class PROJECT_EDEN_API AGP_PlayerCharacter : public AGP_BaseCharacter
@@ -83,8 +84,14 @@ public:
 	UAnimInstance* GetUEFNSourceAnimInstance() const;
 	float PlayUEFNSourceFallbackMontage(UAnimMontage* Montage, float PlayRate = 1.0f);
 	bool IsPlayingUEFNSourceFallbackMontage() const;
-	void StopUEFNSourceFallbackMontage(float BlendOutTime = 0.2f, bool bApplyRootMotionInertia = false);
+	void StopUEFNSourceFallbackMontage(float BlendOutTime = 0.2f);
+	void SetActionRootMotionInputCancelEnabled(bool bEnabled);
+	void BeginActionMotionTracking();
+	void StopActionMotionTracking();
+	void ApplyCurrentActionInertia();
 	FVector GetLastUEFNSourceRootMotionVelocity() const { return LastUEFNSourceRootMotionVelocity; }
+	FVector GetCurrentActionMotionVelocity() const { return CurrentActionMotionVelocity; }
+	FOnActionRootMotionCancelInput OnActionRootMotionCancelInput;
 	
 	/** [데이터 에셋 기반] 런타임 스킬 교체 함수 (bIgnoreRestrictions로 로그라이크식 예외 지원) */
 	UFUNCTION(BlueprintCallable, Category = "GAS|Combat")
@@ -115,14 +122,51 @@ private:
 	TObjectPtr<UAnimMontage> ActiveUEFNSourceFallbackMontage;
 
 	bool bApplyUEFNSourceFallbackRootMotion = false;
+	bool bActionRootMotionInputCancelEnabled = false;
 	FVector LastUEFNSourceRootMotionVelocity = FVector::ZeroVector;
 	FVector LastNonZeroUEFNSourceRootMotionVelocity = FVector::ZeroVector;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animation|Runtime Retarget Fallback", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
-	float FallbackRootMotionInertiaScale = 1.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animation|Runtime Retarget Fallback", meta = (AllowPrivateAccess = "true", ClampMin = "0.01"))
+	float FallbackRootMotionDistanceCorrection = 1.18f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animation|Runtime Retarget Fallback", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
-	float FallbackRootMotionInertiaMinSpeed = 100.0f;
+	struct FGPActionMotionSample
+	{
+		FVector Delta = FVector::ZeroVector;
+		float DeltaSeconds = 0.0f;
+		float TimeSeconds = 0.0f;
+	};
+
+	void UpdateActionMotionTracking(float DeltaSeconds);
+	void UpdateActionCarryVelocity(float DeltaSeconds);
+	void FlushActionMotionTracking();
+	FVector GetCurrentActionInertiaVelocity() const;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Action Inertia", meta = (AllowPrivateAccess = "true"))
+	bool bApplyActionInertiaOnMontageComplete = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Action Inertia", meta = (AllowPrivateAccess = "true", ClampMin = "0.02"))
+	float ActionInertiaSampleWindow = 0.12f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Action Inertia", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float ActionInertiaMinSampleTime = 0.03f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Action Inertia", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float ActionInertiaMinSpeed = 100.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Action Inertia", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float ActionInertiaMaxSpeed = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Action Inertia", meta = (AllowPrivateAccess = "true"))
+	bool bCarryEntryVelocityDuringActionRootMotion = true;
+
+	bool bTrackActionMotion = false;
+	FVector LastActionMotionSampleLocation = FVector::ZeroVector;
+	float LastActionMotionSampleTime = 0.0f;
+	FVector ActionMotionEntryVelocity = FVector::ZeroVector;
+	FVector ActionMotionCarryVelocity = FVector::ZeroVector;
+	FVector LastActionCarryActualDelta = FVector::ZeroVector;
+	FVector CurrentActionMotionVelocity = FVector::ZeroVector;
+	TArray<FGPActionMotionSample> ActionMotionSamples;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "White Void", meta = (AllowPrivateAccess = "true"))
 	FVector WhiteVoidOffset = FVector(0.0, 0.0, -10000.0);

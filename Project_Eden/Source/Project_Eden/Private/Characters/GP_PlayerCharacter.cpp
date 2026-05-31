@@ -22,8 +22,15 @@
 #include "Player/GP_PlayerState.h"
 #include "AbilitySystemComponent.h"
 #include "GameplayTags/GP_Tags.h"
+#include "HAL/IConsoleManager.h"
 #include "TimerManager.h"
 #include "UObject/UnrealType.h"
+
+static int32 GGPActionInertiaDebug = 1;
+static FAutoConsoleVariableRef CVarGPActionInertiaDebug(
+	TEXT("gp.ActionInertia.Debug"),
+	GGPActionInertiaDebug,
+	TEXT("Log action root-motion/fallback inertia samples."));
 
 AGP_PlayerCharacter::AGP_PlayerCharacter()
 {
@@ -127,21 +134,37 @@ void AGP_PlayerCharacter::Tick(float DeltaSeconds)
 		if (MoveComp && MoveComp->UpdatedComponent && (!RootMotionDeltaTranslation.IsNearlyZero() || !RootMotionDeltaRot.IsZero()))
 		{
 			const float TranslationYawOffset = AnimationSet ? AnimationSet->SourceRootMotionTranslationYawOffset : 0.0f;
-			const FVector CorrectedTranslation = FRotator(0.0f, TranslationYawOffset, 0.0f).RotateVector(RootMotionDeltaTranslation) * GetMovementSpeedScaleRatio();
+			const float RootMotionScaleRatio = GetMovementSpeedScaleRatio() * FMath::Max(FallbackRootMotionDistanceCorrection, 0.01f);
+			const FVector CorrectedTranslation = FRotator(0.0f, TranslationYawOffset, 0.0f).RotateVector(RootMotionDeltaTranslation) * RootMotionScaleRatio;
 			const FVector WorldDelta = GetActorTransform().TransformVectorNoScale(CorrectedTranslation);
 			const FQuat TargetRotation = RootMotionDeltaRot.IsZero()
 				? MoveComp->UpdatedComponent->GetComponentQuat()
 				: RootMotionDeltaRot.Quaternion() * MoveComp->UpdatedComponent->GetComponentQuat();
 
 			FHitResult MoveHit;
+			const FVector LocationBeforeMove = GetActorLocation();
 			MoveComp->SafeMoveUpdatedComponent(WorldDelta, TargetRotation, true, MoveHit);
 
 			if (DeltaSeconds > KINDA_SMALL_NUMBER)
 			{
-				LastUEFNSourceRootMotionVelocity = WorldDelta / DeltaSeconds;
+				const FVector ActualWorldDelta = GetActorLocation() - LocationBeforeMove;
+				LastUEFNSourceRootMotionVelocity = ActualWorldDelta / DeltaSeconds;
 				if (!LastUEFNSourceRootMotionVelocity.IsNearlyZero())
 				{
 					LastNonZeroUEFNSourceRootMotionVelocity = LastUEFNSourceRootMotionVelocity;
+				}
+
+				if (GGPActionInertiaDebug != 0)
+				{
+					UE_LOG(LogTemp, Warning, TEXT("[ActionRM][FallbackTick] Actor=%s Dt=%.4f Scale=%.3f Correction=%.3f RootDelta=%.1f WorldDelta=%.1f ActualDelta=%.1f ActualSpeed=%.1f"),
+						*GetName(),
+						DeltaSeconds,
+						RootMotionScaleRatio,
+						FallbackRootMotionDistanceCorrection,
+						RootMotionDeltaTranslation.Size2D(),
+						WorldDelta.Size2D(),
+						ActualWorldDelta.Size2D(),
+						LastUEFNSourceRootMotionVelocity.Size2D());
 				}
 			}
 		}
@@ -158,6 +181,8 @@ void AGP_PlayerCharacter::Tick(float DeltaSeconds)
 	}
 
 	UpdateConditionalMaxAcceleration(DeltaSeconds);
+	UpdateActionCarryVelocity(DeltaSeconds);
+	UpdateActionMotionTracking(DeltaSeconds);
 }
 
 UAnimInstance* AGP_PlayerCharacter::GetUEFNSourceAnimInstance() const
@@ -198,6 +223,239 @@ bool AGP_PlayerCharacter::IsPlayingUEFNSourceFallbackMontage() const
 		&& SourceAnimInstance->Montage_IsPlaying(ActiveUEFNSourceFallbackMontage);
 }
 
+void AGP_PlayerCharacter::SetActionRootMotionInputCancelEnabled(bool bEnabled)
+{
+	bActionRootMotionInputCancelEnabled = bEnabled;
+}
+
+void AGP_PlayerCharacter::BeginActionMotionTracking()
+{
+	bTrackActionMotion = true;
+	LastActionMotionSampleLocation = GetActorLocation();
+	LastActionMotionSampleTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
+	ActionMotionEntryVelocity = GetVelocity();
+	ActionMotionEntryVelocity.Z = 0.0f;
+	ActionMotionCarryVelocity = ActionMotionEntryVelocity;
+	LastActionCarryActualDelta = FVector::ZeroVector;
+	CurrentActionMotionVelocity = FVector::ZeroVector;
+	ActionMotionSamples.Reset();
+
+	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+	{
+		MoveComp->Velocity.X = 0.0f;
+		MoveComp->Velocity.Y = 0.0f;
+	}
+
+	if (GGPActionInertiaDebug != 0)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[ActionRM][Begin] Actor=%s EntrySpeed=%.1f Velocity=%s"),
+			*GetName(),
+			ActionMotionEntryVelocity.Size2D(),
+			*ActionMotionEntryVelocity.ToCompactString());
+	}
+}
+
+void AGP_PlayerCharacter::StopActionMotionTracking()
+{
+	bTrackActionMotion = false;
+	ActionMotionCarryVelocity = FVector::ZeroVector;
+	LastActionCarryActualDelta = FVector::ZeroVector;
+	CurrentActionMotionVelocity = FVector::ZeroVector;
+	ActionMotionSamples.Reset();
+}
+
+void AGP_PlayerCharacter::UpdateActionCarryVelocity(float DeltaSeconds)
+{
+	LastActionCarryActualDelta = FVector::ZeroVector;
+
+	if (!bTrackActionMotion || !bCarryEntryVelocityDuringActionRootMotion || DeltaSeconds < (1.0f / 240.0f))
+	{
+		return;
+	}
+
+	UCharacterMovementComponent* MoveComp = GetCharacterMovement();
+	if (!MoveComp || !MoveComp->UpdatedComponent || ActionMotionCarryVelocity.IsNearlyZero())
+	{
+		return;
+	}
+
+	const FVector CarryDelta = ActionMotionCarryVelocity * DeltaSeconds;
+	const FVector LocationBeforeMove = GetActorLocation();
+
+	FHitResult MoveHit;
+	MoveComp->SafeMoveUpdatedComponent(CarryDelta, MoveComp->UpdatedComponent->GetComponentQuat(), true, MoveHit);
+	LastActionCarryActualDelta = GetActorLocation() - LocationBeforeMove;
+	LastActionCarryActualDelta.Z = 0.0f;
+
+	const float CarrySpeed = ActionMotionCarryVelocity.Size2D();
+	const float CarryDeceleration = MoveComp->GetMaxBrakingDeceleration();
+	const float NewCarrySpeed = FMath::Max(CarrySpeed - CarryDeceleration * DeltaSeconds, 0.0f);
+	ActionMotionCarryVelocity = NewCarrySpeed > 0.0f
+		? ActionMotionCarryVelocity.GetSafeNormal2D() * NewCarrySpeed
+		: FVector::ZeroVector;
+
+	if (GGPActionInertiaDebug != 0)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[ActionRM][Carry] Actor=%s Fallback=%d Dt=%.4f EntrySpeed=%.1f CarrySpeed=%.1f CarryDelta=%.1f ActualDelta=%.1f"),
+			*GetName(),
+			IsPlayingUEFNSourceFallbackMontage() ? 1 : 0,
+			DeltaSeconds,
+			ActionMotionEntryVelocity.Size2D(),
+			CarrySpeed,
+			CarryDelta.Size2D(),
+			LastActionCarryActualDelta.Size2D());
+	}
+}
+
+void AGP_PlayerCharacter::UpdateActionMotionTracking(float DeltaSeconds)
+{
+	if (!bTrackActionMotion || DeltaSeconds < (1.0f / 240.0f))
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	const float CurrentTime = World ? World->GetTimeSeconds() : 0.0f;
+	const FVector CurrentLocation = GetActorLocation();
+	FVector Delta = CurrentLocation - LastActionMotionSampleLocation;
+	Delta.Z = 0.0f;
+	CurrentActionMotionVelocity = DeltaSeconds > KINDA_SMALL_NUMBER ? Delta / DeltaSeconds : FVector::ZeroVector;
+	const FVector EstimatedRootMotionDelta = Delta - LastActionCarryActualDelta;
+	LastActionMotionSampleLocation = CurrentLocation;
+	LastActionMotionSampleTime = CurrentTime;
+
+	FGPActionMotionSample Sample;
+	Sample.Delta = Delta;
+	Sample.DeltaSeconds = DeltaSeconds;
+	Sample.TimeSeconds = CurrentTime;
+	ActionMotionSamples.Add(Sample);
+
+	if (GGPActionInertiaDebug != 0)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[ActionRM][Sample] Actor=%s Fallback=%d Dt=%.4f TotalDelta=%.1f TotalSpeed=%.1f RMDelta=%.1f RMSpeed=%.1f CarryDelta=%.1f CarrySpeed=%.1f Samples=%d"),
+			*GetName(),
+			IsPlayingUEFNSourceFallbackMontage() ? 1 : 0,
+			DeltaSeconds,
+			Delta.Size2D(),
+			Delta.Size2D() / DeltaSeconds,
+			EstimatedRootMotionDelta.Size2D(),
+			EstimatedRootMotionDelta.Size2D() / DeltaSeconds,
+			LastActionCarryActualDelta.Size2D(),
+			LastActionCarryActualDelta.Size2D() / DeltaSeconds,
+			ActionMotionSamples.Num());
+	}
+
+	const float OldestAllowedTime = CurrentTime - FMath::Max(ActionInertiaSampleWindow, 0.02f);
+	while (!ActionMotionSamples.IsEmpty() && ActionMotionSamples[0].TimeSeconds < OldestAllowedTime)
+	{
+		ActionMotionSamples.RemoveAt(0, 1, EAllowShrinking::No);
+	}
+}
+
+void AGP_PlayerCharacter::FlushActionMotionTracking()
+{
+	if (!bTrackActionMotion)
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	const float CurrentTime = World ? World->GetTimeSeconds() : 0.0f;
+	const float DeltaSeconds = CurrentTime - LastActionMotionSampleTime;
+	if (DeltaSeconds < (1.0f / 120.0f))
+	{
+		return;
+	}
+
+	UpdateActionMotionTracking(DeltaSeconds);
+}
+
+FVector AGP_PlayerCharacter::GetCurrentActionInertiaVelocity() const
+{
+	FVector TotalDelta = FVector::ZeroVector;
+	float TotalTime = 0.0f;
+
+	for (const FGPActionMotionSample& Sample : ActionMotionSamples)
+	{
+		TotalDelta += Sample.Delta;
+		TotalTime += Sample.DeltaSeconds;
+	}
+
+	if (TotalTime < ActionInertiaMinSampleTime)
+	{
+		return FVector::ZeroVector;
+	}
+
+	FVector SampledVelocity = TotalDelta / TotalTime;
+	SampledVelocity.Z = 0.0f;
+	return SampledVelocity;
+}
+
+void AGP_PlayerCharacter::ApplyCurrentActionInertia()
+{
+	FlushActionMotionTracking();
+	bTrackActionMotion = false;
+
+	if (!bApplyActionInertiaOnMontageComplete)
+	{
+		ActionMotionCarryVelocity = FVector::ZeroVector;
+		LastActionCarryActualDelta = FVector::ZeroVector;
+		CurrentActionMotionVelocity = FVector::ZeroVector;
+		ActionMotionSamples.Reset();
+		return;
+	}
+
+	UCharacterMovementComponent* MoveComp = GetCharacterMovement();
+	if (!MoveComp)
+	{
+		ActionMotionCarryVelocity = FVector::ZeroVector;
+		LastActionCarryActualDelta = FVector::ZeroVector;
+		CurrentActionMotionVelocity = FVector::ZeroVector;
+		ActionMotionSamples.Reset();
+		return;
+	}
+
+	FVector HandoffVelocity = ActionMotionCarryVelocity;
+	HandoffVelocity.Z = 0.0f;
+	const float HandoffSpeed = HandoffVelocity.Size2D();
+	if (HandoffSpeed < ActionInertiaMinSpeed)
+	{
+		if (GGPActionInertiaDebug != 0)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[ActionRM][ApplySkip] Actor=%s EntrySpeed=%.1f HandoffSpeed=%.1f Samples=%d"),
+				*GetName(),
+				ActionMotionEntryVelocity.Size2D(),
+				HandoffSpeed,
+				ActionMotionSamples.Num());
+		}
+		ActionMotionCarryVelocity = FVector::ZeroVector;
+		LastActionCarryActualDelta = FVector::ZeroVector;
+		CurrentActionMotionVelocity = FVector::ZeroVector;
+		ActionMotionSamples.Reset();
+		return;
+	}
+
+	if (ActionInertiaMaxSpeed > 0.0f && HandoffSpeed > ActionInertiaMaxSpeed)
+	{
+		HandoffVelocity = HandoffVelocity.GetSafeNormal2D() * ActionInertiaMaxSpeed;
+	}
+
+	MoveComp->Velocity = FVector(HandoffVelocity.X, HandoffVelocity.Y, MoveComp->Velocity.Z);
+	ActionMotionCarryVelocity = FVector::ZeroVector;
+	LastActionCarryActualDelta = FVector::ZeroVector;
+	CurrentActionMotionVelocity = FVector::ZeroVector;
+	if (GGPActionInertiaDebug != 0)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[ActionRM][Apply] Actor=%s EntrySpeed=%.1f HandoffSpeed=%.1f Handoff=%s Samples=%d"),
+			*GetName(),
+			ActionMotionEntryVelocity.Size2D(),
+			HandoffVelocity.Size2D(),
+			*HandoffVelocity.ToCompactString(),
+			ActionMotionSamples.Num());
+	}
+	ActionMotionSamples.Reset();
+}
+
 void AGP_PlayerCharacter::Landed(const FHitResult& Hit)
 {
 	Super::Landed(Hit);
@@ -210,7 +468,7 @@ void AGP_PlayerCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
 	DOREPLIFETIME_CONDITION(AGP_PlayerCharacter, bIsInWhiteVoid, COND_SkipOwner);
 }
 
-void AGP_PlayerCharacter::StopUEFNSourceFallbackMontage(float BlendOutTime, bool bApplyRootMotionInertia)
+void AGP_PlayerCharacter::StopUEFNSourceFallbackMontage(float BlendOutTime)
 {
 	UAnimInstance* SourceAnimInstance = GetUEFNSourceAnimInstance();
 	if (IsValid(SourceAnimInstance))
@@ -223,19 +481,8 @@ void AGP_PlayerCharacter::StopUEFNSourceFallbackMontage(float BlendOutTime, bool
 		SourceAnimInstance->Montage_Stop(BlendOutTime, nullptr);
 	}
 
-	if (bApplyRootMotionInertia)
-	{
-		if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
-		{
-			const FVector HandoffVelocity = LastNonZeroUEFNSourceRootMotionVelocity * FMath::Max(FallbackRootMotionInertiaScale, 0.0f);
-			if (HandoffVelocity.SizeSquared2D() >= FallbackRootMotionInertiaMinSpeed * FallbackRootMotionInertiaMinSpeed)
-			{
-				MoveComp->Velocity = HandoffVelocity;
-			}
-		}
-	}
-
 	bApplyUEFNSourceFallbackRootMotion = false;
+	bActionRootMotionInputCancelEnabled = false;
 	ActiveUEFNSourceFallbackMontage = nullptr;
 	LastNonZeroUEFNSourceRootMotionVelocity = FVector::ZeroVector;
 }
@@ -293,6 +540,15 @@ void AGP_PlayerCharacter::AddMovementInput(FVector WorldDirection, float ScaleVa
 	
 	if (!bForce && ASC && ASC->HasMatchingGameplayTag(GPTags::State::Status::Fixed))
 	{
+		if (bActionRootMotionInputCancelEnabled && FMath::Abs(ScaleValue) > KINDA_SMALL_NUMBER && !WorldDirection.IsNearlyZero())
+		{
+			bActionRootMotionInputCancelEnabled = false;
+			OnActionRootMotionCancelInput.Broadcast();
+			if (!ASC->HasMatchingGameplayTag(GPTags::State::Status::Fixed))
+			{
+				Super::AddMovementInput(WorldDirection, ScaleValue, bForce);
+			}
+		}
 		return; 
 	}
 	

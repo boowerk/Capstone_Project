@@ -186,6 +186,7 @@ void UGP_Skill_DashSlash::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 	bMovementControlUnlocked = false;
 	bHasAppliedAttackHit = false;
 	ClearExistingTasks();
+	PC->BeginActionMotionTracking();
 
 	WaitHitTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(this, GPTags::Event::Player::AttackHit);
 	if (WaitHitTask)
@@ -276,7 +277,15 @@ void UGP_Skill_DashSlash::EndAbility(const FGameplayAbilitySpecHandle Handle,
 
 	if (AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo()))
 	{
-		PC->StopUEFNSourceFallbackMontage(0.2f, !bWasCancelled);
+		if (!bWasCancelled)
+		{
+			PC->ApplyCurrentActionInertia();
+		}
+		else
+		{
+			PC->StopActionMotionTracking();
+		}
+		PC->StopUEFNSourceFallbackMontage(0.2f);
 	}
 
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);

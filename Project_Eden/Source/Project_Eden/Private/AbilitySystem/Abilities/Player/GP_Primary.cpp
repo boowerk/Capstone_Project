@@ -80,6 +80,7 @@ void UGP_Primary::StartComboSequence()
 	
 
 	ClearExistingTasks();
+	PC->BeginActionMotionTracking();
 
 	WaitHitTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(this, GPTags::Event::Player::AttackHit);
 	WaitHitTask->EventReceived.AddDynamic(this, &ThisClass::OnAttackHitEventReceived);
@@ -197,7 +198,15 @@ void UGP_Primary::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGam
 
 	if (AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo()))
 	{
-		PC->StopUEFNSourceFallbackMontage(0.2f, !bWasCancelled);
+		if (!bWasCancelled)
+		{
+			PC->ApplyCurrentActionInertia();
+		}
+		else
+		{
+			PC->StopActionMotionTracking();
+		}
+		PC->StopUEFNSourceFallbackMontage(0.2f);
 	}
 
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);

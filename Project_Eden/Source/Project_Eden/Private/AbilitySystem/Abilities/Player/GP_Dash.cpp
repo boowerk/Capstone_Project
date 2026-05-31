@@ -3,6 +3,7 @@
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
 #include "Animation/GP_AnimNotify_SendGameplayEvent.h"
+#include "Animation/AnimInstance.h"
 #include "Characters/GP_PlayerCharacter.h"
 #include "GameplayTags/GP_Tags.h"
 #include "Animation/PDA_CharacterAnimationSet.h"
@@ -72,6 +73,11 @@ void UGP_Dash::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FG
 		return;
 	}
 
+	if (!ActionRootMotionCancelInputHandle.IsValid())
+	{
+		ActionRootMotionCancelInputHandle = PC->OnActionRootMotionCancelInput.AddUObject(this, &ThisClass::OnActionRootMotionCancelInput);
+	}
+
 	// 애니메이션 세트 - 구르기(Dash) 몽타주
 	UAnimMontage* DashMontage = nullptr;
 	UAnimMontage* SourceDashMontage = nullptr;
@@ -102,6 +108,9 @@ void UGP_Dash::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FG
 		PC->SetActorRotation(DashDirection.Rotation());
 	}
 
+	PC->BeginActionMotionTracking();
+	ActiveDashMontage = DashMontage;
+
 	if (IsValid(DashMontage))
 	{
 		// 몽타주 실행 태스크 생성
@@ -123,6 +132,7 @@ void UGP_Dash::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FG
 	}
 	else
 	{
+		ActiveDashMontage = nullptr;
 		const float FallbackDuration = PC->PlayUEFNSourceFallbackMontage(SourceDashMontage, 1.0f);
 		if (FallbackDuration <= 0.0f)
 		{
@@ -145,21 +155,21 @@ void UGP_Dash::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FG
 				World->GetTimerManager().SetTimer(
 					FallbackActionEndTimerHandle,
 					this,
-					&ThisClass::OnMontageCompleted,
+					&ThisClass::OnFallbackActionEnd,
 					ActionEndTime,
 					false);
 			}
 		}
 	}
-	
-	UAbilityTask_WaitGameplayEvent* WaitEventTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(
-       this, GPTags::Event::Player::ActionEnd);
 
-    if (WaitEventTask)
-    {
-       WaitEventTask->EventReceived.AddDynamic(this, &ThisClass::OnDashActionEnd);
-       WaitEventTask->ReadyForActivation();
-    }
+	UAbilityTask_WaitGameplayEvent* WaitEventTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(
+		this, GPTags::Event::Player::ActionEnd);
+
+	if (WaitEventTask)
+	{
+		WaitEventTask->EventReceived.AddDynamic(this, &ThisClass::OnDashActionEnd);
+		WaitEventTask->ReadyForActivation();
+	}
 }
 
 void UGP_Dash::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
@@ -172,13 +182,53 @@ void UGP_Dash::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGamepl
 
 	if (AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo()))
 	{
-		PC->StopUEFNSourceFallbackMontage(0.2f, !bWasCancelled);
+		PC->SetActionRootMotionInputCancelEnabled(false);
+		if (ActionRootMotionCancelInputHandle.IsValid())
+		{
+			PC->OnActionRootMotionCancelInput.Remove(ActionRootMotionCancelInputHandle);
+			ActionRootMotionCancelInputHandle.Reset();
+		}
+
+		if (!bWasCancelled)
+		{
+			PC->ApplyCurrentActionInertia();
+		}
+		else
+		{
+			PC->StopActionMotionTracking();
+		}
+		PC->StopUEFNSourceFallbackMontage(0.2f);
+
+		if (IsValid(ActiveDashMontage))
+		{
+			if (UAnimInstance* AnimInstance = PC->GetMesh() ? PC->GetMesh()->GetAnimInstance() : nullptr)
+			{
+				AnimInstance->Montage_Stop(0.2f, ActiveDashMontage);
+			}
+		}
+		ActiveDashMontage = nullptr;
 	}
 
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }
 
 void UGP_Dash::OnDashActionEnd(FGameplayEventData Payload)
+{
+	if (AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo()))
+	{
+		PC->SetActionRootMotionInputCancelEnabled(true);
+	}
+}
+
+void UGP_Dash::OnFallbackActionEnd()
+{
+	if (AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo()))
+	{
+		PC->SetActionRootMotionInputCancelEnabled(true);
+	}
+}
+
+void UGP_Dash::OnActionRootMotionCancelInput()
 {
 	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 }

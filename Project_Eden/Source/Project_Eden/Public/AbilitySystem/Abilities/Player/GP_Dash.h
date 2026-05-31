@@ -5,6 +5,8 @@
 #include "TimerManager.h"
 #include "GP_Dash.generated.h"
 
+class UAnimMontage;
+
 UCLASS()
 class PROJECT_EDEN_API UGP_Dash : public UGP_GameplayAbility
 {
@@ -21,6 +23,11 @@ protected:
 	void OnDashActionEnd(FGameplayEventData Payload);
 
 	UFUNCTION()
+	void OnFallbackActionEnd();
+
+	void OnActionRootMotionCancelInput();
+
+	UFUNCTION()
 	void OnMontageCompleted();
 
 	UFUNCTION()
@@ -29,4 +36,6 @@ protected:
 private:
 	FTimerHandle FallbackMontageEndTimerHandle;
 	FTimerHandle FallbackActionEndTimerHandle;
+	FDelegateHandle ActionRootMotionCancelInputHandle;
+	TObjectPtr<UAnimMontage> ActiveDashMontage;
 };

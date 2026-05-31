@@ -166,10 +166,19 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		return;
 	}
 
-	const FVector WorldVelocity = Character->GetVelocity();
+	FVector WorldVelocity = Character->GetVelocity();
 	const FVector WorldAcceleration = MovementComponent->GetCurrentAcceleration();
 	const AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(Character);
 	const bool bCanUseRuntimePoseSearchChooser = PlayerCharacter && PlayerCharacter->GetUEFNSourceAnimInstance() == this;
+	if (bCanUseRuntimePoseSearchChooser && PlayerCharacter->IsPlayingUEFNSourceFallbackMontage())
+	{
+		const FVector ActionMotionVelocity = PlayerCharacter->GetCurrentActionMotionVelocity();
+		if (!ActionMotionVelocity.IsNearlyZero())
+		{
+			WorldVelocity.X = ActionMotionVelocity.X;
+			WorldVelocity.Y = ActionMotionVelocity.Y;
+		}
+	}
 	if (bCanUseRuntimePoseSearchChooser &&
 		(!PoseSearchChooser || PoseSearchChooser->GetPathName().Contains(DeprecatedPoseSearchChooserName)))
 	{
