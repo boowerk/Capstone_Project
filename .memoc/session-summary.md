@@ -10,21 +10,18 @@ tags:
   - memoc/state
 ---
 # Session Summary
-Last: 2026-05-31T00:00:00
+Last: 2026-05-31T05:00:00
 Replace, do not append. Keep <800B.
 History: worklog. Resume risks: 04-handoff.md.
 
 ## Status
-- Tech element flow works: PlayerState tech tag drives skill VFX and elemental damage/resistance.
-- `GP_TechSelectWidget` exists; test WBP/buttons work. Test controller opens it with raw `K`.
-- Added DA actor/VFX path: SkillData now has `SpawnActorClass`; element entries have `ProjectileVisualSystem`.
-- DA editor labels clarified: `Execution Actor Class`, `Impact Visual Actor Class`, `Active VFX Override`.
-
-## Changed
-- Projectile/AreaProjectile replicate `ProjectileVisualSystem` and expose `BP_OnProjectileVisualSystemChanged`.
-- ThrownBurst/MineBurst/NetTest/SplitShot prefer DA `SpawnActorClass`, then fallback to old GA class vars.
-- ThrownBurst/NetTest/SplitShot pass DA projectile VFX. ThrownBurst/MineBurst pass element impact actor.
+- Tech element drives skill VFX + elemental damage/resistance.
+- `GP_TechSelectWidget` test WBP works; test controller opens with raw `K`.
+- SkillData has DA-driven `Execution Actor Class`, impact visual, active VFX.
+- `UGP_SkillAugmentData` added as augment DA shell: target skill tags, granted element, modifiers, visual overrides.
 
 ## Open Tasks
-- Rebuild in editor/VS, fill DA `SpawnActorClass`/projectile VFX, implement BP event to set Niagara asset.
+- Rebuild in editor/VS.
+- Fill DA actor/VFX for ThrownBurst/SplitShot/MineBurst.
+- Connect augment DA to runtime selection/damage later.
 - Later replace raw `K` with Enhanced Input `IA_ToggleTechSelect`.

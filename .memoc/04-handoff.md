@@ -31,6 +31,12 @@ Last synced: 2026-05-26T20:45:00
 - `ThrownBurst`, `MineBurst`, `NetTestProjectile`, and `SplitShot` read spawn actors from SkillData first.
 - `ThrownBurst`, `NetTestProjectile`, and `SplitShot` pass projectile VFX from SkillData; `MineBurst` has no projectile VFX use yet.
 
+## Skill Augment Handoff
+
+- `UGP_SkillAugmentData` was added as a data-only shell.
+- Fields cover display info, `TargetSkillTags`, optional `GrantedElementTag`, numeric modifiers, `ImpactVisualActorOverride`, and `ActiveVFXOverride`.
+- No runtime system reads it yet. Next pass should decide where selected augments live (PlayerState/ASC/run state) and how modifiers merge into SkillData damage/cooldown/radius/projectile count.
+
 ## What Changed
 
 - Created `/Game/Characters/PlayerCharacter/ABP_UEFNSource_Player` for the UEFN mannequin skeleton.
