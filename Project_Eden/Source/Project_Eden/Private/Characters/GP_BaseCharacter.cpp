@@ -110,20 +110,20 @@ void AGP_BaseCharacter::MulticastShowDamageNumber_Implementation(int32 DamageAmo
 	SpawnDamageNumberActor(DamageAmount, Element);
 }
 
-void AGP_BaseCharacter::ShowSkillVisualActor(TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation)
+void AGP_BaseCharacter::ShowSkillVisualActor(TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation, float ScaleMultiplier)
 {
 	if (HasAuthority())
 	{
-		MulticastSpawnSkillVisualActor(VisualActorClass, Location, Rotation);
+		MulticastSpawnSkillVisualActor(VisualActorClass, Location, Rotation, ScaleMultiplier);
 		return;
 	}
 
-	SpawnSkillVisualActor(VisualActorClass, Location, Rotation);
+	SpawnSkillVisualActor(VisualActorClass, Location, Rotation, ScaleMultiplier);
 }
 
-void AGP_BaseCharacter::MulticastSpawnSkillVisualActor_Implementation(TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation)
+void AGP_BaseCharacter::MulticastSpawnSkillVisualActor_Implementation(TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation, float ScaleMultiplier)
 {
-	SpawnSkillVisualActor(VisualActorClass, Location, Rotation);
+	SpawnSkillVisualActor(VisualActorClass, Location, Rotation, ScaleMultiplier);
 }
 
 void AGP_BaseCharacter::SpawnDamageNumberActor(int32 DamageAmount, EWeaponElement Element)
@@ -151,7 +151,7 @@ void AGP_BaseCharacter::SpawnDamageNumberActor(int32 DamageAmount, EWeaponElemen
 	DamageNumberActor->InitializeDamageNumber(DamageAmount, Element);
 }
 
-void AGP_BaseCharacter::SpawnSkillVisualActor(TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation)
+void AGP_BaseCharacter::SpawnSkillVisualActor(TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation, float ScaleMultiplier)
 {
 	if (!IsValid(GetWorld()) || !VisualActorClass)
 	{
@@ -163,12 +163,17 @@ void AGP_BaseCharacter::SpawnSkillVisualActor(TSubclassOf<AActor> VisualActorCla
 	SpawnParams.Instigator = this;
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
-	GetWorld()->SpawnActor<AActor>(
+	AActor* VisualActor = GetWorld()->SpawnActor<AActor>(
 		VisualActorClass,
 		Location,
 		Rotation,
 		SpawnParams
 	);
+
+	if (IsValid(VisualActor))
+	{
+		VisualActor->SetActorScale3D(FVector(ScaleMultiplier));
+	}
 }
 
 void AGP_BaseCharacter::BindAttributeDelegates(UAbilitySystemComponent* ASC, UAttributeSet* AS)

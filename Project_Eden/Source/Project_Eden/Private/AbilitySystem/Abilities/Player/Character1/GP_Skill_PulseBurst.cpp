@@ -31,10 +31,17 @@ void UGP_Skill_PulseBurst::ActivateAbility(const FGameplayAbilitySpecHandle Hand
 	{
 		UGP_SkillData* SkillData = GetSkillDataFromSpec(Handle, ActorInfo);
 		const FGameplayTag TechElementTag = GetCurrentTechElementTag(ActorInfo);
-		const float FinalBurstRadius = BurstRadius * GetSkillAugmentRadiusMultiplier(SkillData, ActorInfo);
+		const float RadiusMultiplier = GetSkillAugmentRadiusMultiplier(SkillData, ActorInfo);
+		const float FinalBurstRadius = BurstRadius * RadiusMultiplier;
 
 		const FVector BurstLocation = Avatar->GetActorLocation();
-		SpawnVisualActor(Avatar, GetSkillVisualActorClass(SkillData, BurstVisualActorClass, TechElementTag), BurstLocation);
+		SpawnVisualActor(
+			Avatar,
+			GetSkillVisualActorClass(SkillData, BurstVisualActorClass, TechElementTag),
+			BurstLocation,
+			FRotator::ZeroRotator,
+			RadiusMultiplier
+		);
 
 		const TArray<AActor*> HitActors = UGP_BlueprintLibrary::SphereOverlapActorsAtLocation(
 			Avatar,

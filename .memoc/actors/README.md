@@ -2,8 +2,8 @@
 memoc: true
 type: actor
 scope: project-memory
-created: 2026-05-25T11:50:28
-updated: 2026-05-25T11:50:28
+created: 2026-05-31T09:28:42
+updated: 2026-05-31T09:28:42
 status: active
 tags:
   - memoc
@@ -25,5 +25,6 @@ Generated actor index for this shared repo.
 
 ## Actors
 
+- [douyun0623](douyun0623.md)
 - [dyk66](dyk66.md)
 - [lim](lim.md)

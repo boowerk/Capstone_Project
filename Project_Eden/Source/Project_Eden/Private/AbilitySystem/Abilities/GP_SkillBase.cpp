@@ -198,7 +198,7 @@ UNiagaraSystem* UGP_SkillBase::GetProjectileVisualSystem(const UGP_SkillData* Sk
 	return nullptr;
 }
 
-void UGP_SkillBase::SpawnVisualActor(AActor* InstigatorActor, TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation) const
+void UGP_SkillBase::SpawnVisualActor(AActor* InstigatorActor, TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation, float ScaleMultiplier) const
 {
 	if (!IsValid(InstigatorActor) || !VisualActorClass || !InstigatorActor->GetWorld())
 	{
@@ -207,7 +207,7 @@ void UGP_SkillBase::SpawnVisualActor(AActor* InstigatorActor, TSubclassOf<AActor
 
 	if (AGP_BaseCharacter* BaseCharacter = Cast<AGP_BaseCharacter>(InstigatorActor))
 	{
-		BaseCharacter->ShowSkillVisualActor(VisualActorClass, Location, Rotation);
+		BaseCharacter->ShowSkillVisualActor(VisualActorClass, Location, Rotation, ScaleMultiplier);
 		return;
 	}
 
@@ -216,12 +216,17 @@ void UGP_SkillBase::SpawnVisualActor(AActor* InstigatorActor, TSubclassOf<AActor
 	SpawnParams.Instigator = Cast<APawn>(InstigatorActor);
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
-	InstigatorActor->GetWorld()->SpawnActor<AActor>(
+	AActor* SpawnedActor = InstigatorActor->GetWorld()->SpawnActor<AActor>(
 		VisualActorClass,
 		Location,
 		Rotation,
 		SpawnParams
 	);
+
+	if (IsValid(SpawnedActor))
+	{
+		SpawnedActor->SetActorScale3D(FVector(ScaleMultiplier));
+	}
 }
 
 void UGP_SkillBase::PerformAreaAttack()

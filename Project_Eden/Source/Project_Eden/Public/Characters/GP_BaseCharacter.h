@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "CoreMinimal.h"
 #include "AbilitySystemInterface.h"
 #include "GameFramework/Character.h"
@@ -29,7 +29,7 @@ public:
 	virtual UAttributeSet* GetAttributeSet() const { return nullptr; }
 	
 	void ShowDamageNumber(int32 DamageAmount, EWeaponElement Element);
-	void ShowSkillVisualActor(TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation);
+	void ShowSkillVisualActor(TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation, float ScaleMultiplier = 1.0f);
 
 	/** 캐릭터의 외형과 애니메이션을 결정하는 데이터 에셋 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation")
@@ -53,10 +53,10 @@ protected:
 	void MulticastShowDamageNumber(int32 DamageAmount, EWeaponElement Element);
 
 	UFUNCTION(NetMulticast, Reliable)
-	void MulticastSpawnSkillVisualActor(TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation);
+	void MulticastSpawnSkillVisualActor(TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation, float ScaleMultiplier);
 
 	void SpawnDamageNumberActor(int32 DamageAmount, EWeaponElement Element);
-	void SpawnSkillVisualActor(TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation);
+	void SpawnSkillVisualActor(TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation, float ScaleMultiplier);
 	
 	// ASC가 초기화되었을 때 AttributeSet의 델리게이트를 구독할 함수
 	UFUNCTION()

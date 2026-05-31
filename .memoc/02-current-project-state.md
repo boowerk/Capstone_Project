@@ -21,7 +21,7 @@ Last synced: 2026-05-23T00:00:00
 - `AGP_PlayerState` now keeps replicated `SelectedSkillAugments`; `AddSkillAugment` adds an augment on the server and applies `GrantedElementTag` into `CurrentTechElementTag` when present.
 - `AGP_PlayerState::GetSkillAugmentDamageMultiplier` multiplies selected augments whose `TargetSkillTags` exactly match a skill's `SkillIdTag`; `UGP_BlueprintLibrary::ApplyGameplayEffectToActors` applies that multiplier to SkillData base and base spell damage SetByCaller values.
 - User verified a test PulseBurst augment with `DamageMultiplier = 2.0` produces double damage after filling skill id tags in SkillData assets.
-- `AGP_PlayerState::GetSkillAugmentRadiusMultiplier` now multiplies matching augments' `RadiusMultiplier`; `UGP_Skill_PulseBurst` applies it to its overlap radius.
+- `AGP_PlayerState::GetSkillAugmentRadiusMultiplier` now multiplies matching augments' `RadiusMultiplier`; `UGP_Skill_PulseBurst` applies it to its overlap radius and VFX scale.
 - `BP_GP_PlayerCharacter` has a visible `UEFNSourceMesh` native skeletal mesh component attached above `CharacterMesh0`.
 - `UEFNSourceMesh` now uses `/Game/Characters/PlayerCharacter/ABP_UEFNSource_Player` as its AnimBP.
 - `CharacterMesh0` still uses `/Game/Asset/CharacterAction/MaskMan/ABP_MaskMan_Player` to retarget from the parent mesh.
@@ -59,15 +59,12 @@ Last synced: 2026-05-23T00:00:00
 ## Project Snapshot
 
 <!-- memoc:snapshot:start -->
-- Last synced: 2026-05-26T11:35:43
+- Last synced: 2026-05-31T06:04:44
 - Detected stack: Not detected
 
 ### Source Directories
 
 - `.claude`
-- `.dance-of-tal`
-- `.opencode`
-- `.vs`
 - `Project_Eden`
 <!-- memoc:snapshot:end -->
 
