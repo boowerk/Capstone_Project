@@ -6,9 +6,34 @@
 #include "Animation/PDA_CharacterAnimationSet.h"
 #include "Animation/GP_CharacterAnimInstance.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "DrawDebugHelpers.h"
+#include "Engine/Engine.h"
 #include "GameplayEffect.h"
 #include "GameplayTags/GP_Tags.h"
 #include "UObject/ConstructorHelpers.h"
+
+namespace
+{
+TSubclassOf<UGameplayEffect> LoadInitializeAttributesEffectFallback()
+{
+	// The Attribute folder path is the current GAS layout; the root path stays as a legacy fallback for older assets.
+	static const TCHAR* FallbackEffectPaths[] =
+	{
+		TEXT("/Game/GAS_Pattern/AbilitySystem/GameplayEffects/Attribute/GE_InitializeAttributes.GE_InitializeAttributes_C"),
+		TEXT("/Game/GAS_Pattern/AbilitySystem/GameplayEffects/GE_InitializeAttributes.GE_InitializeAttributes_C")
+	};
+
+	for (const TCHAR* EffectPath : FallbackEffectPaths)
+	{
+		if (TSubclassOf<UGameplayEffect> EffectClass = LoadClass<UGameplayEffect>(nullptr, EffectPath))
+		{
+			return EffectClass;
+		}
+	}
+
+	return nullptr;
+}
+}
 
 AGP_BaseCharacter::AGP_BaseCharacter()
 {
@@ -19,10 +44,20 @@ AGP_BaseCharacter::AGP_BaseCharacter()
 	DamageNumberActorClass = AGP_DamageNumberActor::StaticClass();
 
 	// BP에서 초기화 GE를 빼먹은 캐릭터가 PIE를 크래시내지 않도록 프로젝트 기본 Attribute GE를 잡아둡니다.
-	static ConstructorHelpers::FClassFinder<UGameplayEffect> DefaultInitializeAttributesEffectFinder(TEXT("/Game/GAS_Pattern/AbilitySystem/GameplayEffects/GE_InitializeAttributes"));
-	if (DefaultInitializeAttributesEffectFinder.Succeeded())
+	// Prefer the current Attribute GE path so enemies and bosses initialize through the same GAS fallback as their UI.
+	static ConstructorHelpers::FClassFinder<UGameplayEffect> AttributeInitializeAttributesEffectFinder(TEXT("/Game/GAS_Pattern/AbilitySystem/GameplayEffects/Attribute/GE_InitializeAttributes"));
+	if (AttributeInitializeAttributesEffectFinder.Succeeded())
 	{
-		InitializeAttributesEffect = DefaultInitializeAttributesEffectFinder.Class;
+		InitializeAttributesEffect = AttributeInitializeAttributesEffectFinder.Class;
+	}
+	else
+	{
+		// Legacy projects may still keep the initialization GE in the old root gameplay effects folder.
+		static ConstructorHelpers::FClassFinder<UGameplayEffect> LegacyInitializeAttributesEffectFinder(TEXT("/Game/GAS_Pattern/AbilitySystem/GameplayEffects/GE_InitializeAttributes"));
+		if (LegacyInitializeAttributesEffectFinder.Succeeded())
+		{
+			InitializeAttributesEffect = LegacyInitializeAttributesEffectFinder.Class;
+		}
 	}
 
 	OnASCInitialized.AddDynamic(this, &ThisClass::BindAttributeDelegates);
@@ -75,7 +110,7 @@ void AGP_BaseCharacter::GiveStartupAbilities()
 
 void AGP_BaseCharacter::InitializeAttributes() const
 {
-	TSubclassOf<UGameplayEffect> EffectClassToApply = InitializeAttributesEffect;
+	TSubclassOf<UGameplayEffect> EffectClassToApply = ResolveInitializeAttributesEffect();
 	if (!IsValid(EffectClassToApply))
 	{
 		// 레거시/신규 BP가 기본값을 못 받은 경우에도 한 번 더 로드해 PIE 크래시를 막습니다.
@@ -90,7 +125,23 @@ void AGP_BaseCharacter::InitializeAttributes() const
 
 	FGameplayEffectContextHandle ContextHandle = GetAbilitySystemComponent()->MakeEffectContext();
 	FGameplayEffectSpecHandle SpecHandle = GetAbilitySystemComponent()->MakeOutgoingSpec(EffectClassToApply, 1.f, ContextHandle);
+	if (!SpecHandle.IsValid())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[Character] Failed to create initialize attribute GE spec: %s Effect=%s"), *GetNameSafe(this), *GetNameSafe(EffectClassToApply));
+		return;
+	}
+
 	GetAbilitySystemComponent()->ApplyGameplayEffectSpecToSelf(*SpecHandle.Data.Get());
+}
+
+TSubclassOf<UGameplayEffect> AGP_BaseCharacter::ResolveInitializeAttributesEffect() const
+{
+	if (IsValid(InitializeAttributesEffect))
+	{
+		return InitializeAttributesEffect;
+	}
+
+	return LoadInitializeAttributesEffectFallback();
 }
 
 void AGP_BaseCharacter::ShowDamageNumber(int32 DamageAmount, EWeaponElement Element)
@@ -110,20 +161,25 @@ void AGP_BaseCharacter::MulticastShowDamageNumber_Implementation(int32 DamageAmo
 	SpawnDamageNumberActor(DamageAmount, Element);
 }
 
-void AGP_BaseCharacter::ShowSkillVisualActor(TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation, float ScaleMultiplier)
+void AGP_BaseCharacter::ShowSkillVisualActor(TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation)
 {
 	if (HasAuthority())
 	{
-		MulticastSpawnSkillVisualActor(VisualActorClass, Location, Rotation, ScaleMultiplier);
+		MulticastSpawnSkillVisualActor(VisualActorClass, Location, Rotation);
 		return;
 	}
 
-	SpawnSkillVisualActor(VisualActorClass, Location, Rotation, ScaleMultiplier);
+	SpawnSkillVisualActor(VisualActorClass, Location, Rotation);
 }
 
-void AGP_BaseCharacter::MulticastSpawnSkillVisualActor_Implementation(TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation, float ScaleMultiplier)
+void AGP_BaseCharacter::MulticastSpawnSkillVisualActor_Implementation(TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation)
 {
-	SpawnSkillVisualActor(VisualActorClass, Location, Rotation, ScaleMultiplier);
+	SpawnSkillVisualActor(VisualActorClass, Location, Rotation);
+}
+
+void AGP_BaseCharacter::MulticastShowHealthDebug_Implementation(const FString& InstigatorName, float DamageAmount, float CurrentHealth, float MaxHealth, FGameplayTag ElementTag)
+{
+	ShowHealthDebugMessage(InstigatorName, DamageAmount, CurrentHealth, MaxHealth, ElementTag);
 }
 
 void AGP_BaseCharacter::SpawnDamageNumberActor(int32 DamageAmount, EWeaponElement Element)
@@ -151,7 +207,7 @@ void AGP_BaseCharacter::SpawnDamageNumberActor(int32 DamageAmount, EWeaponElemen
 	DamageNumberActor->InitializeDamageNumber(DamageAmount, Element);
 }
 
-void AGP_BaseCharacter::SpawnSkillVisualActor(TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation, float ScaleMultiplier)
+void AGP_BaseCharacter::SpawnSkillVisualActor(TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation)
 {
 	if (!IsValid(GetWorld()) || !VisualActorClass)
 	{
@@ -163,17 +219,40 @@ void AGP_BaseCharacter::SpawnSkillVisualActor(TSubclassOf<AActor> VisualActorCla
 	SpawnParams.Instigator = this;
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
-	AActor* VisualActor = GetWorld()->SpawnActor<AActor>(
+	GetWorld()->SpawnActor<AActor>(
 		VisualActorClass,
 		Location,
 		Rotation,
 		SpawnParams
 	);
+}
 
-	if (IsValid(VisualActor))
+void AGP_BaseCharacter::ShowHealthDebugMessage(const FString& InstigatorName, float DamageAmount, float CurrentHealth, float MaxHealth, FGameplayTag ElementTag) const
+{
+	if (!bDebugHealthChanges)
 	{
-		VisualActor->SetActorScale3D(FVector(ScaleMultiplier));
+		return;
 	}
+
+	const FString ElementName = ElementTag.IsValid() ? ElementTag.ToString() : TEXT("None");
+	const FString DebugMessage = FString::Printf(
+		TEXT("[HP Debug] %s took %.1f from %s | %.1f / %.1f | %s"),
+		*GetNameSafe(this),
+		DamageAmount,
+		*InstigatorName,
+		CurrentHealth,
+		MaxHealth,
+		*ElementName);
+
+	UE_LOG(LogTemp, Log, TEXT("%s"), *DebugMessage);
+
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(INDEX_NONE, DebugHealthMessageDuration, FColor::Red, DebugMessage);
+	}
+
+	// World-space text confirms the damaged actor even when several enemies are on screen.
+	DrawDebugString(GetWorld(), GetActorLocation() + DebugHealthTextOffset, DebugMessage, nullptr, FColor::Red, DebugHealthMessageDuration, true);
 }
 
 void AGP_BaseCharacter::BindAttributeDelegates(UAbilitySystemComponent* ASC, UAttributeSet* AS)
@@ -218,4 +297,19 @@ void AGP_BaseCharacter::HandleDamageTaken(AActor* InstigatorActor, AActor* Targe
 	}
 
 	ShowDamageNumber(FMath::RoundToInt(DamageAmount), ElementToShow);
+
+	if (bDebugHealthChanges)
+	{
+		const UGP_AttributeSet* GPAttributeSet = Cast<UGP_AttributeSet>(GetAttributeSet());
+		if (IsValid(GPAttributeSet))
+		{
+			// Pass server-confirmed values through multicast so client PIE windows see the same debug result.
+			MulticastShowHealthDebug(
+				GetNameSafe(InstigatorActor),
+				DamageAmount,
+				GPAttributeSet->GetHealth(),
+				GPAttributeSet->GetMaxHealth(),
+				ElementTag);
+		}
+	}
 }

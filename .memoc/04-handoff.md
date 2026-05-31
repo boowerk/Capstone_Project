@@ -15,34 +15,13 @@ Last synced: 2026-05-26T20:45:00
 
 ## Current Tech UI Handoff
 
+- Boss HUD fix in progress: `GP_PlayerHUDWidget` now binds boss ASC via `UGP_AttributeWidget` (`BossBar`/`BossHealthBar` name lookup) and `GP_PlayerController::RefreshBossHUD()` re-calls binding for the current boss so live/widget swaps can recover.
+- User created `/Game/UI/HUD/WBP_BossBar` from `UGP_AttributeWidget`; it was configured to Health/MaxHealth and placed as `WBP_PlayerHUDWidget.BossBar`. If editor Blueprint compile reports a stale `BossBar_ProgressBar_Deprecated` GUID ensure, recreate/delete that designer widget manually rather than continuing Python mutation.
 - Tech selection UI test path exists: `GP_TechSelectWidget` C++ parent + `WBP_TestTechSelect` child.
 - Widget buttons must keep exact names for auto-bind: `Button_Pyros`, `Button_Hydro`, `Button_Volt`, `Button_Aero`, `Button_Lux`, `Button_Chaos`, `Button_Brute`.
 - User made test PlayerController toggle widget with raw keyboard `K`; this works for now.
 - Later production pass: replace raw `K` event with Enhanced Input action `IA_ToggleTechSelect` and map it in the player input context.
 - Keep test PlayerController/GameMode separate from main BP to reduce team merge conflicts until feature is stable.
-
-## Projectile VFX Handoff
-
-- `UGP_SkillData` now has `SpawnActorClass`. Projectile-style GAs prefer this value and fallback to their old BP class variable when empty.
-- `FGP_ElementVisualActorEntry` now has `ProjectileVisualSystem` for one Niagara system per element entry.
-- `AGP_Projectile` and `AGP_AreaProjectile` replicate this system and call `BP_OnProjectileVisualSystemChanged`.
-- Projectile BPs must implement that BP event and set their Niagara component asset from the event parameter.
-- DA entries with no projectile VFX keep the existing BP/default visual because null visual systems are ignored.
-- `ThrownBurst`, `MineBurst`, `NetTestProjectile`, and `SplitShot` read spawn actors from SkillData first.
-- `ThrownBurst`, `NetTestProjectile`, and `SplitShot` pass projectile VFX from SkillData; `MineBurst` has no projectile VFX use yet.
-
-## Skill Augment Handoff
-
-- `UGP_SkillAugmentData` was added as a data-only shell.
-- Skill identity tags exist under `GPTags.Ability.Skill.Id.*`; `UGP_SkillData.SkillIdTag` should be filled per DA in editor.
-- `UGP_SkillAugmentData.TargetSkillTags` now filters to `GPTags.Ability.Skill.Id.*`.
-- Fields cover display info, `TargetSkillTags`, optional `GrantedElementTag`, numeric modifiers, `ImpactVisualActorOverride`, and `ActiveVFXOverride`.
-- `AGP_PlayerState` stores replicated `SelectedSkillAugments` and exposes `AddSkillAugment` / `ServerAddSkillAugment`.
-- Adding an augment with `GrantedElementTag` currently updates `CurrentTechElementTag`, so element augments can reuse the existing skill VFX/damage element path.
-- Damage multiplier is wired: matching selected augments (`TargetSkillTags` exact-match `SkillData.SkillIdTag`) multiply SkillData base/base spell damage in `UGP_BlueprintLibrary::ApplyGameplayEffectToActors`.
-- User verified damage multiplier path with `DA_Augment_Test_PulseDamage` at `DamageMultiplier = 2.0`.
-- Radius multiplier is partially wired: matching selected augments multiply PulseBurst overlap radius through `UGP_SkillBase::GetSkillAugmentRadiusMultiplier`.
-- Cooldown/range/projectile count modifiers are still not wired. Other radius-based skills still need their own final-radius pass.
 
 ## What Changed
 
@@ -82,6 +61,7 @@ Last synced: 2026-05-26T20:45:00
 
 ## Blockers
 
+- Latest Live Coding attempt after the final boss-binding idempotency edit is stuck in UBA `Low on memory` retry logs, not a C++ syntax error. Per user preference, ask for editor rebuild/restart instead of forcing another UBT build.
 - Directly injecting a new `AnimGraphNode_ChooserPlayer` into `ABP_UEFNSource_Player` through tooling caused an editor crash; avoid blind graph-node creation in the production AnimBP.
 - `MovementDirection_Recent` was not reliably visible in the chooser UI during authoring. The first custom `Run` chooser pass may omit or duplicate that column until the variable is exposed cleanly.
 
@@ -118,6 +98,9 @@ _None yet._
 
 ## Not Verified
 
+- 2026-05-30 DashSlash skill PIE/runtime behavior: verify `GA_Skill_DashSlash` plays MaskMan target sword dash montage when present, otherwise UEFN source fallback, applies one forward box hit on `AttackHit`, and ends/clears `Fixed` on `ActionEnd` or montage completion.
+- 2026-05-29 MM debug source logging: user will verify via Live Coding; expected result is cyan/green `UEFNSource` log showing current DB, applied DB, validity, and selected animation.
+- 2026-05-29 idle-to-short-walk fix in `UGP_CharacterAnimInstance`: user will verify via Live Coding; expected result is no idle-pose foot slide before start/loop motion appears on short taps.
 - PIE/runtime playback against the new `CHT_MM_MaskMan_Root`.
 - Whether `MovementDirection_Recent` can be exposed cleanly enough to use distinctly from `MovementDirection` in the new `Run` chooser.
 - PIE validation of `SourceRootMotionTranslationYawOffset = -90` on `AM_UEFN_Roll_RM`; if movement flips left instead, set the PDA value to `90`, and if the asset is already authored in UE forward axis set it to `0`.
