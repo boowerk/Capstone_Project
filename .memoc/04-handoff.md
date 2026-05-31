@@ -20,6 +20,8 @@ Last synced: 2026-05-26T20:45:00
 - PulseBurst/GroundBurst apply radius multiplier directly to overlap radius.
 - PulseBurst/GroundBurst pass the same multiplier to spawned visual actor scale.
 - MineBurst/ThrownBurst apply radius multiplier to spawned `AGP_MineBurstActor` / `AGP_AreaProjectile` via `ApplyExplosionRadiusMultiplier`; impact visual actor scale uses the same multiplier.
+- `AGP_PlayerState::GetSkillAugmentRangeMultiplier` and `UGP_SkillBase::GetSkillAugmentRangeMultiplier` are wired.
+- RangeMultiplier scales LineShock box length, ConeSlash candidate range/visual offset, GroundBurst target forward offset, and MineBurst place forward offset.
 - Verify in editor after compile: enable relevant debug radius and test matching augment DA per skill id.
 
 ## Current Tech UI Handoff

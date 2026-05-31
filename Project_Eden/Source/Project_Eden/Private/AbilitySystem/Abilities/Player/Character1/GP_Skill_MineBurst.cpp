@@ -34,6 +34,7 @@ void UGP_Skill_MineBurst::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 	{
 		const FGameplayTag TechElementTag = GetCurrentTechElementTag(ActorInfo);
 		const float RadiusMultiplier = GetSkillAugmentRadiusMultiplier(SkillData, ActorInfo);
+		const float RangeMultiplier = GetSkillAugmentRangeMultiplier(SkillData, ActorInfo);
 
 		FRotator AimRotation = Avatar->GetActorRotation();
 		if (AController* Controller = Avatar->GetController())
@@ -44,7 +45,7 @@ void UGP_Skill_MineBurst::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 		AimRotation.Pitch = 0.f;
 		AimRotation.Roll = 0.f;
 
-		const FVector TargetLocation = Avatar->GetActorLocation() + AimRotation.Vector() * PlaceForwardOffset;
+		const FVector TargetLocation = Avatar->GetActorLocation() + AimRotation.Vector() * (PlaceForwardOffset * RangeMultiplier);
 		const FVector TraceStart = TargetLocation + FVector::UpVector * TraceHeight;
 		const FVector TraceEnd = TargetLocation - FVector::UpVector * TraceDepth;
 

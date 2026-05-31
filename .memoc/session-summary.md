@@ -18,8 +18,9 @@ History: worklog. Resume risks: 04-handoff.md.
 - Augment `RadiusMultiplier` now has SkillBase helper.
 - PulseBurst/GroundBurst scale both overlap radius and spawned visual actor scale.
 - MineBurst/ThrownBurst pass radius multiplier into spawned Mine/AreaProjectile actors; impact visual actors use the same scale.
+- RangeMultiplier now affects LineShock/ConeSlash reach and GroundBurst/MineBurst target placement distance.
 - Re-added SkillBase spawn actor and active Niagara helpers required by DA-driven execution actor/VFX path.
 
 ## Verify
-- Radius growth verified by user. Latest `git diff --check` hit Git shell Win32 error 5, not a reported code issue.
+- Radius/VFX growth verified by user. Range pass: `git diff --check` passed with CRLF warnings only.
 - Unreal build not run.

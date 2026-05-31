@@ -33,6 +33,7 @@ void UGP_Skill_GroundBurst::ActivateAbility(const FGameplayAbilitySpecHandle Han
 		UGP_SkillData* SkillData = GetSkillDataFromSpec(Handle, ActorInfo);
 		const FGameplayTag TechElementTag = GetCurrentTechElementTag(ActorInfo);
 		const float RadiusMultiplier = GetSkillAugmentRadiusMultiplier(SkillData, ActorInfo);
+		const float RangeMultiplier = GetSkillAugmentRangeMultiplier(SkillData, ActorInfo);
 		const float FinalBurstRadius = BurstRadius * RadiusMultiplier;
 
 		FRotator AimRotation = Avatar->GetActorRotation();
@@ -44,7 +45,7 @@ void UGP_Skill_GroundBurst::ActivateAbility(const FGameplayAbilitySpecHandle Han
 		AimRotation.Pitch = 0.f;
 		AimRotation.Roll = 0.f;
 
-		const FVector TargetLocation = Avatar->GetActorLocation() + AimRotation.Vector() * TargetForwardOffset;
+		const FVector TargetLocation = Avatar->GetActorLocation() + AimRotation.Vector() * (TargetForwardOffset * RangeMultiplier);
 		const FVector TraceStart = TargetLocation + FVector::UpVector * TraceHeight;
 		const FVector TraceEnd = TargetLocation - FVector::UpVector * TraceDepth;
 

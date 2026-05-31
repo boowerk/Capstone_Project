@@ -32,6 +32,8 @@ void UGP_Skill_ConeSlash::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 	{
 		UGP_SkillData* SkillData = GetSkillDataFromSpec(Handle, ActorInfo);
 		const FGameplayTag TechElementTag = GetCurrentTechElementTag(ActorInfo);
+		const float RangeMultiplier = GetSkillAugmentRangeMultiplier(SkillData, ActorInfo);
+		const float FinalRange = Range * RangeMultiplier;
 
 		FRotator AimRotation = Avatar->GetActorRotation();
 		if (AController* Controller = Avatar->GetController())
@@ -46,15 +48,15 @@ void UGP_Skill_ConeSlash::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 		const FVector Forward = AimRotation.Vector().GetSafeNormal2D();
 		const FVector VisualLocation =
 			Origin
-			+ Forward * VisualForwardOffset
+			+ Forward * (VisualForwardOffset * RangeMultiplier)
 			+ FVector::UpVector * VisualHeightOffset;
 
-		SpawnVisualActor(Avatar, GetSkillVisualActorClass(SkillData, SlashVisualActorClass, TechElementTag), VisualLocation, AimRotation);
+		SpawnVisualActor(Avatar, GetSkillVisualActorClass(SkillData, SlashVisualActorClass, TechElementTag), VisualLocation, AimRotation, RangeMultiplier);
 
 		const TArray<AActor*> CandidateActors = UGP_BlueprintLibrary::SphereOverlapActorsAtLocation(
 			Avatar,
 			Origin,
-			Range,
+			FinalRange,
 			Avatar,
 			bDrawDebugs
 		);

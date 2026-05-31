@@ -139,6 +139,27 @@ float AGP_PlayerState::GetSkillAugmentRadiusMultiplier(FGameplayTag SkillIdTag) 
 	return RadiusMultiplier;
 }
 
+float AGP_PlayerState::GetSkillAugmentRangeMultiplier(FGameplayTag SkillIdTag) const
+{
+	if (!SkillIdTag.IsValid())
+	{
+		return 1.0f;
+	}
+
+	float RangeMultiplier = 1.0f;
+	for (const UGP_SkillAugmentData* Augment : SelectedSkillAugments)
+	{
+		if (!IsValid(Augment) || !Augment->TargetSkillTags.HasTagExact(SkillIdTag))
+		{
+			continue;
+		}
+
+		RangeMultiplier *= FMath::Max(Augment->Modifiers.RangeMultiplier, 0.0f);
+	}
+
+	return RangeMultiplier;
+}
+
 void AGP_PlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
