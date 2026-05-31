@@ -97,6 +97,27 @@ TArray<UGP_SkillAugmentData*> AGP_PlayerState::GetSelectedSkillAugments() const
 	return Augments;
 }
 
+float AGP_PlayerState::GetSkillAugmentDamageMultiplier(FGameplayTag SkillIdTag) const
+{
+	if (!SkillIdTag.IsValid())
+	{
+		return 1.0f;
+	}
+
+	float DamageMultiplier = 1.0f;
+	for (const UGP_SkillAugmentData* Augment : SelectedSkillAugments)
+	{
+		if (!IsValid(Augment) || !Augment->TargetSkillTags.HasTagExact(SkillIdTag))
+		{
+			continue;
+		}
+
+		DamageMultiplier *= FMath::Max(Augment->Modifiers.DamageMultiplier, 0.0f);
+	}
+
+	return DamageMultiplier;
+}
+
 void AGP_PlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);

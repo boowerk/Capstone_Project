@@ -45,6 +45,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Tech|Augment")
 	TArray<UGP_SkillAugmentData*> GetSelectedSkillAugments() const;
 
+	UFUNCTION(BlueprintPure, Category = "Tech|Augment")
+	float GetSkillAugmentDamageMultiplier(FGameplayTag SkillIdTag) const;
+
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 private:

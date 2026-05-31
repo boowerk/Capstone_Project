@@ -10,18 +10,16 @@ tags:
   - memoc/state
 ---
 # Session Summary
-Last: 2026-05-31T05:45:00
+Last: 2026-05-31T06:20:00
 Replace, do not append. Keep <800B.
 History: worklog. Resume risks: 04-handoff.md.
 
 ## Status
-- Tech element drives VFX/damage.
-- SkillData has actor/VFX fields + `SkillIdTag` (`GPTags.Ability.Skill.Id.*`).
-- Augment DA shell exists; PlayerState replicates selected augments.
-- Augment `GrantedElementTag` applies current tech.
+- Tech drives VFX/damage.
+- SkillData has actor/VFX + `SkillIdTag`.
+- PlayerState replicates augments; granted element applies tech.
+- Matching augment `DamageMultiplier` scales base/base spell; user verified 2x damage.
 
 ## Open Tasks
-- Rebuild; fill each SkillData `SkillIdTag`.
-- Fill DA actor/VFX for ThrownBurst/SplitShot/MineBurst.
-- Connect augment modifiers.
-- Later replace raw `K` with Enhanced Input `IA_ToggleTechSelect`.
+- Fill DA VFX/actor; connect other modifiers.
+- Later replace raw `K` with Enhanced Input.

@@ -39,7 +39,9 @@ Last synced: 2026-05-26T20:45:00
 - Fields cover display info, `TargetSkillTags`, optional `GrantedElementTag`, numeric modifiers, `ImpactVisualActorOverride`, and `ActiveVFXOverride`.
 - `AGP_PlayerState` stores replicated `SelectedSkillAugments` and exposes `AddSkillAugment` / `ServerAddSkillAugment`.
 - Adding an augment with `GrantedElementTag` currently updates `CurrentTechElementTag`, so element augments can reuse the existing skill VFX/damage element path.
-- No runtime system reads numeric modifiers yet. Next pass should decide how modifiers merge into SkillData damage/cooldown/radius/projectile count.
+- Damage multiplier is wired: matching selected augments (`TargetSkillTags` exact-match `SkillData.SkillIdTag`) multiply SkillData base/base spell damage in `UGP_BlueprintLibrary::ApplyGameplayEffectToActors`.
+- User verified damage multiplier path with `DA_Augment_Test_PulseDamage` at `DamageMultiplier = 2.0`.
+- Cooldown/radius/range/projectile count modifiers are still not wired.
 
 ## What Changed
 
