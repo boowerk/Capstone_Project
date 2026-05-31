@@ -9,18 +9,18 @@
 class AActor;
 class UNiagaraSystem;
 
-USTRUCT(BlueprintType)
+USTRUCT(BlueprintType, meta = (DisplayName = "Element Visual Override"))
 struct FGP_ElementVisualActorEntry
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Visual", meta = (Categories = "GPTags.Tech.Element"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Visual", meta = (DisplayName = "Element", Categories = "GPTags.Tech.Element", DisplayPriority = "1"))
 	FGameplayTag ElementTag;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Visual", meta = (DisplayName = "Impact Visual Actor Class", ToolTip = "Element-specific visual actor spawned on impact, burst, or completion."))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Visual", meta = (DisplayName = "Impact Actor", ToolTip = "Element-specific visual actor spawned on impact, burst, or completion.", DisplayPriority = "2"))
 	TSubclassOf<AActor> VisualActorClass;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Visual", meta = (DisplayName = "Active VFX Override", ToolTip = "Element-specific Niagara override used by the spawned execution actor while active. If empty, the actor keeps its default VFX."))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Visual", meta = (DisplayName = "Active Niagara", ToolTip = "Element-specific Niagara override used by the spawned execution actor while active. If empty, the actor keeps its default VFX.", DisplayPriority = "3"))
 	TObjectPtr<UNiagaraSystem> ProjectileVisualSystem;
 };
 
@@ -56,7 +56,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Visual")
 	TSubclassOf<AActor> SkillVisualActorClass;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Visual", meta = (DisplayName = "Element Visual Overrides", ToolTip = "Element-specific visual overrides for impact visuals and active execution VFX."))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Visual", meta = (DisplayName = "Element Visual Overrides", TitleProperty = "ElementTag", ToolTip = "Element-specific visual overrides for impact visuals and active execution VFX."))
 	TArray<FGP_ElementVisualActorEntry> ElementVisualActorClasses;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Actor", meta = (DisplayName = "Execution Actor Class", ToolTip = "Actor spawned to execute this skill. Projectile, mine, field, trap, or other runtime actor. If empty, the ability fallback actor is used."))
