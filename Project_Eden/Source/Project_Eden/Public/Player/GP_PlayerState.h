@@ -48,6 +48,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Tech|Augment")
 	float GetSkillAugmentDamageMultiplier(FGameplayTag SkillIdTag) const;
 
+	UFUNCTION(BlueprintPure, Category = "Tech|Augment")
+	float GetSkillAugmentRadiusMultiplier(FGameplayTag SkillIdTag) const;
+
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 private:

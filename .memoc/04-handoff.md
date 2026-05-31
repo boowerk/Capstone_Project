@@ -41,7 +41,8 @@ Last synced: 2026-05-26T20:45:00
 - Adding an augment with `GrantedElementTag` currently updates `CurrentTechElementTag`, so element augments can reuse the existing skill VFX/damage element path.
 - Damage multiplier is wired: matching selected augments (`TargetSkillTags` exact-match `SkillData.SkillIdTag`) multiply SkillData base/base spell damage in `UGP_BlueprintLibrary::ApplyGameplayEffectToActors`.
 - User verified damage multiplier path with `DA_Augment_Test_PulseDamage` at `DamageMultiplier = 2.0`.
-- Cooldown/radius/range/projectile count modifiers are still not wired.
+- Radius multiplier is partially wired: matching selected augments multiply PulseBurst overlap radius through `UGP_SkillBase::GetSkillAugmentRadiusMultiplier`.
+- Cooldown/range/projectile count modifiers are still not wired. Other radius-based skills still need their own final-radius pass.
 
 ## What Changed
 

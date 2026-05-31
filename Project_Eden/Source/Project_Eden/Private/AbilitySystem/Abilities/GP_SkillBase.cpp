@@ -124,6 +124,31 @@ FGameplayTag UGP_SkillBase::GetCurrentTechElementTag(const FGameplayAbilityActor
 	return FGameplayTag();
 }
 
+float UGP_SkillBase::GetSkillAugmentRadiusMultiplier(const UGP_SkillData* SkillData, const FGameplayAbilityActorInfo* ActorInfo) const
+{
+	if (!SkillData || !SkillData->SkillIdTag.IsValid())
+	{
+		return 1.0f;
+	}
+
+	const AActor* OwnerActor = ActorInfo ? ActorInfo->OwnerActor.Get() : nullptr;
+	if (const AGP_PlayerState* PlayerState = Cast<AGP_PlayerState>(OwnerActor))
+	{
+		return PlayerState->GetSkillAugmentRadiusMultiplier(SkillData->SkillIdTag);
+	}
+
+	const APawn* AvatarPawn = ActorInfo ? Cast<APawn>(ActorInfo->AvatarActor.Get()) : nullptr;
+	if (AvatarPawn)
+	{
+		if (const AGP_PlayerState* PlayerState = AvatarPawn->GetPlayerState<AGP_PlayerState>())
+		{
+			return PlayerState->GetSkillAugmentRadiusMultiplier(SkillData->SkillIdTag);
+		}
+	}
+
+	return 1.0f;
+}
+
 TSubclassOf<AActor> UGP_SkillBase::GetSkillVisualActorClass(const UGP_SkillData* SkillData, TSubclassOf<AActor> FallbackVisualActorClass, FGameplayTag ElementTag) const
 {
 	if (SkillData && ElementTag.IsValid())

@@ -10,7 +10,7 @@ tags:
   - memoc/state
 ---
 # Session Summary
-Last: 2026-05-31T06:20:00
+Last: 2026-05-31T06:35:00
 Replace, do not append. Keep <800B.
 History: worklog. Resume risks: 04-handoff.md.
 
@@ -19,7 +19,8 @@ History: worklog. Resume risks: 04-handoff.md.
 - SkillData has actor/VFX + `SkillIdTag`.
 - PlayerState replicates augments; granted element applies tech.
 - Matching augment `DamageMultiplier` scales base/base spell; user verified 2x damage.
+- PulseBurst now applies matching augment `RadiusMultiplier` to overlap radius.
 
 ## Open Tasks
-- Fill DA VFX/actor; connect other modifiers.
+- Fill DA VFX/actor; connect range/projectile/cooldown modifiers.
 - Later replace raw `K` with Enhanced Input.
