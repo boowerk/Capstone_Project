@@ -10,7 +10,7 @@ tags:
   - memoc/state
 ---
 # Session Summary
-Last: 2026-05-28T20:13:00
+Last: 2026-05-31T00:00:00
 Replace, do not append. Keep <800B.
 History: worklog. Resume risks: 04-handoff.md.
 
@@ -18,6 +18,7 @@ History: worklog. Resume risks: 04-handoff.md.
 - Tech element flow works: PlayerState tech tag drives skill VFX and elemental damage/resistance.
 - `GP_TechSelectWidget` exists; test WBP/buttons work. Test controller opens it with raw `K`.
 - Added DA actor/VFX path: SkillData now has `SpawnActorClass`; element entries have `ProjectileVisualSystem`.
+- DA editor labels clarified: `Execution Actor Class`, `Impact Visual Actor Class`, `Active VFX Override`.
 
 ## Changed
 - Projectile/AreaProjectile replicate `ProjectileVisualSystem` and expose `BP_OnProjectileVisualSystemChanged`.
