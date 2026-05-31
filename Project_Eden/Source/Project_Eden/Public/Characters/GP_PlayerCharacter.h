@@ -95,6 +95,7 @@ public:
 	FVector GetLastUEFNSourceRootMotionVelocity() const { return LastUEFNSourceRootMotionVelocity; }
 	FVector GetCurrentActionMotionVelocity() const { return CurrentActionMotionVelocity; }
 	FVector GetActionMotionAnimVelocity() const;
+	bool IsUsingPostActionAnimVelocity() const;
 	void SetActionLowerBodyMotionMatchBlendEnabled(bool bEnabled);
 	bool ShouldBlendActionLowerBodyToMotionMatching() const { return bBlendActionLowerBodyToMotionMatching; }
 	FOnActionRootMotionCancelInput OnActionRootMotionCancelInput;

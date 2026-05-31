@@ -490,16 +490,33 @@ FVector AGP_PlayerCharacter::GetActionMotionAnimVelocity() const
 	return FVector::ZeroVector;
 }
 
+bool AGP_PlayerCharacter::IsUsingPostActionAnimVelocity() const
+{
+	const UWorld* World = GetWorld();
+	return World
+		&& World->GetTimeSeconds() <= HeldPostActionAnimVelocityUntilTime
+		&& !HeldPostActionAnimVelocity.IsNearlyZero();
+}
+
 void AGP_PlayerCharacter::ApplyCurrentActionInertia()
 {
 	FlushActionMotionTracking();
 	bTrackActionMotion = false;
 	const UWorld* World = GetWorld();
-	if (PostActionAnimVelocityHoldTime > 0.0f && !LastNonZeroActionMotionVelocity.IsNearlyZero())
+	const float CurrentTime = World ? World->GetTimeSeconds() : 0.0f;
+	const bool bHasRecentMoveInput =
+		World
+		&& FMath::Abs(LastActionRootMotionCancelMovementScale) > KINDA_SMALL_NUMBER
+		&& !LastActionRootMotionCancelMovementDirection.IsNearlyZero()
+		&& CurrentTime - LastActionRootMotionCancelMovementInputTime <= HeldMovementInputCancelGraceTime;
+	const bool bShouldHoldPostActionAnimVelocity =
+		bActionRootMotionCancelledByMovementInput || bHasRecentMoveInput;
+
+	if (bShouldHoldPostActionAnimVelocity && PostActionAnimVelocityHoldTime > 0.0f && !LastNonZeroActionMotionVelocity.IsNearlyZero())
 	{
 		HeldPostActionAnimVelocity = LastNonZeroActionMotionVelocity;
 		HeldPostActionAnimVelocity.Z = 0.0f;
-		HeldPostActionAnimVelocityUntilTime = World ? World->GetTimeSeconds() + PostActionAnimVelocityHoldTime : 0.0f;
+		HeldPostActionAnimVelocityUntilTime = World ? CurrentTime + PostActionAnimVelocityHoldTime : 0.0f;
 	}
 	else
 	{

@@ -423,7 +423,7 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		GeneratedTrajectory = MoveTemp(UpdatedTrajectory);
 		NormalizeTrajectoryForMovementScale(GeneratedTrajectory, MovementSpeedScaleRatio);
 	}
-	if (bCanUseRuntimePoseSearchChooser && !ActionMotionVelocity.IsNearlyZero())
+	if (bCanUseRuntimePoseSearchChooser && PlayerCharacter->IsUsingPostActionAnimVelocity())
 	{
 		FVector NormalizedActionMotionVelocity = ActionMotionVelocity;
 		NormalizedActionMotionVelocity.Z = 0.0f;
