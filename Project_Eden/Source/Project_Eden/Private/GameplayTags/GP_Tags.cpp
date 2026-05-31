@@ -37,6 +37,18 @@ namespace GPTags
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Slot01, "GPTags.Ability.Skill.Slot01", "스킬 슬롯 1");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Slot02, "GPTags.Ability.Skill.Slot02", "스킬 슬롯 2");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ultimate, "GPTags.Ability.Skill.Ultimate", "궁극기");
+            namespace Id
+            {
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(WaterPuddle, "GPTags.Ability.Skill.Id.WaterPuddle", "물웅덩이 스킬 식별 태그");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(NetTestProjectile, "GPTags.Ability.Skill.Id.NetTestProjectile", "테스트 프로젝타일 스킬 식별 태그");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(SplitShot, "GPTags.Ability.Skill.Id.SplitShot", "스플릿샷 스킬 식별 태그");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(GroundBurst, "GPTags.Ability.Skill.Id.GroundBurst", "그라운드 버스트 스킬 식별 태그");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(ThrownBurst, "GPTags.Ability.Skill.Id.ThrownBurst", "투척 버스트 스킬 식별 태그");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(PulseBurst, "GPTags.Ability.Skill.Id.PulseBurst", "펄스 버스트 스킬 식별 태그");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(LineShock, "GPTags.Ability.Skill.Id.LineShock", "라인 쇼크 스킬 식별 태그");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(MineBurst, "GPTags.Ability.Skill.Id.MineBurst", "마인 버스트 스킬 식별 태그");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(ConeSlash, "GPTags.Ability.Skill.Id.ConeSlash", "콘 슬래시 스킬 식별 태그");
+            }
         }
         namespace Enemy
         {

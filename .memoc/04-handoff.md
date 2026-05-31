@@ -34,6 +34,8 @@ Last synced: 2026-05-26T20:45:00
 ## Skill Augment Handoff
 
 - `UGP_SkillAugmentData` was added as a data-only shell.
+- Skill identity tags exist under `GPTags.Ability.Skill.Id.*`; `UGP_SkillData.SkillIdTag` should be filled per DA in editor.
+- `UGP_SkillAugmentData.TargetSkillTags` now filters to `GPTags.Ability.Skill.Id.*`.
 - Fields cover display info, `TargetSkillTags`, optional `GrantedElementTag`, numeric modifiers, `ImpactVisualActorOverride`, and `ActiveVFXOverride`.
 - `AGP_PlayerState` stores replicated `SelectedSkillAugments` and exposes `AddSkillAugment` / `ServerAddSkillAugment`.
 - Adding an augment with `GrantedElementTag` currently updates `CurrentTechElementTag`, so element augments can reuse the existing skill VFX/damage element path.

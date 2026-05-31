@@ -53,6 +53,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill")
 	TSubclassOf<UGameplayAbility> AbilityClass;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill", meta = (Categories = "GPTags.Ability.Skill.Id", ToolTip = "Stable skill identity tag used by augments, unlocks, stats, and other non-cooldown systems."))
+	FGameplayTag SkillIdTag;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Visual")
 	TSubclassOf<AActor> SkillVisualActorClass;
 

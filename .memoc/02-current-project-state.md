@@ -16,6 +16,7 @@ Last synced: 2026-05-23T00:00:00
 ## Current Status
 
 - SkillData DA now exposes execution/VFX fields with clearer editor labels: `Execution Actor Class`, `Impact Visual Actor Class`, and `Active VFX Override`; internal C++ names remain unchanged for BP/DA safety.
+- Skill identity tags now exist under `GPTags.Ability.Skill.Id.*`, and `UGP_SkillData` has `SkillIdTag` for augment/unlock/stat targeting separate from cooldown and slot tags.
 - `UGP_SkillAugmentData` exists as the first skill augment data shell. It stores target skill tags, optional granted tech element, numeric modifiers, and optional visual overrides, but is not wired into runtime selection or damage calculation yet.
 - `AGP_PlayerState` now keeps replicated `SelectedSkillAugments`; `AddSkillAugment` adds an augment on the server and applies `GrantedElementTag` into `CurrentTechElementTag` when present.
 - `BP_GP_PlayerCharacter` has a visible `UEFNSourceMesh` native skeletal mesh component attached above `CharacterMesh0`.

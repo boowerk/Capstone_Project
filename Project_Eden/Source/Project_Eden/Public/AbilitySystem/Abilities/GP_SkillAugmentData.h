@@ -48,7 +48,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Augment|Info")
 	TSoftObjectPtr<UTexture2D> AugmentIcon;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Augment|Target", meta = (Categories = "GPTags.Ability.Skill", ToolTip = "Skill tags this augment can affect. Empty means the selection system must decide validity another way."))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Augment|Target", meta = (Categories = "GPTags.Ability.Skill.Id", ToolTip = "Skill identity tags this augment can affect. Empty means the selection system must decide validity another way."))
 	FGameplayTagContainer TargetSkillTags;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Augment|Element", meta = (Categories = "GPTags.Tech.Element", ToolTip = "Element this augment grants or prefers. Empty means no element change."))
