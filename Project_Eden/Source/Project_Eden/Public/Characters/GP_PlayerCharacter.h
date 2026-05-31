@@ -130,6 +130,7 @@ private:
 	bool bApplyUEFNSourceFallbackRootMotion = false;
 	bool bActionRootMotionInputCancelEnabled = false;
 	bool bBlendActionLowerBodyToMotionMatching = false;
+	bool bActionRootMotionCancelledByMovementInput = false;
 	FVector LastActionRootMotionCancelMovementDirection = FVector::ZeroVector;
 	float LastActionRootMotionCancelMovementScale = 0.0f;
 	float LastActionRootMotionCancelMovementInputTime = 0.0f;

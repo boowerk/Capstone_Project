@@ -13,6 +13,35 @@ namespace
 const TCHAR* DefaultPoseSearchChooserPath = TEXT("/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/ChooserTables/CHT_MM_MaskMan_Root_OriginalStyle.CHT_MM_MaskMan_Root_OriginalStyle");
 const TCHAR* DeprecatedPoseSearchChooserName = TEXT("CHT_MM_MaskMan_Root.");
 
+void OverrideTrajectoryPrediction(FTransformTrajectory& Trajectory, const FVector& WorldVelocity)
+{
+	if (Trajectory.Samples.IsEmpty() || WorldVelocity.IsNearlyZero())
+	{
+		return;
+	}
+
+	int32 CurrentSampleIndex = 0;
+	float ClosestTimeToCurrent = TNumericLimits<float>::Max();
+	for (int32 SampleIndex = 0; SampleIndex < Trajectory.Samples.Num(); ++SampleIndex)
+	{
+		const float TimeDistance = FMath::Abs(Trajectory.Samples[SampleIndex].TimeInSeconds);
+		if (TimeDistance < ClosestTimeToCurrent)
+		{
+			ClosestTimeToCurrent = TimeDistance;
+			CurrentSampleIndex = SampleIndex;
+		}
+	}
+
+	const FVector CurrentPosition = Trajectory.Samples[CurrentSampleIndex].Position;
+	for (FTransformTrajectorySample& Sample : Trajectory.Samples)
+	{
+		if (Sample.TimeInSeconds > 0.0f)
+		{
+			Sample.Position = CurrentPosition + (WorldVelocity * Sample.TimeInSeconds);
+		}
+	}
+}
+
 E_MovementDirection ResolveMovementDirection(const FVector& LocalVelocityDirection)
 {
 	const FVector2D Direction2D(LocalVelocityDirection.X, LocalVelocityDirection.Y);
@@ -178,9 +207,13 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		DeltaSeconds,
 		LowerBodyBlendSpeed);
 
-	if (bCanUseRuntimePoseSearchChooser && (PlayerCharacter->IsPlayingUEFNSourceFallbackMontage() || !PlayerCharacter->GetActionMotionAnimVelocity().IsNearlyZero()))
+	FVector ActionMotionVelocity = FVector::ZeroVector;
+	if (bCanUseRuntimePoseSearchChooser)
 	{
-		const FVector ActionMotionVelocity = PlayerCharacter->GetActionMotionAnimVelocity();
+		ActionMotionVelocity = PlayerCharacter->GetActionMotionAnimVelocity();
+	}
+	if (bCanUseRuntimePoseSearchChooser && (PlayerCharacter->IsPlayingUEFNSourceFallbackMontage() || !ActionMotionVelocity.IsNearlyZero()))
+	{
 		if (!ActionMotionVelocity.IsNearlyZero())
 		{
 			WorldVelocity.X = ActionMotionVelocity.X;
@@ -389,6 +422,16 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 			TrajectoryPredictionCount);
 		GeneratedTrajectory = MoveTemp(UpdatedTrajectory);
 		NormalizeTrajectoryForMovementScale(GeneratedTrajectory, MovementSpeedScaleRatio);
+	}
+	if (bCanUseRuntimePoseSearchChooser && !ActionMotionVelocity.IsNearlyZero())
+	{
+		FVector NormalizedActionMotionVelocity = ActionMotionVelocity;
+		NormalizedActionMotionVelocity.Z = 0.0f;
+		OverrideTrajectoryPrediction(GeneratedTrajectory, NormalizedActionMotionVelocity / MovementSpeedScaleRatio);
+		UE_LOG(LogTemp, Warning, TEXT("[ActionRM][AnimTrajectory] Mesh=%s Speed=%.1f Samples=%d"),
+			*GetNameSafe(GetOwningComponent()),
+			NormalizedActionMotionVelocity.Size2D(),
+			GeneratedTrajectory.Samples.Num());
 	}
 
 	if (bCanUseRuntimePoseSearchChooser && PoseSearchChooser)

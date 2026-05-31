@@ -269,6 +269,7 @@ bool AGP_PlayerCharacter::RequestActionRootMotionCancelIfMovementHeld()
 		*LastActionRootMotionCancelMovementDirection.ToCompactString());
 
 	bActionRootMotionInputCancelEnabled = false;
+	bActionRootMotionCancelledByMovementInput = true;
 	OnActionRootMotionCancelInput.Broadcast();
 	return true;
 }
@@ -289,6 +290,7 @@ void AGP_PlayerCharacter::BeginActionMotionTracking()
 {
 	bTrackActionMotion = true;
 	bBlendActionLowerBodyToMotionMatching = false;
+	bActionRootMotionCancelledByMovementInput = false;
 	LastActionMotionSampleLocation = GetActorLocation();
 	LastActionMotionSampleTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
 	ActionMotionEntryVelocity = GetVelocity();
@@ -325,6 +327,7 @@ void AGP_PlayerCharacter::StopActionMotionTracking()
 		CurrentActionMotionVelocity.Size2D());
 	bTrackActionMotion = false;
 	bBlendActionLowerBodyToMotionMatching = false;
+	bActionRootMotionCancelledByMovementInput = false;
 	ActionMotionCarryVelocity = FVector::ZeroVector;
 	LastActionCarryActualDelta = FVector::ZeroVector;
 	CurrentActionMotionVelocity = FVector::ZeroVector;
@@ -510,6 +513,7 @@ void AGP_PlayerCharacter::ApplyCurrentActionInertia()
 		LastActionCarryActualDelta = FVector::ZeroVector;
 		CurrentActionMotionVelocity = FVector::ZeroVector;
 		LastNonZeroActionMotionVelocity = FVector::ZeroVector;
+		bActionRootMotionCancelledByMovementInput = false;
 		ActionMotionSamples.Reset();
 		return;
 	}
@@ -521,12 +525,33 @@ void AGP_PlayerCharacter::ApplyCurrentActionInertia()
 		LastActionCarryActualDelta = FVector::ZeroVector;
 		CurrentActionMotionVelocity = FVector::ZeroVector;
 		LastNonZeroActionMotionVelocity = FVector::ZeroVector;
+		bActionRootMotionCancelledByMovementInput = false;
 		ActionMotionSamples.Reset();
 		return;
 	}
 
 	FVector HandoffVelocity = ActionMotionCarryVelocity;
 	HandoffVelocity.Z = 0.0f;
+	if (bActionRootMotionCancelledByMovementInput && !LastActionRootMotionCancelMovementDirection.IsNearlyZero())
+	{
+		const float CarrySpeed = ActionMotionCarryVelocity.Size2D();
+		const float EntrySpeed = ActionMotionEntryVelocity.Size2D();
+		const float DesiredMoveSpeed = MoveComp->MaxWalkSpeed;
+		const float HandoffSeedSpeed = FMath::Max3(CarrySpeed, EntrySpeed, DesiredMoveSpeed);
+		HandoffVelocity = LastActionRootMotionCancelMovementDirection.GetSafeNormal2D() * HandoffSeedSpeed;
+		const UWorld* HandoffWorld = GetWorld();
+		HeldPostActionAnimVelocity = HandoffVelocity;
+		HeldPostActionAnimVelocity.Z = 0.0f;
+		HeldPostActionAnimVelocityUntilTime = HandoffWorld ? HandoffWorld->GetTimeSeconds() + PostActionAnimVelocityHoldTime : 0.0f;
+		UE_LOG(LogTemp, Warning, TEXT("[ActionRM][ApplyHeldInput] Actor=%s CarrySpeed=%.1f EntrySpeed=%.1f DesiredMoveSpeed=%.1f SeedSpeed=%.1f Dir=%s"),
+			*GetName(),
+			CarrySpeed,
+			EntrySpeed,
+			DesiredMoveSpeed,
+			HandoffSeedSpeed,
+			*LastActionRootMotionCancelMovementDirection.ToCompactString());
+	}
+
 	const float HandoffSpeed = HandoffVelocity.Size2D();
 	if (HandoffSpeed < ActionInertiaMinSpeed)
 	{
@@ -542,6 +567,7 @@ void AGP_PlayerCharacter::ApplyCurrentActionInertia()
 		LastActionCarryActualDelta = FVector::ZeroVector;
 		CurrentActionMotionVelocity = FVector::ZeroVector;
 		LastNonZeroActionMotionVelocity = FVector::ZeroVector;
+		bActionRootMotionCancelledByMovementInput = false;
 		ActionMotionSamples.Reset();
 		return;
 	}
@@ -556,6 +582,7 @@ void AGP_PlayerCharacter::ApplyCurrentActionInertia()
 	LastActionCarryActualDelta = FVector::ZeroVector;
 	CurrentActionMotionVelocity = FVector::ZeroVector;
 	LastNonZeroActionMotionVelocity = FVector::ZeroVector;
+	bActionRootMotionCancelledByMovementInput = false;
 	if (GGPActionInertiaDebug != 0)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("[ActionRM][Apply] Actor=%s EntrySpeed=%.1f HandoffSpeed=%.1f Handoff=%s Samples=%d"),
@@ -605,6 +632,7 @@ void AGP_PlayerCharacter::StopUEFNSourceFallbackMontage(float BlendOutTime)
 	bApplyUEFNSourceFallbackRootMotion = false;
 	bActionRootMotionInputCancelEnabled = false;
 	bBlendActionLowerBodyToMotionMatching = false;
+	bActionRootMotionCancelledByMovementInput = false;
 	ActiveUEFNSourceFallbackMontage = nullptr;
 	LastNonZeroUEFNSourceRootMotionVelocity = FVector::ZeroVector;
 }
