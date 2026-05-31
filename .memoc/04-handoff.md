@@ -109,6 +109,7 @@ _None yet._
 
 ## Not Verified
 
+- 2026-05-31 `UGP_AugmentSelectWidget`: create BP child, bind `Button_Augment0..2` and `TextBlock_Augment0..2`, feed three `UGP_SkillAugmentData` candidates with `SetCandidateAugments`, then verify click adds to `AGP_PlayerState::SelectedSkillAugments`.
 - 2026-05-30 DashSlash skill PIE/runtime behavior: verify `GA_Skill_DashSlash` plays MaskMan target sword dash montage when present, otherwise UEFN source fallback, applies one forward box hit on `AttackHit`, and ends/clears `Fixed` on `ActionEnd` or montage completion.
 - 2026-05-29 MM debug source logging: user will verify via Live Coding; expected result is cyan/green `UEFNSource` log showing current DB, applied DB, validity, and selected animation.
 - 2026-05-29 idle-to-short-walk fix in `UGP_CharacterAnimInstance`: user will verify via Live Coding; expected result is no idle-pose foot slide before start/loop motion appears on short taps.

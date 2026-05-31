@@ -15,6 +15,7 @@ Last synced: 2026-05-23T00:00:00
 
 ## Current Status
 
+- `UGP_AugmentSelectWidget` is a new C++ parent for a 3-candidate augment selection widget; BP children should bind `Button_Augment0..2` and `TextBlock_Augment0..2`.
 - Skill augment range scaling is wired for distance-style skills: `RangeMultiplier` affects LineShock length, ConeSlash hit range/visual offset, GroundBurst target distance, and MineBurst placement distance.
 - Skill augment radius scaling is wired for burst-family skills: SkillBase resolves matching `RadiusMultiplier`, PulseBurst/GroundBurst scale their overlap radius directly, and MineBurst/ThrownBurst pass the multiplier into spawned mine/area projectile actors.
 - Action root-motion movement is componentized as `authored/retargeted RM + shared carry`: target montages use their authored RM, source fallback montages use runtime-retarget consumed RM multiplied by `MovementSpeedScaleRatio`, and both add the same entry-velocity carry path. `BeginActionMotionTracking()` captures entry XY velocity then zeros CMC XY to avoid fallback double-consuming old movement velocity. Handoff applies remaining carry velocity only, not sampled RM+carry.
