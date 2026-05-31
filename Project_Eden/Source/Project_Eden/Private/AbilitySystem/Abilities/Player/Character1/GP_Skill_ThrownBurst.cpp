@@ -33,6 +33,7 @@ void UGP_Skill_ThrownBurst::ActivateAbility(const FGameplayAbilitySpecHandle Han
 	if (HasAuthority(&ActivationInfo))
 	{
 		const FGameplayTag TechElementTag = GetCurrentTechElementTag(ActorInfo);
+		const float RadiusMultiplier = GetSkillAugmentRadiusMultiplier(SkillData, ActorInfo);
 
 		FRotator SpawnRotation = Avatar->GetActorRotation();
 		if (AController* Controller = Avatar->GetController())
@@ -65,6 +66,7 @@ void UGP_Skill_ThrownBurst::ActivateAbility(const FGameplayAbilitySpecHandle Han
 			Projectile->SetSkillData(SkillData);
 			Projectile->SetImpactVisualActorClass(GetSkillVisualActorClass(SkillData, nullptr, TechElementTag));
 			Projectile->SetProjectileVisualSystem(GetProjectileVisualSystem(SkillData, TechElementTag));
+			Projectile->ApplyExplosionRadiusMultiplier(RadiusMultiplier);
 		}
 		else if (SpawnedActor)
 		{

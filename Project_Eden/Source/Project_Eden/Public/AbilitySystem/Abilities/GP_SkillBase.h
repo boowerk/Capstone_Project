@@ -7,6 +7,7 @@
 
 class AActor;
 class UGP_SkillData;
+class UNiagaraSystem;
 
 /**
  * 프로젝트 Eden의 모든 '스킬'들이 상속받을 베이스 클래스
@@ -50,8 +51,11 @@ protected:
 	void PerformAreaAttack();
 
 	FGameplayTag GetCurrentTechElementTag(const FGameplayAbilityActorInfo* ActorInfo) const;
+	float GetSkillAugmentRadiusMultiplier(const UGP_SkillData* SkillData, const FGameplayAbilityActorInfo* ActorInfo) const;
 	TSubclassOf<AActor> GetSkillVisualActorClass(const UGP_SkillData* SkillData, TSubclassOf<AActor> FallbackVisualActorClass, FGameplayTag ElementTag = FGameplayTag()) const;
-	void SpawnVisualActor(AActor* InstigatorActor, TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation = FRotator::ZeroRotator) const;
+	TSubclassOf<AActor> GetSkillSpawnActorClass(const UGP_SkillData* SkillData, TSubclassOf<AActor> FallbackActorClass) const;
+	UNiagaraSystem* GetProjectileVisualSystem(const UGP_SkillData* SkillData, FGameplayTag ElementTag = FGameplayTag()) const;
+	void SpawnVisualActor(AActor* InstigatorActor, TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation = FRotator::ZeroRotator, float VisualScale = 1.0f) const;
 
 	// 어빌리티 종료 시 호출할 정리 함수
 	UFUNCTION()

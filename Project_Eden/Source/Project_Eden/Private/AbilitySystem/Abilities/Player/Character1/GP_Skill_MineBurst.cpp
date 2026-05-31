@@ -33,6 +33,7 @@ void UGP_Skill_MineBurst::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 	if (HasAuthority(&ActivationInfo))
 	{
 		const FGameplayTag TechElementTag = GetCurrentTechElementTag(ActorInfo);
+		const float RadiusMultiplier = GetSkillAugmentRadiusMultiplier(SkillData, ActorInfo);
 
 		FRotator AimRotation = Avatar->GetActorRotation();
 		if (AController* Controller = Avatar->GetController())
@@ -78,6 +79,7 @@ void UGP_Skill_MineBurst::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 		{
 			MineActor->SetSkillData(SkillData);
 			MineActor->SetImpactVisualActorClass(GetSkillVisualActorClass(SkillData, nullptr, TechElementTag));
+			MineActor->ApplyExplosionRadiusMultiplier(RadiusMultiplier);
 		}
 		else if (SpawnedActor)
 		{

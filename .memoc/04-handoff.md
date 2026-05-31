@@ -13,6 +13,15 @@ tags:
 
 Last synced: 2026-05-26T20:45:00
 
+## Skill Augment Handoff
+
+- `AGP_PlayerState::GetSkillAugmentRadiusMultiplier` returns multiplied radius modifiers for selected augments exact-matching `SkillData.SkillIdTag`.
+- `UGP_SkillBase` exposes `GetSkillAugmentRadiusMultiplier`, `GetSkillSpawnActorClass`, and `GetProjectileVisualSystem`.
+- PulseBurst/GroundBurst apply radius multiplier directly to overlap radius.
+- PulseBurst/GroundBurst pass the same multiplier to spawned visual actor scale.
+- MineBurst/ThrownBurst apply radius multiplier to spawned `AGP_MineBurstActor` / `AGP_AreaProjectile` via `ApplyExplosionRadiusMultiplier`; impact visual actor scale uses the same multiplier.
+- Verify in editor after compile: enable relevant debug radius and test matching augment DA per skill id.
+
 ## Current Tech UI Handoff
 
 - Boss HUD fix in progress: `GP_PlayerHUDWidget` now binds boss ASC via `UGP_AttributeWidget` (`BossBar`/`BossHealthBar` name lookup) and `GP_PlayerController::RefreshBossHUD()` re-calls binding for the current boss so live/widget swaps can recover.

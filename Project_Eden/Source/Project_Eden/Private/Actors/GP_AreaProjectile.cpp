@@ -76,6 +76,13 @@ void AGP_AreaProjectile::SetProjectileVisualSystem(UNiagaraSystem* InProjectileV
 	BP_OnProjectileVisualSystemChanged(ProjectileVisualSystem);
 }
 
+void AGP_AreaProjectile::ApplyExplosionRadiusMultiplier(float RadiusMultiplier)
+{
+	const float SafeMultiplier = FMath::Max(RadiusMultiplier, 0.0f);
+	ExplosionRadius *= SafeMultiplier;
+	VisualScaleMultiplier *= SafeMultiplier;
+}
+
 void AGP_AreaProjectile::OnRep_ProjectileVisualSystem()
 {
 	if (ProjectileVisualSystem)
@@ -119,7 +126,7 @@ void AGP_AreaProjectile::Explode(const FVector& ImpactLocation)
 
 	bHasExploded = true;
 
-	MulticastSpawnImpactVisual(ImpactLocation, ImpactVisualActorClass);
+	MulticastSpawnImpactVisual(ImpactLocation, ImpactVisualActorClass, VisualScaleMultiplier);
 
 	if (AActor* InstigatorActor = GetInstigator())
 	{
@@ -137,7 +144,7 @@ void AGP_AreaProjectile::Explode(const FVector& ImpactLocation)
 	Destroy();
 }
 
-void AGP_AreaProjectile::MulticastSpawnImpactVisual_Implementation(const FVector& ImpactLocation, TSubclassOf<AActor> VisualActorClass)
+void AGP_AreaProjectile::MulticastSpawnImpactVisual_Implementation(const FVector& ImpactLocation, TSubclassOf<AActor> VisualActorClass, float VisualScale)
 {
 	if (!VisualActorClass)
 	{
@@ -149,10 +156,15 @@ void AGP_AreaProjectile::MulticastSpawnImpactVisual_Implementation(const FVector
 	SpawnParams.Instigator = GetInstigator();
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
-	GetWorld()->SpawnActor<AActor>(
+	AActor* VisualActor = GetWorld()->SpawnActor<AActor>(
 		VisualActorClass,
 		ImpactLocation,
 		FRotator::ZeroRotator,
 		SpawnParams
 	);
+
+	if (IsValid(VisualActor))
+	{
+		VisualActor->SetActorScale3D(FVector(FMath::Max(VisualScale, 0.0f)));
+	}
 }

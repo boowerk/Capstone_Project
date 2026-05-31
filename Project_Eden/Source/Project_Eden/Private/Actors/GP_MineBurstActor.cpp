@@ -59,6 +59,13 @@ void AGP_MineBurstActor::BeginPlay()
 	);
 }
 
+void AGP_MineBurstActor::ApplyExplosionRadiusMultiplier(float RadiusMultiplier)
+{
+	const float SafeMultiplier = FMath::Max(RadiusMultiplier, 0.0f);
+	ExplosionRadius *= SafeMultiplier;
+	VisualScaleMultiplier *= SafeMultiplier;
+}
+
 void AGP_MineBurstActor::OnTriggerOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
 	if (!HasAuthority())
@@ -106,7 +113,7 @@ void AGP_MineBurstActor::Explode()
 	bHasExploded = true;
 	const FVector ImpactLocation = GetActorLocation();
 
-	MulticastSpawnImpactVisual(ImpactLocation, ImpactVisualActorClass);
+	MulticastSpawnImpactVisual(ImpactLocation, ImpactVisualActorClass, VisualScaleMultiplier);
 
 	if (AActor* InstigatorActor = GetInstigator())
 	{
@@ -124,7 +131,7 @@ void AGP_MineBurstActor::Explode()
 	Destroy();
 }
 
-void AGP_MineBurstActor::MulticastSpawnImpactVisual_Implementation(const FVector& ImpactLocation, TSubclassOf<AActor> VisualActorClass)
+void AGP_MineBurstActor::MulticastSpawnImpactVisual_Implementation(const FVector& ImpactLocation, TSubclassOf<AActor> VisualActorClass, float VisualScale)
 {
 	if (!VisualActorClass)
 	{
@@ -136,10 +143,15 @@ void AGP_MineBurstActor::MulticastSpawnImpactVisual_Implementation(const FVector
 	SpawnParams.Instigator = GetInstigator();
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
-	GetWorld()->SpawnActor<AActor>(
+	AActor* VisualActor = GetWorld()->SpawnActor<AActor>(
 		VisualActorClass,
 		ImpactLocation,
 		FRotator::ZeroRotator,
 		SpawnParams
 	);
+
+	if (IsValid(VisualActor))
+	{
+		VisualActor->SetActorScale3D(FVector(FMath::Max(VisualScale, 0.0f)));
+	}
 }

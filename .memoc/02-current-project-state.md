@@ -15,6 +15,7 @@ Last synced: 2026-05-23T00:00:00
 
 ## Current Status
 
+- Skill augment radius scaling is wired for burst-family skills: SkillBase resolves matching `RadiusMultiplier`, PulseBurst/GroundBurst scale their overlap radius directly, and MineBurst/ThrownBurst pass the multiplier into spawned mine/area projectile actors.
 - Action root-motion movement is componentized as `authored/retargeted RM + shared carry`: target montages use their authored RM, source fallback montages use runtime-retarget consumed RM multiplied by `MovementSpeedScaleRatio`, and both add the same entry-velocity carry path. `BeginActionMotionTracking()` captures entry XY velocity then zeros CMC XY to avoid fallback double-consuming old movement velocity. Handoff applies remaining carry velocity only, not sampled RM+carry.
 - UEFNSource fallback montage debug/anim speed reads `AGP_PlayerCharacter::GetCurrentActionMotionVelocity()` during fallback playback because manual `SafeMoveUpdatedComponent` root motion is not reflected in `CharacterMovement->Velocity`.
 - Current roll RM source assets differ: `/Game/Characters/MaskMan/Animations/MaskMan_Roll_RM` root distance is ~593.9, while `/Game/Characters/UEFN_Mannequin/Animations/Montage/Roll/UEFN_Roll_RM` is ~465.5. With MaskMan `MovementSpeedScaleRatio=1.22`, fallback expected distance is ~568 before carry/collision.

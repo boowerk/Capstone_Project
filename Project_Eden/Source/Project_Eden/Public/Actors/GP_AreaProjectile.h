@@ -23,6 +23,7 @@ public:
 	void SetSkillData(UGP_SkillData* InSkillData) { SkillData = InSkillData; }
 	void SetImpactVisualActorClass(TSubclassOf<AActor> InImpactVisualActorClass) { ImpactVisualActorClass = InImpactVisualActorClass; }
 	void SetProjectileVisualSystem(UNiagaraSystem* InProjectileVisualSystem);
+	void ApplyExplosionRadiusMultiplier(float RadiusMultiplier);
 
 protected:
 	virtual void BeginPlay() override;
@@ -74,10 +75,13 @@ protected:
 	void OnProjectileOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 
 	UFUNCTION(NetMulticast, Reliable)
-	void MulticastSpawnImpactVisual(const FVector& ImpactLocation, TSubclassOf<AActor> VisualActorClass);
+	void MulticastSpawnImpactVisual(const FVector& ImpactLocation, TSubclassOf<AActor> VisualActorClass, float VisualScale);
 
 	void Explode(const FVector& ImpactLocation);
 
 	UPROPERTY(Transient)
 	bool bHasExploded = false;
+
+	UPROPERTY(Transient)
+	float VisualScaleMultiplier = 1.0f;
 };

@@ -124,6 +124,31 @@ FGameplayTag UGP_SkillBase::GetCurrentTechElementTag(const FGameplayAbilityActor
 	return FGameplayTag();
 }
 
+float UGP_SkillBase::GetSkillAugmentRadiusMultiplier(const UGP_SkillData* SkillData, const FGameplayAbilityActorInfo* ActorInfo) const
+{
+	if (!SkillData || !SkillData->SkillIdTag.IsValid())
+	{
+		return 1.0f;
+	}
+
+	const AActor* OwnerActor = ActorInfo ? ActorInfo->OwnerActor.Get() : nullptr;
+	if (const AGP_PlayerState* PlayerState = Cast<AGP_PlayerState>(OwnerActor))
+	{
+		return PlayerState->GetSkillAugmentRadiusMultiplier(SkillData->SkillIdTag);
+	}
+
+	const APawn* AvatarPawn = ActorInfo ? Cast<APawn>(ActorInfo->AvatarActor.Get()) : nullptr;
+	if (AvatarPawn)
+	{
+		if (const AGP_PlayerState* PlayerState = AvatarPawn->GetPlayerState<AGP_PlayerState>())
+		{
+			return PlayerState->GetSkillAugmentRadiusMultiplier(SkillData->SkillIdTag);
+		}
+	}
+
+	return 1.0f;
+}
+
 TSubclassOf<AActor> UGP_SkillBase::GetSkillVisualActorClass(const UGP_SkillData* SkillData, TSubclassOf<AActor> FallbackVisualActorClass, FGameplayTag ElementTag) const
 {
 	if (SkillData && ElementTag.IsValid())
@@ -145,7 +170,35 @@ TSubclassOf<AActor> UGP_SkillBase::GetSkillVisualActorClass(const UGP_SkillData*
 	return FallbackVisualActorClass;
 }
 
-void UGP_SkillBase::SpawnVisualActor(AActor* InstigatorActor, TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation) const
+TSubclassOf<AActor> UGP_SkillBase::GetSkillSpawnActorClass(const UGP_SkillData* SkillData, TSubclassOf<AActor> FallbackActorClass) const
+{
+	if (SkillData && SkillData->SpawnActorClass)
+	{
+		return SkillData->SpawnActorClass;
+	}
+
+	return FallbackActorClass;
+}
+
+UNiagaraSystem* UGP_SkillBase::GetProjectileVisualSystem(const UGP_SkillData* SkillData, FGameplayTag ElementTag) const
+{
+	if (!SkillData || !ElementTag.IsValid())
+	{
+		return nullptr;
+	}
+
+	for (const FGP_ElementVisualActorEntry& Entry : SkillData->ElementVisualActorClasses)
+	{
+		if (Entry.ElementTag.MatchesTagExact(ElementTag))
+		{
+			return Entry.ProjectileVisualSystem;
+		}
+	}
+
+	return nullptr;
+}
+
+void UGP_SkillBase::SpawnVisualActor(AActor* InstigatorActor, TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation, float VisualScale) const
 {
 	if (!IsValid(InstigatorActor) || !VisualActorClass || !InstigatorActor->GetWorld())
 	{
@@ -154,7 +207,7 @@ void UGP_SkillBase::SpawnVisualActor(AActor* InstigatorActor, TSubclassOf<AActor
 
 	if (AGP_BaseCharacter* BaseCharacter = Cast<AGP_BaseCharacter>(InstigatorActor))
 	{
-		BaseCharacter->ShowSkillVisualActor(VisualActorClass, Location, Rotation);
+		BaseCharacter->ShowSkillVisualActor(VisualActorClass, Location, Rotation, VisualScale);
 		return;
 	}
 
@@ -163,12 +216,17 @@ void UGP_SkillBase::SpawnVisualActor(AActor* InstigatorActor, TSubclassOf<AActor
 	SpawnParams.Instigator = Cast<APawn>(InstigatorActor);
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
-	InstigatorActor->GetWorld()->SpawnActor<AActor>(
+	AActor* VisualActor = InstigatorActor->GetWorld()->SpawnActor<AActor>(
 		VisualActorClass,
 		Location,
 		Rotation,
 		SpawnParams
 	);
+
+	if (IsValid(VisualActor))
+	{
+		VisualActor->SetActorScale3D(FVector(FMath::Max(VisualScale, 0.0f)));
+	}
 }
 
 void UGP_SkillBase::PerformAreaAttack()

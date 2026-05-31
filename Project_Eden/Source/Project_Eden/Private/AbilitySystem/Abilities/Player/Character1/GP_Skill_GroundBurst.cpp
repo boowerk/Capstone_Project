@@ -32,6 +32,8 @@ void UGP_Skill_GroundBurst::ActivateAbility(const FGameplayAbilitySpecHandle Han
 	{
 		UGP_SkillData* SkillData = GetSkillDataFromSpec(Handle, ActorInfo);
 		const FGameplayTag TechElementTag = GetCurrentTechElementTag(ActorInfo);
+		const float RadiusMultiplier = GetSkillAugmentRadiusMultiplier(SkillData, ActorInfo);
+		const float FinalBurstRadius = BurstRadius * RadiusMultiplier;
 
 		FRotator AimRotation = Avatar->GetActorRotation();
 		if (AController* Controller = Avatar->GetController())
@@ -59,12 +61,12 @@ void UGP_Skill_GroundBurst::ActivateAbility(const FGameplayAbilitySpecHandle Han
 		);
 
 		const FVector BurstLocation = bHitGround ? HitResult.Location : TargetLocation;
-		SpawnVisualActor(Avatar, GetSkillVisualActorClass(SkillData, BurstVisualActorClass, TechElementTag), BurstLocation);
+		SpawnVisualActor(Avatar, GetSkillVisualActorClass(SkillData, BurstVisualActorClass, TechElementTag), BurstLocation, FRotator::ZeroRotator, RadiusMultiplier);
 
 		const TArray<AActor*> HitActors = UGP_BlueprintLibrary::SphereOverlapActorsAtLocation(
 			Avatar,
 			BurstLocation,
-			BurstRadius,
+			FinalBurstRadius,
 			Avatar,
 			bDrawDebugs
 		);

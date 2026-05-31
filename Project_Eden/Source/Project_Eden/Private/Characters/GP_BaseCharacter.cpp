@@ -161,20 +161,20 @@ void AGP_BaseCharacter::MulticastShowDamageNumber_Implementation(int32 DamageAmo
 	SpawnDamageNumberActor(DamageAmount, Element);
 }
 
-void AGP_BaseCharacter::ShowSkillVisualActor(TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation)
+void AGP_BaseCharacter::ShowSkillVisualActor(TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation, float VisualScale)
 {
 	if (HasAuthority())
 	{
-		MulticastSpawnSkillVisualActor(VisualActorClass, Location, Rotation);
+		MulticastSpawnSkillVisualActor(VisualActorClass, Location, Rotation, VisualScale);
 		return;
 	}
 
-	SpawnSkillVisualActor(VisualActorClass, Location, Rotation);
+	SpawnSkillVisualActor(VisualActorClass, Location, Rotation, VisualScale);
 }
 
-void AGP_BaseCharacter::MulticastSpawnSkillVisualActor_Implementation(TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation)
+void AGP_BaseCharacter::MulticastSpawnSkillVisualActor_Implementation(TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation, float VisualScale)
 {
-	SpawnSkillVisualActor(VisualActorClass, Location, Rotation);
+	SpawnSkillVisualActor(VisualActorClass, Location, Rotation, VisualScale);
 }
 
 void AGP_BaseCharacter::MulticastShowHealthDebug_Implementation(const FString& InstigatorName, float DamageAmount, float CurrentHealth, float MaxHealth, FGameplayTag ElementTag)
@@ -207,7 +207,7 @@ void AGP_BaseCharacter::SpawnDamageNumberActor(int32 DamageAmount, EWeaponElemen
 	DamageNumberActor->InitializeDamageNumber(DamageAmount, Element);
 }
 
-void AGP_BaseCharacter::SpawnSkillVisualActor(TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation)
+void AGP_BaseCharacter::SpawnSkillVisualActor(TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation, float VisualScale)
 {
 	if (!IsValid(GetWorld()) || !VisualActorClass)
 	{
@@ -219,12 +219,17 @@ void AGP_BaseCharacter::SpawnSkillVisualActor(TSubclassOf<AActor> VisualActorCla
 	SpawnParams.Instigator = this;
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
-	GetWorld()->SpawnActor<AActor>(
+	AActor* VisualActor = GetWorld()->SpawnActor<AActor>(
 		VisualActorClass,
 		Location,
 		Rotation,
 		SpawnParams
 	);
+
+	if (IsValid(VisualActor))
+	{
+		VisualActor->SetActorScale3D(FVector(FMath::Max(VisualScale, 0.0f)));
+	}
 }
 
 void AGP_BaseCharacter::ShowHealthDebugMessage(const FString& InstigatorName, float DamageAmount, float CurrentHealth, float MaxHealth, FGameplayTag ElementTag) const
