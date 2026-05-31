@@ -15,6 +15,7 @@ Last synced: 2026-05-23T00:00:00
 
 ## Current Status
 
+- `UGP_SkillAugmentPoolData` is a new DataAsset for storing augment DA lists and `PickRandomAugments(Count)` returns valid non-duplicate random candidates for UI.
 - `UGP_AugmentSelectWidget` is a new C++ parent for a 3-candidate augment selection widget; BP children should bind `Button_Augment0..2` and `TextBlock_Augment0..2`.
 - Skill augment range scaling is wired for distance-style skills: `RangeMultiplier` affects LineShock length, ConeSlash hit range/visual offset, GroundBurst target distance, and MineBurst placement distance.
 - Skill augment radius scaling is wired for burst-family skills: SkillBase resolves matching `RadiusMultiplier`, PulseBurst/GroundBurst scale their overlap radius directly, and MineBurst/ThrownBurst pass the multiplier into spawned mine/area projectile actors.
