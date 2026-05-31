@@ -30,6 +30,7 @@ class PROJECT_EDEN_API AGP_PlayerCharacter : public AGP_BaseCharacter
 
 public:
 	AGP_PlayerCharacter();
+	virtual ~AGP_PlayerCharacter() override;
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void Landed(const FHitResult& Hit) override;
@@ -86,11 +87,16 @@ public:
 	bool IsPlayingUEFNSourceFallbackMontage() const;
 	void StopUEFNSourceFallbackMontage(float BlendOutTime = 0.2f);
 	void SetActionRootMotionInputCancelEnabled(bool bEnabled);
+	bool RequestActionRootMotionCancelIfMovementHeld();
+	void ClearActionRootMotionCancelMovementInput();
 	void BeginActionMotionTracking();
 	void StopActionMotionTracking();
 	void ApplyCurrentActionInertia();
 	FVector GetLastUEFNSourceRootMotionVelocity() const { return LastUEFNSourceRootMotionVelocity; }
 	FVector GetCurrentActionMotionVelocity() const { return CurrentActionMotionVelocity; }
+	FVector GetActionMotionAnimVelocity() const;
+	void SetActionLowerBodyMotionMatchBlendEnabled(bool bEnabled);
+	bool ShouldBlendActionLowerBodyToMotionMatching() const { return bBlendActionLowerBodyToMotionMatching; }
 	FOnActionRootMotionCancelInput OnActionRootMotionCancelInput;
 	
 	/** [데이터 에셋 기반] 런타임 스킬 교체 함수 (bIgnoreRestrictions로 로그라이크식 예외 지원) */
@@ -123,11 +129,18 @@ private:
 
 	bool bApplyUEFNSourceFallbackRootMotion = false;
 	bool bActionRootMotionInputCancelEnabled = false;
+	bool bBlendActionLowerBodyToMotionMatching = false;
+	FVector LastActionRootMotionCancelMovementDirection = FVector::ZeroVector;
+	float LastActionRootMotionCancelMovementScale = 0.0f;
+	float LastActionRootMotionCancelMovementInputTime = 0.0f;
 	FVector LastUEFNSourceRootMotionVelocity = FVector::ZeroVector;
 	FVector LastNonZeroUEFNSourceRootMotionVelocity = FVector::ZeroVector;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animation|Runtime Retarget Fallback", meta = (AllowPrivateAccess = "true", ClampMin = "0.01"))
 	float FallbackRootMotionDistanceCorrection = 1.18f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Action Root Motion", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float HeldMovementInputCancelGraceTime = 0.50f;
 
 	struct FGPActionMotionSample
 	{
@@ -159,6 +172,9 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Action Inertia", meta = (AllowPrivateAccess = "true"))
 	bool bCarryEntryVelocityDuringActionRootMotion = true;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Action Inertia", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float PostActionAnimVelocityHoldTime = 0.35f;
+
 	bool bTrackActionMotion = false;
 	FVector LastActionMotionSampleLocation = FVector::ZeroVector;
 	float LastActionMotionSampleTime = 0.0f;
@@ -166,6 +182,9 @@ private:
 	FVector ActionMotionCarryVelocity = FVector::ZeroVector;
 	FVector LastActionCarryActualDelta = FVector::ZeroVector;
 	FVector CurrentActionMotionVelocity = FVector::ZeroVector;
+	FVector LastNonZeroActionMotionVelocity = FVector::ZeroVector;
+	FVector HeldPostActionAnimVelocity = FVector::ZeroVector;
+	float HeldPostActionAnimVelocityUntilTime = 0.0f;
 	TArray<FGPActionMotionSample> ActionMotionSamples;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "White Void", meta = (AllowPrivateAccess = "true"))

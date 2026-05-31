@@ -170,9 +170,17 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	const FVector WorldAcceleration = MovementComponent->GetCurrentAcceleration();
 	const AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(Character);
 	const bool bCanUseRuntimePoseSearchChooser = PlayerCharacter && PlayerCharacter->GetUEFNSourceAnimInstance() == this;
-	if (bCanUseRuntimePoseSearchChooser && PlayerCharacter->IsPlayingUEFNSourceFallbackMontage())
+	const bool bBlendActionLowerBodyToMM = PlayerCharacter && PlayerCharacter->ShouldBlendActionLowerBodyToMotionMatching();
+	const float LowerBodyBlendSpeed = bBlendActionLowerBodyToMM ? ActionLowerBodyMotionMatchBlendInSpeed : ActionLowerBodyMotionMatchBlendOutSpeed;
+	ActionLowerBodyMotionMatchBlendAlpha = FMath::FInterpTo(
+		ActionLowerBodyMotionMatchBlendAlpha,
+		bBlendActionLowerBodyToMM ? 1.f : 0.f,
+		DeltaSeconds,
+		LowerBodyBlendSpeed);
+
+	if (bCanUseRuntimePoseSearchChooser && (PlayerCharacter->IsPlayingUEFNSourceFallbackMontage() || !PlayerCharacter->GetActionMotionAnimVelocity().IsNearlyZero()))
 	{
-		const FVector ActionMotionVelocity = PlayerCharacter->GetCurrentActionMotionVelocity();
+		const FVector ActionMotionVelocity = PlayerCharacter->GetActionMotionAnimVelocity();
 		if (!ActionMotionVelocity.IsNearlyZero())
 		{
 			WorldVelocity.X = ActionMotionVelocity.X;

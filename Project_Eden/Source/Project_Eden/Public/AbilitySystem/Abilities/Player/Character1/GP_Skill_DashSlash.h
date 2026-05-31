@@ -68,6 +68,7 @@ private:
 	FTimerHandle FallbackMontageEndTimerHandle;
 	FTimerHandle FallbackAttackHitTimerHandle;
 	FTimerHandle FallbackActionEndTimerHandle;
+	FDelegateHandle ActionRootMotionCancelInputHandle;
 
 	bool bHasAppliedAttackHit = false;
 	bool bMovementControlUnlocked = false;
@@ -84,6 +85,8 @@ private:
 
 	UFUNCTION()
 	void OnFallbackActionEnd();
+
+	void OnActionRootMotionCancelInput();
 
 	UFUNCTION()
 	void OnMontageCompleted();

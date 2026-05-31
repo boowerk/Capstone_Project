@@ -163,6 +163,15 @@ protected:
 	bool bIsSprinting;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Chooser")
+	float ActionLowerBodyMotionMatchBlendAlpha = 0.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Chooser", meta = (ClampMin = "0.0"))
+	float ActionLowerBodyMotionMatchBlendInSpeed = 10.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Chooser", meta = (ClampMin = "0.0"))
+	float ActionLowerBodyMotionMatchBlendOutSpeed = 18.f;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Chooser")
 	E_MovementMode MovementMode = E_MovementMode::Grounded;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Chooser")

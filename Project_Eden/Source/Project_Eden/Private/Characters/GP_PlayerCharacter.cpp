@@ -88,6 +88,17 @@ AGP_PlayerCharacter::AGP_PlayerCharacter()
 	// 태그 추가 함수 추가후 호출 예정지
 }
 
+AGP_PlayerCharacter::~AGP_PlayerCharacter()
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(RestoreLagTimerHandle);
+	}
+
+	OnActionRootMotionCancelInput.Clear();
+	ActionMotionSamples.Empty();
+}
+
 void AGP_PlayerCharacter::BeginPlay()
 {
 	Super::BeginPlay();
@@ -229,11 +240,55 @@ void AGP_PlayerCharacter::SetActionRootMotionInputCancelEnabled(bool bEnabled)
 		bEnabled ? 1 : 0,
 		*GetName());
 	bActionRootMotionInputCancelEnabled = bEnabled;
+	if (bActionRootMotionInputCancelEnabled)
+	{
+		RequestActionRootMotionCancelIfMovementHeld();
+	}
+}
+
+bool AGP_PlayerCharacter::RequestActionRootMotionCancelIfMovementHeld()
+{
+	if (!bActionRootMotionInputCancelEnabled
+		|| FMath::Abs(LastActionRootMotionCancelMovementScale) <= KINDA_SMALL_NUMBER
+		|| LastActionRootMotionCancelMovementDirection.IsNearlyZero())
+	{
+		return false;
+	}
+
+	const UWorld* World = GetWorld();
+	const float CurrentTime = World ? World->GetTimeSeconds() : 0.0f;
+	if (World && HeldMovementInputCancelGraceTime > 0.0f
+		&& CurrentTime - LastActionRootMotionCancelMovementInputTime > HeldMovementInputCancelGraceTime)
+	{
+		return false;
+	}
+
+	UE_LOG(LogTemp, Warning, TEXT("[ActionEndTrace][Character] HeldMoveCancelBroadcast Actor=%s Scale=%.3f Dir=%s"),
+		*GetName(),
+		LastActionRootMotionCancelMovementScale,
+		*LastActionRootMotionCancelMovementDirection.ToCompactString());
+
+	bActionRootMotionInputCancelEnabled = false;
+	OnActionRootMotionCancelInput.Broadcast();
+	return true;
+}
+
+void AGP_PlayerCharacter::ClearActionRootMotionCancelMovementInput()
+{
+	LastActionRootMotionCancelMovementDirection = FVector::ZeroVector;
+	LastActionRootMotionCancelMovementScale = 0.0f;
+	LastActionRootMotionCancelMovementInputTime = 0.0f;
+}
+
+void AGP_PlayerCharacter::SetActionLowerBodyMotionMatchBlendEnabled(bool bEnabled)
+{
+	bBlendActionLowerBodyToMotionMatching = bEnabled;
 }
 
 void AGP_PlayerCharacter::BeginActionMotionTracking()
 {
 	bTrackActionMotion = true;
+	bBlendActionLowerBodyToMotionMatching = false;
 	LastActionMotionSampleLocation = GetActorLocation();
 	LastActionMotionSampleTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
 	ActionMotionEntryVelocity = GetVelocity();
@@ -241,6 +296,9 @@ void AGP_PlayerCharacter::BeginActionMotionTracking()
 	ActionMotionCarryVelocity = ActionMotionEntryVelocity;
 	LastActionCarryActualDelta = FVector::ZeroVector;
 	CurrentActionMotionVelocity = FVector::ZeroVector;
+	LastNonZeroActionMotionVelocity = FVector::ZeroVector;
+	HeldPostActionAnimVelocity = FVector::ZeroVector;
+	HeldPostActionAnimVelocityUntilTime = 0.0f;
 	ActionMotionSamples.Reset();
 
 	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
@@ -266,9 +324,13 @@ void AGP_PlayerCharacter::StopActionMotionTracking()
 		ActionMotionCarryVelocity.Size2D(),
 		CurrentActionMotionVelocity.Size2D());
 	bTrackActionMotion = false;
+	bBlendActionLowerBodyToMotionMatching = false;
 	ActionMotionCarryVelocity = FVector::ZeroVector;
 	LastActionCarryActualDelta = FVector::ZeroVector;
 	CurrentActionMotionVelocity = FVector::ZeroVector;
+	LastNonZeroActionMotionVelocity = FVector::ZeroVector;
+	HeldPostActionAnimVelocity = FVector::ZeroVector;
+	HeldPostActionAnimVelocityUntilTime = 0.0f;
 	ActionMotionSamples.Reset();
 }
 
@@ -328,6 +390,11 @@ void AGP_PlayerCharacter::UpdateActionMotionTracking(float DeltaSeconds)
 	FVector Delta = CurrentLocation - LastActionMotionSampleLocation;
 	Delta.Z = 0.0f;
 	CurrentActionMotionVelocity = DeltaSeconds > KINDA_SMALL_NUMBER ? Delta / DeltaSeconds : FVector::ZeroVector;
+	if (!CurrentActionMotionVelocity.IsNearlyZero())
+	{
+		LastNonZeroActionMotionVelocity = CurrentActionMotionVelocity;
+		LastNonZeroActionMotionVelocity.Z = 0.0f;
+	}
 	const FVector EstimatedRootMotionDelta = Delta - LastActionCarryActualDelta;
 	LastActionMotionSampleLocation = CurrentLocation;
 	LastActionMotionSampleTime = CurrentTime;
@@ -399,16 +466,50 @@ FVector AGP_PlayerCharacter::GetCurrentActionInertiaVelocity() const
 	return SampledVelocity;
 }
 
+FVector AGP_PlayerCharacter::GetActionMotionAnimVelocity() const
+{
+	if (!CurrentActionMotionVelocity.IsNearlyZero())
+	{
+		return CurrentActionMotionVelocity;
+	}
+
+	if (bTrackActionMotion && !LastNonZeroActionMotionVelocity.IsNearlyZero())
+	{
+		return LastNonZeroActionMotionVelocity;
+	}
+
+	const UWorld* World = GetWorld();
+	if (World && World->GetTimeSeconds() <= HeldPostActionAnimVelocityUntilTime)
+	{
+		return HeldPostActionAnimVelocity;
+	}
+
+	return FVector::ZeroVector;
+}
+
 void AGP_PlayerCharacter::ApplyCurrentActionInertia()
 {
 	FlushActionMotionTracking();
 	bTrackActionMotion = false;
+	const UWorld* World = GetWorld();
+	if (PostActionAnimVelocityHoldTime > 0.0f && !LastNonZeroActionMotionVelocity.IsNearlyZero())
+	{
+		HeldPostActionAnimVelocity = LastNonZeroActionMotionVelocity;
+		HeldPostActionAnimVelocity.Z = 0.0f;
+		HeldPostActionAnimVelocityUntilTime = World ? World->GetTimeSeconds() + PostActionAnimVelocityHoldTime : 0.0f;
+	}
+	else
+	{
+		HeldPostActionAnimVelocity = FVector::ZeroVector;
+		HeldPostActionAnimVelocityUntilTime = 0.0f;
+	}
 
 	if (!bApplyActionInertiaOnMontageComplete)
 	{
 		ActionMotionCarryVelocity = FVector::ZeroVector;
 		LastActionCarryActualDelta = FVector::ZeroVector;
 		CurrentActionMotionVelocity = FVector::ZeroVector;
+		LastNonZeroActionMotionVelocity = FVector::ZeroVector;
 		ActionMotionSamples.Reset();
 		return;
 	}
@@ -419,6 +520,7 @@ void AGP_PlayerCharacter::ApplyCurrentActionInertia()
 		ActionMotionCarryVelocity = FVector::ZeroVector;
 		LastActionCarryActualDelta = FVector::ZeroVector;
 		CurrentActionMotionVelocity = FVector::ZeroVector;
+		LastNonZeroActionMotionVelocity = FVector::ZeroVector;
 		ActionMotionSamples.Reset();
 		return;
 	}
@@ -439,6 +541,7 @@ void AGP_PlayerCharacter::ApplyCurrentActionInertia()
 		ActionMotionCarryVelocity = FVector::ZeroVector;
 		LastActionCarryActualDelta = FVector::ZeroVector;
 		CurrentActionMotionVelocity = FVector::ZeroVector;
+		LastNonZeroActionMotionVelocity = FVector::ZeroVector;
 		ActionMotionSamples.Reset();
 		return;
 	}
@@ -452,6 +555,7 @@ void AGP_PlayerCharacter::ApplyCurrentActionInertia()
 	ActionMotionCarryVelocity = FVector::ZeroVector;
 	LastActionCarryActualDelta = FVector::ZeroVector;
 	CurrentActionMotionVelocity = FVector::ZeroVector;
+	LastNonZeroActionMotionVelocity = FVector::ZeroVector;
 	if (GGPActionInertiaDebug != 0)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("[ActionRM][Apply] Actor=%s EntrySpeed=%.1f HandoffSpeed=%.1f Handoff=%s Samples=%d"),
@@ -500,6 +604,7 @@ void AGP_PlayerCharacter::StopUEFNSourceFallbackMontage(float BlendOutTime)
 
 	bApplyUEFNSourceFallbackRootMotion = false;
 	bActionRootMotionInputCancelEnabled = false;
+	bBlendActionLowerBodyToMotionMatching = false;
 	ActiveUEFNSourceFallbackMontage = nullptr;
 	LastNonZeroUEFNSourceRootMotionVelocity = FVector::ZeroVector;
 }
@@ -552,6 +657,17 @@ void AGP_PlayerCharacter::OnRep_PlayerState()
 
 void AGP_PlayerCharacter::AddMovementInput(FVector WorldDirection, float ScaleValue, bool bForce)
 {
+	if (FMath::Abs(ScaleValue) > KINDA_SMALL_NUMBER && !WorldDirection.IsNearlyZero())
+	{
+		LastActionRootMotionCancelMovementDirection = WorldDirection.GetSafeNormal2D();
+		LastActionRootMotionCancelMovementScale = ScaleValue;
+		LastActionRootMotionCancelMovementInputTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
+	}
+	else
+	{
+		ClearActionRootMotionCancelMovementInput();
+	}
+
 	// 기존 IsSprintExitControlLocked() 대신, ASC에서 직접 Fixed 태그만 검사
 	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
 	
@@ -559,12 +675,7 @@ void AGP_PlayerCharacter::AddMovementInput(FVector WorldDirection, float ScaleVa
 	{
 		if (bActionRootMotionInputCancelEnabled && FMath::Abs(ScaleValue) > KINDA_SMALL_NUMBER && !WorldDirection.IsNearlyZero())
 		{
-			UE_LOG(LogTemp, Warning, TEXT("[ActionEndTrace][Character] MoveCancelBroadcast Actor=%s Scale=%.3f Dir=%s"),
-				*GetName(),
-				ScaleValue,
-				*WorldDirection.ToCompactString());
-			bActionRootMotionInputCancelEnabled = false;
-			OnActionRootMotionCancelInput.Broadcast();
+			RequestActionRootMotionCancelIfMovementHeld();
 			if (!ASC->HasMatchingGameplayTag(GPTags::State::Status::Fixed))
 			{
 				Super::AddMovementInput(WorldDirection, ScaleValue, bForce);

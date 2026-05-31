@@ -221,6 +221,7 @@ void UGP_Dash::OnDashActionEnd(FGameplayEventData Payload)
 	UE_LOG(LogTemp, Warning, TEXT("[ActionEndTrace][Dash] ActionEndEvent EnableInputCancel"));
 	if (AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo()))
 	{
+		PC->SetActionLowerBodyMotionMatchBlendEnabled(true);
 		PC->SetActionRootMotionInputCancelEnabled(true);
 	}
 }
@@ -230,6 +231,7 @@ void UGP_Dash::OnFallbackActionEnd()
 	UE_LOG(LogTemp, Warning, TEXT("[ActionEndTrace][Dash] FallbackActionEndTimer EnableInputCancel"));
 	if (AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo()))
 	{
+		PC->SetActionLowerBodyMotionMatchBlendEnabled(true);
 		PC->SetActionRootMotionInputCancelEnabled(true);
 	}
 }

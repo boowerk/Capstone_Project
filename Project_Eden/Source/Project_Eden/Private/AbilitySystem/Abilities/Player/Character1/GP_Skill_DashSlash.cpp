@@ -142,6 +142,11 @@ void UGP_Skill_DashSlash::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 		return;
 	}
 
+	if (!ActionRootMotionCancelInputHandle.IsValid())
+	{
+		ActionRootMotionCancelInputHandle = PC->OnActionRootMotionCancelInput.AddUObject(this, &ThisClass::OnActionRootMotionCancelInput);
+	}
+
 	UPDA_CharacterAnimationSet* AnimSet = PC->GetAnimationSet();
 	UAnimMontage* MontageToPlay = SkillMontage;
 	UAnimMontage* SourceMontageToPlay = nullptr;
@@ -294,6 +299,13 @@ void UGP_Skill_DashSlash::EndAbility(const FGameplayAbilitySpecHandle Handle,
 
 	if (AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo()))
 	{
+		PC->SetActionRootMotionInputCancelEnabled(false);
+		if (ActionRootMotionCancelInputHandle.IsValid())
+		{
+			PC->OnActionRootMotionCancelInput.Remove(ActionRootMotionCancelInputHandle);
+			ActionRootMotionCancelInputHandle.Reset();
+		}
+
 		if (!bWasCancelled)
 		{
 			PC->ApplyCurrentActionInertia();
@@ -394,6 +406,11 @@ void UGP_Skill_DashSlash::OnActionEndEventReceived(FGameplayEventData Payload)
 {
 	UE_LOG(LogTemp, Warning, TEXT("[ActionEndTrace][DashSlash] ActionEndEvent UnlockOnly"));
 	UnlockMovementControl();
+	if (AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo()))
+	{
+		PC->SetActionLowerBodyMotionMatchBlendEnabled(true);
+		PC->SetActionRootMotionInputCancelEnabled(true);
+	}
 
 	if (!bHasAppliedAttackHit)
 	{
@@ -405,11 +422,22 @@ void UGP_Skill_DashSlash::OnFallbackActionEnd()
 {
 	UE_LOG(LogTemp, Warning, TEXT("[ActionEndTrace][DashSlash] FallbackActionEndTimer UnlockOnly"));
 	UnlockMovementControl();
+	if (AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo()))
+	{
+		PC->SetActionLowerBodyMotionMatchBlendEnabled(true);
+		PC->SetActionRootMotionInputCancelEnabled(true);
+	}
 
 	if (!bHasAppliedAttackHit)
 	{
 		PerformDashSlashHit();
 	}
+}
+
+void UGP_Skill_DashSlash::OnActionRootMotionCancelInput()
+{
+	UE_LOG(LogTemp, Warning, TEXT("[ActionEndTrace][DashSlash] InputCancelDelegate EndAbility"));
+	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 }
 
 void UGP_Skill_DashSlash::OnMontageCompleted()
