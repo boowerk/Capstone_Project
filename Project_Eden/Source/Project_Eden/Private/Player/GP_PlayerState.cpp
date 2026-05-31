@@ -1,5 +1,6 @@
 ﻿#include "Player/GP_PlayerState.h"
 #include "AbilitySystem/GP_AbilitySystemComponent.h"
+#include "AbilitySystem/Abilities/GP_SkillAugmentData.h"
 #include "AbilitySystemComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "AbilitySystem/GP_AttributeSet.h"
@@ -55,11 +56,53 @@ void AGP_PlayerState::ServerSetCurrentTechElementTag_Implementation(FGameplayTag
 	SetCurrentTechElementTag(NewElementTag);
 }
 
+void AGP_PlayerState::AddSkillAugment(UGP_SkillAugmentData* AugmentData)
+{
+	if (!IsValid(AugmentData))
+	{
+		return;
+	}
+
+	if (!HasAuthority())
+	{
+		ServerAddSkillAugment(AugmentData);
+		return;
+	}
+
+	SelectedSkillAugments.Add(AugmentData);
+
+	if (AugmentData->GrantedElementTag.IsValid())
+	{
+		CurrentTechElementTag = AugmentData->GrantedElementTag;
+	}
+
+	ForceNetUpdate();
+}
+
+void AGP_PlayerState::ServerAddSkillAugment_Implementation(UGP_SkillAugmentData* AugmentData)
+{
+	AddSkillAugment(AugmentData);
+}
+
+TArray<UGP_SkillAugmentData*> AGP_PlayerState::GetSelectedSkillAugments() const
+{
+	TArray<UGP_SkillAugmentData*> Augments;
+	Augments.Reserve(SelectedSkillAugments.Num());
+
+	for (UGP_SkillAugmentData* Augment : SelectedSkillAugments)
+	{
+		Augments.Add(Augment);
+	}
+
+	return Augments;
+}
+
 void AGP_PlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME(AGP_PlayerState, CurrentTechElementTag);
+	DOREPLIFETIME(AGP_PlayerState, SelectedSkillAugments);
 }
 
 void AGP_PlayerState::OnRep_EquippedWeaponData()
@@ -67,5 +110,9 @@ void AGP_PlayerState::OnRep_EquippedWeaponData()
 }
 
 void AGP_PlayerState::OnRep_CurrentTechElementTag()
+{
+}
+
+void AGP_PlayerState::OnRep_SelectedSkillAugments()
 {
 }

@@ -35,7 +35,9 @@ Last synced: 2026-05-26T20:45:00
 
 - `UGP_SkillAugmentData` was added as a data-only shell.
 - Fields cover display info, `TargetSkillTags`, optional `GrantedElementTag`, numeric modifiers, `ImpactVisualActorOverride`, and `ActiveVFXOverride`.
-- No runtime system reads it yet. Next pass should decide where selected augments live (PlayerState/ASC/run state) and how modifiers merge into SkillData damage/cooldown/radius/projectile count.
+- `AGP_PlayerState` stores replicated `SelectedSkillAugments` and exposes `AddSkillAugment` / `ServerAddSkillAugment`.
+- Adding an augment with `GrantedElementTag` currently updates `CurrentTechElementTag`, so element augments can reuse the existing skill VFX/damage element path.
+- No runtime system reads numeric modifiers yet. Next pass should decide how modifiers merge into SkillData damage/cooldown/radius/projectile count.
 
 ## What Changed
 

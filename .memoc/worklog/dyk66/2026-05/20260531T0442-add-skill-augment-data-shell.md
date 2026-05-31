@@ -21,18 +21,22 @@ created: 2026-05-31T04:42:27
 
 - Added `UGP_SkillAugmentData` as data-only augment shell.
 - Added modifier struct for damage/cooldown/radius/range/projectile count.
-- Left runtime selection and damage merge for later.
+- Added replicated selected augment storage to `AGP_PlayerState`.
+- Adding an augment with `GrantedElementTag` updates current tech element.
+- Left modifier merge into damage/cooldown/radius/projectiles for later.
 
 ## Changed Files
 
 - `Project_Eden/Source/Project_Eden/Public/AbilitySystem/Abilities/GP_SkillAugmentData.h`
+- `Project_Eden/Source/Project_Eden/Public/Player/GP_PlayerState.h`
+- `Project_Eden/Source/Project_Eden/Private/Player/GP_PlayerState.cpp`
 - `.memoc/session-summary.md`
 - `.memoc/02-current-project-state.md`
 - `.memoc/04-handoff.md`
 
 ## Verification
 
-- `git diff --check -- Project_Eden/Source/Project_Eden/Public/AbilitySystem/Abilities/GP_SkillAugmentData.h`
+- `git diff --check -- Project_Eden/Source/Project_Eden/Public/Player/GP_PlayerState.h Project_Eden/Source/Project_Eden/Private/Player/GP_PlayerState.cpp Project_Eden/Source/Project_Eden/Public/AbilitySystem/Abilities/GP_SkillAugmentData.h`
 - Build not run.
 
 ## Follow-up

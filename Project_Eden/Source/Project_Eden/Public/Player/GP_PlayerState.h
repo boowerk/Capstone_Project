@@ -12,6 +12,7 @@ class UAttributeSet;
 class UAbilitySystemComponent;
 class UGP_WeaponAttributeSet;
 class UPDA_WeaponItemCollection;
+class UGP_SkillAugmentData;
 
 UCLASS()
 class PROJECT_EDEN_API AGP_PlayerState : public APlayerState, public IAbilitySystemInterface
@@ -35,6 +36,15 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Tech")
 	FGameplayTag GetCurrentTechElementTag() const { return CurrentTechElementTag; }
 
+	UFUNCTION(BlueprintCallable, Category = "Tech|Augment")
+	void AddSkillAugment(UGP_SkillAugmentData* AugmentData);
+
+	UFUNCTION(Server, Reliable)
+	void ServerAddSkillAugment(UGP_SkillAugmentData* AugmentData);
+
+	UFUNCTION(BlueprintPure, Category = "Tech|Augment")
+	TArray<UGP_SkillAugmentData*> GetSelectedSkillAugments() const;
+
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 private:
@@ -50,9 +60,15 @@ private:
 	UPROPERTY(ReplicatedUsing = OnRep_CurrentTechElementTag, EditDefaultsOnly, BlueprintReadOnly, Category = "Tech", meta = (AllowPrivateAccess = "true", Categories = "GPTags.Tech.Element"))
 	FGameplayTag CurrentTechElementTag;
 
+	UPROPERTY(ReplicatedUsing = OnRep_SelectedSkillAugments, BlueprintReadOnly, Category = "Tech|Augment", meta = (AllowPrivateAccess = "true"))
+	TArray<TObjectPtr<UGP_SkillAugmentData>> SelectedSkillAugments;
+
 	UFUNCTION()
 	void OnRep_EquippedWeaponData();
 
 	UFUNCTION()
 	void OnRep_CurrentTechElementTag();
+
+	UFUNCTION()
+	void OnRep_SelectedSkillAugments();
 };
