@@ -3,41 +3,27 @@
 
 #include "AbilitySystem/Abilities/Player/Character1/GP_Skill_NetTestProjectile.h"
 
-#include "AbilitySystemComponent.h"
 #include "Actors/GP_Projectile.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/Character.h"
 
-void UGP_Skill_NetTestProjectile::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
-                                                  const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo,
-                                                  const FGameplayEventData* TriggerEventData)
+UGP_Skill_NetTestProjectile::UGP_Skill_NetTestProjectile()
 {
-	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
+	SelectionMode = EGP_SkillSelectionMode::Projectile;
+}
 
-	if (!ActorInfo)
+void UGP_Skill_NetTestProjectile::ExecuteConfirmedSkill_Implementation(const FGP_SkillTargetData& TargetData)
+{
+	ACharacter* Avatar = Cast<ACharacter>(GetAvatarActorFromActorInfo());
+	if (!Avatar || !ProjectileClass)
 	{
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
 
-	ACharacter* Avatar = Cast<ACharacter>(ActorInfo->AvatarActor.Get());
-	UAbilitySystemComponent* ASC = ActorInfo->AbilitySystemComponent.Get();
-
-	if (!Avatar || !ASC || !CommitAbility(Handle, ActorInfo, ActivationInfo))
+	if (HasAuthority(&CurrentActivationInfo))
 	{
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-		return;
-	}
-
-	if (HasAuthority(&ActivationInfo) && ProjectileClass)
-	{
-		FRotator SpawnRotation = Avatar->GetActorRotation();
-
-		if (AController* Controller = Avatar->GetController())
-		{
-			SpawnRotation = Controller->GetControlRotation();
-			SpawnRotation.Pitch = FMath::ClampAngle(SpawnRotation.Pitch, -5.f, 10.f);
-		}
+		FRotator SpawnRotation = TargetData.AimDirection.Rotation();
+		SpawnRotation.Pitch = FMath::ClampAngle(SpawnRotation.Pitch, -5.f, 10.f);
 
 		const FVector AimDirection = SpawnRotation.Vector();
 		const FVector SpawnLocation =
@@ -61,9 +47,7 @@ void UGP_Skill_NetTestProjectile::ActivateAbility(const FGameplayAbilitySpecHand
 
 		if (Projectile)
 		{
-			Projectile->SetSkillData(GetSkillDataFromSpec(Handle, ActorInfo));
+			Projectile->SetSkillData(GetSkillDataFromSpec(CurrentSpecHandle, CurrentActorInfo));
 		}
 	}
-
-	EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
 }

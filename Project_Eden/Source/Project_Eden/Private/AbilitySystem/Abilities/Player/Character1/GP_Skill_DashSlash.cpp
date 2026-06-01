@@ -53,6 +53,7 @@ UGP_Skill_DashSlash::UGP_Skill_DashSlash()
 
 	ActivationOwnedTags.AddTag(GPTags::State::Movement::Dash);
 	CancelAbilitiesWithTag.AddTag(GPTags::Ability::Skill::Primary);
+	CancelAbilitiesWithTag.AddTag(GPTags::Ability::Skill::Selection);
 
 	HitEventTag = GPTags::Event::Enemy::HitReact;
 

@@ -33,6 +33,7 @@ namespace GPTags
         namespace Skill
         {
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(SkillRoot, "GPTags.Ability.Skill", "스킬 전체 부모 태그");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Selection, "GPTags.Ability.Skill.Selection", "스킬 선택/조준 상태 어빌리티");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Primary, "GPTags.Ability.Skill.Primary", "평타");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Slot01, "GPTags.Ability.Skill.Slot01", "스킬 슬롯 1");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Slot02, "GPTags.Ability.Skill.Slot02", "스킬 슬롯 2");
@@ -112,6 +113,14 @@ namespace GPTags
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Sprinting, "GPTags.State.Movement.Sprinting", "달리기 상태");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Dash, "GPTags.State.Movement.Dash", "대쉬 상태");
         }
+        namespace Skill
+        {
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Selecting, "GPTags.State.Skill.Selecting", "스킬 선택 입력 대기 상태");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Previewing, "GPTags.State.Skill.Previewing", "스킬 프리뷰 표시 상태");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Projectile, "GPTags.State.Skill.Projectile", "투사체 스킬 조준 상태");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ray, "GPTags.State.Skill.Ray", "레이/라인 스킬 조준 상태");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(TargetActor, "GPTags.State.Skill.TargetActor", "대상 선택 스킬 조준 상태");
+        }
         namespace Buff
         {
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Shield, "GPTags.State.Buff.Shield", "보호막 버프");
@@ -166,6 +175,12 @@ namespace GPTags
             
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(ComboEnable, "GPTags.Event.Player.ComboEnable", "Player 콤보 액션 이벤트");
         }
+        namespace Skill
+        {
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(ConfirmPrimary, "GPTags.Event.Skill.Confirm.Primary", "선택 중인 스킬의 기본 확정 입력");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(ConfirmSecondary, "GPTags.Event.Skill.Confirm.Secondary", "선택 중인 스킬의 보조 확정 입력");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Cancel, "GPTags.Event.Skill.Cancel", "선택 중인 스킬 취소 입력");
+        }
         namespace Enemy
         {
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(HitReact, "GPTags.Event.Enemy.HitReact", "Enemy 피격 리액션 이벤트");
@@ -189,6 +204,7 @@ namespace GPTags
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(MineBurst, "GPTags.Cooldown.Skill.MineBurst", "마인 버스트 스킬 쿨다운");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(ConeSlash, "GPTags.Cooldown.Skill.ConeSlash", "콘 슬래시 스킬 쿨다운");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(DashSlash, "GPTags.Cooldown.Skill.DashSlash", "대쉬베기 스킬 쿨다운");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(LifeDrainTarget, "GPTags.Cooldown.Skill.LifeDrainTarget", "타겟 흡혈 스킬 쿨다운");
         }
         namespace Data
         {

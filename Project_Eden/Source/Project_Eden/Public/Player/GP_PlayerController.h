@@ -1,7 +1,8 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
+#include "GameplayTagContainer.h"
 #include "GP_PlayerController.generated.h"
 
 class AGP_PlayerCharacter;
@@ -32,7 +33,7 @@ protected:
 
 private:
 	FVector2D CurrentMoveInput = FVector2D::ZeroVector;
-	
+
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Movement")
 	TArray<TObjectPtr<UInputMappingContext>> InputMappingContexts;
 
@@ -51,14 +52,20 @@ private:
 	TObjectPtr<UInputAction> PrimaryAttackAction;
 
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
+	TObjectPtr<UInputAction> SecondarySkillConfirmAction;
+
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
+	TObjectPtr<UInputAction> CancelSkillSelectionAction;
+
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
 	TObjectPtr<UInputAction> SprintAction;
-	
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "GAS|Input|Settings", meta = (AllowPrivateAccess = "true"))
 	bool bIsSprintToggle = false;
-	
+
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
 	TObjectPtr<UInputAction> DashAction;
-	
+
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
 	TObjectPtr<UInputAction> SkillSlot1Action;
 
@@ -86,7 +93,7 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Tests")
 	TSubclassOf<class UGameplayAbility> NetTestProjectileAbilityClass;
-	
+
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
 	TSubclassOf<UUserWidget> HUDWidgetClass;
 
@@ -132,6 +139,8 @@ private:
 
 	// --- 전투 및 스킬 (Combat) ---
 	void Input_PrimaryAttack();
+	void Input_SecondarySkillConfirm();
+	void Input_CancelSkillSelection();
 	void Input_SkillSlot1();
 	void Input_SkillSlot2();
 	void Input_UltimateSkill();
@@ -146,7 +155,13 @@ private:
 	UFUNCTION(Server, Reliable, WithValidation)
 	void Server_RotateTestSkill();
 
+	UFUNCTION(Server, Reliable, WithValidation)
+	void Server_SendSkillSelectionEvent(FGameplayTag EventTag);
+
 	bool ActivateAbilityByTag(const FGameplayTag& AbilityTag) const;
+	bool IsSkillSelectionActive() const;
+	bool SendSkillSelectionEvent(const FGameplayTag& EventTag) const;
+	void CancelSkillSelectionIfActive() const;
 	void ClearTestSkillSlots(UAbilitySystemComponent* ASC);
 	int32 GetTestSkillPresetCount() const;
 	void EquipTestSkillPreset(AGP_PlayerCharacter* PlayerCharacter, int32 PresetIndex);

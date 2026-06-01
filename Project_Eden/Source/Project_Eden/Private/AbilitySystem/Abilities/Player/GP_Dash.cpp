@@ -54,6 +54,7 @@ UGP_Dash::UGP_Dash()
 	// ActivationOwnedTags.AddTag(GPTags::State::Status::Invincible);	// 무적 상태
 	BlockAbilitiesWithTag.AddTag(GPTags::Ability::Skill::SkillRoot);
 	CancelAbilitiesWithTag.AddTag(GPTags::Ability::Skill::Primary);
+	CancelAbilitiesWithTag.AddTag(GPTags::Ability::Skill::Selection);
 }
 
 void UGP_Dash::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
