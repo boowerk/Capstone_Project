@@ -1,30 +1,37 @@
-#include "Characters/GP_PlayerCharacter.h"
-#include "Actors/GP_WhiteVoidSetActor.h"
-#include "Actors/GP_WhiteVoidSetComponent.h"
-#include "Animation/GP_CharacterAnimInstance.h"
-#include "Animation/AnimInstance.h"
-#include "Animation/GP_CharacterAnimInstance.h"
-#include "Animation/AnimMontage.h"
-#include "Animation/AnimSequenceBase.h"
-#include "Animation/BlendSpace.h"
-#include "Animation/AnimTypes.h"
-#include "Animation/PDA_CharacterAnimationSet.h"
+﻿#include "Characters/GP_PlayerCharacter.h"
+
+// Engine / Core Headers
+#include "AbilitySystemComponent.h"
+#include "TimerManager.h"
+#include "Net/UnrealNetwork.h"
+#include "Kismet/GameplayStatics.h"
+#include "HAL/IConsoleManager.h"
+#include "UObject/UnrealType.h"
+
+// Framework / Component Headers
+#include "GameFramework/PlayerController.h"
+#include "GameFramework/SpringArmComponent.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "Camera/CameraComponent.h"
 #include "Camera/PlayerCameraManager.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
-#include "CharacterTrajectoryComponent.h"
-#include "GameFramework/CharacterMovementComponent.h"
-#include "GameFramework/PlayerController.h"
-#include "GameFramework/SpringArmComponent.h"
-#include "Kismet/GameplayStatics.h"
-#include "Net/UnrealNetwork.h"
+
+// Animation Headers
+#include "Animation/AnimInstance.h"
+#include "Animation/AnimMontage.h"
+#include "Animation/AnimSequenceBase.h"
+#include "Animation/BlendSpace.h"
+#include "Animation/AnimTypes.h"
+
+// Project Specific Headers
 #include "Player/GP_PlayerState.h"
-#include "AbilitySystemComponent.h"
+#include "Actors/GP_WhiteVoidSetActor.h"
+#include "Actors/GP_WhiteVoidSetComponent.h"
+#include "Animation/GP_CharacterAnimInstance.h"
+#include "Animation/PDA_CharacterAnimationSet.h"
+#include "CharacterTrajectoryComponent.h"
 #include "GameplayTags/GP_Tags.h"
-#include "HAL/IConsoleManager.h"
-#include "TimerManager.h"
-#include "UObject/UnrealType.h"
 
 static int32 GGPActionInertiaDebug = 1;
 static FAutoConsoleVariableRef CVarGPActionInertiaDebug(
@@ -48,13 +55,13 @@ AGP_PlayerCharacter::AGP_PlayerCharacter()
 	GetCharacterMovement()->RotationRate = FRotator(0.0f, 540.0f, 0.0f);
 	GetCharacterMovement()->JumpZVelocity = 500.f;
 	GetCharacterMovement()->AirControl = 0.2f;
-	
+
 	// 초기 속도 세팅
-	GetCharacterMovement()->MaxWalkSpeed = GetScaledNormalWalkSpeed(); 
+	GetCharacterMovement()->MaxWalkSpeed = GetScaledNormalWalkSpeed();
 	GetCharacterMovement()->MinAnalogWalkSpeed = 20.f;
-	
+
 	// 물리 제동 마찰력 (추후 블루프린트에서 제어하여 슬라이딩 거리를 조절합니다)
-	GetCharacterMovement()->BrakingDecelerationWalking = 1000.f; 
+	GetCharacterMovement()->BrakingDecelerationWalking = 1000.f;
 	GetCharacterMovement()->BrakingDecelerationFalling = 1500.f;
 
 	UEFNSourceMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("UEFNSourceMesh"));
@@ -84,7 +91,7 @@ AGP_PlayerCharacter::AGP_PlayerCharacter()
 	FollowCamera->bUsePawnControlRotation = false;
 
 	WhiteVoidSetClass = AGP_WhiteVoidSetActor::StaticClass();
-	
+
 	// 태그 추가 함수 추가후 호출 예정지
 }
 
@@ -673,11 +680,11 @@ void AGP_PlayerCharacter::PossessedBy(AController* NewController)
 {
 	Super::PossessedBy(NewController);
 	if (!IsValid(GetAbilitySystemComponent()) || !HasAuthority()) return;
-	
+
 	GetAbilitySystemComponent()->InitAbilityActorInfo(GetPlayerState(), this);
 	GetAbilitySystemComponent()->RegisterGameplayTagEvent(GPTags::State::Movement::Sprinting, EGameplayTagEventType::NewOrRemoved).AddUObject(this, &ThisClass::OnSprintingTagChanged);
 	GetAbilitySystemComponent()->RegisterGameplayTagEvent(GPTags::State::Status::Fixed, EGameplayTagEventType::NewOrRemoved).AddUObject(this, &ThisClass::OnFixedTagChanged);
-	
+
 	OnASCInitialized.Broadcast(GetAbilitySystemComponent(), GetAttributeSet());
 	GiveStartupAbilities();
 	InitializeAttributes();
@@ -687,9 +694,9 @@ void AGP_PlayerCharacter::OnRep_PlayerState()
 {
 	Super::OnRep_PlayerState();
 	if (!IsValid(GetAbilitySystemComponent())) return;
-	
+
 	GetAbilitySystemComponent()->InitAbilityActorInfo(GetPlayerState(), this);
-	
+
 	// 클라이언트 환경 Sprinting 태그 리스너 바인딩
 	GetAbilitySystemComponent()->RegisterGameplayTagEvent(GPTags::State::Movement::Sprinting, EGameplayTagEventType::NewOrRemoved).AddUObject(this, &ThisClass::OnSprintingTagChanged);
 	GetAbilitySystemComponent()->RegisterGameplayTagEvent(GPTags::State::Status::Fixed, EGameplayTagEventType::NewOrRemoved).AddUObject(this, &ThisClass::OnFixedTagChanged);
@@ -715,7 +722,7 @@ void AGP_PlayerCharacter::AddMovementInput(FVector WorldDirection, float ScaleVa
 
 	// 기존 IsSprintExitControlLocked() 대신, ASC에서 직접 Fixed 태그만 검사
 	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
-	
+
 	if (!bForce && ASC && ASC->HasMatchingGameplayTag(GPTags::State::Status::Fixed))
 	{
 		if (bActionRootMotionInputCancelEnabled && FMath::Abs(ScaleValue) > KINDA_SMALL_NUMBER && !WorldDirection.IsNearlyZero())
@@ -726,9 +733,9 @@ void AGP_PlayerCharacter::AddMovementInput(FVector WorldDirection, float ScaleVa
 				Super::AddMovementInput(WorldDirection, ScaleValue, bForce);
 			}
 		}
-		return; 
+		return;
 	}
-	
+
 	Super::AddMovementInput(WorldDirection, ScaleValue, bForce);
 }
 
@@ -736,11 +743,11 @@ void AGP_PlayerCharacter::ToggleSprinting()
 {
 	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
 	if (!ASC) return;
-	
+
 	// Sprinting 토글을 위한 태그 요청 (어빌리티 동작을 가정)
 	FGameplayTagContainer SprintTag;
-	SprintTag.AddTag(GPTags::State::Movement::Sprinting); 
-	
+	SprintTag.AddTag(GPTags::State::Movement::Sprinting);
+
 	if (IsSprinting())
 	{
 		// 달리기 중이라면 어빌리티/태그 강제 취소
@@ -759,7 +766,7 @@ void AGP_PlayerCharacter::StartSprinting()
 	if (!ASC || IsSprinting()) return;
 
 	FGameplayTagContainer SprintTag;
-	SprintTag.AddTag(GPTags::State::Movement::Sprinting); 
+	SprintTag.AddTag(GPTags::State::Movement::Sprinting);
 	ASC->TryActivateAbilitiesByTag(SprintTag);
 }
 
@@ -769,7 +776,7 @@ void AGP_PlayerCharacter::StopSprinting()
 	if (!ASC || !IsSprinting()) return;
 
 	FGameplayTagContainer SprintTag;
-	SprintTag.AddTag(GPTags::State::Movement::Sprinting); 
+	SprintTag.AddTag(GPTags::State::Movement::Sprinting);
 	ASC->CancelAbilities(&SprintTag);
 }
 
@@ -926,12 +933,12 @@ void AGP_PlayerCharacter::ApplyRetargetVisualScaleFromAnimationSet()
 bool AGP_PlayerCharacter::TryPerformDash()
 {
 	if (!GetAbilitySystemComponent()) return false;
-    
+
 	if (GetCharacterMovement()->IsFalling()) return false;
 
 	FGameplayTagContainer DashTag;
 	DashTag.AddTag(GPTags::Ability::Movement::Dash);
-    
+
 	return GetAbilitySystemComponent()->TryActivateAbilitiesByTag(DashTag);
 }
 
@@ -1294,7 +1301,7 @@ void AGP_PlayerCharacter::ClearAbilitySlot(FGameplayTag SlotTag)
 	// 1. 기존 해당 슬롯에 있던 어빌리티 제거 (중복 방지)
 	const TArray<FGameplayAbilitySpec>& Specs = ASC->GetActivatableAbilities();
 	TArray<FGameplayAbilitySpecHandle> HandlesToRemove;
-	
+
 	for (const FGameplayAbilitySpec& Spec : Specs)
 	{
 		if (Spec.GetDynamicSpecSourceTags().HasTagExact(SlotTag))
