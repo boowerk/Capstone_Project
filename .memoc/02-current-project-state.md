@@ -17,6 +17,7 @@ Last synced: 2026-05-28T18:40:00+09:00
 
 - Added `UGP_CharacterStatsMenuWidget` as a GAS-backed parent class for a Tab-opened Attributes menu; it snapshots player Health/Mana/Attack/Defense/Stagger/etc. and refreshes `UGP_AttributeWidget` children through ASC delegates.
 - `AGP_PlayerController` now exposes `CharacterStatsMenuWidgetClass` plus optional `CharacterStatsMenuAction`; if no action is assigned, Tab toggles the menu directly.
+- `UGP_CharacterStatsMenuWidget` now resolves value TextBlocks by name and writes GAS snapshot values in C++; `BP_OnAttributeSnapshotsUpdated` is optional/off by default for custom BP reactions only.
 - `ArtSource/UI/CharacterStatsMenu` contains source PNG candidates for the Attributes menu: dark background, red underline/selection/side strip, gold panel/divider/header ornaments, and stat icons.
 - GAS damage/HUD triage: enemy and boss attacks now point/fallback to `/Game/GAS_Pattern/AbilitySystem/GameplayEffects/Damage/GE_PrimaryDamage`; player AttributeSet damage broadcasts use avatar fallback for PlayerState-owned ASCs.
 - Player HUD GAS binding now resolves attribute widgets by name and binds boss health through `UGP_AttributeWidget`; `/Game/UI/HUD/WBP_PlayerHUDWidget.BossBar` is expected to be a `WBP_BossBar` child with Health/MaxHealth attributes.

@@ -4,14 +4,32 @@
 #include "AbilitySystem/GP_AttributeSet.h"
 #include "Blueprint/WidgetTree.h"
 #include "Characters/GP_BaseCharacter.h"
+#include "Components/TextBlock.h"
 #include "Components/Widget.h"
 #include "UI/GP_AttributeWidget.h"
+
+UGP_CharacterStatsMenuWidget::UGP_CharacterStatsMenuWidget(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
+{
+	// Designer widgets only need these names; C++ resolves and updates the value TextBlocks from GAS snapshots.
+	StatTextBindings =
+	{
+		FGPCharacterStatTextBinding(FName(TEXT("Health")), FName(TEXT("HpValueText"))),
+		FGPCharacterStatTextBinding(FName(TEXT("AttackPower")), FName(TEXT("AttackValueText"))),
+		FGPCharacterStatTextBinding(FName(TEXT("Armor")), FName(TEXT("DefenseValueText"))),
+		FGPCharacterStatTextBinding(FName(TEXT("Toughness")), FName(TEXT("StaggerValueText"))),
+		FGPCharacterStatTextBinding(FName(TEXT("MagicPower")), FName(TEXT("MagicValueText"))),
+		FGPCharacterStatTextBinding(FName(TEXT("MoveSpeed")), FName(TEXT("SpeedValueText")))
+	};
+}
 
 void UGP_CharacterStatsMenuWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 
-	// 에디터에서 만든 WBP를 PlayerController가 초기화하지 못한 경우에도 소유 Pawn 기준으로 자동 바인딩합니다.
+	RebuildStatTextBindings();
+
+	// Auto-bind from the owning pawn as a fallback when the PlayerController did not initialize the widget yet.
 	if (!BoundCharacter.IsValid())
 	{
 		InitializeForCharacter(Cast<AGP_BaseCharacter>(GetOwningPlayerPawn()));
@@ -36,7 +54,7 @@ void UGP_CharacterStatsMenuWidget::InitializeForCharacter(AGP_BaseCharacter* InC
 {
 	if (BoundCharacter.IsValid())
 	{
-		// Pawn 교체나 리스폰 때 이전 캐릭터의 ASC 초기화 이벤트가 남지 않게 정리합니다.
+		// Remove the old pawn callback before rebinding so respawn/reopen does not duplicate ASC subscriptions.
 		BoundCharacter->OnASCInitialized.RemoveAll(this);
 	}
 
@@ -84,7 +102,7 @@ void UGP_CharacterStatsMenuWidget::BindToASC(UAbilitySystemComponent* InASC)
 			continue;
 		}
 
-		// GAS 값이 바뀌면 텍스트 스냅샷과 GP_AttributeWidget 기반 바를 같이 갱신합니다.
+		// A single GAS delegate refreshes both native TextBlocks and embedded GP_AttributeWidget bars.
 		const FDelegateHandle Handle = InASC->GetGameplayAttributeValueChangeDelegate(Attribute).AddUObject(
 			this,
 			&ThisClass::HandleBoundAttributeChanged);
@@ -102,7 +120,7 @@ void UGP_CharacterStatsMenuWidget::ClearASC()
 	BoundAttributeSet.Reset();
 
 	AttributeSnapshots.Reset();
-	BP_OnAttributeSnapshotsUpdated(AttributeSnapshots);
+	NotifyAttributeSnapshotsUpdated();
 }
 
 void UGP_CharacterStatsMenuWidget::SetActiveTab(EGPCharacterMenuTab NewTab)
@@ -117,11 +135,11 @@ void UGP_CharacterStatsMenuWidget::RefreshAttributeSnapshots()
 
 	if (!BoundAttributeSet.IsValid())
 	{
-		BP_OnAttributeSnapshotsUpdated(AttributeSnapshots);
+		NotifyAttributeSnapshotsUpdated();
 		return;
 	}
 
-	// 현재 GAS AttributeSet을 그대로 메뉴 데이터로 노출해 BP에서는 배치와 스타일만 신경 쓰게 합니다.
+	// The menu exposes current GAS attributes as a compact view model for both native and optional BP UI.
 	AddStatSnapshot(FName(TEXT("Health")), NSLOCTEXT("GPCharacterStatsMenu", "Health", "HP"), UGP_AttributeSet::GetHealthAttribute(), UGP_AttributeSet::GetMaxHealthAttribute());
 	AddStatSnapshot(FName(TEXT("Mana")), NSLOCTEXT("GPCharacterStatsMenu", "Mana", "Mana"), UGP_AttributeSet::GetManaAttribute(), UGP_AttributeSet::GetMaxManaAttribute());
 	AddStatSnapshot(FName(TEXT("AttackPower")), NSLOCTEXT("GPCharacterStatsMenu", "AttackPower", "Attack"), UGP_AttributeSet::GetAttackPowerAttribute());
@@ -142,7 +160,7 @@ void UGP_CharacterStatsMenuWidget::RefreshAttributeSnapshots()
 	AddStatSnapshot(FName(TEXT("ChaosResistance")), NSLOCTEXT("GPCharacterStatsMenu", "ChaosResistance", "Chaos RES"), UGP_AttributeSet::GetChaosResistanceAttribute());
 	AddStatSnapshot(FName(TEXT("BruteResistance")), NSLOCTEXT("GPCharacterStatsMenu", "BruteResistance", "Brute RES"), UGP_AttributeSet::GetBruteResistanceAttribute());
 
-	BP_OnAttributeSnapshotsUpdated(AttributeSnapshots);
+	NotifyAttributeSnapshotsUpdated();
 }
 
 bool UGP_CharacterStatsMenuWidget::GetAttributeSnapshotById(FName Id, FGPCharacterStatSnapshot& OutSnapshot) const
@@ -210,7 +228,7 @@ void UGP_CharacterStatsMenuWidget::AddUniqueAttribute(TArray<FGameplayAttribute>
 
 void UGP_CharacterStatsMenuWidget::AddSnapshotAttributes(TArray<FGameplayAttribute>& Attributes) const
 {
-	// 메뉴에서 표시하는 기본 능력치들은 모두 델리게이트를 구독해 실시간으로 갱신합니다.
+	// Subscribe to every stat shown in the Attributes menu so native TextBlocks update in real time.
 	AddUniqueAttribute(Attributes, UGP_AttributeSet::GetHealthAttribute());
 	AddUniqueAttribute(Attributes, UGP_AttributeSet::GetMaxHealthAttribute());
 	AddUniqueAttribute(Attributes, UGP_AttributeSet::GetManaAttribute());
@@ -246,7 +264,7 @@ void UGP_CharacterStatsMenuWidget::AddWidgetTreeAttributes(TArray<FGameplayAttri
 	{
 		if (const UGP_AttributeWidget* AttributeWidget = Cast<UGP_AttributeWidget>(ChildWidget))
 		{
-			// 에디터에서 HP/Mana 바를 직접 배치한 경우 해당 바의 Attribute도 자동으로 구독합니다.
+			// Embedded attribute bars can declare their own attributes and still share the same GAS subscription path.
 			AddUniqueAttribute(Attributes, AttributeWidget->Attribute);
 			AddUniqueAttribute(Attributes, AttributeWidget->MaxAttribute);
 		}
@@ -281,11 +299,155 @@ void UGP_CharacterStatsMenuWidget::RemoveAttributeBindings()
 		{
 			if (Binding.Attribute.IsValid() && Binding.Handle.IsValid())
 			{
-				// 델리게이트를 추가한 정확한 Attribute에서 해제해야 재오픈 시 중복 갱신이 생기지 않습니다.
+				// Remove from the exact attribute delegate used during bind to prevent duplicate updates after reopen.
 				BoundASC->GetGameplayAttributeValueChangeDelegate(Binding.Attribute).Remove(Binding.Handle);
 			}
 		}
 	}
 
 	AttributeBindings.Reset();
+}
+
+void UGP_CharacterStatsMenuWidget::NotifyAttributeSnapshotsUpdated()
+{
+	RefreshStatTextBlocks();
+
+	if (bBroadcastAttributeSnapshotBlueprintEvent)
+	{
+		BP_OnAttributeSnapshotsUpdated(AttributeSnapshots);
+	}
+}
+
+void UGP_CharacterStatsMenuWidget::RefreshStatTextBlocks()
+{
+	if (!bEnableNativeStatTextBinding || !WidgetTree)
+	{
+		return;
+	}
+
+	if (ResolvedTextBindings.Num() == 0 && StatTextBindings.Num() > 0)
+	{
+		RebuildStatTextBindings();
+	}
+
+	for (const FGPResolvedCharacterStatTextBinding& Binding : ResolvedTextBindings)
+	{
+		UTextBlock* TextBlock = Binding.TextBlock.Get();
+		if (!IsValid(TextBlock))
+		{
+			continue;
+		}
+
+		FGPCharacterStatSnapshot Snapshot;
+		if (GetAttributeSnapshotById(Binding.StatId, Snapshot))
+		{
+			TextBlock->SetText(FormatStatText(Snapshot, Binding.Format));
+		}
+		else
+		{
+			TextBlock->SetText(FText::FromString(TEXT("--")));
+		}
+	}
+}
+
+void UGP_CharacterStatsMenuWidget::RebuildStatTextBindings()
+{
+	ResolvedTextBindings.Reset();
+
+	if (!bEnableNativeStatTextBinding || !WidgetTree)
+	{
+		return;
+	}
+
+	for (const FGPCharacterStatTextBinding& Binding : StatTextBindings)
+	{
+		if (Binding.StatId.IsNone() || Binding.WidgetName.IsNone())
+		{
+			continue;
+		}
+
+		if (UTextBlock* TextBlock = ResolveStatTextBlock(Binding.WidgetName))
+		{
+			FGPResolvedCharacterStatTextBinding ResolvedBinding;
+			ResolvedBinding.StatId = Binding.StatId;
+			ResolvedBinding.Format = Binding.Format;
+			ResolvedBinding.TextBlock = TextBlock;
+			ResolvedTextBindings.Add(ResolvedBinding);
+		}
+	}
+}
+
+UTextBlock* UGP_CharacterStatsMenuWidget::ResolveStatTextBlock(const FName& WidgetName) const
+{
+	if (!WidgetTree || WidgetName.IsNone())
+	{
+		return nullptr;
+	}
+
+	if (UTextBlock* ExactTextBlock = Cast<UTextBlock>(WidgetTree->FindWidget(WidgetName)))
+	{
+		return ExactTextBlock;
+	}
+
+	return FindTextBlockByNormalizedName(WidgetName);
+}
+
+UTextBlock* UGP_CharacterStatsMenuWidget::FindTextBlockByNormalizedName(const FName& WidgetName) const
+{
+	if (!WidgetTree)
+	{
+		return nullptr;
+	}
+
+	const FString TargetName = NormalizeWidgetLookupName(WidgetName);
+	UTextBlock* FoundTextBlock = nullptr;
+
+	WidgetTree->ForEachWidget([&FoundTextBlock, &TargetName](UWidget* ChildWidget)
+	{
+		if (FoundTextBlock)
+		{
+			return;
+		}
+
+		UTextBlock* CandidateTextBlock = Cast<UTextBlock>(ChildWidget);
+		if (!IsValid(CandidateTextBlock))
+		{
+			return;
+		}
+
+		if (NormalizeWidgetLookupName(CandidateTextBlock->GetFName()).Equals(TargetName, ESearchCase::IgnoreCase))
+		{
+			FoundTextBlock = CandidateTextBlock;
+		}
+	});
+
+	return FoundTextBlock;
+}
+
+FString UGP_CharacterStatsMenuWidget::NormalizeWidgetLookupName(const FName& Name)
+{
+	FString NormalizedName = Name.ToString();
+	NormalizedName.ReplaceInline(TEXT(" "), TEXT(""));
+	NormalizedName.ReplaceInline(TEXT("_"), TEXT(""));
+	NormalizedName.ReplaceInline(TEXT("-"), TEXT(""));
+	return NormalizedName.ToLower();
+}
+
+FText UGP_CharacterStatsMenuWidget::FormatStatText(const FGPCharacterStatSnapshot& Snapshot, EGPCharacterStatTextFormat Format)
+{
+	FNumberFormattingOptions NumberFormat;
+	NumberFormat.SetUseGrouping(false);
+	NumberFormat.SetMaximumFractionalDigits(0);
+	NumberFormat.SetMinimumFractionalDigits(0);
+
+	const FText CurrentValueText = FText::AsNumber(FMath::RoundToInt(Snapshot.Value), &NumberFormat);
+	if (Format == EGPCharacterStatTextFormat::ValueAndMax && Snapshot.bHasMaxValue)
+	{
+		return FText::Format(
+			NSLOCTEXT("GPCharacterStatsMenu", "ValueAndMax", "{0} / {1}"),
+			CurrentValueText,
+			FText::AsNumber(FMath::RoundToInt(Snapshot.MaxValue), &NumberFormat));
+	}
+
+	return CurrentValueText;
 }
