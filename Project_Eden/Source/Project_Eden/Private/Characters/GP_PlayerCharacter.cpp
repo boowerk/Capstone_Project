@@ -1,29 +1,43 @@
-#include "Characters/GP_PlayerCharacter.h"
-#include "Actors/GP_WhiteVoidSetActor.h"
-#include "Actors/GP_WhiteVoidSetComponent.h"
-#include "Animation/GP_CharacterAnimInstance.h"
-#include "Animation/AnimInstance.h"
-#include "Animation/GP_CharacterAnimInstance.h"
-#include "Animation/AnimMontage.h"
-#include "Animation/AnimSequenceBase.h"
-#include "Animation/BlendSpace.h"
-#include "Animation/AnimTypes.h"
-#include "Animation/PDA_CharacterAnimationSet.h"
+﻿#include "Characters/GP_PlayerCharacter.h"
+
+// Engine / Core Headers
+#include "AbilitySystemComponent.h"
+#include "TimerManager.h"
+#include "Net/UnrealNetwork.h"
+#include "Kismet/GameplayStatics.h"
+#include "HAL/IConsoleManager.h"
+#include "UObject/UnrealType.h"
+
+// Framework / Component Headers
+#include "GameFramework/PlayerController.h"
+#include "GameFramework/SpringArmComponent.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "Camera/CameraComponent.h"
 #include "Camera/PlayerCameraManager.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
-#include "CharacterTrajectoryComponent.h"
-#include "GameFramework/CharacterMovementComponent.h"
-#include "GameFramework/PlayerController.h"
-#include "GameFramework/SpringArmComponent.h"
-#include "Kismet/GameplayStatics.h"
-#include "Net/UnrealNetwork.h"
+
+// Animation Headers
+#include "Animation/AnimInstance.h"
+#include "Animation/AnimMontage.h"
+#include "Animation/AnimSequenceBase.h"
+#include "Animation/BlendSpace.h"
+#include "Animation/AnimTypes.h"
+
+// Project Specific Headers
 #include "Player/GP_PlayerState.h"
-#include "AbilitySystemComponent.h"
+#include "Actors/GP_WhiteVoidSetActor.h"
+#include "Actors/GP_WhiteVoidSetComponent.h"
+#include "Animation/GP_CharacterAnimInstance.h"
+#include "Animation/PDA_CharacterAnimationSet.h"
+#include "CharacterTrajectoryComponent.h"
 #include "GameplayTags/GP_Tags.h"
-#include "TimerManager.h"
-#include "UObject/UnrealType.h"
+
+static int32 GGPActionInertiaDebug = 1;
+static FAutoConsoleVariableRef CVarGPActionInertiaDebug(
+	TEXT("gp.ActionInertia.Debug"),
+	GGPActionInertiaDebug,
+	TEXT("Log action root-motion/fallback inertia samples."));
 
 AGP_PlayerCharacter::AGP_PlayerCharacter()
 {
@@ -41,13 +55,13 @@ AGP_PlayerCharacter::AGP_PlayerCharacter()
 	GetCharacterMovement()->RotationRate = FRotator(0.0f, 540.0f, 0.0f);
 	GetCharacterMovement()->JumpZVelocity = 500.f;
 	GetCharacterMovement()->AirControl = 0.2f;
-	
+
 	// 초기 속도 세팅
-	GetCharacterMovement()->MaxWalkSpeed = GetScaledNormalWalkSpeed(); 
+	GetCharacterMovement()->MaxWalkSpeed = GetScaledNormalWalkSpeed();
 	GetCharacterMovement()->MinAnalogWalkSpeed = 20.f;
-	
+
 	// 물리 제동 마찰력 (추후 블루프린트에서 제어하여 슬라이딩 거리를 조절합니다)
-	GetCharacterMovement()->BrakingDecelerationWalking = 1000.f; 
+	GetCharacterMovement()->BrakingDecelerationWalking = 1000.f;
 	GetCharacterMovement()->BrakingDecelerationFalling = 1500.f;
 
 	UEFNSourceMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("UEFNSourceMesh"));
@@ -77,8 +91,19 @@ AGP_PlayerCharacter::AGP_PlayerCharacter()
 	FollowCamera->bUsePawnControlRotation = false;
 
 	WhiteVoidSetClass = AGP_WhiteVoidSetActor::StaticClass();
-	
+
 	// 태그 추가 함수 추가후 호출 예정지
+}
+
+AGP_PlayerCharacter::~AGP_PlayerCharacter()
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(RestoreLagTimerHandle);
+	}
+
+	OnActionRootMotionCancelInput.Clear();
+	ActionMotionSamples.Empty();
 }
 
 void AGP_PlayerCharacter::BeginPlay()
@@ -127,18 +152,38 @@ void AGP_PlayerCharacter::Tick(float DeltaSeconds)
 		if (MoveComp && MoveComp->UpdatedComponent && (!RootMotionDeltaTranslation.IsNearlyZero() || !RootMotionDeltaRot.IsZero()))
 		{
 			const float TranslationYawOffset = AnimationSet ? AnimationSet->SourceRootMotionTranslationYawOffset : 0.0f;
-			const FVector CorrectedTranslation = FRotator(0.0f, TranslationYawOffset, 0.0f).RotateVector(RootMotionDeltaTranslation) * GetMovementSpeedScaleRatio();
+			const float RootMotionScaleRatio = GetMovementSpeedScaleRatio() * FMath::Max(FallbackRootMotionDistanceCorrection, 0.01f);
+			const FVector CorrectedTranslation = FRotator(0.0f, TranslationYawOffset, 0.0f).RotateVector(RootMotionDeltaTranslation) * RootMotionScaleRatio;
 			const FVector WorldDelta = GetActorTransform().TransformVectorNoScale(CorrectedTranslation);
 			const FQuat TargetRotation = RootMotionDeltaRot.IsZero()
 				? MoveComp->UpdatedComponent->GetComponentQuat()
 				: RootMotionDeltaRot.Quaternion() * MoveComp->UpdatedComponent->GetComponentQuat();
 
 			FHitResult MoveHit;
+			const FVector LocationBeforeMove = GetActorLocation();
 			MoveComp->SafeMoveUpdatedComponent(WorldDelta, TargetRotation, true, MoveHit);
 
 			if (DeltaSeconds > KINDA_SMALL_NUMBER)
 			{
-				LastUEFNSourceRootMotionVelocity = WorldDelta / DeltaSeconds;
+				const FVector ActualWorldDelta = GetActorLocation() - LocationBeforeMove;
+				LastUEFNSourceRootMotionVelocity = ActualWorldDelta / DeltaSeconds;
+				if (!LastUEFNSourceRootMotionVelocity.IsNearlyZero())
+				{
+					LastNonZeroUEFNSourceRootMotionVelocity = LastUEFNSourceRootMotionVelocity;
+				}
+
+				if (GGPActionInertiaDebug != 0)
+				{
+					UE_LOG(LogTemp, Warning, TEXT("[ActionRM][FallbackTick] Actor=%s Dt=%.4f Scale=%.3f Correction=%.3f RootDelta=%.1f WorldDelta=%.1f ActualDelta=%.1f ActualSpeed=%.1f"),
+						*GetName(),
+						DeltaSeconds,
+						RootMotionScaleRatio,
+						FallbackRootMotionDistanceCorrection,
+						RootMotionDeltaTranslation.Size2D(),
+						WorldDelta.Size2D(),
+						ActualWorldDelta.Size2D(),
+						LastUEFNSourceRootMotionVelocity.Size2D());
+				}
 			}
 		}
 	}
@@ -154,6 +199,8 @@ void AGP_PlayerCharacter::Tick(float DeltaSeconds)
 	}
 
 	UpdateConditionalMaxAcceleration(DeltaSeconds);
+	UpdateActionCarryVelocity(DeltaSeconds);
+	UpdateActionMotionTracking(DeltaSeconds);
 }
 
 UAnimInstance* AGP_PlayerCharacter::GetUEFNSourceAnimInstance() const
@@ -180,6 +227,7 @@ float AGP_PlayerCharacter::PlayUEFNSourceFallbackMontage(UAnimMontage* Montage, 
 		ActiveUEFNSourceFallbackMontage = Montage;
 		bApplyUEFNSourceFallbackRootMotion = true;
 		LastUEFNSourceRootMotionVelocity = FVector::ZeroVector;
+		LastNonZeroUEFNSourceRootMotionVelocity = FVector::ZeroVector;
 	}
 
 	return PlayedDuration;
@@ -191,6 +239,384 @@ bool AGP_PlayerCharacter::IsPlayingUEFNSourceFallbackMontage() const
 	return IsValid(SourceAnimInstance)
 		&& IsValid(ActiveUEFNSourceFallbackMontage)
 		&& SourceAnimInstance->Montage_IsPlaying(ActiveUEFNSourceFallbackMontage);
+}
+
+void AGP_PlayerCharacter::SetActionRootMotionInputCancelEnabled(bool bEnabled)
+{
+	UE_LOG(LogTemp, Warning, TEXT("[ActionEndTrace][Character] SetInputCancelEnabled=%d Actor=%s"),
+		bEnabled ? 1 : 0,
+		*GetName());
+	bActionRootMotionInputCancelEnabled = bEnabled;
+	if (bActionRootMotionInputCancelEnabled)
+	{
+		RequestActionRootMotionCancelIfMovementHeld();
+	}
+}
+
+bool AGP_PlayerCharacter::RequestActionRootMotionCancelIfMovementHeld()
+{
+	if (!bActionRootMotionInputCancelEnabled
+		|| FMath::Abs(LastActionRootMotionCancelMovementScale) <= KINDA_SMALL_NUMBER
+		|| LastActionRootMotionCancelMovementDirection.IsNearlyZero())
+	{
+		return false;
+	}
+
+	const UWorld* World = GetWorld();
+	const float CurrentTime = World ? World->GetTimeSeconds() : 0.0f;
+	if (World && HeldMovementInputCancelGraceTime > 0.0f
+		&& CurrentTime - LastActionRootMotionCancelMovementInputTime > HeldMovementInputCancelGraceTime)
+	{
+		return false;
+	}
+
+	UE_LOG(LogTemp, Warning, TEXT("[ActionEndTrace][Character] HeldMoveCancelBroadcast Actor=%s Scale=%.3f Dir=%s"),
+		*GetName(),
+		LastActionRootMotionCancelMovementScale,
+		*LastActionRootMotionCancelMovementDirection.ToCompactString());
+
+	bActionRootMotionInputCancelEnabled = false;
+	bActionRootMotionCancelledByMovementInput = true;
+	OnActionRootMotionCancelInput.Broadcast();
+	return true;
+}
+
+void AGP_PlayerCharacter::ClearActionRootMotionCancelMovementInput()
+{
+	LastActionRootMotionCancelMovementDirection = FVector::ZeroVector;
+	LastActionRootMotionCancelMovementScale = 0.0f;
+	LastActionRootMotionCancelMovementInputTime = 0.0f;
+}
+
+void AGP_PlayerCharacter::SetActionLowerBodyMotionMatchBlendEnabled(bool bEnabled)
+{
+	bBlendActionLowerBodyToMotionMatching = bEnabled;
+}
+
+void AGP_PlayerCharacter::BeginActionMotionTracking()
+{
+	bTrackActionMotion = true;
+	bBlendActionLowerBodyToMotionMatching = false;
+	bActionRootMotionCancelledByMovementInput = false;
+	LastActionMotionSampleLocation = GetActorLocation();
+	LastActionMotionSampleTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
+	ActionMotionEntryVelocity = GetVelocity();
+	ActionMotionEntryVelocity.Z = 0.0f;
+	ActionMotionCarryVelocity = ActionMotionEntryVelocity;
+	LastActionCarryActualDelta = FVector::ZeroVector;
+	CurrentActionMotionVelocity = FVector::ZeroVector;
+	LastNonZeroActionMotionVelocity = FVector::ZeroVector;
+	HeldPostActionAnimVelocity = FVector::ZeroVector;
+	HeldPostActionAnimVelocityUntilTime = 0.0f;
+	ActionMotionSamples.Reset();
+
+	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+	{
+		MoveComp->Velocity.X = 0.0f;
+		MoveComp->Velocity.Y = 0.0f;
+	}
+
+	if (GGPActionInertiaDebug != 0)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[ActionRM][Begin] Actor=%s EntrySpeed=%.1f Velocity=%s"),
+			*GetName(),
+			ActionMotionEntryVelocity.Size2D(),
+			*ActionMotionEntryVelocity.ToCompactString());
+	}
+}
+
+void AGP_PlayerCharacter::StopActionMotionTracking()
+{
+	UE_LOG(LogTemp, Warning, TEXT("[ActionEndTrace][Character] StopActionMotionTracking Actor=%s Track=%d CarrySpeed=%.1f CurrentSpeed=%.1f"),
+		*GetName(),
+		bTrackActionMotion ? 1 : 0,
+		ActionMotionCarryVelocity.Size2D(),
+		CurrentActionMotionVelocity.Size2D());
+	bTrackActionMotion = false;
+	bBlendActionLowerBodyToMotionMatching = false;
+	bActionRootMotionCancelledByMovementInput = false;
+	ActionMotionCarryVelocity = FVector::ZeroVector;
+	LastActionCarryActualDelta = FVector::ZeroVector;
+	CurrentActionMotionVelocity = FVector::ZeroVector;
+	LastNonZeroActionMotionVelocity = FVector::ZeroVector;
+	HeldPostActionAnimVelocity = FVector::ZeroVector;
+	HeldPostActionAnimVelocityUntilTime = 0.0f;
+	ActionMotionSamples.Reset();
+}
+
+void AGP_PlayerCharacter::UpdateActionCarryVelocity(float DeltaSeconds)
+{
+	LastActionCarryActualDelta = FVector::ZeroVector;
+
+	if (!bTrackActionMotion || !bCarryEntryVelocityDuringActionRootMotion || DeltaSeconds < (1.0f / 240.0f))
+	{
+		return;
+	}
+
+	UCharacterMovementComponent* MoveComp = GetCharacterMovement();
+	if (!MoveComp || !MoveComp->UpdatedComponent || ActionMotionCarryVelocity.IsNearlyZero())
+	{
+		return;
+	}
+
+	const FVector CarryDelta = ActionMotionCarryVelocity * DeltaSeconds;
+	const FVector LocationBeforeMove = GetActorLocation();
+
+	FHitResult MoveHit;
+	MoveComp->SafeMoveUpdatedComponent(CarryDelta, MoveComp->UpdatedComponent->GetComponentQuat(), true, MoveHit);
+	LastActionCarryActualDelta = GetActorLocation() - LocationBeforeMove;
+	LastActionCarryActualDelta.Z = 0.0f;
+
+	const float CarrySpeed = ActionMotionCarryVelocity.Size2D();
+	const float CarryDeceleration = MoveComp->GetMaxBrakingDeceleration();
+	const float NewCarrySpeed = FMath::Max(CarrySpeed - CarryDeceleration * DeltaSeconds, 0.0f);
+	ActionMotionCarryVelocity = NewCarrySpeed > 0.0f
+		? ActionMotionCarryVelocity.GetSafeNormal2D() * NewCarrySpeed
+		: FVector::ZeroVector;
+
+	if (GGPActionInertiaDebug != 0)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[ActionRM][Carry] Actor=%s Fallback=%d Dt=%.4f EntrySpeed=%.1f CarrySpeed=%.1f CarryDelta=%.1f ActualDelta=%.1f"),
+			*GetName(),
+			IsPlayingUEFNSourceFallbackMontage() ? 1 : 0,
+			DeltaSeconds,
+			ActionMotionEntryVelocity.Size2D(),
+			CarrySpeed,
+			CarryDelta.Size2D(),
+			LastActionCarryActualDelta.Size2D());
+	}
+}
+
+void AGP_PlayerCharacter::UpdateActionMotionTracking(float DeltaSeconds)
+{
+	if (!bTrackActionMotion || DeltaSeconds < (1.0f / 240.0f))
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	const float CurrentTime = World ? World->GetTimeSeconds() : 0.0f;
+	const FVector CurrentLocation = GetActorLocation();
+	FVector Delta = CurrentLocation - LastActionMotionSampleLocation;
+	Delta.Z = 0.0f;
+	CurrentActionMotionVelocity = DeltaSeconds > KINDA_SMALL_NUMBER ? Delta / DeltaSeconds : FVector::ZeroVector;
+	if (!CurrentActionMotionVelocity.IsNearlyZero())
+	{
+		LastNonZeroActionMotionVelocity = CurrentActionMotionVelocity;
+		LastNonZeroActionMotionVelocity.Z = 0.0f;
+	}
+	const FVector EstimatedRootMotionDelta = Delta - LastActionCarryActualDelta;
+	LastActionMotionSampleLocation = CurrentLocation;
+	LastActionMotionSampleTime = CurrentTime;
+
+	FGPActionMotionSample Sample;
+	Sample.Delta = Delta;
+	Sample.DeltaSeconds = DeltaSeconds;
+	Sample.TimeSeconds = CurrentTime;
+	ActionMotionSamples.Add(Sample);
+
+	if (GGPActionInertiaDebug != 0)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[ActionRM][Sample] Actor=%s Fallback=%d Dt=%.4f TotalDelta=%.1f TotalSpeed=%.1f RMDelta=%.1f RMSpeed=%.1f CarryDelta=%.1f CarrySpeed=%.1f Samples=%d"),
+			*GetName(),
+			IsPlayingUEFNSourceFallbackMontage() ? 1 : 0,
+			DeltaSeconds,
+			Delta.Size2D(),
+			Delta.Size2D() / DeltaSeconds,
+			EstimatedRootMotionDelta.Size2D(),
+			EstimatedRootMotionDelta.Size2D() / DeltaSeconds,
+			LastActionCarryActualDelta.Size2D(),
+			LastActionCarryActualDelta.Size2D() / DeltaSeconds,
+			ActionMotionSamples.Num());
+	}
+
+	const float OldestAllowedTime = CurrentTime - FMath::Max(ActionInertiaSampleWindow, 0.02f);
+	while (!ActionMotionSamples.IsEmpty() && ActionMotionSamples[0].TimeSeconds < OldestAllowedTime)
+	{
+		ActionMotionSamples.RemoveAt(0, 1, EAllowShrinking::No);
+	}
+}
+
+void AGP_PlayerCharacter::FlushActionMotionTracking()
+{
+	if (!bTrackActionMotion)
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	const float CurrentTime = World ? World->GetTimeSeconds() : 0.0f;
+	const float DeltaSeconds = CurrentTime - LastActionMotionSampleTime;
+	if (DeltaSeconds < (1.0f / 120.0f))
+	{
+		return;
+	}
+
+	UpdateActionMotionTracking(DeltaSeconds);
+}
+
+FVector AGP_PlayerCharacter::GetCurrentActionInertiaVelocity() const
+{
+	FVector TotalDelta = FVector::ZeroVector;
+	float TotalTime = 0.0f;
+
+	for (const FGPActionMotionSample& Sample : ActionMotionSamples)
+	{
+		TotalDelta += Sample.Delta;
+		TotalTime += Sample.DeltaSeconds;
+	}
+
+	if (TotalTime < ActionInertiaMinSampleTime)
+	{
+		return FVector::ZeroVector;
+	}
+
+	FVector SampledVelocity = TotalDelta / TotalTime;
+	SampledVelocity.Z = 0.0f;
+	return SampledVelocity;
+}
+
+FVector AGP_PlayerCharacter::GetActionMotionAnimVelocity() const
+{
+	if (!CurrentActionMotionVelocity.IsNearlyZero())
+	{
+		return CurrentActionMotionVelocity;
+	}
+
+	if (bTrackActionMotion && !LastNonZeroActionMotionVelocity.IsNearlyZero())
+	{
+		return LastNonZeroActionMotionVelocity;
+	}
+
+	const UWorld* World = GetWorld();
+	if (World && World->GetTimeSeconds() <= HeldPostActionAnimVelocityUntilTime)
+	{
+		return HeldPostActionAnimVelocity;
+	}
+
+	return FVector::ZeroVector;
+}
+
+bool AGP_PlayerCharacter::IsUsingPostActionAnimVelocity() const
+{
+	const UWorld* World = GetWorld();
+	return World
+		&& World->GetTimeSeconds() <= HeldPostActionAnimVelocityUntilTime
+		&& !HeldPostActionAnimVelocity.IsNearlyZero();
+}
+
+void AGP_PlayerCharacter::ApplyCurrentActionInertia()
+{
+	FlushActionMotionTracking();
+	bTrackActionMotion = false;
+	const UWorld* World = GetWorld();
+	const float CurrentTime = World ? World->GetTimeSeconds() : 0.0f;
+	const bool bHasRecentMoveInput =
+		World
+		&& FMath::Abs(LastActionRootMotionCancelMovementScale) > KINDA_SMALL_NUMBER
+		&& !LastActionRootMotionCancelMovementDirection.IsNearlyZero()
+		&& CurrentTime - LastActionRootMotionCancelMovementInputTime <= HeldMovementInputCancelGraceTime;
+	const bool bShouldHoldPostActionAnimVelocity =
+		bActionRootMotionCancelledByMovementInput || bHasRecentMoveInput;
+
+	if (bShouldHoldPostActionAnimVelocity && PostActionAnimVelocityHoldTime > 0.0f && !LastNonZeroActionMotionVelocity.IsNearlyZero())
+	{
+		HeldPostActionAnimVelocity = LastNonZeroActionMotionVelocity;
+		HeldPostActionAnimVelocity.Z = 0.0f;
+		HeldPostActionAnimVelocityUntilTime = World ? CurrentTime + PostActionAnimVelocityHoldTime : 0.0f;
+	}
+	else
+	{
+		HeldPostActionAnimVelocity = FVector::ZeroVector;
+		HeldPostActionAnimVelocityUntilTime = 0.0f;
+	}
+
+	if (!bApplyActionInertiaOnMontageComplete)
+	{
+		ActionMotionCarryVelocity = FVector::ZeroVector;
+		LastActionCarryActualDelta = FVector::ZeroVector;
+		CurrentActionMotionVelocity = FVector::ZeroVector;
+		LastNonZeroActionMotionVelocity = FVector::ZeroVector;
+		bActionRootMotionCancelledByMovementInput = false;
+		ActionMotionSamples.Reset();
+		return;
+	}
+
+	UCharacterMovementComponent* MoveComp = GetCharacterMovement();
+	if (!MoveComp)
+	{
+		ActionMotionCarryVelocity = FVector::ZeroVector;
+		LastActionCarryActualDelta = FVector::ZeroVector;
+		CurrentActionMotionVelocity = FVector::ZeroVector;
+		LastNonZeroActionMotionVelocity = FVector::ZeroVector;
+		bActionRootMotionCancelledByMovementInput = false;
+		ActionMotionSamples.Reset();
+		return;
+	}
+
+	FVector HandoffVelocity = ActionMotionCarryVelocity;
+	HandoffVelocity.Z = 0.0f;
+	if (bActionRootMotionCancelledByMovementInput && !LastActionRootMotionCancelMovementDirection.IsNearlyZero())
+	{
+		const float CarrySpeed = ActionMotionCarryVelocity.Size2D();
+		const float EntrySpeed = ActionMotionEntryVelocity.Size2D();
+		const float DesiredMoveSpeed = MoveComp->MaxWalkSpeed;
+		const float HandoffSeedSpeed = FMath::Max3(CarrySpeed, EntrySpeed, DesiredMoveSpeed);
+		HandoffVelocity = LastActionRootMotionCancelMovementDirection.GetSafeNormal2D() * HandoffSeedSpeed;
+		const UWorld* HandoffWorld = GetWorld();
+		HeldPostActionAnimVelocity = HandoffVelocity;
+		HeldPostActionAnimVelocity.Z = 0.0f;
+		HeldPostActionAnimVelocityUntilTime = HandoffWorld ? HandoffWorld->GetTimeSeconds() + PostActionAnimVelocityHoldTime : 0.0f;
+		UE_LOG(LogTemp, Warning, TEXT("[ActionRM][ApplyHeldInput] Actor=%s CarrySpeed=%.1f EntrySpeed=%.1f DesiredMoveSpeed=%.1f SeedSpeed=%.1f Dir=%s"),
+			*GetName(),
+			CarrySpeed,
+			EntrySpeed,
+			DesiredMoveSpeed,
+			HandoffSeedSpeed,
+			*LastActionRootMotionCancelMovementDirection.ToCompactString());
+	}
+
+	const float HandoffSpeed = HandoffVelocity.Size2D();
+	if (HandoffSpeed < ActionInertiaMinSpeed)
+	{
+		if (GGPActionInertiaDebug != 0)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[ActionRM][ApplySkip] Actor=%s EntrySpeed=%.1f HandoffSpeed=%.1f Samples=%d"),
+				*GetName(),
+				ActionMotionEntryVelocity.Size2D(),
+				HandoffSpeed,
+				ActionMotionSamples.Num());
+		}
+		ActionMotionCarryVelocity = FVector::ZeroVector;
+		LastActionCarryActualDelta = FVector::ZeroVector;
+		CurrentActionMotionVelocity = FVector::ZeroVector;
+		LastNonZeroActionMotionVelocity = FVector::ZeroVector;
+		bActionRootMotionCancelledByMovementInput = false;
+		ActionMotionSamples.Reset();
+		return;
+	}
+
+	if (ActionInertiaMaxSpeed > 0.0f && HandoffSpeed > ActionInertiaMaxSpeed)
+	{
+		HandoffVelocity = HandoffVelocity.GetSafeNormal2D() * ActionInertiaMaxSpeed;
+	}
+
+	MoveComp->Velocity = FVector(HandoffVelocity.X, HandoffVelocity.Y, MoveComp->Velocity.Z);
+	ActionMotionCarryVelocity = FVector::ZeroVector;
+	LastActionCarryActualDelta = FVector::ZeroVector;
+	CurrentActionMotionVelocity = FVector::ZeroVector;
+	LastNonZeroActionMotionVelocity = FVector::ZeroVector;
+	bActionRootMotionCancelledByMovementInput = false;
+	if (GGPActionInertiaDebug != 0)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[ActionRM][Apply] Actor=%s EntrySpeed=%.1f HandoffSpeed=%.1f Handoff=%s Samples=%d"),
+			*GetName(),
+			ActionMotionEntryVelocity.Size2D(),
+			HandoffVelocity.Size2D(),
+			*HandoffVelocity.ToCompactString(),
+			ActionMotionSamples.Num());
+	}
+	ActionMotionSamples.Reset();
 }
 
 void AGP_PlayerCharacter::Landed(const FHitResult& Hit)
@@ -208,6 +634,15 @@ void AGP_PlayerCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
 void AGP_PlayerCharacter::StopUEFNSourceFallbackMontage(float BlendOutTime)
 {
 	UAnimInstance* SourceAnimInstance = GetUEFNSourceAnimInstance();
+	const float SourcePosition = IsValid(SourceAnimInstance) && IsValid(ActiveUEFNSourceFallbackMontage)
+		? SourceAnimInstance->Montage_GetPosition(ActiveUEFNSourceFallbackMontage)
+		: -1.0f;
+	UE_LOG(LogTemp, Warning, TEXT("[ActionEndTrace][Character] StopFallbackMontage Actor=%s Montage=%s Pos=%.3f ApplyRM=%d Blend=%.2f"),
+		*GetName(),
+		*GetNameSafe(ActiveUEFNSourceFallbackMontage),
+		SourcePosition,
+		bApplyUEFNSourceFallbackRootMotion ? 1 : 0,
+		BlendOutTime);
 	if (IsValid(SourceAnimInstance))
 	{
 		if (IsValid(ActiveUEFNSourceFallbackMontage))
@@ -217,8 +652,13 @@ void AGP_PlayerCharacter::StopUEFNSourceFallbackMontage(float BlendOutTime)
 		// 방어 코드: 슬롯명 미스매칭이나 몽타주 매칭 어긋남 대비하여 전체 활성 몽타주 강제 정지 처리
 		SourceAnimInstance->Montage_Stop(BlendOutTime, nullptr);
 	}
+
 	bApplyUEFNSourceFallbackRootMotion = false;
+	bActionRootMotionInputCancelEnabled = false;
+	bBlendActionLowerBodyToMotionMatching = false;
+	bActionRootMotionCancelledByMovementInput = false;
 	ActiveUEFNSourceFallbackMontage = nullptr;
+	LastNonZeroUEFNSourceRootMotionVelocity = FVector::ZeroVector;
 }
 
 // ==========================================
@@ -240,11 +680,11 @@ void AGP_PlayerCharacter::PossessedBy(AController* NewController)
 {
 	Super::PossessedBy(NewController);
 	if (!IsValid(GetAbilitySystemComponent()) || !HasAuthority()) return;
-	
+
 	GetAbilitySystemComponent()->InitAbilityActorInfo(GetPlayerState(), this);
 	GetAbilitySystemComponent()->RegisterGameplayTagEvent(GPTags::State::Movement::Sprinting, EGameplayTagEventType::NewOrRemoved).AddUObject(this, &ThisClass::OnSprintingTagChanged);
 	GetAbilitySystemComponent()->RegisterGameplayTagEvent(GPTags::State::Status::Fixed, EGameplayTagEventType::NewOrRemoved).AddUObject(this, &ThisClass::OnFixedTagChanged);
-	
+
 	OnASCInitialized.Broadcast(GetAbilitySystemComponent(), GetAttributeSet());
 	GiveStartupAbilities();
 	InitializeAttributes();
@@ -254,9 +694,9 @@ void AGP_PlayerCharacter::OnRep_PlayerState()
 {
 	Super::OnRep_PlayerState();
 	if (!IsValid(GetAbilitySystemComponent())) return;
-	
+
 	GetAbilitySystemComponent()->InitAbilityActorInfo(GetPlayerState(), this);
-	
+
 	// 클라이언트 환경 Sprinting 태그 리스너 바인딩
 	GetAbilitySystemComponent()->RegisterGameplayTagEvent(GPTags::State::Movement::Sprinting, EGameplayTagEventType::NewOrRemoved).AddUObject(this, &ThisClass::OnSprintingTagChanged);
 	GetAbilitySystemComponent()->RegisterGameplayTagEvent(GPTags::State::Status::Fixed, EGameplayTagEventType::NewOrRemoved).AddUObject(this, &ThisClass::OnFixedTagChanged);
@@ -269,14 +709,33 @@ void AGP_PlayerCharacter::OnRep_PlayerState()
 
 void AGP_PlayerCharacter::AddMovementInput(FVector WorldDirection, float ScaleValue, bool bForce)
 {
+	if (FMath::Abs(ScaleValue) > KINDA_SMALL_NUMBER && !WorldDirection.IsNearlyZero())
+	{
+		LastActionRootMotionCancelMovementDirection = WorldDirection.GetSafeNormal2D();
+		LastActionRootMotionCancelMovementScale = ScaleValue;
+		LastActionRootMotionCancelMovementInputTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
+	}
+	else
+	{
+		ClearActionRootMotionCancelMovementInput();
+	}
+
 	// 기존 IsSprintExitControlLocked() 대신, ASC에서 직접 Fixed 태그만 검사
 	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
-	
+
 	if (!bForce && ASC && ASC->HasMatchingGameplayTag(GPTags::State::Status::Fixed))
 	{
-		return; 
+		if (bActionRootMotionInputCancelEnabled && FMath::Abs(ScaleValue) > KINDA_SMALL_NUMBER && !WorldDirection.IsNearlyZero())
+		{
+			RequestActionRootMotionCancelIfMovementHeld();
+			if (!ASC->HasMatchingGameplayTag(GPTags::State::Status::Fixed))
+			{
+				Super::AddMovementInput(WorldDirection, ScaleValue, bForce);
+			}
+		}
+		return;
 	}
-	
+
 	Super::AddMovementInput(WorldDirection, ScaleValue, bForce);
 }
 
@@ -284,11 +743,11 @@ void AGP_PlayerCharacter::ToggleSprinting()
 {
 	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
 	if (!ASC) return;
-	
+
 	// Sprinting 토글을 위한 태그 요청 (어빌리티 동작을 가정)
 	FGameplayTagContainer SprintTag;
-	SprintTag.AddTag(GPTags::State::Movement::Sprinting); 
-	
+	SprintTag.AddTag(GPTags::State::Movement::Sprinting);
+
 	if (IsSprinting())
 	{
 		// 달리기 중이라면 어빌리티/태그 강제 취소
@@ -307,7 +766,7 @@ void AGP_PlayerCharacter::StartSprinting()
 	if (!ASC || IsSprinting()) return;
 
 	FGameplayTagContainer SprintTag;
-	SprintTag.AddTag(GPTags::State::Movement::Sprinting); 
+	SprintTag.AddTag(GPTags::State::Movement::Sprinting);
 	ASC->TryActivateAbilitiesByTag(SprintTag);
 }
 
@@ -317,7 +776,7 @@ void AGP_PlayerCharacter::StopSprinting()
 	if (!ASC || !IsSprinting()) return;
 
 	FGameplayTagContainer SprintTag;
-	SprintTag.AddTag(GPTags::State::Movement::Sprinting); 
+	SprintTag.AddTag(GPTags::State::Movement::Sprinting);
 	ASC->CancelAbilities(&SprintTag);
 }
 
@@ -474,12 +933,12 @@ void AGP_PlayerCharacter::ApplyRetargetVisualScaleFromAnimationSet()
 bool AGP_PlayerCharacter::TryPerformDash()
 {
 	if (!GetAbilitySystemComponent()) return false;
-    
+
 	if (GetCharacterMovement()->IsFalling()) return false;
 
 	FGameplayTagContainer DashTag;
 	DashTag.AddTag(GPTags::Ability::Movement::Dash);
-    
+
 	return GetAbilitySystemComponent()->TryActivateAbilitiesByTag(DashTag);
 }
 
@@ -842,7 +1301,7 @@ void AGP_PlayerCharacter::ClearAbilitySlot(FGameplayTag SlotTag)
 	// 1. 기존 해당 슬롯에 있던 어빌리티 제거 (중복 방지)
 	const TArray<FGameplayAbilitySpec>& Specs = ASC->GetActivatableAbilities();
 	TArray<FGameplayAbilitySpecHandle> HandlesToRemove;
-	
+
 	for (const FGameplayAbilitySpec& Spec : Specs)
 	{
 		if (Spec.GetDynamicSpecSourceTags().HasTagExact(SlotTag))

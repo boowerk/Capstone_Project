@@ -200,6 +200,8 @@ namespace GPTags
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(MineBurst);
 
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(ConeSlash);
+
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(DashSlash);
 		}
 		namespace Data
 		{

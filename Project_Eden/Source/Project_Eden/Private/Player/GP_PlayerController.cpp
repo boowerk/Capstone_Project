@@ -210,6 +210,7 @@ void AGP_PlayerController::Input_MoveCompleted(const FInputActionValue& Value)
 	ResetMoveDirectionSmoothing();
 	if (AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetPawn()))
 	{
+		PlayerCharacter->ClearActionRootMotionCancelMovementInput();
 		if (UCharacterMovementComponent* MoveComp = PlayerCharacter->GetCharacterMovement())
 		{
 			MoveComp->bUseControllerDesiredRotation = false;

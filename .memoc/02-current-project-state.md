@@ -11,14 +11,26 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-05-28T18:40:00+09:00
+Last synced: 2026-06-01T00:29:00+09:00
 
 ## Current Status
 
-- Added `UGP_CharacterStatsMenuWidget` as a GAS-backed parent class for a Tab-opened Attributes menu; it snapshots player Health/Mana/Attack/Defense/Stagger/etc. and refreshes `UGP_AttributeWidget` children through ASC delegates.
-- `AGP_PlayerController` now exposes `CharacterStatsMenuWidgetClass` plus optional `CharacterStatsMenuAction`; if no action is assigned, Tab toggles the menu directly.
-- `UGP_CharacterStatsMenuWidget` now resolves value TextBlocks by name and writes GAS snapshot values in C++; `BP_OnAttributeSnapshotsUpdated` is optional/off by default for custom BP reactions only.
-- `ArtSource/UI/CharacterStatsMenu` contains source PNG candidates for the Attributes menu: dark background, red underline/selection/side strip, gold panel/divider/header ornaments, and stat icons.
+- ActionEnd lower-body handoff signal exists in C++ only for now. `Dash` and `DashSlash` request `SetActionLowerBodyMotionMatchBlendEnabled(true)` at ActionEnd/fallback ActionEnd, and `UGP_CharacterAnimInstance` exposes `ActionLowerBodyMotionMatchBlendAlpha` with interp speeds. The attempted AnimBP `LayeredBlendPerBone` graph insertion was reverted because it broke `DefaultSlot.Source` and caused non-montage animation A-pose. `ABP_UEFNSource_Player` and `ABP_MaskMan_Player` are restored to `pre-slot pose -> DefaultSlot -> Output`; a future lower-body handoff should use a cached-pose/safe single-consumer graph.
+- Held movement now cancels action RM at ActionEnd without requiring a fresh key press. `AGP_PlayerCharacter` caches non-zero movement input even while `Fixed`, clears it on `Input_MoveCompleted`, and when `SetActionRootMotionInputCancelEnabled(true)` is called it broadcasts `OnActionRootMotionCancelInput` immediately if cached input is recent. `UGP_Skill_DashSlash` now registers/removes the same cancel delegate path as `UGP_Dash`.
+- Log verification showed held cancel does fire for sprint-held fallback roll, but `ApplyCurrentActionInertia()` skipped because `ActionMotionCarryVelocity` had decayed to ~54 while entry speed was ~854. Held-input cancel now sets `bActionRootMotionCancelledByMovementInput` and seeds handoff velocity from max(carry, `ActionMotionEntryVelocity`, `CharacterMovement.MaxWalkSpeed`) in the held input direction, logging `[ActionRM][ApplyHeldInput]`.
+- Direction-change slip after roll is being handled by feeding the held-input handoff velocity back into animation context. When held-input handoff seeds velocity, it also overwrites `HeldPostActionAnimVelocity`. `UGP_CharacterAnimInstance` now uses non-zero action motion velocity to override future `GeneratedTrajectory` sample positions for the UEFNSource AnimInstance, logging `[ActionRM][AnimTrajectory]`, so MM can see the intended direction immediately after ActionEnd instead of waiting for the normal trajectory component to recover.
+- Trajectory override must not run during montage/root-motion playback. User observed good gameplay but odd vertical trajectory debug while rolling. The override condition was narrowed to `PlayerCharacter->IsUsingPostActionAnimVelocity()`, so roll playback keeps the normal `CharacterTrajectoryComponent` path and the synthetic future trajectory only exists for the short post-ActionEnd handoff window.
+- Rare stop stutter after sprint-roll with released input was likely caused by unconditional post-action anim velocity hold from the last RM velocity. `ApplyCurrentActionInertia()` now creates `HeldPostActionAnimVelocity` only when cached move input is still recent or the action ended through movement-input cancel; released-input natural completion clears the hold.
+- `ActionEnd` is control/input unlock, not montage end. For A-pose/default-pose bugs after RM actions, do not fix by changing RM/inertia end paths. Current trace patch adds `[ActionEndTrace]` logs; `UGP_Skill_DashSlash` treats `OnBlendOut` as log-only instead of completion. Logs showed fallback roll was not stopped by input in no-input tests; source fallback montage auto blend-out/default slot began before ability timer completion. After `Always Update Source Pose`, `AM_UEFN_Roll_RM` and `AM_UEFN_Sword_Dash_RM` BlendOut time is `0.25`.
+- After enabling `Always Update Source Pose` on `ABP_UEFNSource_Player.DefaultSlot`, source fallback montage BlendOut was raised to `0.25`. `AGP_PlayerCharacter` now keeps a short post-action anim velocity (`PostActionAnimVelocityHoldTime=0.35`) from the last non-zero action motion velocity so UEFNSource MM can pick moving/stop poses after fast jump-roll instead of snapping to idle while capsule velocity/CMC velocity differ.
+- Action root-motion movement is componentized as `authored/retargeted RM + shared carry`: target montages use their authored RM, source fallback montages use runtime-retarget consumed RM multiplied by `MovementSpeedScaleRatio`, and both add the same entry-velocity carry path. `BeginActionMotionTracking()` captures entry XY velocity then zeros CMC XY to avoid fallback double-consuming old movement velocity. Handoff applies remaining carry velocity only, not sampled RM+carry.
+- UEFNSource fallback montage debug/anim speed reads `AGP_PlayerCharacter::GetCurrentActionMotionVelocity()` during fallback playback because manual `SafeMoveUpdatedComponent` root motion is not reflected in `CharacterMovement->Velocity`.
+- Current roll RM source assets differ: `/Game/Characters/MaskMan/Animations/MaskMan_Roll_RM` root distance is ~593.9, while `/Game/Characters/UEFN_Mannequin/Animations/Montage/Roll/UEFN_Roll_RM` is ~465.5. With MaskMan `MovementSpeedScaleRatio=1.22`, fallback expected distance is ~568 before carry/collision.
+- `AGP_PlayerCharacter.FallbackRootMotionDistanceCorrection` defaults to `1.18` to compensate observed runtime fallback loss: user measured target roll ~590-600 and fallback ~502 with only MovementSpeedScaleRatio; corrected expected fallback is ~592.
+- DashSlash skill now exists as `UGP_Skill_DashSlash` plus `/Game/GAS_Pattern/AbilitySystem/Abilities/PlayerAbilities/Character1/GA_Skill_DashSlash` and `/Game/GAS_Pattern/AbilitySystem/SkillData/DA_Skill_DashSlash`. It plays `PDA_CharacterAnimationSet.SwordMontages.Dash_RM`, falls back to `SourceSwordMontages.Dash_RM`, and uses `GPTags.Cooldown.Skill.DashSlash` as a C++ cooldown fallback when the DA cooldown tag is blank.
+- `UGP_CharacterAnimInstance` now treats ground acceleration input as movement intent before `Speed2D` crosses `IdleSpeedThreshold`, so short idle-to-walk taps can select start/move motion instead of dragging the idle pose while the capsule accelerates.
+- Motion matching debug can now print from the `UEFNSource` anim instance with separate screen keys from the target mesh, including runtime DB, applied DB, result validity, and selected animation.
+- `UGP_Primary::StartComboSequence` no longer rotates the player toward current movement input before starting a combo montage, so primary attacks use the character's current forward direction only.
 - GAS damage/HUD triage: enemy and boss attacks now point/fallback to `/Game/GAS_Pattern/AbilitySystem/GameplayEffects/Damage/GE_PrimaryDamage`; player AttributeSet damage broadcasts use avatar fallback for PlayerState-owned ASCs.
 - Player HUD GAS binding now resolves attribute widgets by name and binds boss health through `UGP_AttributeWidget`; `/Game/UI/HUD/WBP_PlayerHUDWidget.BossBar` is expected to be a `WBP_BossBar` child with Health/MaxHealth attributes.
 - `BP_GP_PlayerCharacter` has a visible `UEFNSourceMesh` native skeletal mesh component attached above `CharacterMesh0`.
@@ -89,7 +101,7 @@ Last synced: 2026-05-23T00:00:00
 ## Project Snapshot
 
 <!-- memoc:snapshot:start -->
-- Last synced: 2026-05-27T00:22:36
+- Last synced: 2026-05-31T12:33:05
 - Detected stack: Not detected
 
 ### Source Directories

@@ -6,7 +6,6 @@
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 #include "Abilities/Tasks/AbilityTask_WaitInputPress.h"
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
-#include "Player/GP_PlayerController.h"
 #include "Utils/GP_BlueprintLibrary.h"
 
 UGP_Primary::UGP_Primary()
@@ -79,26 +78,9 @@ void UGP_Primary::StartComboSequence()
 		return;
 	}
 	
-	if (AGP_PlayerController* PCtrl = Cast<AGP_PlayerController>(PC->GetController()))
-	{
-		FVector2D MoveInput = PCtrl->GetCurrentMoveInput();
-		if (!MoveInput.IsNearlyZero())
-		{
-			const FRotator YawRotation(0.f, PCtrl->GetControlRotation().Yaw, 0.f);
-			const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
-			const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
-
-			// 2D 입력 벡터를 3D 월드 방향 벡터로 변환
-			FVector DesiredDirection = (ForwardDirection * MoveInput.Y) + (RightDirection * MoveInput.X);
-			DesiredDirection.Z = 0.0f; 
-			DesiredDirection.Normalize();
-
-			// 캐릭터의 방향을 즉시 변경
-			PC->SetActorRotation(DesiredDirection.Rotation());
-		}
-	}
 
 	ClearExistingTasks();
+	PC->BeginActionMotionTracking();
 
 	WaitHitTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(this, GPTags::Event::Player::AttackHit);
 	WaitHitTask->EventReceived.AddDynamic(this, &ThisClass::OnAttackHitEventReceived);
@@ -216,6 +198,14 @@ void UGP_Primary::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGam
 
 	if (AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo()))
 	{
+		if (!bWasCancelled)
+		{
+			PC->ApplyCurrentActionInertia();
+		}
+		else
+		{
+			PC->StopActionMotionTracking();
+		}
 		PC->StopUEFNSourceFallbackMontage(0.2f);
 	}
 

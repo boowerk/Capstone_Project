@@ -13,6 +13,35 @@ namespace
 const TCHAR* DefaultPoseSearchChooserPath = TEXT("/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/ChooserTables/CHT_MM_MaskMan_Root_OriginalStyle.CHT_MM_MaskMan_Root_OriginalStyle");
 const TCHAR* DeprecatedPoseSearchChooserName = TEXT("CHT_MM_MaskMan_Root.");
 
+void OverrideTrajectoryPrediction(FTransformTrajectory& Trajectory, const FVector& WorldVelocity)
+{
+	if (Trajectory.Samples.IsEmpty() || WorldVelocity.IsNearlyZero())
+	{
+		return;
+	}
+
+	int32 CurrentSampleIndex = 0;
+	float ClosestTimeToCurrent = TNumericLimits<float>::Max();
+	for (int32 SampleIndex = 0; SampleIndex < Trajectory.Samples.Num(); ++SampleIndex)
+	{
+		const float TimeDistance = FMath::Abs(Trajectory.Samples[SampleIndex].TimeInSeconds);
+		if (TimeDistance < ClosestTimeToCurrent)
+		{
+			ClosestTimeToCurrent = TimeDistance;
+			CurrentSampleIndex = SampleIndex;
+		}
+	}
+
+	const FVector CurrentPosition = Trajectory.Samples[CurrentSampleIndex].Position;
+	for (FTransformTrajectorySample& Sample : Trajectory.Samples)
+	{
+		if (Sample.TimeInSeconds > 0.0f)
+		{
+			Sample.Position = CurrentPosition + (WorldVelocity * Sample.TimeInSeconds);
+		}
+	}
+}
+
 E_MovementDirection ResolveMovementDirection(const FVector& LocalVelocityDirection)
 {
 	const FVector2D Direction2D(LocalVelocityDirection.X, LocalVelocityDirection.Y);
@@ -122,6 +151,10 @@ void UGP_CharacterAnimInstance::NativeInitializeAnimation()
 	Super::NativeInitializeAnimation();
 
 	Character = Cast<ACharacter>(TryGetPawnOwner());
+	if (!Character)
+	{
+		Character = Cast<ACharacter>(GetOwningActor());
+	}
 	if (Character)
 	{
 		MovementComponent = Character->GetCharacterMovement();
@@ -147,6 +180,10 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	if (!Character || !MovementComponent)
 	{
 		Character = Cast<ACharacter>(TryGetPawnOwner());
+		if (!Character)
+		{
+			Character = Cast<ACharacter>(GetOwningActor());
+		}
 		if (Character)
 		{
 			MovementComponent = Character->GetCharacterMovement();
@@ -158,10 +195,31 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		return;
 	}
 
-	const FVector WorldVelocity = Character->GetVelocity();
+	FVector WorldVelocity = Character->GetVelocity();
 	const FVector WorldAcceleration = MovementComponent->GetCurrentAcceleration();
 	const AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(Character);
 	const bool bCanUseRuntimePoseSearchChooser = PlayerCharacter && PlayerCharacter->GetUEFNSourceAnimInstance() == this;
+	const bool bBlendActionLowerBodyToMM = PlayerCharacter && PlayerCharacter->ShouldBlendActionLowerBodyToMotionMatching();
+	const float LowerBodyBlendSpeed = bBlendActionLowerBodyToMM ? ActionLowerBodyMotionMatchBlendInSpeed : ActionLowerBodyMotionMatchBlendOutSpeed;
+	ActionLowerBodyMotionMatchBlendAlpha = FMath::FInterpTo(
+		ActionLowerBodyMotionMatchBlendAlpha,
+		bBlendActionLowerBodyToMM ? 1.f : 0.f,
+		DeltaSeconds,
+		LowerBodyBlendSpeed);
+
+	FVector ActionMotionVelocity = FVector::ZeroVector;
+	if (bCanUseRuntimePoseSearchChooser)
+	{
+		ActionMotionVelocity = PlayerCharacter->GetActionMotionAnimVelocity();
+	}
+	if (bCanUseRuntimePoseSearchChooser && (PlayerCharacter->IsPlayingUEFNSourceFallbackMontage() || !ActionMotionVelocity.IsNearlyZero()))
+	{
+		if (!ActionMotionVelocity.IsNearlyZero())
+		{
+			WorldVelocity.X = ActionMotionVelocity.X;
+			WorldVelocity.Y = ActionMotionVelocity.Y;
+		}
+	}
 	if (bCanUseRuntimePoseSearchChooser &&
 		(!PoseSearchChooser || PoseSearchChooser->GetPathName().Contains(DeprecatedPoseSearchChooserName)))
 	{
@@ -180,7 +238,8 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	MMDatabaseLOD = static_cast<float>(static_cast<uint8>(MMDatabaseLODEnum));
 	const float CurrentMaxSpeed = MovementComponent->GetMaxSpeed() / MovementSpeedScaleRatio;
 	bIsSprinting = CurrentMaxSpeed >= SprintSpeedThreshold || Speed2D >= SprintSpeedThreshold;
-	const bool bIsMovingNow = Speed2D > IdleSpeedThreshold;
+	const bool bWantsGroundMovement = bHasAcceleration && !bIsFalling;
+	const bool bIsMovingNow = Speed2D > IdleSpeedThreshold || bWantsGroundMovement;
 	const bool bWasFallingLastFrame = MovementMode == E_MovementMode::InAir;
 	const E_MovementDirection PreviousDirection = MovementDirection;
 
@@ -219,7 +278,7 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	}
 
 	// Detect movement start for Chooser to select Start animations
-	IsStarting = !bWasMovingLastFrame && bIsMovingNow && bHasAcceleration;
+	IsStarting = !bWasMovingLastFrame && bWantsGroundMovement;
 	const bool bStopTriggeredThisFrame = bWasMovingLastFrame && !bHasAcceleration && !bIsFalling;
 	if (bStopTriggeredThisFrame)
 	{
@@ -272,17 +331,16 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	}
 
 	const float ActiveTurnThreshold = ShouldTurnInPlace ? 2.0f : TurnInPlaceYawThreshold;
+	const bool bCanKeepTurnInPlace = !bIsFalling && Speed2D <= TurnInPlaceMaxSpeed && !bHasAcceleration;
 
 	bool bWantTurnInPlace =
-		!bIsFalling &&
-		Speed2D <= TurnInPlaceMaxSpeed &&
-		!bHasAcceleration &&
+		bCanKeepTurnInPlace &&
 		TimeSinceMovementStopped >= TurnInPlaceMinIdleTime &&
 		TimeSinceLastLanded > LandedSignalDuration &&
 		YawDelta > ActiveTurnThreshold;
 
 	// Hysteresis: Keep TurnInPlace active for a minimum duration to prevent animation chattering
-	if (ShouldTurnInPlace && TimeSinceTurnInPlaceStarted < TurnInPlaceMinDuration)
+	if (ShouldTurnInPlace && bCanKeepTurnInPlace && TimeSinceTurnInPlaceStarted < TurnInPlaceMinDuration)
 	{
 		bWantTurnInPlace = true;
 	}
@@ -295,7 +353,7 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		if (AnimNameStr.Contains(TEXT("Turn")) || AnimNameStr.Contains(TEXT("turn")) || AnimNameStr.Contains(TEXT("TIP")))
 		{
 			// Reaction: Allow instant interruption if the player actually starts moving
-			if (Speed2D <= TurnInPlaceMaxSpeed && !bHasAcceleration && !bIsFalling)
+			if (bCanKeepTurnInPlace)
 			{
 				bWantTurnInPlace = true;
 			}
@@ -309,6 +367,7 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		Speed2D >= RunSpeedThreshold &&
 		!IsStopping &&
 		!IsPivoting &&
+		!ShouldTurnInPlace &&
 		YawRate >= MovingTurnYawRateThreshold;
 
 	JustTraversed = false;
@@ -363,6 +422,16 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 			TrajectoryPredictionCount);
 		GeneratedTrajectory = MoveTemp(UpdatedTrajectory);
 		NormalizeTrajectoryForMovementScale(GeneratedTrajectory, MovementSpeedScaleRatio);
+	}
+	if (bCanUseRuntimePoseSearchChooser && PlayerCharacter->IsUsingPostActionAnimVelocity())
+	{
+		FVector NormalizedActionMotionVelocity = ActionMotionVelocity;
+		NormalizedActionMotionVelocity.Z = 0.0f;
+		OverrideTrajectoryPrediction(GeneratedTrajectory, NormalizedActionMotionVelocity / MovementSpeedScaleRatio);
+		UE_LOG(LogTemp, Warning, TEXT("[ActionRM][AnimTrajectory] Mesh=%s Speed=%.1f Samples=%d"),
+			*GetNameSafe(GetOwningComponent()),
+			NormalizedActionMotionVelocity.Size2D(),
+			GeneratedTrajectory.Samples.Num());
 	}
 
 	if (bCanUseRuntimePoseSearchChooser && PoseSearchChooser)
@@ -430,13 +499,14 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	LastActorYaw = CurrentYaw;
 
 #if !UE_BUILD_SHIPPING
-	if (bEnableDebugLog && GEngine && PlayerCharacter && PlayerCharacter->IsLocallyControlled() && GetSkelMeshComponent() == PlayerCharacter->GetMesh())
+	const bool bIsUEFNSourceAnimInstance = PlayerCharacter && PlayerCharacter->GetUEFNSourceAnimInstance() == this;
+	if (GEngine && PlayerCharacter && PlayerCharacter->IsLocallyControlled() && bIsUEFNSourceAnimInstance)
 	{
 		const FString SelectedAnimText = bMotionMatchingResultValid
 			? (MotionMatchingSelectedAnimName.IsNone() ? TEXT("Null Asset") : MotionMatchingSelectedAnimName.ToString())
 			: TEXT("Invalid Result");
 		const FString DebugText = FString::Printf(
-			TEXT("DBG v2 Mesh: %s \nMM Speed2D: %.1f \nRaw Speed: %.1f \nSpeed Scale: %.2f \nProfile Scale: %.2f \nMaxWalk: %.1f \nGait: %s \nState: %s \nTurn:%d \nStop:%d \nPivot:%d \nSpin:%d \nPivotDot: %.2f \nYawRate: %.1f \nIdleT: %.2f \nStopT: %.2f \nPivotT: %.2f \nLandT: %.2f"),
+			TEXT("DBG v3 Mesh: %s (UEFNSource) \nMM Speed2D: %.1f \nRaw Speed: %.1f \nSpeed Scale: %.2f \nProfile Scale: %.2f \nMaxWalk: %.1f \nGait: %s \nState: %s \nTurn:%d \nStop:%d \nPivot:%d \nSpin:%d \nPivotDot: %.2f \nYawRate: %.1f \nIdleT: %.2f \nStopT: %.2f \nPivotT: %.2f \nLandT: %.2f"),
 			*GetNameSafe(GetSkelMeshComponent()),
 			Speed2D,
 			GroundSpeed,
@@ -456,17 +526,18 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 			TimeSincePivotStarted,
 			TimeSinceLastLanded);
 		const FString DebugAssetText = FString::Printf(
-			TEXT("MM DB: %s \nValid:%d \nAnim: %s"),
+			TEXT("MM DB: %s \nApplied DB: %s \nValid:%d \nAnim: %s"),
 			*GetNameSafe(RuntimePoseSearchDatabase),
+			*GetNameSafe(LastAppliedRuntimePoseSearchDatabase),
 			bMotionMatchingResultValid ? 1 : 0,
 			*SelectedAnimText);
 		GEngine->AddOnScreenDebugMessage(
-			0x4D4D4442,
+			0x4D4D4452,
 			0.f,
 			FColor::Cyan,
 			DebugText);
 		GEngine->AddOnScreenDebugMessage(
-			0x4D4D4443,
+			0x4D4D4453,
 			0.f,
 			FColor::Green,
 			DebugAssetText);

@@ -294,3 +294,31 @@ History: worklog. Resume risks: 04-handoff.md.
 
 ## Open Tasks
 - Run project build to verify compile, then launch PIE to test multi-play replicated transition and camera/MM smoothing.
+
+## [2026-05-31T12:33:05] archived summary (1347B)
+
+---
+memoc: true
+type: state
+scope: project-memory
+status: active
+tags:
+  - memoc
+  - memoc/state
+updated: 2026-05-31T20:27:00+09:00
+created: 2026-05-28T12:18:30
+---
+# Session Summary
+Last: 2026-05-31T20:48:00+09:00
+Replace, do not append. Keep <800B.
+
+## Status
+- ActionEnd remains input/control unlock, not montage end.
+- User enabled `Always Update Source Pose`; A-pose fixed. Source fallback RM montage BlendOut is `0.25`.
+- Added post-action anim velocity hold (`0.35s`) so source MM can see fast action handoff velocity.
+- Added ActionEnd lower-body MM signal in C++ only: Dash/DashSlash set `bBlendActionLowerBodyToMotionMatching`; `UGP_CharacterAnimInstance` exposes interp alpha.
+- Reverted unsafe AnimBP `LayeredBlendPerBone` graph insertion because it broke `DefaultSlot.Source`, making non-montage animation A-pose. Restored `ABP_UEFNSource_Player` and `ABP_MaskMan_Player` to `pre-slot pose -> DefaultSlot -> Output`.
+- Added held-move ActionEnd cancel: player caches movement input while Fixed, clears on MoveCompleted, and broadcasts cancel immediately when ActionEnd enables input cancel if movement is still held. DashSlash now registers the same cancel delegate as Dash.
+
+## Verify
+- Both AnimBPs compiled/saved after restore earlier. MCP hit usage limit before latest compile; user/editor must LiveCode or compile to verify C++.
