@@ -2,7 +2,9 @@
 
 #include "AbilitySystem/Abilities/GP_SkillAugmentData.h"
 #include "Components/Button.h"
+#include "Components/Image.h"
 #include "Components/TextBlock.h"
+#include "Engine/Texture2D.h"
 #include "Player/GP_PlayerState.h"
 
 void UGP_AugmentSelectWidget::NativeConstruct()
@@ -13,7 +15,7 @@ void UGP_AugmentSelectWidget::NativeConstruct()
 	if (Button_Augment1) { Button_Augment1->OnClicked.AddDynamic(this, &UGP_AugmentSelectWidget::SelectAugment1); }
 	if (Button_Augment2) { Button_Augment2->OnClicked.AddDynamic(this, &UGP_AugmentSelectWidget::SelectAugment2); }
 
-	RefreshCandidateTexts();
+	RefreshCandidateViews();
 }
 
 void UGP_AugmentSelectWidget::SetCandidateAugments(const TArray<UGP_SkillAugmentData*>& NewCandidateAugments)
@@ -26,7 +28,7 @@ void UGP_AugmentSelectWidget::SetCandidateAugments(const TArray<UGP_SkillAugment
 		CandidateAugments.Add(AugmentData);
 	}
 
-	RefreshCandidateTexts();
+	RefreshCandidateViews();
 }
 
 bool UGP_AugmentSelectWidget::SelectCandidateIndex(int32 CandidateIndex)
@@ -74,11 +76,36 @@ void UGP_AugmentSelectWidget::SelectAugment2()
 	SelectCandidateIndex(2);
 }
 
-void UGP_AugmentSelectWidget::RefreshCandidateTexts()
+void UGP_AugmentSelectWidget::RefreshCandidateViews()
 {
-	if (TextBlock_Augment0) { TextBlock_Augment0->SetText(GetAugmentDisplayText(GetCandidateAugment(0))); }
-	if (TextBlock_Augment1) { TextBlock_Augment1->SetText(GetAugmentDisplayText(GetCandidateAugment(1))); }
-	if (TextBlock_Augment2) { TextBlock_Augment2->SetText(GetAugmentDisplayText(GetCandidateAugment(2))); }
+	RefreshCandidateView(0, TextBlock_Augment0, TextBlock_Description0, Image_Icon0);
+	RefreshCandidateView(1, TextBlock_Augment1, TextBlock_Description1, Image_Icon1);
+	RefreshCandidateView(2, TextBlock_Augment2, TextBlock_Description2, Image_Icon2);
+}
+
+void UGP_AugmentSelectWidget::RefreshCandidateView(int32 CandidateIndex, UTextBlock* NameText, UTextBlock* DescriptionText, UImage* IconImage)
+{
+	const UGP_SkillAugmentData* AugmentData = GetCandidateAugment(CandidateIndex);
+
+	if (NameText)
+	{
+		NameText->SetText(GetAugmentDisplayText(AugmentData));
+	}
+
+	if (DescriptionText)
+	{
+		DescriptionText->SetText(IsValid(AugmentData) ? AugmentData->AugmentDescription : FText::GetEmpty());
+	}
+
+	if (IconImage)
+	{
+		UTexture2D* IconTexture = IsValid(AugmentData) ? AugmentData->AugmentIcon.LoadSynchronous() : nullptr;
+		IconImage->SetVisibility(IsValid(IconTexture) ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+		if (IsValid(IconTexture))
+		{
+			IconImage->SetBrushFromTexture(IconTexture, true);
+		}
+	}
 }
 
 FText UGP_AugmentSelectWidget::GetAugmentDisplayText(const UGP_SkillAugmentData* AugmentData) const

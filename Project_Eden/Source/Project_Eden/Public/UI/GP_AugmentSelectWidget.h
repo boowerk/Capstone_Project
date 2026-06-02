@@ -7,6 +7,7 @@
 class AGP_PlayerState;
 class UButton;
 class UGP_SkillAugmentData;
+class UImage;
 class UTextBlock;
 
 UCLASS()
@@ -54,6 +55,24 @@ protected:
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> TextBlock_Augment2;
 
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> TextBlock_Description0;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> TextBlock_Description1;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> TextBlock_Description2;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UImage> Image_Icon0;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UImage> Image_Icon1;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UImage> Image_Icon2;
+
 	UFUNCTION()
 	void SelectAugment0();
 
@@ -63,7 +82,8 @@ protected:
 	UFUNCTION()
 	void SelectAugment2();
 
-	void RefreshCandidateTexts();
+	void RefreshCandidateViews();
+	void RefreshCandidateView(int32 CandidateIndex, UTextBlock* NameText, UTextBlock* DescriptionText, UImage* IconImage);
 	FText GetAugmentDisplayText(const UGP_SkillAugmentData* AugmentData) const;
 	AGP_PlayerState* GetGPPlayerState() const;
 };
