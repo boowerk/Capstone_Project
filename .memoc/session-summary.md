@@ -12,17 +12,17 @@ updated: 2026-05-31T15:20:00+09:00
 created: 2026-05-28T12:18:30
 ---
 # Session Summary
-Last: 2026-06-02T01:35:00+09:00
+Last: 2026-06-02T20:51:00+09:00
 Replace, do not append. Keep <800B.
 History: worklog. Resume risks: 04-handoff.md.
 
 ## Status
-- Primary melee attacks now auto-acquire a nearby combat-valid target, reuse `TargetActor`, rotate player toward it during the swing, and interpolate local camera control rotation toward it.
-- `bIsLockOn` is not enabled for this flow, so lock-on does not force constant facing/movement constraints; other sword skills remain direction-driven.
-- Full Project_EdenEditor build passed after adding `Engine/OverlapResult.h`.
+- Primary melee has short lock-on style auto-facing/camera interpolation without enabling `bIsLockOn`.
+- Dash now snapshots active `UGP_Primary` before cancellation; during primary melee it plays `SourceDodgeMontages.Left_RM/Right_RM` instead of roll. Normal dash still uses roll/source roll.
+- Live Coding stays enabled, but project plugin preloading is disabled so `McpAutomationBridge` should be lazy-loaded instead of enabled for Live Coding rebuilds. `Project_EdenEditor Win64 Development` built successfully with UBT after closing the editor.
 
 ## Open Tasks
-- PIE-test primary melee auto-facing/camera interpolation feel.
+- PIE-test primary melee auto-facing and melee dodge feel.
 
 ## Resume
-- Build verified. Watch primary auto-facing radius/duration tuning in editor.
+- Local project user settings include `[/Script/LiveCoding.LiveCodingSettings] bEnabled=True`, `bPreloadProjectModules=True`, `bPreloadProjectPluginModules=False`.

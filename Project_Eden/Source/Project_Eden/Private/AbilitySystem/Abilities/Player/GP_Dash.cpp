@@ -2,6 +2,8 @@
 
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
+#include "AbilitySystemComponent.h"
+#include "AbilitySystem/Abilities/Player/GP_Primary.h"
 #include "Animation/GP_AnimNotify_SendGameplayEvent.h"
 #include "Animation/AnimInstance.h"
 #include "Characters/GP_PlayerCharacter.h"
@@ -11,6 +13,25 @@
 
 namespace
 {
+bool IsPrimaryAttackActive(const FGameplayAbilityActorInfo* ActorInfo)
+{
+	const UAbilitySystemComponent* ASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
+	if (!ASC)
+	{
+		return false;
+	}
+
+	for (const FGameplayAbilitySpec& Spec : ASC->GetActivatableAbilities())
+	{
+		if (Spec.IsActive() && Spec.Ability && Spec.Ability->IsA<UGP_Primary>())
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
 float FindFirstGameplayEventNotifyTime(const UAnimMontage* Montage, const FGameplayTag& EventTag)
 {
 	if (!IsValid(Montage) || !EventTag.IsValid())
@@ -59,6 +80,8 @@ UGP_Dash::UGP_Dash()
 
 void UGP_Dash::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
+	const bool bUseMeleeDodgeMontage = IsPrimaryAttackActive(ActorInfo);
+
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
 	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
@@ -84,8 +107,26 @@ void UGP_Dash::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FG
 	UAnimMontage* SourceDashMontage = nullptr;
 	if (UPDA_CharacterAnimationSet* AnimSet = PC->GetAnimationSet())
 	{
-		DashMontage = AnimSet->RollMontages.Roll_RM;
-		SourceDashMontage = AnimSet->SourceRollMontages.Roll_RM;
+		if (bUseMeleeDodgeMontage)
+		{
+			const FVector LocalDashDirection = PC->GetActorTransform().InverseTransformVectorNoScale(PC->GetLastMovementInputVector());
+			const bool bDodgeRight = LocalDashDirection.Y >= 0.0f;
+			SourceDashMontage = bDodgeRight
+				? AnimSet->SourceDodgeMontages.Right_RM
+				: AnimSet->SourceDodgeMontages.Left_RM;
+
+			if (!IsValid(SourceDashMontage))
+			{
+				SourceDashMontage = bDodgeRight
+					? AnimSet->SourceDodgeMontages.Left_RM
+					: AnimSet->SourceDodgeMontages.Right_RM;
+			}
+		}
+		else
+		{
+			DashMontage = AnimSet->RollMontages.Roll_RM;
+			SourceDashMontage = AnimSet->SourceRollMontages.Roll_RM;
+		}
 	}
 
 	if (!IsValid(DashMontage) && !IsValid(SourceDashMontage))
