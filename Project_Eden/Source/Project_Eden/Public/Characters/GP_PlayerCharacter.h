@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "Characters/GP_BaseCharacter.h"
@@ -17,10 +17,10 @@ class UPDA_WeaponItemCollection;
 class UPDA_CharacterAnimationSet;
 class UAnimSequenceBase;
 class UBlendSpace;
-
 class UGP_SkillData;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnSkillEquipped, FGameplayTag, SlotTag, UGP_SkillData*, SkillData);
+DECLARE_MULTICAST_DELEGATE(FOnActionRootMotionCancelInput);
 
 UCLASS()
 class PROJECT_EDEN_API AGP_PlayerCharacter : public AGP_BaseCharacter
@@ -28,27 +28,40 @@ class PROJECT_EDEN_API AGP_PlayerCharacter : public AGP_BaseCharacter
 	GENERATED_BODY()
 
 public:
+	// =========================================================================
+	// 1. 라이프사이클 & 기본 오버라이드 함수군 (Lifecycle & Base Overrides)
+	// =========================================================================
 	AGP_PlayerCharacter();
+	virtual ~AGP_PlayerCharacter() override;
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void Landed(const FHitResult& Hit) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
-	
+	virtual void AddMovementInput(FVector WorldDirection, float ScaleValue, bool bForce = false) override;
+
+	// =========================================================================
+	// 2. GAS (Gameplay Ability System) 인터페이스 & 상태 초기화
+	// =========================================================================
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 	virtual UAttributeSet* GetAttributeSet() const override;
 	virtual void PossessedBy(AController* NewController) override;
 	virtual void OnRep_PlayerState() override;
-	virtual void AddMovementInput(FVector WorldDirection, float ScaleValue, bool bForce = false) override;
-	
-	void ToggleSprinting(); 
+
+	// =========================================================================
+	// 3. 이동 및 상태 제어 API (Movement & State Control)
+	// =========================================================================
+	void ToggleSprinting();
 	void StartSprinting();
 	void StopSprinting();
-	bool IsSprinting() const; 
-	
+	bool IsSprinting() const;
+
 	bool TryPerformDash();
 	bool IsDashing() const;
 	bool IsLockOn() const { return bIsLockOn; }
 
+	// =========================================================================
+	// 4. 화이트 보이드 API (White Void Transition)
+	// =========================================================================
 	UFUNCTION(BlueprintCallable, Category = "White Void")
 	void ToggleWhiteVoid();
 
@@ -61,6 +74,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "White Void")
 	bool IsInWhiteVoid() const { return bIsInWhiteVoid; }
 
+	// =========================================================================
+	// 5. 이동 속도 프로필 & 제어 API (Movement Speed & Profiles)
+	// =========================================================================
 	float GetMovementSpeedScaleRatio() const;
 	float GetScaledNormalWalkSpeed() const;
 	float GetScaledSprintSpeed() const;
@@ -79,29 +95,121 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Movement|Speed")
 	void ClearMovementSpeedProfileOverride();
 
+	// =========================================================================
+	// 6. 애니메이션 세트 & UEFN 몽타주 / 루트 모션 / 액션 관성 제어
+	// =========================================================================
+	virtual void UpdateAnimationSet() override;
 	UPDA_CharacterAnimationSet* GetAnimationSet() const { return AnimationSet; }
 	UAnimInstance* GetUEFNSourceAnimInstance() const;
+
 	float PlayUEFNSourceFallbackMontage(UAnimMontage* Montage, float PlayRate = 1.0f);
 	bool IsPlayingUEFNSourceFallbackMontage() const;
 	void StopUEFNSourceFallbackMontage(float BlendOutTime = 0.2f);
+
+	void SetActionRootMotionInputCancelEnabled(bool bEnabled);
+	bool RequestActionRootMotionCancelIfMovementHeld();
+	void ClearActionRootMotionCancelMovementInput();
+
+	void BeginActionMotionTracking();
+	void StopActionMotionTracking();
+	void ApplyCurrentActionInertia();
+
 	FVector GetLastUEFNSourceRootMotionVelocity() const { return LastUEFNSourceRootMotionVelocity; }
-	
-	/** [데이터 에셋 기반] 런타임 스킬 교체 함수 (bIgnoreRestrictions로 로그라이크식 예외 지원) */
+	FVector GetCurrentActionMotionVelocity() const { return CurrentActionMotionVelocity; }
+	FVector GetActionMotionAnimVelocity() const;
+	bool IsUsingPostActionAnimVelocity() const;
+
+	void SetActionLowerBodyMotionMatchBlendEnabled(bool bEnabled);
+	bool ShouldBlendActionLowerBodyToMotionMatching() const { return bBlendActionLowerBodyToMotionMatching; }
+
+	FOnActionRootMotionCancelInput OnActionRootMotionCancelInput;
+
+	// =========================================================================
+	// 7. 런타임 스킬 장착 (Runtime Skill Equipment)
+	// =========================================================================
 	UFUNCTION(BlueprintCallable, Category = "GAS|Combat")
 	void EquipSkill(UGP_SkillData* NewSkillData, FGameplayTag SlotTag, bool bIgnoreRestrictions = false);
 
-	/** 구형 호환용 (클래스 직접 교체) */
 	UFUNCTION(BlueprintCallable, Category = "GAS|Combat", meta = (DeprecatedFunction, DeprecationMessage = "Use DataAsset version instead"))
 	void EquipSkillByClass(FGameplayTag SlotTag, TSubclassOf<UGameplayAbility> NewAbilityClass);
 
 	UPROPERTY(BlueprintAssignable, Category = "GAS|Events")
 	FOnSkillEquipped OnSkillEquipped;
 
+protected:
+	// =========================================================================
+	// 8. 가속도 제어 & 무브먼트 튜닝 함수군 (Movement Acceleration & Tuning)
+	// =========================================================================
+	void UpdateConditionalMaxAcceleration(float DeltaSeconds);
+	bool ShouldStartAccelerationClamp() const;
+	bool ShouldReleaseAccelerationClamp() const;
+	void RestoreNormalMaxAcceleration();
+
+	// =========================================================================
+	// 9. 애니메이션 및 비주얼 제어 이벤트 콜백 (Animation & Visual Callbacks)
+	// =========================================================================
+	void OnSprintingTagChanged(const FGameplayTag CallbackTag, int32 NewCount);
+	void OnFixedTagChanged(const FGameplayTag CallbackTag, int32 NewCount);
+	void ApplyMovementSpeedFromAnimationSet();
+	void ApplyRetargetVisualScaleFromAnimationSet();
+	void RefreshCurrentMaxWalkSpeed();
+	void PushMovementSpeedScaleRatioToAnimInstances();
+
+	// =========================================================================
+	// 10. 컴뱃 & 록온 (Combat & LockOn Variables)
+	// =========================================================================
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Combat|LockOn")
+	bool bIsLockOn = false;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Combat|LockOn")
+	TObjectPtr<AActor> TargetActor;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|LockOn")
+	float LockOnRotationInterpSpeed = 10.0f;
+
+	// =========================================================================
+	// 11. 장비 & 무기 관련 설정 (Equipment & Weapon Settings)
+	// =========================================================================
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment|Weapon")
+	TObjectPtr<UPDA_WeaponItemCollection> DefaultWeaponCollection;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment|Weapon")
+	FName DefaultWeaponId = TEXT("WP_Common_Fire_Sword");
+
+	// =========================================================================
+	// 12. 이동 프로필 및 가속도 제어 튜닝 설정값 (Movement Tuning Settings)
+	// =========================================================================
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Speed")
+	FGPDirectionalMovementSpeedProfile MovementSpeedProfile;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Speed")
+	bool bOverrideMovementSpeedProfile = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Speed", meta = (EditCondition = "bOverrideMovementSpeedProfile"))
+	FGPDirectionalMovementSpeedProfile MovementSpeedProfileOverride;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Speed|GAS", meta = (ClampMin = "0.01"))
+	float GASMovementSpeedMultiplier = 1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Speed|GAS", meta = (ClampMin = "0.01"))
+	float GASMovementSpeedScaleRatioMultiplier = 1.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Tuning")
+	float StartClampMaxAcceleration = 500.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Tuning")
+	float StartClampMaxDuration = 0.5f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Tuning")
+	float StartClampReleaseSpeed = 350.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Tuning")
+	bool bDebugStartAccelerationClamp = false;
 
 private:
-	bool GiveAbilityToSlot(FGameplayTag SlotTag, TSubclassOf<UGameplayAbility> AbilityClass, UObject* SourceObject = nullptr);
-	void ClearAbilitySlot(FGameplayTag SlotTag);
-
+	// =========================================================================
+	// 13. 컴포넌트 선언 (Internal Components)
+	// =========================================================================
 	UPROPERTY(VisibleAnywhere, Category = "Camera")
 	TObjectPtr<USpringArmComponent> CameraBoom;
 
@@ -111,12 +219,9 @@ private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Animation|Retarget", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USkeletalMeshComponent> UEFNSourceMesh;
 
-	UPROPERTY(Transient)
-	TObjectPtr<UAnimMontage> ActiveUEFNSourceFallbackMontage;
-
-	bool bApplyUEFNSourceFallbackRootMotion = false;
-	FVector LastUEFNSourceRootMotionVelocity = FVector::ZeroVector;
-
+	// =========================================================================
+	// 14. 화이트 보이드 제어 상태 & 내부 함수 (White Void Internal State & Helpers)
+	// =========================================================================
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "White Void", meta = (AllowPrivateAccess = "true"))
 	FVector WhiteVoidOffset = FVector(0.0, 0.0, -10000.0);
 
@@ -153,7 +258,7 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "White Void", meta = (AllowPrivateAccess = "true"))
 	bool bDebugWhiteVoidTransition = false;
 
-	UPROPERTY(BlueprintReadOnly, Replicated, Category = "White Void", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_IsInWhiteVoid, Category = "White Void", meta = (AllowPrivateAccess = "true"))
 	bool bIsInWhiteVoid = false;
 
 	bool bHasStoredWhiteVoidOrigin = false;
@@ -163,88 +268,102 @@ private:
 	bool bStoredCameraLagEnabled = false;
 	bool bStoredCameraRotationLagEnabled = false;
 
+	FTimerHandle RestoreLagTimerHandle;
+
 	UFUNCTION(Server, Reliable)
 	void ServerSetWhiteVoid(bool bNewInWhiteVoid);
 
+	UFUNCTION()
+	void OnRep_IsInWhiteVoid();
+
 	void SetWhiteVoidState(bool bNewInWhiteVoid);
 	void PerformWhiteVoidTransition(bool bNewInWhiteVoid);
-	void CacheWhiteVoidTransitionState();
+	void CacheWhiteVoidTransitionState(bool bCacheCameraLag = true);
 	void RestoreWhiteVoidCameraLag();
 	FVector ResolveWhiteVoidTargetLocation(bool bNewInWhiteVoid) const;
 	void EnsureWhiteVoidSetExists();
 	void ResetMotionTrajectoryAfterWhiteVoidTransition();
 	void SuppressMotionMatchingForWhiteVoidTransition() const;
 
-public:
-	virtual void UpdateAnimationSet() override;
+	// =========================================================================
+	// 15. 액션 루트 모션, 관성 & 몽타주 트래킹 (Action Motion Tracking)
+	// =========================================================================
+	struct FGPActionMotionSample
+	{
+		FVector Delta = FVector::ZeroVector;
+		float DeltaSeconds = 0.0f;
+		float TimeSeconds = 0.0f;
+	};
 
-protected:
-	
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Combat|LockOn")
-	bool bIsLockOn = false; 
-	
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Combat|LockOn")
-	TObjectPtr<AActor> TargetActor; 
-	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|LockOn")
-	float LockOnRotationInterpSpeed = 10.0f;
+	void UpdateActionMotionTracking(float DeltaSeconds);
+	void UpdateActionCarryVelocity(float DeltaSeconds);
+	void FlushActionMotionTracking();
+	FVector GetCurrentActionInertiaVelocity() const;
 
-	
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment|Weapon")
-	TObjectPtr<UPDA_WeaponItemCollection> DefaultWeaponCollection;
+	UPROPERTY(Transient)
+	TObjectPtr<UAnimMontage> ActiveUEFNSourceFallbackMontage;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment|Weapon")
-	FName DefaultWeaponId = TEXT("WP_Common_Fire_Sword");
-	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Speed")
-	FGPDirectionalMovementSpeedProfile MovementSpeedProfile;
+	bool bApplyUEFNSourceFallbackRootMotion = false;
+	bool bActionRootMotionInputCancelEnabled = false;
+	bool bBlendActionLowerBodyToMotionMatching = false;
+	bool bActionRootMotionCancelledByMovementInput = false;
+	FVector LastActionRootMotionCancelMovementDirection = FVector::ZeroVector;
+	float LastActionRootMotionCancelMovementScale = 0.0f;
+	float LastActionRootMotionCancelMovementInputTime = 0.0f;
+	FVector LastUEFNSourceRootMotionVelocity = FVector::ZeroVector;
+	FVector LastNonZeroUEFNSourceRootMotionVelocity = FVector::ZeroVector;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Speed")
-	bool bOverrideMovementSpeedProfile = false;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animation|Runtime Retarget Fallback", meta = (AllowPrivateAccess = "true", ClampMin = "0.01"))
+	float FallbackRootMotionDistanceCorrection = 1.18f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Speed", meta = (EditCondition = "bOverrideMovementSpeedProfile"))
-	FGPDirectionalMovementSpeedProfile MovementSpeedProfileOverride;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Action Root Motion", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float HeldMovementInputCancelGraceTime = 0.50f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Speed|GAS", meta = (ClampMin = "0.01"))
-	float GASMovementSpeedMultiplier = 1.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Action Inertia", meta = (AllowPrivateAccess = "true"))
+	bool bApplyActionInertiaOnMontageComplete = true;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Speed|GAS", meta = (ClampMin = "0.01"))
-	float GASMovementSpeedScaleRatioMultiplier = 1.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Action Inertia", meta = (AllowPrivateAccess = "true", ClampMin = "0.02"))
+	float ActionInertiaSampleWindow = 0.12f;
 
-	
-	// GAS 태그 이벤트 콜백
-	void OnSprintingTagChanged(const FGameplayTag CallbackTag, int32 NewCount);
-	void OnFixedTagChanged(const FGameplayTag CallbackTag, int32 NewCount);
-	void ApplyMovementSpeedFromAnimationSet();
-	void ApplyRetargetVisualScaleFromAnimationSet();
-	void RefreshCurrentMaxWalkSpeed();
-	void PushMovementSpeedScaleRatioToAnimInstances();
-	
-	// 가속도 가변 제어 튜닝 설정값
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Tuning")
-	float StartClampMaxAcceleration = 500.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Action Inertia", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float ActionInertiaMinSampleTime = 0.03f;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Tuning")
-	float StartClampMaxDuration = 0.5f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Action Inertia", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float ActionInertiaMinSpeed = 100.0f;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Tuning")
-	float StartClampReleaseSpeed = 350.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Action Inertia", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float ActionInertiaMaxSpeed = 0.0f;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Tuning")
-	bool bDebugStartAccelerationClamp = false;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Action Inertia", meta = (AllowPrivateAccess = "true"))
+	bool bCarryEntryVelocityDuringActionRootMotion = true;
 
-private:
-	// 런타임 제어 상태 변수
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Action Inertia", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float PostActionAnimVelocityHoldTime = 0.35f;
+
+	bool bTrackActionMotion = false;
+	FVector LastActionMotionSampleLocation = FVector::ZeroVector;
+	float LastActionMotionSampleTime = 0.0f;
+	FVector ActionMotionEntryVelocity = FVector::ZeroVector;
+	FVector ActionMotionCarryVelocity = FVector::ZeroVector;
+	FVector LastActionCarryActualDelta = FVector::ZeroVector;
+	FVector CurrentActionMotionVelocity = FVector::ZeroVector;
+	FVector LastNonZeroActionMotionVelocity = FVector::ZeroVector;
+	FVector HeldPostActionAnimVelocity = FVector::ZeroVector;
+	float HeldPostActionAnimVelocityUntilTime = 0.0f;
+	TArray<FGPActionMotionSample> ActionMotionSamples;
+
+	// =========================================================================
+	// 16. 가속도 제어 런타임 변수 (Movement Acceleration Runtime States)
+	// =========================================================================
 	bool bIsStartAccelerationClamped = false;
 	float StartAccelerationClampElapsed = 0.0f;
 	float NormalMaxAcceleration = 2048.0f;
 	FVector LastMoveInputDirection = FVector::ZeroVector;
 	float MoveInputReversalGraceTimeRemaining = 0.0f;
 
-protected:
-	void UpdateConditionalMaxAcceleration(float DeltaSeconds);
-	bool ShouldStartAccelerationClamp() const;
-	bool ShouldReleaseAccelerationClamp() const;
-	void RestoreNormalMaxAcceleration();
-
+	// =========================================================================
+	// 17. 능력 및 스킬 제어 유틸 함수 (Ability Slot Control Helpers)
+	// =========================================================================
+	bool GiveAbilityToSlot(FGameplayTag SlotTag, TSubclassOf<UGameplayAbility> AbilityClass, UObject* SourceObject = nullptr);
+	void ClearAbilitySlot(FGameplayTag SlotTag);
 };

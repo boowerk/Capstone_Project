@@ -8,6 +8,8 @@
 
 #include "GP_AttributeWidget.generated.h"
 
+class UProgressBar;
+
 /**
  * 
  */
@@ -34,4 +36,13 @@ public:
 	
 protected:
 	virtual void NativeConstruct() override;
+
+private:
+	// Blueprint가 BP_OnAttributeChange를 구현하지 않아도 기본 ProgressBar를 GAS 값으로 갱신하기 위한 fallback입니다.
+	UPROPERTY(Transient)
+	TObjectPtr<UProgressBar> CachedNativeProgressBar;
+
+	void ApplyNativeProgressBarValue(float NewValue, float NewMaxValue);
+	UProgressBar* ResolveNativeProgressBar();
+	bool ShouldUseBossFillColorFallback() const;
 };

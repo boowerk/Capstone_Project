@@ -4,6 +4,7 @@
 #include "Components/Widget.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystem/GP_AttributeSet.h"
+#include "Blueprint/WidgetTree.h"
 #include "Characters/GP_BaseCharacter.h"
 
 UGP_PlayerHUDWidget::UGP_PlayerHUDWidget(const FObjectInitializer& ObjectInitializer)
@@ -51,41 +52,225 @@ void UGP_PlayerHUDWidget::BindToASC(UAbilitySystemComponent* InASC)
 	UGP_AttributeSet* AS = const_cast<UGP_AttributeSet*>(Cast<UGP_AttributeSet>(InASC->GetAttributeSet(UGP_AttributeSet::StaticClass())));
 	if (!IsValid(AS)) return;
 
-	auto BindWidgetDelegates = [InASC, AS](UGP_AttributeWidget* Widget)
+	RemoveAttributeDelegateHandles(BoundPlayerASC, PlayerAttributeDelegateHandles);
+	BoundPlayerASC = InASC;
+
+	auto ResolveAttributeWidget = [this](UGP_AttributeWidget* BoundWidget, const FName WidgetName)
 	{
-		if (!Widget) return;
-
-		TTuple<FGameplayAttribute, FGameplayAttribute> Pair(Widget->Attribute, Widget->MaxAttribute);
-        
-		// 1. 바인딩 즉시 현재 수치로 1회 강제 업데이트
-		Widget->OnAttributeChange(Pair, AS);
-
-		// 메모리 보호를 위해 약은 포인터 생성
-		TWeakObjectPtr<UGP_AttributeWidget> WeakWidget(Widget);
-		TWeakObjectPtr<UGP_AttributeSet> WeakAS(AS);
-
-		// 2. 현재값 변화 감지
-		InASC->GetGameplayAttributeValueChangeDelegate(Pair.Key).AddLambda([WeakWidget, Pair, WeakAS](const FOnAttributeChangeData& Data)
+		if (IsValid(BoundWidget))
 		{
-			if (WeakWidget.IsValid() && WeakAS.IsValid())
-			{
-				WeakWidget->OnAttributeChange(Pair, WeakAS.Get());
-			}
-		});
+			return BoundWidget;
+		}
 
-		// 3. 최대값 변화 감지
-		InASC->GetGameplayAttributeValueChangeDelegate(Pair.Value).AddLambda([WeakWidget, Pair, WeakAS](const FOnAttributeChangeData& Data)
-		{
-			if (WeakWidget.IsValid() && WeakAS.IsValid())
-			{
-				WeakWidget->OnAttributeChange(Pair, WeakAS.Get());
-			}
-		});
+		return Cast<UGP_AttributeWidget>(GetWidgetFromName(WidgetName));
 	};
 
-	BindWidgetDelegates(HealthBar);
-	BindWidgetDelegates(ManaBar);
-	BindWidgetDelegates(StaminaBar);
+	BindAttributeWidgetToASC(InASC, ResolveAttributeWidget(HealthBar, TEXT("HealthBar")), AS, PlayerAttributeDelegateHandles);
+	BindAttributeWidgetToASC(InASC, ResolveAttributeWidget(ManaBar, TEXT("ManaBar")), AS, PlayerAttributeDelegateHandles);
+	BindAttributeWidgetToASC(InASC, ResolveAttributeWidget(StaminaBar, TEXT("StaminaBar")), AS, PlayerAttributeDelegateHandles);
+}
+
+void UGP_PlayerHUDWidget::BindBossToASC(UAbilitySystemComponent* InASC)
+{
+	if (!IsValid(InASC))
+	{
+		ClearBossASC();
+		return;
+	}
+
+	UGP_AttributeSet* AS = const_cast<UGP_AttributeSet*>(Cast<UGP_AttributeSet>(InASC->GetAttributeSet(UGP_AttributeSet::StaticClass())));
+	if (!IsValid(AS))
+	{
+		ClearBossASC();
+		return;
+	}
+
+	if (UGP_AttributeWidget* BossAttributeWidget = ResolveBossHealthBar())
+	{
+		EnsureBossHealthAttributes(BossAttributeWidget);
+
+		if (BoundBossASC == InASC && BossAttributeDelegateHandles.Num() > 0)
+		{
+			TTuple<FGameplayAttribute, FGameplayAttribute> Pair(BossAttributeWidget->Attribute, BossAttributeWidget->MaxAttribute);
+			if (Pair.Key.IsValid() && Pair.Value.IsValid())
+			{
+				BossAttributeWidget->OnAttributeChange(Pair, AS);
+			}
+			return;
+		}
+
+		RemoveAttributeDelegateHandles(BoundBossASC, BossAttributeDelegateHandles);
+		BoundBossASC = InASC;
+		BindAttributeWidgetToASC(InASC, BossAttributeWidget, AS, BossAttributeDelegateHandles);
+		return;
+	}
+
+	ClearBossASC();
+}
+
+void UGP_PlayerHUDWidget::ClearBossASC()
+{
+	RemoveAttributeDelegateHandles(BoundBossASC, BossAttributeDelegateHandles);
+}
+
+void UGP_PlayerHUDWidget::BindAttributeWidgetToASC(UAbilitySystemComponent* InASC, UGP_AttributeWidget* Widget, UGP_AttributeSet* AttributeSet, TArray<FGPAttributeDelegateBinding>& DelegateHandles)
+{
+	if (!IsValid(InASC) || !IsValid(Widget) || !IsValid(AttributeSet))
+	{
+		return;
+	}
+
+	TTuple<FGameplayAttribute, FGameplayAttribute> Pair(Widget->Attribute, Widget->MaxAttribute);
+	if (!Pair.Key.IsValid() || !Pair.Value.IsValid())
+	{
+		return;
+	}
+
+	Widget->OnAttributeChange(Pair, AttributeSet);
+
+	TWeakObjectPtr<UGP_AttributeWidget> WeakWidget(Widget);
+	TWeakObjectPtr<UGP_AttributeSet> WeakAS(AttributeSet);
+
+	FDelegateHandle CurrentValueHandle = InASC->GetGameplayAttributeValueChangeDelegate(Pair.Key).AddLambda([WeakWidget, Pair, WeakAS](const FOnAttributeChangeData& Data)
+	{
+		if (WeakWidget.IsValid() && WeakAS.IsValid())
+		{
+			WeakWidget->OnAttributeChange(Pair, WeakAS.Get());
+		}
+	});
+	DelegateHandles.Emplace(Pair.Key, CurrentValueHandle);
+
+	FDelegateHandle MaxValueHandle = InASC->GetGameplayAttributeValueChangeDelegate(Pair.Value).AddLambda([WeakWidget, Pair, WeakAS](const FOnAttributeChangeData& Data)
+	{
+		if (WeakWidget.IsValid() && WeakAS.IsValid())
+		{
+			WeakWidget->OnAttributeChange(Pair, WeakAS.Get());
+		}
+	});
+	DelegateHandles.Emplace(Pair.Value, MaxValueHandle);
+}
+
+void UGP_PlayerHUDWidget::RemoveAttributeDelegateHandles(TWeakObjectPtr<UAbilitySystemComponent>& BoundASC, TArray<FGPAttributeDelegateBinding>& DelegateHandles)
+{
+	if (BoundASC.IsValid())
+	{
+		for (const FGPAttributeDelegateBinding& Binding : DelegateHandles)
+		{
+			if (Binding.Attribute.IsValid() && Binding.Handle.IsValid())
+			{
+				// Remove the handle from the exact GAS attribute delegate it was added to.
+				BoundASC->GetGameplayAttributeValueChangeDelegate(Binding.Attribute).Remove(Binding.Handle);
+			}
+		}
+	}
+
+	DelegateHandles.Reset();
+	BoundASC.Reset();
+}
+
+void UGP_PlayerHUDWidget::EnsureBossHealthAttributes(UGP_AttributeWidget* Widget) const
+{
+	if (!IsValid(Widget))
+	{
+		return;
+	}
+
+	// WBP_BossBar is a GP_AttributeWidget, so force it to boss Health/MaxHealth even if the BP defaults are missing.
+	Widget->Attribute = UGP_AttributeSet::GetHealthAttribute();
+	Widget->MaxAttribute = UGP_AttributeSet::GetMaxHealthAttribute();
+}
+
+UGP_AttributeWidget* UGP_PlayerHUDWidget::ResolveAttributeWidgetFromWidget(UWidget* WidgetObject) const
+{
+	if (!IsValid(WidgetObject))
+	{
+		return nullptr;
+	}
+
+	if (UGP_AttributeWidget* AttributeWidget = Cast<UGP_AttributeWidget>(WidgetObject))
+	{
+		return AttributeWidget;
+	}
+
+	const UUserWidget* UserWidget = Cast<UUserWidget>(WidgetObject);
+	if (!IsValid(UserWidget) || !UserWidget->WidgetTree)
+	{
+		return nullptr;
+	}
+
+	UGP_AttributeWidget* FoundWidget = nullptr;
+	UserWidget->WidgetTree->ForEachWidget([&FoundWidget](UWidget* ChildWidget)
+	{
+		if (!FoundWidget)
+		{
+			FoundWidget = Cast<UGP_AttributeWidget>(ChildWidget);
+		}
+	});
+
+	return FoundWidget;
+}
+
+UGP_AttributeWidget* UGP_PlayerHUDWidget::ResolveAttributeWidgetByName(const FName WidgetName) const
+{
+	// Boss bars may be either a direct GP_AttributeWidget or a wrapper UserWidget that contains one.
+	return ResolveAttributeWidgetFromWidget(GetWidgetFromName(WidgetName));
+}
+
+UGP_AttributeWidget* UGP_PlayerHUDWidget::ResolveBossHealthBar() const
+{
+	if (BossHealthBar)
+	{
+		return BossHealthBar;
+	}
+
+	if (!WidgetTree)
+	{
+		return nullptr;
+	}
+
+	static const FName CandidateNames[] =
+	{
+		TEXT("BossHealthBar"),
+		TEXT("BossBar"),
+		TEXT("WBP_BossBar"),
+		TEXT("BossHealth"),
+		TEXT("BossHPBar")
+	};
+
+	for (const FName& CandidateName : CandidateNames)
+	{
+		if (UGP_AttributeWidget* CandidateWidget = ResolveAttributeWidgetByName(CandidateName))
+		{
+			return CandidateWidget;
+		}
+	}
+
+	if (UGP_AttributeWidget* CandidateWidget = ResolveAttributeWidgetFromWidget(BossFrame))
+	{
+		return CandidateWidget;
+	}
+
+	if (UGP_AttributeWidget* CandidateWidget = ResolveAttributeWidgetByName(TEXT("BossBox")))
+	{
+		return CandidateWidget;
+	}
+
+	UGP_AttributeWidget* FoundBossWidget = nullptr;
+	WidgetTree->ForEachWidget([this, &FoundBossWidget](UWidget* ChildWidget)
+	{
+		if (!FoundBossWidget && ChildWidget && ChildWidget->GetName().Contains(TEXT("Boss")))
+		{
+			// As a last resort, scan only Boss-named widgets to avoid binding the player health bar by mistake.
+			FoundBossWidget = ResolveAttributeWidgetFromWidget(ChildWidget);
+		}
+	});
+
+	if (FoundBossWidget)
+	{
+		return FoundBossWidget;
+	}
+
+	return nullptr;
 }
 
 void UGP_PlayerHUDWidget::SetLocationText(const FText& InLocationText)

@@ -7,6 +7,7 @@
 #include "GameFramework/Pawn.h"
 #include "GameplayEffect.h"
 #include "GameplayTags/GP_Tags.h"
+#include "UObject/ConstructorHelpers.h"
 
 namespace GP_EnemyAttack_Internal
 {
@@ -37,6 +38,12 @@ UGP_EnemyAttack::UGP_EnemyAttack()
 	// 부모 클래스 수치 기본값 설정
 	AttackRadius = 120.0f;
 	ForwardOffset = 140.0f;
+
+	static ConstructorHelpers::FClassFinder<UGameplayEffect> DamageEffectFinder(TEXT("/Game/GAS_Pattern/AbilitySystem/GameplayEffects/Damage/GE_PrimaryDamage"));
+	if (DamageEffectFinder.Succeeded())
+	{
+		DamageEffectClass = DamageEffectFinder.Class;
+	}
 }
 
 void UGP_EnemyAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,

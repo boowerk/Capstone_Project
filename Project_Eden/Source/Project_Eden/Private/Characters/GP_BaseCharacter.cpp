@@ -182,6 +182,11 @@ void AGP_BaseCharacter::MulticastShowHealthDebug_Implementation(const FString& I
 	ShowHealthDebugMessage(InstigatorName, DamageAmount, CurrentHealth, MaxHealth, ElementTag);
 }
 
+void AGP_BaseCharacter::MulticastShowHealthDebug_Implementation(const FString& InstigatorName, float DamageAmount, float CurrentHealth, float MaxHealth, FGameplayTag ElementTag)
+{
+	ShowHealthDebugMessage(InstigatorName, DamageAmount, CurrentHealth, MaxHealth, ElementTag);
+}
+
 void AGP_BaseCharacter::SpawnDamageNumberActor(int32 DamageAmount, EWeaponElement Element)
 {
 	if (!IsValid(GetWorld()) || !IsValid(DamageNumberActorClass))
@@ -230,6 +235,34 @@ void AGP_BaseCharacter::SpawnSkillVisualActor(TSubclassOf<AActor> VisualActorCla
 	{
 		VisualActor->SetActorScale3D(FVector(FMath::Max(VisualScale, 0.0f)));
 	}
+}
+
+void AGP_BaseCharacter::ShowHealthDebugMessage(const FString& InstigatorName, float DamageAmount, float CurrentHealth, float MaxHealth, FGameplayTag ElementTag) const
+{
+	if (!bDebugHealthChanges)
+	{
+		return;
+	}
+
+	const FString ElementName = ElementTag.IsValid() ? ElementTag.ToString() : TEXT("None");
+	const FString DebugMessage = FString::Printf(
+		TEXT("[HP Debug] %s took %.1f from %s | %.1f / %.1f | %s"),
+		*GetNameSafe(this),
+		DamageAmount,
+		*InstigatorName,
+		CurrentHealth,
+		MaxHealth,
+		*ElementName);
+
+	UE_LOG(LogTemp, Log, TEXT("%s"), *DebugMessage);
+
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(INDEX_NONE, DebugHealthMessageDuration, FColor::Red, DebugMessage);
+	}
+
+	// World-space text confirms the damaged actor even when several enemies are on screen.
+	DrawDebugString(GetWorld(), GetActorLocation() + DebugHealthTextOffset, DebugMessage, nullptr, FColor::Red, DebugHealthMessageDuration, true);
 }
 
 void AGP_BaseCharacter::ShowHealthDebugMessage(const FString& InstigatorName, float DamageAmount, float CurrentHealth, float MaxHealth, FGameplayTag ElementTag) const

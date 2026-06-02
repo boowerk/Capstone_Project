@@ -518,7 +518,7 @@ namespace GPFemaleAnimationSetup
 
 		AnimationSet->Modify();
 		AnimationSet->CharacterMesh = SkeletalMesh;
-		AnimationSet->DashMontage = DashMontage;
+		AnimationSet->RollMontages.Roll_RM = DashMontage;
 		AnimationSet->PrimaryAttackMontage = PrimaryMontage;
 		AnimationSet->LightAttackMontages.Reset();
 		for (UAnimMontage* AttackMontage : LightAttackMontages)

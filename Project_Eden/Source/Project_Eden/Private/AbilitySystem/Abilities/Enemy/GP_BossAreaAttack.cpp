@@ -18,7 +18,7 @@ UGP_BossAreaAttack::UGP_BossAreaAttack()
 
 	// Area currently uses the data-asset fallback animation instead of the old placeholder montage path.
 
-	static ConstructorHelpers::FClassFinder<UGameplayEffect> DamageEffectFinder(TEXT("/Game/GAS_Pattern/AbilitySystem/GameplayEffects/GE_PrimaryDamage"));
+	static ConstructorHelpers::FClassFinder<UGameplayEffect> DamageEffectFinder(TEXT("/Game/GAS_Pattern/AbilitySystem/GameplayEffects/Damage/GE_PrimaryDamage"));
 	if (DamageEffectFinder.Succeeded())
 	{
 		DamageEffectClass = DamageEffectFinder.Class;

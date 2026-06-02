@@ -9,40 +9,34 @@
 #include "GameFramework/Controller.h"
 #include "GameFramework/Character.h"
 
-void UGP_Skill_NetTestProjectile::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
-                                                  const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo,
-                                                  const FGameplayEventData* TriggerEventData)
+UGP_Skill_NetTestProjectile::UGP_Skill_NetTestProjectile()
 {
-	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
+	SelectionMode = EGP_SkillSelectionMode::Projectile;
+}
 
-	if (!ActorInfo)
+void UGP_Skill_NetTestProjectile::ExecuteConfirmedSkill_Implementation(const FGP_SkillTargetData& TargetData)
+{
+	ACharacter* Avatar = Cast<ACharacter>(GetAvatarActorFromActorInfo());
+	if (!Avatar || !ProjectileClass)
 	{
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
 
-	ACharacter* Avatar = Cast<ACharacter>(ActorInfo->AvatarActor.Get());
-	UAbilitySystemComponent* ASC = ActorInfo->AbilitySystemComponent.Get();
-	UGP_SkillData* SkillData = GetSkillDataFromSpec(Handle, ActorInfo);
+	UAbilitySystemComponent* ASC = CurrentActorInfo ? CurrentActorInfo->AbilitySystemComponent.Get() : nullptr;
+	UGP_SkillData* SkillData = GetSkillDataFromSpec(CurrentSpecHandle, CurrentActorInfo);
 	const TSubclassOf<AActor> SpawnActorClass = GetSkillSpawnActorClass(SkillData, ProjectileClass);
 
-	if (!Avatar || !ASC || !CommitAbility(Handle, ActorInfo, ActivationInfo))
+	if (!ASC || !CommitAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo))
 	{
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 		return;
 	}
 
-	if (HasAuthority(&ActivationInfo) && SpawnActorClass)
+	if (HasAuthority(&CurrentActivationInfo) && SpawnActorClass)
 	{
-		const FGameplayTag TechElementTag = GetCurrentTechElementTag(ActorInfo);
-
-		FRotator SpawnRotation = Avatar->GetActorRotation();
-
-		if (AController* Controller = Avatar->GetController())
-		{
-			SpawnRotation = Controller->GetControlRotation();
-			SpawnRotation.Pitch = FMath::ClampAngle(SpawnRotation.Pitch, -5.f, 10.f);
-		}
+		const FGameplayTag TechElementTag = GetCurrentTechElementTag(CurrentActorInfo);
+		FRotator SpawnRotation = TargetData.AimDirection.Rotation();
+		SpawnRotation.Pitch = FMath::ClampAngle(SpawnRotation.Pitch, -5.f, 10.f);
 
 		const FVector AimDirection = SpawnRotation.Vector();
 		const FVector SpawnLocation =
@@ -75,6 +69,4 @@ void UGP_Skill_NetTestProjectile::ActivateAbility(const FGameplayAbilitySpecHand
 			UE_LOG(LogTemp, Warning, TEXT("%s expected AGP_Projectile but spawned %s."), *GetNameSafe(this), *GetNameSafe(SpawnedActor));
 		}
 	}
-
-	EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
 }
