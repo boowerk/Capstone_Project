@@ -1,14 +1,15 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "AbilitySystem/Abilities/GP_SkillAugmentData.h"
 #include "Blueprint/UserWidget.h"
 #include "GP_AugmentSelectWidget.generated.h"
 
 class AGP_PlayerState;
 class UButton;
-class UGP_SkillAugmentData;
 class UImage;
 class UTextBlock;
+class UTexture2D;
 
 UCLASS()
 class PROJECT_EDEN_API UGP_AugmentSelectWidget : public UUserWidget
@@ -16,6 +17,8 @@ class PROJECT_EDEN_API UGP_AugmentSelectWidget : public UUserWidget
 	GENERATED_BODY()
 
 public:
+	UGP_AugmentSelectWidget(const FObjectInitializer& ObjectInitializer);
+
 	UFUNCTION(BlueprintCallable, Category = "Tech|Augment")
 	void SetCandidateAugments(const TArray<UGP_SkillAugmentData*>& NewCandidateAugments);
 
@@ -36,6 +39,9 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, Category = "Tech|Augment")
 	TArray<TObjectPtr<UGP_SkillAugmentData>> CandidateAugments;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Tech|Augment|Visual")
+	TMap<EGP_SkillAugmentType, TSoftObjectPtr<UTexture2D>> AugmentTypeBackgrounds;
 
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UButton> Button_Augment0;
@@ -73,6 +79,15 @@ protected:
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UImage> Image_Icon2;
 
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UImage> Image_CardBg0;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UImage> Image_CardBg1;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UImage> Image_CardBg2;
+
 	UFUNCTION()
 	void SelectAugment0();
 
@@ -83,7 +98,8 @@ protected:
 	void SelectAugment2();
 
 	void RefreshCandidateViews();
-	void RefreshCandidateView(int32 CandidateIndex, UTextBlock* NameText, UTextBlock* DescriptionText, UImage* IconImage);
+	void RefreshCandidateView(int32 CandidateIndex, UTextBlock* NameText, UTextBlock* DescriptionText, UImage* IconImage, UImage* BackgroundImage);
 	FText GetAugmentDisplayText(const UGP_SkillAugmentData* AugmentData) const;
+	UTexture2D* GetAugmentTypeBackgroundTexture(const UGP_SkillAugmentData* AugmentData) const;
 	AGP_PlayerState* GetGPPlayerState() const;
 };

@@ -114,12 +114,15 @@ Last synced: 2026-05-23T00:00:00
 - Verify runtime behavior in PIE for source motion, visible state transitions, and retarget fidelity with Blueprint trajectory preferred at runtime.
 - Connect `CHT_MM_MaskMan_Root` as the active chooser source for `UGP_CharacterAnimInstance` and validate `Idle / TurnInPlace / Run / Sprint / InAir`.
 - Keep manual enum/MM branching only as a temporary fallback until the new chooser fully replaces it.
+- Verify `UGP_AugmentSelectWidget` after editor rebuild: each augment DA's `AugmentType` should select the matching card background (`Dawn/Dusk/Midnight/Zenith` defaults).
 
 ## Completed Tasks
 
 - Created `Diagonal_Path_Curvature_Analysis.md` containing diagnostic details on the forward-to-diagonal trajectory angularity.
 - Resolved missing declaration `GetActiveMovementSpeedProfile` in `GP_PlayerCharacter.h`, fixing multiple C++ compilation errors and verified successful build.
 - Resolved missing include `#include "GameplayTags/GP_Tags.h"` in `GP_BaseCharacter.cpp`, fixing compiler errors (C2653/C2065 for GPTags element variables) and verified clean compile of Project C++.
+- Added `EGP_SkillAugmentType` (`BasicAttack`, `Skill`, `Ultimate`, `Passive`) to augment DAs and wired type-driven card backgrounds in `UGP_AugmentSelectWidget`.
+- Renamed `WBP_TestAugmentSelect_1` card background images to `Image_CardBg0/1/2` for C++ optional binding.
 - See `.memoc/worklog/` for full shared activity history.
 
 ## Commands

@@ -7,6 +7,15 @@
 #include "Engine/Texture2D.h"
 #include "Player/GP_PlayerState.h"
 
+UGP_AugmentSelectWidget::UGP_AugmentSelectWidget(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
+{
+	AugmentTypeBackgrounds.Add(EGP_SkillAugmentType::BasicAttack, TSoftObjectPtr<UTexture2D>(FSoftObjectPath(TEXT("/Game/Debug/UI/Augments/Icons/Dawn.Dawn"))));
+	AugmentTypeBackgrounds.Add(EGP_SkillAugmentType::Skill, TSoftObjectPtr<UTexture2D>(FSoftObjectPath(TEXT("/Game/Debug/UI/Augments/Icons/Dusk.Dusk"))));
+	AugmentTypeBackgrounds.Add(EGP_SkillAugmentType::Ultimate, TSoftObjectPtr<UTexture2D>(FSoftObjectPath(TEXT("/Game/Debug/UI/Augments/Icons/Midnight.Midnight"))));
+	AugmentTypeBackgrounds.Add(EGP_SkillAugmentType::Passive, TSoftObjectPtr<UTexture2D>(FSoftObjectPath(TEXT("/Game/Debug/UI/Augments/Icons/Zenith.Zenith"))));
+}
+
 void UGP_AugmentSelectWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
@@ -78,12 +87,12 @@ void UGP_AugmentSelectWidget::SelectAugment2()
 
 void UGP_AugmentSelectWidget::RefreshCandidateViews()
 {
-	RefreshCandidateView(0, TextBlock_Augment0, TextBlock_Description0, Image_Icon0);
-	RefreshCandidateView(1, TextBlock_Augment1, TextBlock_Description1, Image_Icon1);
-	RefreshCandidateView(2, TextBlock_Augment2, TextBlock_Description2, Image_Icon2);
+	RefreshCandidateView(0, TextBlock_Augment0, TextBlock_Description0, Image_Icon0, Image_CardBg0);
+	RefreshCandidateView(1, TextBlock_Augment1, TextBlock_Description1, Image_Icon1, Image_CardBg1);
+	RefreshCandidateView(2, TextBlock_Augment2, TextBlock_Description2, Image_Icon2, Image_CardBg2);
 }
 
-void UGP_AugmentSelectWidget::RefreshCandidateView(int32 CandidateIndex, UTextBlock* NameText, UTextBlock* DescriptionText, UImage* IconImage)
+void UGP_AugmentSelectWidget::RefreshCandidateView(int32 CandidateIndex, UTextBlock* NameText, UTextBlock* DescriptionText, UImage* IconImage, UImage* BackgroundImage)
 {
 	const UGP_SkillAugmentData* AugmentData = GetCandidateAugment(CandidateIndex);
 
@@ -100,10 +109,20 @@ void UGP_AugmentSelectWidget::RefreshCandidateView(int32 CandidateIndex, UTextBl
 	if (IconImage)
 	{
 		UTexture2D* IconTexture = IsValid(AugmentData) ? AugmentData->AugmentIcon.LoadSynchronous() : nullptr;
-		IconImage->SetVisibility(IsValid(IconTexture) ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+		IconImage->SetVisibility(IsValid(IconTexture) ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Hidden);
 		if (IsValid(IconTexture))
 		{
 			IconImage->SetBrushFromTexture(IconTexture, true);
+		}
+	}
+
+	if (BackgroundImage)
+	{
+		UTexture2D* BackgroundTexture = GetAugmentTypeBackgroundTexture(AugmentData);
+		BackgroundImage->SetVisibility(IsValid(BackgroundTexture) ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+		if (IsValid(BackgroundTexture))
+		{
+			BackgroundImage->SetBrushFromTexture(BackgroundTexture, true);
 		}
 	}
 }
@@ -121,6 +140,17 @@ FText UGP_AugmentSelectWidget::GetAugmentDisplayText(const UGP_SkillAugmentData*
 	}
 
 	return FText::FromString(AugmentData->GetName());
+}
+
+UTexture2D* UGP_AugmentSelectWidget::GetAugmentTypeBackgroundTexture(const UGP_SkillAugmentData* AugmentData) const
+{
+	if (!IsValid(AugmentData))
+	{
+		return nullptr;
+	}
+
+	const TSoftObjectPtr<UTexture2D>* BackgroundTexture = AugmentTypeBackgrounds.Find(AugmentData->AugmentType);
+	return BackgroundTexture ? BackgroundTexture->LoadSynchronous() : nullptr;
 }
 
 AGP_PlayerState* UGP_AugmentSelectWidget::GetGPPlayerState() const
