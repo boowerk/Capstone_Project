@@ -1,0 +1,39 @@
+{
+  "name": "@kevin0181/memoc",
+  "version": "1.4.12",
+  "description": "Give AI agents a memory. Scaffolds session-to-session context for Claude Code, Codex, Cursor, and more.",
+  "keywords": [
+    "ai",
+    "agent",
+    "memory",
+    "context",
+    "scaffold",
+    "claude",
+    "codex",
+    "llm"
+  ],
+  "author": "kevin0181",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/neneee0181/memoc.git"
+  },
+  "homepage": "https://github.com/neneee0181/memoc#readme",
+  "bugs": {
+    "url": "https://github.com/neneee0181/memoc/issues"
+  },
+  "bin": {
+    "memoc": "bin/cli.js"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "files": [
+    "bin/",
+    "plugins/",
+    "skills/memoc*/"
+  ],
+  "engines": {
+    "node": ">=16"
+  }
+}

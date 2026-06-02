@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "AbilitySystem/Abilities/GP_GameplayAbility.h"
@@ -10,8 +10,10 @@ class UGP_SkillData;
 class UNiagaraSystem;
 
 /**
+ * UGP_SkillBase
+ *
  * 프로젝트 Eden의 모든 '스킬'들이 상속받을 베이스 클래스
- * 행동 메커니즘은 C++에서, 수치는 블루프린트에서 설정
+ * 행동 메커니즘은 C++에서 정의하고, 수치 및 에셋은 블루프린트에서 설정합니다.
  */
 UCLASS()
 class PROJECT_EDEN_API UGP_SkillBase : public UGP_GameplayAbility
@@ -19,34 +21,18 @@ class PROJECT_EDEN_API UGP_SkillBase : public UGP_GameplayAbility
 	GENERATED_BODY()
 
 public:
+	// =========================================================================
+	// 1. 라이프사이클 및 기본 오버라이드 함수군 (Lifecycle & Overrides)
+	// =========================================================================
 	UGP_SkillBase();
 
 	virtual bool CheckCooldown(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
 	virtual void ApplyCooldown(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo) const override;
 
 protected:
-	// 블루프린트에서 설정 수치
-	
-	UPROPERTY(EditDefaultsOnly, Category = "GAS|Skill|Visuals")
-	TObjectPtr<UAnimMontage> SkillMontage;
-
-	UPROPERTY(EditDefaultsOnly, Category = "GAS|Skill|Values")
-	TSubclassOf<UGameplayEffect> DamageEffectClass;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS|Skill|Cooldown")
-	TSubclassOf<UGameplayEffect> GenericCooldownEffectClass;
-
-	// 공격 반경
-	UPROPERTY(EditDefaultsOnly, Category = "GAS|Skill|Values")
-	float AttackRadius = 200.f;
-
-	// 전방 오프셋 
-	UPROPERTY(EditDefaultsOnly, Category = "GAS|Skill|Values")
-	float ForwardOffset = 100.f;
-
-	// C++ 공통 메커니즘 (Mechanics)
-
-	//범위 내 적들을 찾아 데미지를 입히는 공통 유틸리티
+	// =========================================================================
+	// 2. C++ 공통 스킬 메커니즘 함수군 (Skill Mechanics Helpers)
+	// =========================================================================
 	UFUNCTION(BlueprintCallable, Category = "GAS|Skill|Mechanics")
 	void PerformAreaAttack();
 
@@ -57,10 +43,29 @@ protected:
 	TSubclassOf<AActor> GetSkillSpawnActorClass(const UGP_SkillData* SkillData, TSubclassOf<AActor> FallbackActorClass) const;
 	UNiagaraSystem* GetProjectileVisualSystem(const UGP_SkillData* SkillData, FGameplayTag ElementTag = FGameplayTag()) const;
 	void SpawnVisualActor(AActor* InstigatorActor, TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation = FRotator::ZeroRotator, float VisualScale = 1.0f) const;
+	UGP_SkillData* GetSkillDataFromSpec(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo) const;
 
-	// 어빌리티 종료 시 호출할 정리 함수
+	// =========================================================================
+	// 3. 애니메이션 및 콜백 함수군 (Animation & Callbacks)
+	// =========================================================================
 	UFUNCTION()
 	void OnMontageEnded(UAnimMontage* Montage, bool bInterrupted);
 
-	UGP_SkillData* GetSkillDataFromSpec(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo) const;
+	// =========================================================================
+	// 4. 스킬 설정 및 수치 변수군 (Skill Assets & Values)
+	// =========================================================================
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Skill|Visuals")
+	TObjectPtr<UAnimMontage> SkillMontage;
+
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Skill|Values")
+	TSubclassOf<UGameplayEffect> DamageEffectClass;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS|Skill|Cooldown")
+	TSubclassOf<UGameplayEffect> GenericCooldownEffectClass;
+
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Skill|Values")
+	float AttackRadius = 200.f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Skill|Values")
+	float ForwardOffset = 100.f;
 };

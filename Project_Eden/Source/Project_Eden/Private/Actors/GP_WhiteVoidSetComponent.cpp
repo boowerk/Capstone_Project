@@ -97,7 +97,6 @@ void UGP_WhiteVoidSetComponent::EnsureChildComponents()
 		FloorComponent = NewObject<UStaticMeshComponent>(Owner, TEXT("WhiteVoidFloor"));
 		FloorComponent->SetupAttachment(this);
 		FloorComponent->RegisterComponent();
-		Owner->AddInstanceComponent(FloorComponent);
 	}
 
 	if (!SkySphereComponent)
@@ -105,7 +104,6 @@ void UGP_WhiteVoidSetComponent::EnsureChildComponents()
 		SkySphereComponent = NewObject<UStaticMeshComponent>(Owner, TEXT("WhiteVoidSkySphere"));
 		SkySphereComponent->SetupAttachment(this);
 		SkySphereComponent->RegisterComponent();
-		Owner->AddInstanceComponent(SkySphereComponent);
 	}
 
 }

@@ -58,7 +58,11 @@ void UGP_AttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallbac
 			SetHealth(NewHealth);
 
 			// 2. 공격자(Instigator)와 타겟 정보 가져오기
-			AActor* TargetActor = GetOwningActor();
+			AActor* TargetActor = IsValid(TargetASC) ? TargetASC->GetAvatarActor() : nullptr;
+			if (!IsValid(TargetActor))
+			{
+				TargetActor = GetOwningActor();
+			}
 			AActor* InstigatorActor = Data.EffectSpec.GetContext().GetOriginalInstigator();
 			UAbilitySystemComponent* SourceASC = Data.EffectSpec.GetContext().GetOriginalInstigatorAbilitySystemComponent();
 
@@ -139,9 +143,8 @@ void UGP_AttributeSet::PreAttributeChange(const FGameplayAttribute& Attribute, f
 
 void UGP_AttributeSet::OnRep_AttributesInitialized()
 {
-	if (!bAttributesInitialized)
+	if (bAttributesInitialized)
 	{
-		bAttributesInitialized = true;
 		OnAttributesInitialized.Broadcast();
 	}
 }

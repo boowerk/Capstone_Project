@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "AbilitySystem/Abilities/GP_SkillBase.h"
+#include "AbilitySystem/Abilities/GP_TargetedSkillBase.h"
 #include "GP_Skill_NetTestProjectile.generated.h"
 
 class AGP_Projectile;
@@ -12,14 +12,16 @@ class AGP_Projectile;
  * 네트워크 테스트 프로젝타일 스킬
  */
 UCLASS()
-class PROJECT_EDEN_API UGP_Skill_NetTestProjectile : public UGP_SkillBase
+class PROJECT_EDEN_API UGP_Skill_NetTestProjectile : public UGP_TargetedSkillBase
 {
 	GENERATED_BODY()
 
 public:
-	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
+	UGP_Skill_NetTestProjectile();
 
 protected:
+	virtual void ExecuteConfirmedSkill_Implementation(const FGP_SkillTargetData& TargetData) override;
+
 	// --- 수치 및 설정 (Values) ---
 
 	// 프로젝타일 클래스 (블루프린트에서 설정)
