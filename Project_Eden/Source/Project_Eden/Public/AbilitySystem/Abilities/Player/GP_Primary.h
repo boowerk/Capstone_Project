@@ -41,6 +41,12 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Skill|Combo")
 	bool bUseRandomCombo = false;
 
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Skill|Primary Targeting", meta = (ClampMin = "0.0"))
+	float AutoTargetSearchRadius = 450.0f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Skill|Primary Targeting", meta = (ClampMin = "0.0"))
+	float AutoTargetFacingDuration = 0.35f;
+
 private:
 	// =========================================================================
 	// 3. 콤보 시퀀스 및 상태 제어 함수군 (Combo Sequence Helpers)

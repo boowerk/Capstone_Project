@@ -58,6 +58,7 @@ public:
 	bool TryPerformDash();
 	bool IsDashing() const;
 	bool IsLockOn() const { return bIsLockOn; }
+	bool AimPrimaryAttackAtBestTarget(float SearchRadius, float ForwardOffset, float Duration);
 
 	// =========================================================================
 	// 4. 화이트 보이드 API (White Void Transition)
@@ -167,6 +168,12 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|LockOn")
 	float LockOnRotationInterpSpeed = 10.0f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Primary Attack", meta = (ClampMin = "0.0"))
+	float PrimaryAttackAutoFacingRotationInterpSpeed = 18.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Primary Attack", meta = (ClampMin = "0.0"))
+	float PrimaryAttackAutoFacingCameraInterpSpeed = 8.0f;
+
 	// =========================================================================
 	// 11. 장비 & 무기 관련 설정 (Equipment & Weapon Settings)
 	// =========================================================================
@@ -270,6 +277,11 @@ private:
 
 	FTimerHandle RestoreLagTimerHandle;
 
+	UPROPERTY(Transient)
+	TObjectPtr<AActor> PrimaryAttackAutoFacingTarget;
+
+	float PrimaryAttackAutoFacingEndTime = 0.0f;
+
 	UFUNCTION(Server, Reliable)
 	void ServerSetWhiteVoid(bool bNewInWhiteVoid);
 
@@ -284,6 +296,8 @@ private:
 	void EnsureWhiteVoidSetExists();
 	void ResetMotionTrajectoryAfterWhiteVoidTransition();
 	void SuppressMotionMatchingForWhiteVoidTransition() const;
+	AActor* FindBestPrimaryAttackTarget(float SearchRadius, float ForwardOffset) const;
+	void UpdatePrimaryAttackAutoFacing(float DeltaSeconds);
 
 	// =========================================================================
 	// 15. 액션 루트 모션, 관성 & 몽타주 트래킹 (Action Motion Tracking)

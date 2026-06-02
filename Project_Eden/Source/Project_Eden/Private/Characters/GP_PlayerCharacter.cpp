@@ -7,6 +7,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "HAL/IConsoleManager.h"
 #include "UObject/UnrealType.h"
+#include "Engine/OverlapResult.h"
 
 // Framework / Component Headers
 #include "GameFramework/PlayerController.h"
@@ -32,6 +33,7 @@
 #include "Animation/PDA_CharacterAnimationSet.h"
 #include "CharacterTrajectoryComponent.h"
 #include "GameplayTags/GP_Tags.h"
+#include "Utils/GP_BlueprintLibrary.h"
 
 static int32 GGPActionInertiaDebug = 1;
 static FAutoConsoleVariableRef CVarGPActionInertiaDebug(
@@ -201,6 +203,127 @@ void AGP_PlayerCharacter::Tick(float DeltaSeconds)
 	UpdateConditionalMaxAcceleration(DeltaSeconds);
 	UpdateActionCarryVelocity(DeltaSeconds);
 	UpdateActionMotionTracking(DeltaSeconds);
+	UpdatePrimaryAttackAutoFacing(DeltaSeconds);
+}
+
+bool AGP_PlayerCharacter::AimPrimaryAttackAtBestTarget(float SearchRadius, float ForwardOffset, float Duration)
+{
+	AActor* BestTarget = FindBestPrimaryAttackTarget(SearchRadius, ForwardOffset);
+	if (!IsValid(BestTarget))
+	{
+		PrimaryAttackAutoFacingTarget = nullptr;
+		PrimaryAttackAutoFacingEndTime = 0.0f;
+		TargetActor = nullptr;
+		return false;
+	}
+
+	TargetActor = BestTarget;
+	PrimaryAttackAutoFacingTarget = BestTarget;
+	PrimaryAttackAutoFacingEndTime = GetWorld() ? GetWorld()->GetTimeSeconds() + FMath::Max(Duration, 0.0f) : 0.0f;
+	UpdatePrimaryAttackAutoFacing(0.0f);
+	return true;
+}
+
+AActor* AGP_PlayerCharacter::FindBestPrimaryAttackTarget(float SearchRadius, float ForwardOffset) const
+{
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return nullptr;
+	}
+
+	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(GP_PrimaryAttackAutoTarget), false);
+	QueryParams.AddIgnoredActor(this);
+
+	FCollisionResponseParams ResponseParams;
+	ResponseParams.CollisionResponse.SetAllChannels(ECR_Ignore);
+	ResponseParams.CollisionResponse.SetResponse(ECC_Pawn, ECR_Block);
+
+	TArray<FOverlapResult> OverlapResults;
+	const FVector SearchCenter = GetActorLocation() + GetActorForwardVector() * FMath::Max(ForwardOffset, 0.0f);
+	World->OverlapMultiByChannel(
+		OverlapResults,
+		SearchCenter,
+		FQuat::Identity,
+		ECC_Visibility,
+		FCollisionShape::MakeSphere(FMath::Max(SearchRadius, 1.0f)),
+		QueryParams,
+		ResponseParams);
+
+	AActor* BestTarget = nullptr;
+	float BestScore = TNumericLimits<float>::Max();
+	const FVector Forward2D = GetActorForwardVector().GetSafeNormal2D();
+	const FVector ActorLocation = GetActorLocation();
+
+	for (const FOverlapResult& Result : OverlapResults)
+	{
+		AActor* Candidate = Result.GetActor();
+		if (!IsValid(Candidate) || !UGP_BlueprintLibrary::CanApplyCombatEffect(const_cast<AGP_PlayerCharacter*>(this), Candidate))
+		{
+			continue;
+		}
+
+		FVector ToCandidate = Candidate->GetActorLocation() - ActorLocation;
+		ToCandidate.Z = 0.0f;
+		const float Distance = ToCandidate.Size();
+		if (Distance <= KINDA_SMALL_NUMBER)
+		{
+			continue;
+		}
+
+		const float FacingDot = FVector::DotProduct(Forward2D, ToCandidate / Distance);
+		if (FacingDot < -0.35f)
+		{
+			continue;
+		}
+
+		const float Score = Distance - FacingDot * 150.0f;
+		if (Score < BestScore)
+		{
+			BestScore = Score;
+			BestTarget = Candidate;
+		}
+	}
+
+	return BestTarget;
+}
+
+void AGP_PlayerCharacter::UpdatePrimaryAttackAutoFacing(float DeltaSeconds)
+{
+	const UWorld* World = GetWorld();
+	const float CurrentTime = World ? World->GetTimeSeconds() : 0.0f;
+	if (!IsValid(PrimaryAttackAutoFacingTarget) || (PrimaryAttackAutoFacingEndTime > 0.0f && CurrentTime > PrimaryAttackAutoFacingEndTime))
+	{
+		PrimaryAttackAutoFacingTarget = nullptr;
+		return;
+	}
+
+	FVector ToTarget = PrimaryAttackAutoFacingTarget->GetActorLocation() - GetActorLocation();
+	ToTarget.Z = 0.0f;
+	if (ToTarget.IsNearlyZero())
+	{
+		return;
+	}
+
+	const FRotator TargetYaw(0.0f, ToTarget.Rotation().Yaw, 0.0f);
+	const FRotator NewActorRotation = DeltaSeconds > KINDA_SMALL_NUMBER
+		? FMath::RInterpTo(GetActorRotation(), TargetYaw, DeltaSeconds, PrimaryAttackAutoFacingRotationInterpSpeed)
+		: TargetYaw;
+	SetActorRotation(NewActorRotation);
+
+	AController* OwningController = GetController();
+	if (!OwningController || !OwningController->IsLocalController())
+	{
+		return;
+	}
+
+	const FVector CameraFrom = FollowCamera ? FollowCamera->GetComponentLocation() : GetActorLocation();
+	const FRotator TargetCameraRotation = (PrimaryAttackAutoFacingTarget->GetActorLocation() - CameraFrom).Rotation();
+	const FRotator CurrentControlRotation = OwningController->GetControlRotation();
+	const FRotator NewControlRotation = DeltaSeconds > KINDA_SMALL_NUMBER
+		? FMath::RInterpTo(CurrentControlRotation, TargetCameraRotation, DeltaSeconds, PrimaryAttackAutoFacingCameraInterpSpeed)
+		: CurrentControlRotation;
+	OwningController->SetControlRotation(FRotator(NewControlRotation.Pitch, NewControlRotation.Yaw, 0.0f));
 }
 
 UAnimInstance* AGP_PlayerCharacter::GetUEFNSourceAnimInstance() const

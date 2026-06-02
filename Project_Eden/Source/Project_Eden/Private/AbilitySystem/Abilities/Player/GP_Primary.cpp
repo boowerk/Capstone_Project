@@ -80,6 +80,7 @@ void UGP_Primary::StartComboSequence()
 	
 
 	ClearExistingTasks();
+	PC->AimPrimaryAttackAtBestTarget(AutoTargetSearchRadius, ForwardOffset, AutoTargetFacingDuration);
 	PC->BeginActionMotionTracking();
 
 	WaitHitTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(this, GPTags::Event::Player::AttackHit);

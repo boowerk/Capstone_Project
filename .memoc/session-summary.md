@@ -12,17 +12,17 @@ updated: 2026-05-31T15:20:00+09:00
 created: 2026-05-28T12:18:30
 ---
 # Session Summary
-Last: 2026-06-02T00:45:00+09:00
+Last: 2026-06-02T01:35:00+09:00
 Replace, do not append. Keep <800B.
 History: worklog. Resume risks: 04-handoff.md.
 
 ## Status
-- Reworked aerial matador mage boss instructions and added project doc copy.
-- LifeDrain LoS ignores pawns/movable actors and pauses on temporary blocked LoS/range instead of ending.
-- Augment radius/range helpers, DA-driven spawn/VFX helpers, augment pool, and augment select widget icon/description binding exist.
+- Primary melee attacks now auto-acquire a nearby combat-valid target, reuse `TargetActor`, rotate player toward it during the swing, and interpolate local camera control rotation toward it.
+- `bIsLockOn` is not enabled for this flow, so lock-on does not force constant facing/movement constraints; other sword skills remain direction-driven.
+- Full Project_EdenEditor build passed after adding `Engine/OverlapResult.h`.
 
 ## Open Tasks
-- Re-run full C++ build after disabling/triggering Live Coding; current merge also needs final conflict verification.
+- PIE-test primary melee auto-facing/camera interpolation feel.
 
 ## Resume
-- UHT passed. Full build still stops with "Unable to build while Live Coding is active."
+- Build verified. Watch primary auto-facing radius/duration tuning in editor.
