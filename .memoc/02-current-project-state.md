@@ -11,7 +11,7 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-06-01T00:29:00+09:00
+Last synced: 2026-06-01T15:24:40+09:00
 
 ## Current Status
 
@@ -33,6 +33,7 @@ Last synced: 2026-06-01T00:29:00+09:00
 - `UGP_Primary::StartComboSequence` no longer rotates the player toward current movement input before starting a combo montage, so primary attacks use the character's current forward direction only.
 - GAS damage/HUD triage: enemy and boss attacks now point/fallback to `/Game/GAS_Pattern/AbilitySystem/GameplayEffects/Damage/GE_PrimaryDamage`; player AttributeSet damage broadcasts use avatar fallback for PlayerState-owned ASCs.
 - Player HUD GAS binding now resolves attribute widgets by name and binds boss health through `UGP_AttributeWidget`; `/Game/UI/HUD/WBP_PlayerHUDWidget.BossBar` is expected to be a `WBP_BossBar` child with Health/MaxHealth attributes.
+- Character stats menu now has native tab navigation in `UGP_CharacterStatsMenuWidget`: it auto-detects `MapTab`, `JournalTab`, `ItemsTab`, `AttributesTab`, `GearTab`, `AbilitiesTab`, and `SystemTab`, supports text/border hit-testing or `UButton` delegates, updates title/selected opacity, keeps Attributes bound to GAS snapshots, and can drive a `TabContentSwitcher`/named page panels in UMG.
 - `BP_GP_PlayerCharacter` has a visible `UEFNSourceMesh` native skeletal mesh component attached above `CharacterMesh0`.
 - `UEFNSourceMesh` now uses `/Game/Characters/PlayerCharacter/ABP_UEFNSource_Player` as its AnimBP.
 - `CharacterMesh0` still uses `/Game/Asset/CharacterAction/MaskMan/ABP_MaskMan_Player` to retarget from the parent mesh.

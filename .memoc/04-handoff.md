@@ -11,10 +11,13 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-05-26T20:45:00
+Last synced: 2026-06-01T15:24:40+09:00
 
 ## Current Tech UI Handoff
 
+- Character stats/menu tabs are now handled by `UGP_CharacterStatsMenuWidget` C++. It auto-detects existing tab labels (`MapTab`, `JournalTab`, `ItemsTab`, `AttributesTab`, `GearTab`, `AbilitiesTab`, `SystemTab`) and supports both text/border hit-testing and actual `UButton` delegates.
+- For real page switching in `/Game/UI/CharacterStatMenu/WBP_CharacterStatsMenu`, add a `WidgetSwitcher` named `TabContentSwitcher` with child order Map, Journal, Item, Attributes, Gear, Abilities, System. Alternative: use named panels (`MapPanel`, `JournalPanel`, `ItemsPanel`/`ItemPanel`, `AttributesPanel`, `GearPanel`, `AbilitiesPanel`, `SystemPanel`).
+- Optional selected bars are auto-detected if named `MapUnderline`, `JournalUnderline`, `ItemsUnderline`, `AttributesUnderline`, `GearUnderline`, `AbilitiesUnderline`, `SystemUnderline`. Without those, C++ still changes tab opacity and `TitleText`.
 - Boss HUD fix in progress: `GP_PlayerHUDWidget` now binds boss ASC via `UGP_AttributeWidget` (`BossBar`/`BossHealthBar` name lookup) and `GP_PlayerController::RefreshBossHUD()` re-calls binding for the current boss so live/widget swaps can recover.
 - User created `/Game/UI/HUD/WBP_BossBar` from `UGP_AttributeWidget`; it was configured to Health/MaxHealth and placed as `WBP_PlayerHUDWidget.BossBar`. If editor Blueprint compile reports a stale `BossBar_ProgressBar_Deprecated` GUID ensure, recreate/delete that designer widget manually rather than continuing Python mutation.
 - Tech selection UI test path exists: `GP_TechSelectWidget` C++ parent + `WBP_TestTechSelect` child.
@@ -71,6 +74,7 @@ _None yet._
 
 ## Verified
 
+- Full `Project_EdenEditor Win64 Development` build succeeded after the character stats menu tab-navigation C++ change.
 - `ABP_UEFNSource_Player` compiles and saves.
 - `BP_GP_PlayerCharacter` CDO shows `UEFNSourceMesh.animClass = /Game/Characters/PlayerCharacter/ABP_UEFNSource_Player.ABP_UEFNSource_Player_C`.
 - Build error about undefined `FTransformTrajectory` was fixed by including `Animation/TrajectoryTypes.h`.
