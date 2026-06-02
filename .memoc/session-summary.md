@@ -10,19 +10,19 @@ tags:
   - memoc/state
 ---
 # Session Summary
-Last: 2026-06-01T15:24+09:00
+Last: 2026-06-02T17:49+09:00
 Replace, do not append. Keep <800B.
 History: worklog. Resume risks: 04-handoff.md.
 
 ## Status
-- Character stats menu tab navigation added in `UGP_CharacterStatsMenuWidget`.
-- Supports labels, buttons, `TabContentSwitcher`/named panels, and GAS-backed Attributes.
+- Matador Mage Boss C++ pass completed in three feature commits.
+- Full `Project_EdenEditor Win64 Development` build succeeded.
 
 ## Changed
-- `GP_CharacterStatsMenuWidget.h/.cpp`
+- State/damage tags, decoy-bull-chain actors, Matador boss character, bull/groggy abilities, boss AI keys/selector.
 
 ## Open Tasks
-- UMG: add `TabContentSwitcher` children ordered Map, Journal, Item, Attributes, Gear, Abilities, System.
+- Editor: add optional Matador BB keys, create/use BP child, tune VFX/BT in PIE.
 
 ## Resume
-- Full editor build succeeded. Unrelated git state remains: modified `M_BossTelegraph_Fan.uasset`, unmerged `TestMap.umap`.
+- Unrelated: modified `WBP_CharacterStatsMenu.uasset`; untracked instruction file.

@@ -11,10 +11,12 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-06-01T15:24:40+09:00
+Last synced: 2026-06-02T17:49:29+09:00
 
 ## Current Status
 
+- Matador Mage Boss native pass is implemented and build-verified. Feature commits added Matador guarded/groggy tags, the state component, guarded damage reduction, decoy/bull/chain actors, `AGP_MatadorMageBossCharacter`, Matador bull/groggy abilities, Blackboard keys, and boss selector/service/task wiring.
+- Matador default visual uses `/Game/Characters/MaskMan/SK_MaskMan`. Blackboard key constants now include `ChainBreakCount`, `bIsGroggy`, `bCanUseBullPattern`, `bBullPatternActive`, `DecoyActor`, `MainBossActor`, `PreferredHoverHeight`, `PreferredAirRange`, and `bShouldTeleport`.
 - ActionEnd lower-body handoff signal exists in C++ only for now. `Dash` and `DashSlash` request `SetActionLowerBodyMotionMatchBlendEnabled(true)` at ActionEnd/fallback ActionEnd, and `UGP_CharacterAnimInstance` exposes `ActionLowerBodyMotionMatchBlendAlpha` with interp speeds. The attempted AnimBP `LayeredBlendPerBone` graph insertion was reverted because it broke `DefaultSlot.Source` and caused non-montage animation A-pose. `ABP_UEFNSource_Player` and `ABP_MaskMan_Player` are restored to `pre-slot pose -> DefaultSlot -> Output`; a future lower-body handoff should use a cached-pose/safe single-consumer graph.
 - Held movement now cancels action RM at ActionEnd without requiring a fresh key press. `AGP_PlayerCharacter` caches non-zero movement input even while `Fixed`, clears it on `Input_MoveCompleted`, and when `SetActionRootMotionInputCancelEnabled(true)` is called it broadcasts `OnActionRootMotionCancelInput` immediately if cached input is recent. `UGP_Skill_DashSlash` now registers/removes the same cancel delegate path as `UGP_Dash`.
 - Log verification showed held cancel does fire for sprint-held fallback roll, but `ApplyCurrentActionInertia()` skipped because `ActionMotionCarryVelocity` had decayed to ~54 while entry speed was ~854. Held-input cancel now sets `bActionRootMotionCancelledByMovementInput` and seeds handoff velocity from max(carry, `ActionMotionEntryVelocity`, `CharacterMovement.MaxWalkSpeed`) in the held input direction, logging `[ActionRM][ApplyHeldInput]`.

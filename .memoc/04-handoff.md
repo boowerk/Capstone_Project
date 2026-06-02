@@ -11,7 +11,14 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-06-01T15:24:40+09:00
+Last synced: 2026-06-02T17:49:29+09:00
+
+## Current Matador Mage Boss Handoff
+
+- C++ is complete and build-verified for the first Matador pass. Use `AGP_MatadorMageBossCharacter` or a Blueprint child as the placed boss. It creates `UGP_MatadorBossStateComponent`, grants Matador bull/groggy GAS abilities, and defaults its mesh to `/Game/Characters/MaskMan/SK_MaskMan`.
+- Runtime pattern flow: boss selector can choose `GPTags.Ability.Enemy.Utility_MatadorBullPattern`; the ability spawns `AGP_BullChargeActor`; bull collision with `AGP_MatadorBossDecoyActor` calls the state component; 3 chain breaks enter Groggy and remove guarded damage reduction.
+- Editor setup still needed: add optional Blackboard keys `ChainBreakCount`, `bIsGroggy`, `bCanUseBullPattern`, `bBullPatternActive`, `DecoyActor`, `MainBossActor`, `PreferredHoverHeight`, `PreferredAirRange`, `bShouldTeleport` to the boss Blackboard asset if designers want to inspect/branch on them.
+- PIE checklist: verify guarded damage is 10% while `MatadorGuarded`, normal damage while `Groggy`, decoy damage routes to the real boss ASC, bull hit on decoy increments chain stage 0/1/2/3, and Groggy recovers after `GroggyDuration`.
 
 ## Current Tech UI Handoff
 
