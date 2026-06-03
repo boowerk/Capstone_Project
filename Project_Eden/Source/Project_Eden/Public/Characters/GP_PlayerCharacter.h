@@ -103,7 +103,7 @@ public:
 	UPDA_CharacterAnimationSet* GetAnimationSet() const { return AnimationSet; }
 	UAnimInstance* GetUEFNSourceAnimInstance() const;
 
-	float PlayUEFNSourceFallbackMontage(UAnimMontage* Montage, float PlayRate = 1.0f);
+	float PlayUEFNSourceFallbackMontage(UAnimMontage* Montage, float PlayRate = 1.0f, float PreviousMontageBlendOutTime = 0.1f);
 	bool IsPlayingUEFNSourceFallbackMontage() const;
 	void StopUEFNSourceFallbackMontage(float BlendOutTime = 0.2f);
 
@@ -114,6 +114,8 @@ public:
 	void BeginActionMotionTracking();
 	void StopActionMotionTracking();
 	void ApplyCurrentActionInertia();
+	void BeginPrimaryAttackMovementAssist(float SpeedRatio);
+	void StopPrimaryAttackMovementAssist();
 
 	FVector GetLastUEFNSourceRootMotionVelocity() const { return LastUEFNSourceRootMotionVelocity; }
 	FVector GetCurrentActionMotionVelocity() const { return CurrentActionMotionVelocity; }
@@ -311,6 +313,7 @@ private:
 
 	void UpdateActionMotionTracking(float DeltaSeconds);
 	void UpdateActionCarryVelocity(float DeltaSeconds);
+	void UpdatePrimaryAttackMovementAssist(float DeltaSeconds);
 	void FlushActionMotionTracking();
 	FVector GetCurrentActionInertiaVelocity() const;
 
@@ -353,6 +356,9 @@ private:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Action Inertia", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
 	float PostActionAnimVelocityHoldTime = 0.35f;
+
+	bool bPrimaryAttackMovementAssistEnabled = false;
+	float PrimaryAttackMovementAssistSpeedRatio = 0.35f;
 
 	bool bTrackActionMotion = false;
 	FVector LastActionMotionSampleLocation = FVector::ZeroVector;

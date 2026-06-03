@@ -12,8 +12,9 @@ UGP_Primary::UGP_Primary()
 {
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
 
-	// 어빌리티 활성화 동안 이동 입력을 막기 위해 Fixed 태그 부여
-	ActivationOwnedTags.AddTag(GPTags::State::Status::Fixed);
+	FGameplayTagContainer AbilityAssetTags;
+	AbilityAssetTags.AddTag(GPTags::Ability::Skill::Primary);
+	SetAssetTags(AbilityAssetTags);
 
 	// 부모 클래스 수치 기본값 설정
 	AttackRadius = 100.0f;
@@ -40,12 +41,20 @@ void UGP_Primary::InputPressed(const FGameplayAbilitySpecHandle Handle, const FG
 
 	// 선입력 허용: 애니메이션 도중 언제 클릭하든 다음 공격을 예약합니다.
 	bHasQueuedNextAttack = true;
+	TryStartQueuedAttackFromActionEnd();
 }
 void UGP_Primary::StartComboSequence()
 {
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(SourceFallbackCompletionTimerHandle);
+	}
+	bActionEndWindowOpen = false;
+
 	bHasQueuedNextAttack = false;
 	bIsComboWindowOpen = false;
 	bHasAppliedCurrentAttackHit = false;
+	bCurrentSwingUsesActionMotionTracking = ShouldUseActionMotionTrackingForComboIndex(CurrentComboIndex);
 
 	AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo());
 	if (!IsValid(PC))
@@ -71,6 +80,13 @@ void UGP_Primary::StartComboSequence()
 	{
 		SourceMontageToPlay = AnimSet->SourceLightAttackMontages[CurrentComboIndex];
 	}
+	CurrentTargetAttackMontage = MontageToPlay;
+	CurrentSourceAttackMontage = SourceMontageToPlay;
+	UE_LOG(LogTemp, Warning, TEXT("[PrimaryCombo] Start Index=%d Target=%s Source=%s ActionRM=%d"),
+		CurrentComboIndex,
+		*GetNameSafe(MontageToPlay),
+		*GetNameSafe(SourceMontageToPlay),
+		bCurrentSwingUsesActionMotionTracking ? 1 : 0);
 
 	if (!IsValid(MontageToPlay) && !IsValid(SourceMontageToPlay))
 	{
@@ -81,7 +97,17 @@ void UGP_Primary::StartComboSequence()
 
 	ClearExistingTasks();
 	PC->AimPrimaryAttackAtBestTarget(AutoTargetSearchRadius, ForwardOffset, AutoTargetFacingDuration);
-	PC->BeginActionMotionTracking();
+	if (bCurrentSwingUsesActionMotionTracking)
+	{
+		PC->StopPrimaryAttackMovementAssist();
+		PC->BeginActionMotionTracking();
+	}
+	else
+	{
+		PC->StopActionMotionTracking();
+		PC->SetActionLowerBodyMotionMatchBlendEnabled(true);
+		PC->BeginPrimaryAttackMovementAssist(MobileAttackMovementAssistSpeedRatio);
+	}
 
 	WaitHitTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(this, GPTags::Event::Player::AttackHit);
 	WaitHitTask->EventReceived.AddDynamic(this, &ThisClass::OnAttackHitEventReceived);
@@ -107,25 +133,87 @@ void UGP_Primary::StartComboSequence()
 		MontageTask->OnInterrupted.AddDynamic(this, &ThisClass::OnMontageInterrupted);
 		MontageTask->ReadyForActivation();
 	}
-	else if (PC->PlayUEFNSourceFallbackMontage(SourceMontageToPlay, 1.0f) <= 0.0f)
+	else
 	{
-		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+		const float SourceFallbackDuration = PC->PlayUEFNSourceFallbackMontage(SourceMontageToPlay, 1.0f);
+		if (SourceFallbackDuration <= 0.0f)
+		{
+			EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+			return;
+		}
+		ScheduleSourceFallbackMontageCompletion(SourceFallbackDuration);
 	}
 }
 
 void UGP_Primary::ClearExistingTasks()
 {
 	if (MontageTask) { MontageTask->EndTask(); MontageTask = nullptr; }
+	ClearEventTasks();
+}
+
+void UGP_Primary::ClearEventTasks()
+{
 	if (WaitHitTask) { WaitHitTask->EndTask(); WaitHitTask = nullptr; }
 	if (WaitLegacyPrimaryHitTask) { WaitLegacyPrimaryHitTask->EndTask(); WaitLegacyPrimaryHitTask = nullptr; }
 	if (WaitComboTask) { WaitComboTask->EndTask(); WaitComboTask = nullptr; }
 	if (WaitEndTask) { WaitEndTask->EndTask(); WaitEndTask = nullptr; }
 }
 
+void UGP_Primary::ScheduleSourceFallbackMontageCompletion(float Duration)
+{
+	if (Duration <= KINDA_SMALL_NUMBER)
+	{
+		OnSourceFallbackMontageCompleted();
+		return;
+	}
+
+	UE_LOG(LogTemp, Warning, TEXT("[PrimaryCombo] SourceFallbackCompletionTimer Duration=%.3f"), Duration);
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().SetTimer(
+			SourceFallbackCompletionTimerHandle,
+			this,
+			&ThisClass::OnSourceFallbackMontageCompleted,
+			Duration,
+			false);
+	}
+}
+
+void UGP_Primary::OnSourceFallbackMontageCompleted()
+{
+	OnMontageCompleted();
+}
+
+bool UGP_Primary::TryStartQueuedAttackFromActionEnd()
+{
+	if (!bActionEndWindowOpen || !bHasQueuedNextAttack)
+	{
+		return false;
+	}
+
+	AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo());
+	const UPDA_CharacterAnimationSet* AnimSet = IsValid(PC) ? PC->GetAnimationSet() : nullptr;
+	const int32 MaxCombo = AnimSet ? FMath::Max(AnimSet->LightAttackMontages.Num(), AnimSet->SourceLightAttackMontages.Num()) : 0;
+	if (MaxCombo <= 0 || CurrentComboIndex >= MaxCombo - 1)
+	{
+		return false;
+	}
+
+	CurrentComboIndex = GetNextComboIndex(MaxCombo);
+	StartComboSequence();
+	return true;
+}
+
 int32 UGP_Primary::GetNextComboIndex(int32 MaxComboCount)
 {
 	if (bUseRandomCombo) return FMath::RandRange(0, MaxComboCount - 1);
 	return (CurrentComboIndex + 1) % MaxComboCount;
+}
+
+bool UGP_Primary::ShouldUseActionMotionTrackingForComboIndex(int32 ComboIndex) const
+{
+	return ActionMotionComboIndices.Contains(ComboIndex);
 }
 
 
@@ -136,42 +224,29 @@ void UGP_Primary::OnComboEnableEventReceived(FGameplayEventData Payload)
 
 void UGP_Primary::OnActionEndEventReceived(FGameplayEventData Payload)
 {
-	AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo());
-	if (!IsValid(PC) || !IsValid(PC->GetAnimationSet()))
+	bActionEndWindowOpen = true;
+	if (TryStartQueuedAttackFromActionEnd())
 	{
-		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 		return;
-	}
-
-	const UPDA_CharacterAnimationSet* AnimSet = PC->GetAnimationSet();
-	int32 MaxCombo = FMath::Max(AnimSet->LightAttackMontages.Num(), AnimSet->SourceLightAttackMontages.Num());
-	if (MaxCombo <= 0)
-	{
-		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
-		return;
-	}
-
-	if (bHasQueuedNextAttack)
-	{
-		CurrentComboIndex = GetNextComboIndex(MaxCombo);
-
-		if (!bUseRandomCombo && CurrentComboIndex == 0)
-		{
-			EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
-		}
-		else
-		{
-			StartComboSequence();
-		}
-	}
-	else
-	{
-		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 	}
 }
 
 void UGP_Primary::OnMontageCompleted()
 {
+	AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo());
+	const UPDA_CharacterAnimationSet* AnimSet = IsValid(PC) ? PC->GetAnimationSet() : nullptr;
+	const int32 MaxCombo = AnimSet ? FMath::Max(AnimSet->LightAttackMontages.Num(), AnimSet->SourceLightAttackMontages.Num()) : 0;
+	if (MaxCombo > 0 && CurrentComboIndex < MaxCombo - 1)
+	{
+		if (bHasQueuedNextAttack)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[PrimaryCombo] MontageCompletedStartQueued Index=%d Max=%d"), CurrentComboIndex, MaxCombo);
+			CurrentComboIndex = GetNextComboIndex(MaxCombo);
+			StartComboSequence();
+			return;
+		}
+	}
+
 	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 }
 
@@ -195,11 +270,16 @@ void UGP_Primary::OnAttackHitEventReceived(FGameplayEventData Payload)
 
 void UGP_Primary::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(SourceFallbackCompletionTimerHandle);
+	}
+	bActionEndWindowOpen = false;
 	ClearExistingTasks();
 
 	if (AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo()))
 	{
-		if (!bWasCancelled)
+		if (!bWasCancelled && bCurrentSwingUsesActionMotionTracking)
 		{
 			PC->ApplyCurrentActionInertia();
 		}
@@ -207,6 +287,7 @@ void UGP_Primary::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGam
 		{
 			PC->StopActionMotionTracking();
 		}
+		PC->StopPrimaryAttackMovementAssist();
 		PC->StopUEFNSourceFallbackMontage(0.2f);
 	}
 

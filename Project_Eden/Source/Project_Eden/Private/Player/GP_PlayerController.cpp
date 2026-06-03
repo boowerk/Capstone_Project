@@ -275,14 +275,16 @@ void AGP_PlayerController::Input_Dash()
 
 	if (AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetCharacter()))
 	{
-
 		if (PlayerCharacter->TryPerformDash())
 		{
 			return;
 		}
 	}
 
-	ActivateAbilityByTag(GPTags::Ability::Movement::Dash);
+	if (ActivateAbilityByTag(GPTags::Ability::Movement::Dash))
+	{
+		return;
+	}
 }
 
 

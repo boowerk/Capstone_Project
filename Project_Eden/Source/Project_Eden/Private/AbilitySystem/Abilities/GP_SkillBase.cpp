@@ -174,8 +174,41 @@ float UGP_SkillBase::GetSkillAugmentRangeMultiplier(const UGP_SkillData* SkillDa
 	return 1.0f;
 }
 
-TSubclassOf<AActor> UGP_SkillBase::GetSkillVisualActorClass(const UGP_SkillData* SkillData, TSubclassOf<AActor> FallbackVisualActorClass, FGameplayTag ElementTag) const
+TSubclassOf<AActor> UGP_SkillBase::GetSkillVisualActorClass(const UGP_SkillData* SkillData, TSubclassOf<AActor> FallbackVisualActorClass, FGameplayTag ElementTag, FGameplayTag CueTag) const
 {
+	if (SkillData)
+	{
+		TSubclassOf<AActor> BestVisualActorClass;
+		int32 BestScore = INDEX_NONE;
+
+		for (const FGP_SkillVisualCueEntry& Entry : SkillData->VisualCues)
+		{
+			if (Entry.VisualType != EGP_SkillVisualType::Actor || !Entry.VisualActorClass)
+			{
+				continue;
+			}
+
+			const bool bCueMatches = !Entry.CueTag.IsValid() || (CueTag.IsValid() && Entry.CueTag.MatchesTagExact(CueTag));
+			const bool bElementMatches = !Entry.ElementTag.IsValid() || (ElementTag.IsValid() && Entry.ElementTag.MatchesTagExact(ElementTag));
+			if (!bCueMatches || !bElementMatches)
+			{
+				continue;
+			}
+
+			const int32 Score = (Entry.CueTag.IsValid() ? 2 : 0) + (Entry.ElementTag.IsValid() ? 1 : 0);
+			if (Score > BestScore)
+			{
+				BestScore = Score;
+				BestVisualActorClass = Entry.VisualActorClass;
+			}
+		}
+
+		if (BestVisualActorClass)
+		{
+			return BestVisualActorClass;
+		}
+	}
+
 	if (SkillData && ElementTag.IsValid())
 	{
 		for (const FGP_ElementVisualActorEntry& Entry : SkillData->ElementVisualActorClasses)
@@ -205,11 +238,51 @@ TSubclassOf<AActor> UGP_SkillBase::GetSkillSpawnActorClass(const UGP_SkillData* 
 	return FallbackActorClass;
 }
 
+UNiagaraSystem* UGP_SkillBase::GetSkillNiagaraSystem(const UGP_SkillData* SkillData, FGameplayTag ElementTag, FGameplayTag CueTag) const
+{
+	if (!SkillData)
+	{
+		return nullptr;
+	}
+
+	UNiagaraSystem* BestNiagaraSystem = nullptr;
+	int32 BestScore = INDEX_NONE;
+
+	for (const FGP_SkillVisualCueEntry& Entry : SkillData->VisualCues)
+	{
+		if (Entry.VisualType != EGP_SkillVisualType::Niagara || !Entry.NiagaraSystem)
+		{
+			continue;
+		}
+
+		const bool bCueMatches = !Entry.CueTag.IsValid() || (CueTag.IsValid() && Entry.CueTag.MatchesTagExact(CueTag));
+		const bool bElementMatches = !Entry.ElementTag.IsValid() || (ElementTag.IsValid() && Entry.ElementTag.MatchesTagExact(ElementTag));
+		if (!bCueMatches || !bElementMatches)
+		{
+			continue;
+		}
+
+		const int32 Score = (Entry.CueTag.IsValid() ? 2 : 0) + (Entry.ElementTag.IsValid() ? 1 : 0);
+		if (Score > BestScore)
+		{
+			BestScore = Score;
+			BestNiagaraSystem = Entry.NiagaraSystem;
+		}
+	}
+
+	return BestNiagaraSystem;
+}
+
 UNiagaraSystem* UGP_SkillBase::GetProjectileVisualSystem(const UGP_SkillData* SkillData, FGameplayTag ElementTag) const
 {
 	if (!SkillData || !ElementTag.IsValid())
 	{
 		return nullptr;
+	}
+
+	if (UNiagaraSystem* NiagaraSystem = GetSkillNiagaraSystem(SkillData, ElementTag))
+	{
+		return NiagaraSystem;
 	}
 
 	for (const FGP_ElementVisualActorEntry& Entry : SkillData->ElementVisualActorClasses)

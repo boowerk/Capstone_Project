@@ -39,8 +39,9 @@ protected:
 	FGameplayTag GetCurrentTechElementTag(const FGameplayAbilityActorInfo* ActorInfo) const;
 	float GetSkillAugmentRadiusMultiplier(const UGP_SkillData* SkillData, const FGameplayAbilityActorInfo* ActorInfo) const;
 	float GetSkillAugmentRangeMultiplier(const UGP_SkillData* SkillData, const FGameplayAbilityActorInfo* ActorInfo) const;
-	TSubclassOf<AActor> GetSkillVisualActorClass(const UGP_SkillData* SkillData, TSubclassOf<AActor> FallbackVisualActorClass, FGameplayTag ElementTag = FGameplayTag()) const;
+	TSubclassOf<AActor> GetSkillVisualActorClass(const UGP_SkillData* SkillData, TSubclassOf<AActor> FallbackVisualActorClass, FGameplayTag ElementTag = FGameplayTag(), FGameplayTag CueTag = FGameplayTag()) const;
 	TSubclassOf<AActor> GetSkillSpawnActorClass(const UGP_SkillData* SkillData, TSubclassOf<AActor> FallbackActorClass) const;
+	UNiagaraSystem* GetSkillNiagaraSystem(const UGP_SkillData* SkillData, FGameplayTag ElementTag = FGameplayTag(), FGameplayTag CueTag = FGameplayTag()) const;
 	UNiagaraSystem* GetProjectileVisualSystem(const UGP_SkillData* SkillData, FGameplayTag ElementTag = FGameplayTag()) const;
 	void SpawnVisualActor(AActor* InstigatorActor, TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation = FRotator::ZeroRotator, float VisualScale = 1.0f) const;
 	UGP_SkillData* GetSkillDataFromSpec(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo) const;

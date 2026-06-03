@@ -204,6 +204,7 @@ void AGP_PlayerCharacter::Tick(float DeltaSeconds)
 	UpdateActionCarryVelocity(DeltaSeconds);
 	UpdateActionMotionTracking(DeltaSeconds);
 	UpdatePrimaryAttackAutoFacing(DeltaSeconds);
+	UpdatePrimaryAttackMovementAssist(DeltaSeconds);
 }
 
 bool AGP_PlayerCharacter::AimPrimaryAttackAtBestTarget(float SearchRadius, float ForwardOffset, float Duration)
@@ -331,7 +332,7 @@ UAnimInstance* AGP_PlayerCharacter::GetUEFNSourceAnimInstance() const
 	return UEFNSourceMesh ? UEFNSourceMesh->GetAnimInstance() : nullptr;
 }
 
-float AGP_PlayerCharacter::PlayUEFNSourceFallbackMontage(UAnimMontage* Montage, float PlayRate)
+float AGP_PlayerCharacter::PlayUEFNSourceFallbackMontage(UAnimMontage* Montage, float PlayRate, float PreviousMontageBlendOutTime)
 {
 	UAnimInstance* SourceAnimInstance = GetUEFNSourceAnimInstance();
 	if (!IsValid(SourceAnimInstance) || !IsValid(Montage))
@@ -341,7 +342,7 @@ float AGP_PlayerCharacter::PlayUEFNSourceFallbackMontage(UAnimMontage* Montage, 
 
 	if (IsValid(ActiveUEFNSourceFallbackMontage))
 	{
-		SourceAnimInstance->Montage_Stop(0.1f, ActiveUEFNSourceFallbackMontage);
+		SourceAnimInstance->Montage_Stop(FMath::Max(PreviousMontageBlendOutTime, 0.0f), ActiveUEFNSourceFallbackMontage);
 	}
 
 	const float PlayedDuration = SourceAnimInstance->Montage_Play(Montage, PlayRate);
@@ -416,6 +417,18 @@ void AGP_PlayerCharacter::SetActionLowerBodyMotionMatchBlendEnabled(bool bEnable
 	bBlendActionLowerBodyToMotionMatching = bEnabled;
 }
 
+void AGP_PlayerCharacter::BeginPrimaryAttackMovementAssist(float SpeedRatio)
+{
+	bPrimaryAttackMovementAssistEnabled = true;
+	PrimaryAttackMovementAssistSpeedRatio = FMath::Clamp(SpeedRatio, 0.0f, 1.0f);
+}
+
+void AGP_PlayerCharacter::StopPrimaryAttackMovementAssist()
+{
+	bPrimaryAttackMovementAssistEnabled = false;
+	PrimaryAttackMovementAssistSpeedRatio = 0.0f;
+}
+
 void AGP_PlayerCharacter::BeginActionMotionTracking()
 {
 	bTrackActionMotion = true;
@@ -465,6 +478,45 @@ void AGP_PlayerCharacter::StopActionMotionTracking()
 	HeldPostActionAnimVelocity = FVector::ZeroVector;
 	HeldPostActionAnimVelocityUntilTime = 0.0f;
 	ActionMotionSamples.Reset();
+}
+
+void AGP_PlayerCharacter::UpdatePrimaryAttackMovementAssist(float DeltaSeconds)
+{
+	if (!bPrimaryAttackMovementAssistEnabled || DeltaSeconds <= KINDA_SMALL_NUMBER)
+	{
+		return;
+	}
+
+	UCharacterMovementComponent* MoveComp = GetCharacterMovement();
+	if (!MoveComp || !MoveComp->UpdatedComponent || MoveComp->MovementMode != MOVE_Walking)
+	{
+		return;
+	}
+
+	const UWorld* World = GetWorld();
+	const float CurrentTime = World ? World->GetTimeSeconds() : 0.0f;
+	if (LastActionRootMotionCancelMovementDirection.IsNearlyZero()
+		|| FMath::Abs(LastActionRootMotionCancelMovementScale) <= KINDA_SMALL_NUMBER
+		|| (World && CurrentTime - LastActionRootMotionCancelMovementInputTime > 0.15f))
+	{
+		return;
+	}
+
+	const FVector AssistDirection = LastActionRootMotionCancelMovementDirection.GetSafeNormal2D();
+	const float AssistSpeed = GetScaledNormalWalkSpeed() * PrimaryAttackMovementAssistSpeedRatio * FMath::Clamp(FMath::Abs(LastActionRootMotionCancelMovementScale), 0.0f, 1.0f);
+	if (AssistSpeed <= KINDA_SMALL_NUMBER)
+	{
+		return;
+	}
+
+	const float CurrentForwardSpeed = FVector::DotProduct(GetVelocity(), AssistDirection);
+	if (CurrentForwardSpeed >= AssistSpeed * 0.8f)
+	{
+		return;
+	}
+
+	FHitResult MoveHit;
+	MoveComp->SafeMoveUpdatedComponent(AssistDirection * AssistSpeed * DeltaSeconds, MoveComp->UpdatedComponent->GetComponentQuat(), true, MoveHit);
 }
 
 void AGP_PlayerCharacter::UpdateActionCarryVelocity(float DeltaSeconds)

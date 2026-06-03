@@ -3,6 +3,7 @@
 
 #include "CoreMinimal.h"
 #include "AbilitySystem/Abilities/GP_SkillBase.h"
+#include "TimerManager.h"
 #include "GP_Primary.generated.h"
 
 class UAnimMontage;
@@ -47,13 +48,24 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Skill|Primary Targeting", meta = (ClampMin = "0.0"))
 	float AutoTargetFacingDuration = 0.35f;
 
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Skill|Movement")
+	TSet<int32> ActionMotionComboIndices = { 2 };
+
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Skill|Movement", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float MobileAttackMovementAssistSpeedRatio = 0.35f;
+
 private:
 	// =========================================================================
 	// 3. 콤보 시퀀스 및 상태 제어 함수군 (Combo Sequence Helpers)
 	// =========================================================================
 	void StartComboSequence();
 	int32 GetNextComboIndex(int32 MaxComboCount);
+	bool ShouldUseActionMotionTrackingForComboIndex(int32 ComboIndex) const;
 	void ClearExistingTasks();
+	void ClearEventTasks();
+	void ScheduleSourceFallbackMontageCompletion(float Duration);
+	void OnSourceFallbackMontageCompleted();
+	bool TryStartQueuedAttackFromActionEnd();
 
 	// =========================================================================
 	// 4. 애니메이션 몽타주 및 게임플레이 이벤트 콜백 (Gameplay Event Callbacks)
@@ -79,9 +91,17 @@ private:
 	int32 CurrentComboIndex = 0;
 	bool bHasQueuedNextAttack = false;
 	bool bIsComboWindowOpen = false;
+	bool bCurrentSwingUsesActionMotionTracking = false;
+	bool bActionEndWindowOpen = false;
 
 	// Some migrated primary montages still send the ability tag as their hit notify, so each swing guards against duplicate hit events.
 	bool bHasAppliedCurrentAttackHit = false;
+
+	UPROPERTY()
+	TObjectPtr<UAnimMontage> CurrentTargetAttackMontage;
+
+	UPROPERTY()
+	TObjectPtr<UAnimMontage> CurrentSourceAttackMontage;
 
 	// =========================================================================
 	// 6. GAS 어빌리티 태스크 변수군 (Gameplay Ability Tasks)
@@ -100,4 +120,6 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<UAbilityTask_WaitGameplayEvent> WaitEndTask;
+
+	FTimerHandle SourceFallbackCompletionTimerHandle;
 };
