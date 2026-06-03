@@ -17,6 +17,7 @@
 #include "Camera/PlayerCameraManager.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Player/GP_PlayerController.h"
 
 // Animation Headers
 #include "Animation/AnimInstance.h"
@@ -57,6 +58,7 @@ AGP_PlayerCharacter::AGP_PlayerCharacter()
 	GetCharacterMovement()->RotationRate = FRotator(0.0f, 540.0f, 0.0f);
 	GetCharacterMovement()->JumpZVelocity = 500.f;
 	GetCharacterMovement()->AirControl = 0.2f;
+	GetCharacterMovement()->NavAgentProps.bCanCrouch = true;
 
 	// 초기 속도 세팅
 	GetCharacterMovement()->MaxWalkSpeed = GetScaledNormalWalkSpeed();
@@ -116,6 +118,36 @@ void AGP_PlayerCharacter::BeginPlay()
 	if (bAutoSpawnWhiteVoidSet)
 	{
 		EnsureWhiteVoidSetExists();
+	}
+}
+
+void AGP_PlayerCharacter::PostInitializeComponents()
+{
+	Super::PostInitializeComponents();
+
+	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+	{
+		MoveComp->NavAgentProps.bCanCrouch = true;
+	}
+}
+
+void AGP_PlayerCharacter::OnStartCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust)
+{
+	Super::OnStartCrouch(HalfHeightAdjust, ScaledHalfHeightAdjust);
+
+	if (UEFNSourceMesh)
+	{
+		UEFNSourceMesh->AddLocalOffset(FVector(0.0f, 0.0f, ScaledHalfHeightAdjust), false, nullptr, ETeleportType::TeleportPhysics);
+	}
+}
+
+void AGP_PlayerCharacter::OnEndCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust)
+{
+	Super::OnEndCrouch(HalfHeightAdjust, ScaledHalfHeightAdjust);
+
+	if (UEFNSourceMesh)
+	{
+		UEFNSourceMesh->AddLocalOffset(FVector(0.0f, 0.0f, -ScaledHalfHeightAdjust), false, nullptr, ETeleportType::TeleportPhysics);
 	}
 }
 
@@ -421,12 +453,14 @@ void AGP_PlayerCharacter::BeginPrimaryAttackMovementAssist(float SpeedRatio)
 {
 	bPrimaryAttackMovementAssistEnabled = true;
 	PrimaryAttackMovementAssistSpeedRatio = FMath::Clamp(SpeedRatio, 0.0f, 1.0f);
+	LastPrimaryAttackMovementLogTime = -1000.0f;
 }
 
 void AGP_PlayerCharacter::StopPrimaryAttackMovementAssist()
 {
 	bPrimaryAttackMovementAssistEnabled = false;
 	PrimaryAttackMovementAssistSpeedRatio = 0.0f;
+	LastPrimaryAttackMovementLogTime = -1000.0f;
 }
 
 void AGP_PlayerCharacter::BeginActionMotionTracking()
@@ -488,16 +522,42 @@ void AGP_PlayerCharacter::UpdatePrimaryAttackMovementAssist(float DeltaSeconds)
 	}
 
 	UCharacterMovementComponent* MoveComp = GetCharacterMovement();
-	if (!MoveComp || !MoveComp->UpdatedComponent || MoveComp->MovementMode != MOVE_Walking)
+	if (!MoveComp || !MoveComp->UpdatedComponent)
 	{
 		return;
 	}
 
 	const UWorld* World = GetWorld();
 	const float CurrentTime = World ? World->GetTimeSeconds() : 0.0f;
+	const float InputAge = World ? CurrentTime - LastActionRootMotionCancelMovementInputTime : -1.0f;
+	const bool bShouldLog = !World || CurrentTime - LastPrimaryAttackMovementLogTime >= 0.1f;
+	if (bShouldLog)
+	{
+		LastPrimaryAttackMovementLogTime = CurrentTime;
+		UE_LOG(LogTemp, Warning, TEXT("[PrimaryMove] Actor=%s Mode=%d Falling=%d WalkableFloor=%d OnGround=%d Vel=%s Speed2D=%.1f VelZ=%.1f Accel=%s Accel2D=%.1f MaxWalk=%.1f InputAge=%.3f AssistRatio=%.2f"),
+			*GetName(),
+			static_cast<int32>(MoveComp->MovementMode),
+			MoveComp->IsFalling() ? 1 : 0,
+			MoveComp->CurrentFloor.IsWalkableFloor() ? 1 : 0,
+			MoveComp->IsMovingOnGround() ? 1 : 0,
+			*GetVelocity().ToCompactString(),
+			GetVelocity().Size2D(),
+			GetVelocity().Z,
+			*MoveComp->GetCurrentAcceleration().ToCompactString(),
+			MoveComp->GetCurrentAcceleration().Size2D(),
+			MoveComp->MaxWalkSpeed,
+			InputAge,
+			PrimaryAttackMovementAssistSpeedRatio);
+	}
+
+	if (MoveComp->MovementMode != MOVE_Walking)
+	{
+		return;
+	}
+
 	if (LastActionRootMotionCancelMovementDirection.IsNearlyZero()
 		|| FMath::Abs(LastActionRootMotionCancelMovementScale) <= KINDA_SMALL_NUMBER
-		|| (World && CurrentTime - LastActionRootMotionCancelMovementInputTime > 0.15f))
+		|| (World && InputAge > 0.15f))
 	{
 		return;
 	}
@@ -516,7 +576,21 @@ void AGP_PlayerCharacter::UpdatePrimaryAttackMovementAssist(float DeltaSeconds)
 	}
 
 	FHitResult MoveHit;
+	const FVector BeforeLocation = GetActorLocation();
 	MoveComp->SafeMoveUpdatedComponent(AssistDirection * AssistSpeed * DeltaSeconds, MoveComp->UpdatedComponent->GetComponentQuat(), true, MoveHit);
+	const FVector AppliedDelta = GetActorLocation() - BeforeLocation;
+	if (bShouldLog)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[PrimaryMove][Assist] Actor=%s AssistSpeed=%.1f CurrentForward=%.1f Delta=%s DeltaSpeed=%.1f Hit=%d Blocking=%d HitNormal=%s"),
+			*GetName(),
+			AssistSpeed,
+			CurrentForwardSpeed,
+			*AppliedDelta.ToCompactString(),
+			DeltaSeconds > KINDA_SMALL_NUMBER ? AppliedDelta.Size2D() / DeltaSeconds : 0.0f,
+			MoveHit.bBlockingHit ? 1 : 0,
+			MoveHit.IsValidBlockingHit() ? 1 : 0,
+			*MoveHit.Normal.ToCompactString());
+	}
 }
 
 void AGP_PlayerCharacter::UpdateActionCarryVelocity(float DeltaSeconds)
@@ -824,10 +898,17 @@ void AGP_PlayerCharacter::StopUEFNSourceFallbackMontage(float BlendOutTime)
 		{
 			SourceAnimInstance->Montage_Stop(BlendOutTime, ActiveUEFNSourceFallbackMontage);
 		}
-		// 방어 코드: 슬롯명 미스매칭이나 몽타주 매칭 어긋남 대비하여 전체 활성 몽타주 강제 정지 처리
-		SourceAnimInstance->Montage_Stop(BlendOutTime, nullptr);
+		else
+		{
+			SourceAnimInstance->Montage_Stop(BlendOutTime, nullptr);
+		}
 	}
 
+	ClearUEFNSourceFallbackMontageState();
+}
+
+void AGP_PlayerCharacter::ClearUEFNSourceFallbackMontageState()
+{
 	bApplyUEFNSourceFallbackRootMotion = false;
 	bActionRootMotionInputCancelEnabled = false;
 	bBlendActionLowerBodyToMotionMatching = false;
@@ -928,6 +1009,10 @@ void AGP_PlayerCharacter::ToggleSprinting()
 		// 달리기 중이라면 어빌리티/태그 강제 취소
 		ASC->CancelAbilities(&SprintTag);
 	}
+	else if (bPrimaryAttackInProgress)
+	{
+		return;
+	}
 	else
 	{
 		// 걷기 중이라면 달리기 활성화 시도
@@ -938,7 +1023,7 @@ void AGP_PlayerCharacter::ToggleSprinting()
 void AGP_PlayerCharacter::StartSprinting()
 {
 	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
-	if (!ASC || IsSprinting()) return;
+	if (!ASC || IsSprinting() || bPrimaryAttackInProgress) return;
 
 	FGameplayTagContainer SprintTag;
 	SprintTag.AddTag(GPTags::State::Movement::Sprinting);
@@ -959,6 +1044,28 @@ bool AGP_PlayerCharacter::IsSprinting() const
 {
 	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
 	return ASC ? ASC->HasMatchingGameplayTag(GPTags::State::Movement::Sprinting) : false;
+}
+
+void AGP_PlayerCharacter::SetPrimaryAttackInProgress(bool bInProgress)
+{
+	if (bPrimaryAttackInProgress == bInProgress)
+	{
+		return;
+	}
+
+	bPrimaryAttackInProgress = bInProgress;
+	if (bPrimaryAttackInProgress)
+	{
+		StopSprinting();
+	}
+	else if (const AGP_PlayerController* GPController = Cast<AGP_PlayerController>(GetController()))
+	{
+		if (GPController->ShouldResumeHeldSprint())
+		{
+			StartSprinting();
+		}
+	}
+	RefreshCurrentMaxWalkSpeed();
 }
 
 bool AGP_PlayerCharacter::IsDashing() const
@@ -986,6 +1093,7 @@ float AGP_PlayerCharacter::ResolveDirectionalMoveSpeed(const FVector2D& MoveInpu
 {
 	const FGPDirectionalMovementSpeedProfile& Profile = GetActiveMovementSpeedProfile();
 	const FVector2D Input = MoveInput.GetSafeNormal();
+	const bool bEffectiveSprinting = bSprinting && !bPrimaryAttackInProgress;
 	const float ForwardAmount = Input.Y;
 	const float AbsForward = FMath::Abs(Input.Y);
 	const float AbsRight = FMath::Abs(Input.X);
@@ -993,19 +1101,19 @@ float AGP_PlayerCharacter::ResolveDirectionalMoveSpeed(const FVector2D& MoveInpu
 	float BaseSpeed = Profile.NormalForwardSpeed;
 	if (FMath::IsNearlyZero(ForwardAmount) && AbsRight > 0.f)
 	{
-		BaseSpeed = bSprinting ? Profile.SprintSideSpeed : Profile.NormalSideSpeed;
+		BaseSpeed = bEffectiveSprinting ? Profile.SprintSideSpeed : Profile.NormalSideSpeed;
 	}
 	else if (ForwardAmount > 0.f)
 	{
-		BaseSpeed = bSprinting ? Profile.SprintForwardSpeed : Profile.NormalForwardSpeed;
+		BaseSpeed = bEffectiveSprinting ? Profile.SprintForwardSpeed : Profile.NormalForwardSpeed;
 	}
 	else if (AbsRight > AbsForward)
 	{
-		BaseSpeed = bSprinting ? Profile.SprintSideSpeed : Profile.NormalSideSpeed;
+		BaseSpeed = bEffectiveSprinting ? Profile.SprintSideSpeed : Profile.NormalSideSpeed;
 	}
 	else
 	{
-		BaseSpeed = bSprinting ? Profile.SprintBackSpeed : Profile.NormalBackSpeed;
+		BaseSpeed = bEffectiveSprinting ? Profile.SprintBackSpeed : Profile.NormalBackSpeed;
 	}
 
 	return BaseSpeed * GetMovementSpeedScaleRatio() * FMath::Max(GASMovementSpeedMultiplier, 0.01f);
@@ -1053,7 +1161,7 @@ void AGP_PlayerCharacter::RefreshCurrentMaxWalkSpeed()
 {
 	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
 	{
-		MoveComp->MaxWalkSpeed = IsSprinting() ? GetScaledSprintSpeed() : GetScaledNormalWalkSpeed();
+		MoveComp->MaxWalkSpeed = (IsSprinting() && !bPrimaryAttackInProgress) ? GetScaledSprintSpeed() : GetScaledNormalWalkSpeed();
 	}
 }
 

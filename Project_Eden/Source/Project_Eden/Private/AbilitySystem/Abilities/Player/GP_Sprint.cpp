@@ -1,4 +1,5 @@
 #include "AbilitySystem/Abilities/Player/GP_Sprint.h"
+#include "Characters/GP_PlayerCharacter.h"
 #include "GameplayTags/GP_Tags.h"
 
 UGP_Sprint::UGP_Sprint()
@@ -19,6 +20,15 @@ UGP_Sprint::UGP_Sprint()
 void UGP_Sprint::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
+
+	if (const AGP_PlayerCharacter* PlayerCharacter = ActorInfo ? Cast<AGP_PlayerCharacter>(ActorInfo->AvatarActor.Get()) : nullptr)
+	{
+		if (PlayerCharacter->IsPrimaryAttackInProgress())
+		{
+			EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+			return;
+		}
+	}
 
 	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
 	{

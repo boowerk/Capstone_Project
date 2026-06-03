@@ -6,6 +6,7 @@
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 #include "Abilities/Tasks/AbilityTask_WaitInputPress.h"
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "Utils/GP_BlueprintLibrary.h"
 
 UGP_Primary::UGP_Primary()
@@ -61,6 +62,23 @@ void UGP_Primary::StartComboSequence()
 	{
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 		return;
+	}
+	PC->SetPrimaryAttackInProgress(true);
+	if (const UCharacterMovementComponent* MoveComp = PC->GetCharacterMovement())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[PrimaryMove][Start] Actor=%s Index=%d Mode=%d Falling=%d OnGround=%d Vel=%s Speed2D=%.1f VelZ=%.1f Accel=%s Accel2D=%.1f MaxWalk=%.1f Sprint=%d"),
+			*PC->GetName(),
+			CurrentComboIndex,
+			static_cast<int32>(MoveComp->MovementMode),
+			MoveComp->IsFalling() ? 1 : 0,
+			MoveComp->IsMovingOnGround() ? 1 : 0,
+			*PC->GetVelocity().ToCompactString(),
+			PC->GetVelocity().Size2D(),
+			PC->GetVelocity().Z,
+			*MoveComp->GetCurrentAcceleration().ToCompactString(),
+			MoveComp->GetCurrentAcceleration().Size2D(),
+			MoveComp->MaxWalkSpeed,
+			PC->IsSprinting() ? 1 : 0);
 	}
 
 	UPDA_CharacterAnimationSet* AnimSet = PC->GetAnimationSet();
@@ -279,6 +297,7 @@ void UGP_Primary::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGam
 
 	if (AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo()))
 	{
+		PC->SetPrimaryAttackInProgress(false);
 		if (!bWasCancelled && bCurrentSwingUsesActionMotionTracking)
 		{
 			PC->ApplyCurrentActionInertia();
@@ -288,7 +307,14 @@ void UGP_Primary::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGam
 			PC->StopActionMotionTracking();
 		}
 		PC->StopPrimaryAttackMovementAssist();
-		PC->StopUEFNSourceFallbackMontage(0.2f);
+		if (bWasCancelled)
+		{
+			PC->StopUEFNSourceFallbackMontage(0.2f);
+		}
+		else
+		{
+			PC->ClearUEFNSourceFallbackMontageState();
+		}
 	}
 
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);

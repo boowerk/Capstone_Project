@@ -34,8 +34,11 @@ public:
 	AGP_PlayerCharacter();
 	virtual ~AGP_PlayerCharacter() override;
 	virtual void BeginPlay() override;
+	virtual void PostInitializeComponents() override;
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void Landed(const FHitResult& Hit) override;
+	virtual void OnStartCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust) override;
+	virtual void OnEndCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	virtual void AddMovementInput(FVector WorldDirection, float ScaleValue, bool bForce = false) override;
 
@@ -54,6 +57,8 @@ public:
 	void StartSprinting();
 	void StopSprinting();
 	bool IsSprinting() const;
+	bool IsPrimaryAttackInProgress() const { return bPrimaryAttackInProgress; }
+	void SetPrimaryAttackInProgress(bool bInProgress);
 
 	bool TryPerformDash();
 	bool IsDashing() const;
@@ -106,6 +111,7 @@ public:
 	float PlayUEFNSourceFallbackMontage(UAnimMontage* Montage, float PlayRate = 1.0f, float PreviousMontageBlendOutTime = 0.1f);
 	bool IsPlayingUEFNSourceFallbackMontage() const;
 	void StopUEFNSourceFallbackMontage(float BlendOutTime = 0.2f);
+	void ClearUEFNSourceFallbackMontageState();
 
 	void SetActionRootMotionInputCancelEnabled(bool bEnabled);
 	bool RequestActionRootMotionCancelIfMovementHeld();
@@ -359,6 +365,8 @@ private:
 
 	bool bPrimaryAttackMovementAssistEnabled = false;
 	float PrimaryAttackMovementAssistSpeedRatio = 0.35f;
+	bool bPrimaryAttackInProgress = false;
+	float LastPrimaryAttackMovementLogTime = -1000.0f;
 
 	bool bTrackActionMotion = false;
 	FVector LastActionMotionSampleLocation = FVector::ZeroVector;

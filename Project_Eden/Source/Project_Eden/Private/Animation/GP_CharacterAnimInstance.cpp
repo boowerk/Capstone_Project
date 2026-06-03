@@ -242,7 +242,6 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	bHasAcceleration = WorldAcceleration.SizeSquared2D() > KINDA_SMALL_NUMBER;
 	bIsFalling = MovementComponent->IsFalling();
 	bIsAnyMontagePlaying = Montage_IsPlaying(nullptr);
-	MMDatabaseLOD = static_cast<float>(static_cast<uint8>(MMDatabaseLODEnum));
 	const float CurrentMaxSpeed = MovementComponent->GetMaxSpeed() / MovementSpeedScaleRatio;
 	bIsSprinting = CurrentMaxSpeed >= SprintSpeedThreshold || Speed2D >= SprintSpeedThreshold;
 	const bool bWantsGroundMovement = bHasAcceleration && !bIsFalling;
@@ -560,24 +559,32 @@ void UGP_CharacterAnimInstance::ApplyChosenDatabase(UPoseSearchDatabase* Selecte
 	}
 
 	RuntimePoseSearchDatabase = SelectedDatabase;
-	CurrentMotionMatchState = ResolveMotionMatchState(MovementMode, MovementState, Gait);
 
 	const FString DatabaseName = SelectedDatabase->GetName();
 	if (DatabaseName.Contains(TEXT("Sprint")))
 	{
+		CurrentMotionMatchState = ESourceMotionMatchState::Sprint;
 		SprintPoseSearchDatabase = SelectedDatabase;
 	}
 	else if (DatabaseName.Contains(TEXT("Run")))
 	{
+		CurrentMotionMatchState = ESourceMotionMatchState::Run;
 		RunPoseSearchDatabase = SelectedDatabase;
 	}
 	else if (DatabaseName.Contains(TEXT("Walk")))
 	{
+		CurrentMotionMatchState = ESourceMotionMatchState::Walk;
 		WalkPoseSearchDatabase = SelectedDatabase;
 	}
 	else if (DatabaseName.Contains(TEXT("Jump")) || DatabaseName.Contains(TEXT("Land")))
 	{
+		CurrentMotionMatchState = ESourceMotionMatchState::Jump;
 		JumpPoseSearchDatabase = SelectedDatabase;
+	}
+	else
+	{
+		CurrentMotionMatchState = ESourceMotionMatchState::Idle;
+		IdlePoseSearchDatabase = SelectedDatabase;
 	}
 }
 

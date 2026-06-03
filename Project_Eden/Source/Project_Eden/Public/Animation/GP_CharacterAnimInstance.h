@@ -30,14 +30,6 @@ enum class ESourceMotionMatchState : uint8
 };
 
 UENUM(BlueprintType)
-enum class EMMDatabaseLOD : uint8
-{
-	Dense = 0,
-	Sparse = 1,
-	ExtremeSparse = 2
-};
-
-UENUM(BlueprintType)
 enum class E_MovementMode : uint8
 {
 	Grounded = 0,
@@ -139,13 +131,6 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, Category = "Chooser")
 	float MovementSpeedScaleRatio = 1.f;
-
-	// Root chooser compatibility with the original sample's LOD branch.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Chooser")
-	float MMDatabaseLOD = 2.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Chooser")
-	EMMDatabaseLOD MMDatabaseLODEnum = EMMDatabaseLOD::ExtremeSparse;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Locomotion")
 	FVector LocalVelocityDirection;

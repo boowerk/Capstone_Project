@@ -65,3 +65,8 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 - 모션 매칭 궤적 히스토리 리셋 로직(`ResetMotionTrajectoryAfterWhiteVoidTransition`)이 특정 구조체 버전에 강결합되어 발생할 수 있는 메모리 손상 위험을 방지하기 위해, 리플렉션을 통해 속성 이름 `Position`을 먼저 탐색하여 갱신하는 동적 구조체 검증 로직으로 설계 보완.
 - 애니메이션 인스턴스 `NativeUpdateAnimation` 전체 틱이 Suppression 기간에 중단되어 상태 갱신이 마비되는 부작용을 해결하기 위해, 틱은 정상 작동하도록 두고 모션 매칭 노드 평가 지점(`ApplyRuntimeDatabaseToMotionMatchingNode`)에서만 선별적으로 포즈 서치를 무시하도록 차단 구조를 개편.
 - 런타임 컴포넌트 동적 생성 로직(`EnsureChildComponents`)에서 불필요하게 사용되던 무거운 에디터 유틸리티 `Owner->AddInstanceComponent`를 완전 철폐하고, 가비지 컬렉션(GC) 보호를 받는 Transient UPROPERTY와 SetupAttachment/RegisterComponent 표준 계층 구조만을 사용하여 결함을 근절.
+
+### 2026-06-04
+- 캐릭터 웅크리기(Crouch) 로코모션을 모션 매칭에 통합하기 위해, UGP_CharacterAnimInstance C++ 클래스의 기존 Stance 및 IsStopping 변수를 활용하여 Chooser Table(CHT_MM_MaskMan_Root_OriginalStyle)에 조건 바인딩을 추가하기로 결정.
+- Sparse_Crouch_Idles 및 Sparse_Crouch_TurnInPlace PSD 에셋의 결손을 Dense/Extreme_Sparse PSD를 이용한 LOD 대체 매핑(Fallback)으로 해결하여 개발 효율을 높임.
+- 루트 테이블 및 신규 서브 테이블(Crouch Idles / Crouch Walks)을 설계하여 에디터 상에서 최종 구성하도록 지침 수립.
