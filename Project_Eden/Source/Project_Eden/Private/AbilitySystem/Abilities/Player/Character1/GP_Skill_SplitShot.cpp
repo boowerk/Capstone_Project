@@ -42,7 +42,7 @@ void UGP_Skill_SplitShot::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 			AimRotation.Pitch = FMath::ClampAngle(AimRotation.Pitch, -5.f, 10.f);
 		}
 
-		const int32 SafeProjectileCount = FMath::Max(1, ProjectileCount);
+		const int32 SafeProjectileCount = FMath::Max(1, ProjectileCount + GetSkillAugmentProjectileCountBonus(SkillData, ActorInfo));
 		const float StepAngle = SafeProjectileCount > 1
 			? TotalSpreadAngle / static_cast<float>(SafeProjectileCount - 1)
 			: 0.f;

@@ -54,6 +54,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Tech|Augment")
 	float GetSkillAugmentRangeMultiplier(FGameplayTag SkillIdTag) const;
 
+	UFUNCTION(BlueprintPure, Category = "Tech|Augment")
+	float GetSkillAugmentCooldownMultiplier(FGameplayTag SkillIdTag) const;
+
+	UFUNCTION(BlueprintPure, Category = "Tech|Augment")
+	int32 GetSkillAugmentProjectileCountBonus(FGameplayTag SkillIdTag) const;
+
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 private:
@@ -80,4 +86,6 @@ private:
 
 	UFUNCTION()
 	void OnRep_SelectedSkillAugments();
+
+	bool DoesAugmentApplyToSkill(const UGP_SkillAugmentData* AugmentData, FGameplayTag SkillIdTag) const;
 };

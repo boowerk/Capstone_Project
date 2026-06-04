@@ -39,6 +39,8 @@ protected:
 	FGameplayTag GetCurrentTechElementTag(const FGameplayAbilityActorInfo* ActorInfo) const;
 	float GetSkillAugmentRadiusMultiplier(const UGP_SkillData* SkillData, const FGameplayAbilityActorInfo* ActorInfo) const;
 	float GetSkillAugmentRangeMultiplier(const UGP_SkillData* SkillData, const FGameplayAbilityActorInfo* ActorInfo) const;
+	float GetSkillAugmentCooldownMultiplier(const UGP_SkillData* SkillData, const FGameplayAbilityActorInfo* ActorInfo) const;
+	int32 GetSkillAugmentProjectileCountBonus(const UGP_SkillData* SkillData, const FGameplayAbilityActorInfo* ActorInfo) const;
 	TSubclassOf<AActor> GetSkillVisualActorClass(const UGP_SkillData* SkillData, TSubclassOf<AActor> FallbackVisualActorClass, FGameplayTag ElementTag = FGameplayTag()) const;
 	TSubclassOf<AActor> GetSkillSpawnActorClass(const UGP_SkillData* SkillData, TSubclassOf<AActor> FallbackActorClass) const;
 	UNiagaraSystem* GetProjectileVisualSystem(const UGP_SkillData* SkillData, FGameplayTag ElementTag = FGameplayTag()) const;

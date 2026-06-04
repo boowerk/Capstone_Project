@@ -11,10 +11,11 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-06-01T00:29:00+09:00
+Last synced: 2026-06-03T19:04:50+09:00
 
 ## Current Status
 
+- Skill augment modifiers now include cooldown, projectile count, and element requirements. Empty `TargetSkillTags` applies to all skills; `RequiredElementTag` requires current tech element match. `CooldownMultiplier` is wired through `UGP_SkillBase::ApplyCooldown` and DashSlash fallback cooldown. `ProjectileCountBonus` is wired for SplitShot, NetTestProjectile, and ThrownBurst.
 - Selectable skill structure is now in C++: `UGP_TargetedSkillBase` supports `Instant`, `Projectile`, `Ray`, and `TargetActor` selection modes, preview actor/debug target updates, primary/secondary confirm, cancel, server-forwarded selection events, and aim-assist target actor selection near the aim line with range/LoS/filter checks. `UGP_Skill_NetTestProjectile` now uses projectile selection before commit/spawn; Dash/DashSlash cancel `GPTags.Ability.Skill.Selection`. `UGP_Skill_LifeDrainTarget` is a channeled target-select drain sample that continues while target distance <= selection range * 5 and LoS remains clear. Damage uses the configured/fallback damage GE; healing uses `/Game/GAS_Pattern/AbilitySystem/GameplayEffects/Healing/GE_Heal_Generic` with SetByCaller DataName `GPTags.Healing.Data.Base`.
 - memoc commands now use project-local `.memoc/runtime` first. This avoids Codex sandbox timeouts when `.memoc/bin/memoc.cmd summary/search/doctor` tries to execute the global AppData runtime outside the workspace.
 - ActionEnd lower-body handoff signal exists in C++ only for now. `Dash` and `DashSlash` request `SetActionLowerBodyMotionMatchBlendEnabled(true)` at ActionEnd/fallback ActionEnd, and `UGP_CharacterAnimInstance` exposes `ActionLowerBodyMotionMatchBlendAlpha` with interp speeds. The attempted AnimBP `LayeredBlendPerBone` graph insertion was reverted because it broke `DefaultSlot.Source` and caused non-montage animation A-pose. `ABP_UEFNSource_Player` and `ABP_MaskMan_Player` are restored to `pre-slot pose -> DefaultSlot -> Output`; a future lower-body handoff should use a cached-pose/safe single-consumer graph.

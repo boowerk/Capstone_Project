@@ -106,7 +106,8 @@ void UGP_Skill_DashSlash::ApplyCooldown(const FGameplayAbilitySpecHandle Handle,
 		return;
 	}
 
-	const float CooldownDuration = SkillData->CooldownDuration > 0.0f ? SkillData->CooldownDuration : DefaultCooldownDuration;
+	const float CooldownMultiplier = GetSkillAugmentCooldownMultiplier(SkillData, ActorInfo);
+	const float CooldownDuration = (SkillData->CooldownDuration > 0.0f ? SkillData->CooldownDuration : DefaultCooldownDuration) * CooldownMultiplier;
 	if (CooldownDuration <= 0.0f || !GenericCooldownEffectClass)
 	{
 		return;

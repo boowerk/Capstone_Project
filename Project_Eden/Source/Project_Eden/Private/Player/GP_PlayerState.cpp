@@ -107,7 +107,7 @@ float AGP_PlayerState::GetSkillAugmentDamageMultiplier(FGameplayTag SkillIdTag) 
 	float DamageMultiplier = 1.0f;
 	for (const UGP_SkillAugmentData* Augment : SelectedSkillAugments)
 	{
-		if (!IsValid(Augment) || !Augment->TargetSkillTags.HasTagExact(SkillIdTag))
+		if (!DoesAugmentApplyToSkill(Augment, SkillIdTag))
 		{
 			continue;
 		}
@@ -128,7 +128,7 @@ float AGP_PlayerState::GetSkillAugmentRadiusMultiplier(FGameplayTag SkillIdTag) 
 	float RadiusMultiplier = 1.0f;
 	for (const UGP_SkillAugmentData* Augment : SelectedSkillAugments)
 	{
-		if (!IsValid(Augment) || !Augment->TargetSkillTags.HasTagExact(SkillIdTag))
+		if (!DoesAugmentApplyToSkill(Augment, SkillIdTag))
 		{
 			continue;
 		}
@@ -149,7 +149,7 @@ float AGP_PlayerState::GetSkillAugmentRangeMultiplier(FGameplayTag SkillIdTag) c
 	float RangeMultiplier = 1.0f;
 	for (const UGP_SkillAugmentData* Augment : SelectedSkillAugments)
 	{
-		if (!IsValid(Augment) || !Augment->TargetSkillTags.HasTagExact(SkillIdTag))
+		if (!DoesAugmentApplyToSkill(Augment, SkillIdTag))
 		{
 			continue;
 		}
@@ -158,6 +158,64 @@ float AGP_PlayerState::GetSkillAugmentRangeMultiplier(FGameplayTag SkillIdTag) c
 	}
 
 	return RangeMultiplier;
+}
+
+float AGP_PlayerState::GetSkillAugmentCooldownMultiplier(FGameplayTag SkillIdTag) const
+{
+	if (!SkillIdTag.IsValid())
+	{
+		return 1.0f;
+	}
+
+	float CooldownMultiplier = 1.0f;
+	for (const UGP_SkillAugmentData* Augment : SelectedSkillAugments)
+	{
+		if (!DoesAugmentApplyToSkill(Augment, SkillIdTag))
+		{
+			continue;
+		}
+
+		CooldownMultiplier *= FMath::Max(Augment->Modifiers.CooldownMultiplier, 0.0f);
+	}
+
+	return CooldownMultiplier;
+}
+
+int32 AGP_PlayerState::GetSkillAugmentProjectileCountBonus(FGameplayTag SkillIdTag) const
+{
+	if (!SkillIdTag.IsValid())
+	{
+		return 0;
+	}
+
+	int32 ProjectileCountBonus = 0;
+	for (const UGP_SkillAugmentData* Augment : SelectedSkillAugments)
+	{
+		if (!DoesAugmentApplyToSkill(Augment, SkillIdTag))
+		{
+			continue;
+		}
+
+		ProjectileCountBonus += FMath::Max(Augment->Modifiers.ProjectileCountBonus, 0);
+	}
+
+	return ProjectileCountBonus;
+}
+
+bool AGP_PlayerState::DoesAugmentApplyToSkill(const UGP_SkillAugmentData* AugmentData, FGameplayTag SkillIdTag) const
+{
+	if (!IsValid(AugmentData) || !SkillIdTag.IsValid())
+	{
+		return false;
+	}
+
+	const bool bMatchesSkill = AugmentData->TargetSkillTags.IsEmpty() || AugmentData->TargetSkillTags.HasTagExact(SkillIdTag);
+	if (!bMatchesSkill)
+	{
+		return false;
+	}
+
+	return !AugmentData->RequiredElementTag.IsValid() || CurrentTechElementTag.MatchesTagExact(AugmentData->RequiredElementTag);
 }
 
 void AGP_PlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

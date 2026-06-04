@@ -88,7 +88,14 @@ void UGP_SkillBase::ApplyCooldown(const FGameplayAbilitySpecHandle Handle, const
 	}
 
 	SpecHandle.Data->DynamicGrantedTags.AddTag(SkillData->CooldownTag);
-	SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Cooldown::Data::Duration, SkillData->CooldownDuration);
+	const float CooldownMultiplier = GetSkillAugmentCooldownMultiplier(SkillData, ActorInfo);
+	const float CooldownDuration = SkillData->CooldownDuration * CooldownMultiplier;
+	if (CooldownDuration <= 0.0f)
+	{
+		return;
+	}
+
+	SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Cooldown::Data::Duration, CooldownDuration);
 	ApplyGameplayEffectSpecToOwner(Handle, ActorInfo, ActivationInfo, SpecHandle);
 }
 
@@ -174,6 +181,56 @@ float UGP_SkillBase::GetSkillAugmentRangeMultiplier(const UGP_SkillData* SkillDa
 	return 1.0f;
 }
 
+float UGP_SkillBase::GetSkillAugmentCooldownMultiplier(const UGP_SkillData* SkillData, const FGameplayAbilityActorInfo* ActorInfo) const
+{
+	if (!SkillData || !SkillData->SkillIdTag.IsValid())
+	{
+		return 1.0f;
+	}
+
+	const AActor* OwnerActor = ActorInfo ? ActorInfo->OwnerActor.Get() : nullptr;
+	if (const AGP_PlayerState* PlayerState = Cast<AGP_PlayerState>(OwnerActor))
+	{
+		return PlayerState->GetSkillAugmentCooldownMultiplier(SkillData->SkillIdTag);
+	}
+
+	const APawn* AvatarPawn = ActorInfo ? Cast<APawn>(ActorInfo->AvatarActor.Get()) : nullptr;
+	if (AvatarPawn)
+	{
+		if (const AGP_PlayerState* PlayerState = AvatarPawn->GetPlayerState<AGP_PlayerState>())
+		{
+			return PlayerState->GetSkillAugmentCooldownMultiplier(SkillData->SkillIdTag);
+		}
+	}
+
+	return 1.0f;
+}
+
+int32 UGP_SkillBase::GetSkillAugmentProjectileCountBonus(const UGP_SkillData* SkillData, const FGameplayAbilityActorInfo* ActorInfo) const
+{
+	if (!SkillData || !SkillData->SkillIdTag.IsValid())
+	{
+		return 0;
+	}
+
+	const AActor* OwnerActor = ActorInfo ? ActorInfo->OwnerActor.Get() : nullptr;
+	if (const AGP_PlayerState* PlayerState = Cast<AGP_PlayerState>(OwnerActor))
+	{
+		return PlayerState->GetSkillAugmentProjectileCountBonus(SkillData->SkillIdTag);
+	}
+
+	const APawn* AvatarPawn = ActorInfo ? Cast<APawn>(ActorInfo->AvatarActor.Get()) : nullptr;
+	if (AvatarPawn)
+	{
+		if (const AGP_PlayerState* PlayerState = AvatarPawn->GetPlayerState<AGP_PlayerState>())
+		{
+			return PlayerState->GetSkillAugmentProjectileCountBonus(SkillData->SkillIdTag);
+		}
+	}
+
+	return 0;
+}
+
 TSubclassOf<AActor> UGP_SkillBase::GetSkillVisualActorClass(const UGP_SkillData* SkillData, TSubclassOf<AActor> FallbackVisualActorClass, FGameplayTag ElementTag) const
 {
 	if (SkillData && ElementTag.IsValid())
@@ -192,7 +249,23 @@ TSubclassOf<AActor> UGP_SkillBase::GetSkillVisualActorClass(const UGP_SkillData*
 		return SkillData->SkillVisualActorClass;
 	}
 
-	return FallbackVisualActorClass;
+	if (FallbackVisualActorClass)
+	{
+		return FallbackVisualActorClass;
+	}
+
+	if (SkillData)
+	{
+		for (const FGP_ElementVisualActorEntry& Entry : SkillData->ElementVisualActorClasses)
+		{
+			if (Entry.VisualActorClass)
+			{
+				return Entry.VisualActorClass;
+			}
+		}
+	}
+
+	return nullptr;
 }
 
 TSubclassOf<AActor> UGP_SkillBase::GetSkillSpawnActorClass(const UGP_SkillData* SkillData, TSubclassOf<AActor> FallbackActorClass) const
@@ -207,14 +280,25 @@ TSubclassOf<AActor> UGP_SkillBase::GetSkillSpawnActorClass(const UGP_SkillData* 
 
 UNiagaraSystem* UGP_SkillBase::GetProjectileVisualSystem(const UGP_SkillData* SkillData, FGameplayTag ElementTag) const
 {
-	if (!SkillData || !ElementTag.IsValid())
+	if (!SkillData)
 	{
 		return nullptr;
 	}
 
+	if (ElementTag.IsValid())
+	{
+		for (const FGP_ElementVisualActorEntry& Entry : SkillData->ElementVisualActorClasses)
+		{
+			if (Entry.ElementTag.MatchesTagExact(ElementTag))
+			{
+				return Entry.ProjectileVisualSystem;
+			}
+		}
+	}
+
 	for (const FGP_ElementVisualActorEntry& Entry : SkillData->ElementVisualActorClasses)
 	{
-		if (Entry.ElementTag.MatchesTagExact(ElementTag))
+		if (Entry.ProjectileVisualSystem)
 		{
 			return Entry.ProjectileVisualSystem;
 		}

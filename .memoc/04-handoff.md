@@ -11,10 +11,17 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-05-26T20:45:00
+Last synced: 2026-06-03T19:04:50
 
 ## Skill Augment Handoff
 
+- `UGP_SkillAugmentData.TargetSkillTags` empty means global/all-skill augment; otherwise exact skill id match.
+- `UGP_SkillAugmentData.RequiredElementTag` gates modifier application by `AGP_PlayerState.CurrentTechElementTag`; empty means no element requirement.
+- `GrantedElementTag` remains the "change current tech element" field and is separate from `RequiredElementTag`.
+- `AGP_PlayerState` exposes damage, radius, range, cooldown multiplier, and projectile count bonus resolution.
+- `UGP_SkillBase::ApplyCooldown` applies `CooldownMultiplier`; `UGP_Skill_DashSlash` also applies it to its fallback cooldown.
+- `ProjectileCountBonus` is wired for `SplitShot`, `NetTestProjectile`, and `ThrownBurst`; NetTest/ThrownBurst fan extra projectiles across a small 10-degree yaw spread.
+- PIE test still needed: cooldown DA (`CooldownMultiplier=0.5`), projectile DA (`ProjectileCountBonus=1`), and element-gated DA (`RequiredElementTag=Volt`) via augment picker.
 - `AGP_PlayerState::GetSkillAugmentRadiusMultiplier` returns multiplied radius modifiers for selected augments exact-matching `SkillData.SkillIdTag`.
 - `UGP_SkillBase` exposes `GetSkillAugmentRadiusMultiplier`, `GetSkillSpawnActorClass`, and `GetProjectileVisualSystem`.
 - PulseBurst/GroundBurst apply radius multiplier directly to overlap radius.
