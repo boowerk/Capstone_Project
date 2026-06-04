@@ -4,12 +4,18 @@
 
 TArray<UGP_SkillAugmentData*> UGP_SkillAugmentPoolData::PickRandomAugments(int32 Count) const
 {
+	TArray<UGP_SkillAugmentData*> EmptyExcludedAugments;
+	return PickRandomAugmentsExcluding(Count, EmptyExcludedAugments);
+}
+
+TArray<UGP_SkillAugmentData*> UGP_SkillAugmentPoolData::PickRandomAugmentsExcluding(int32 Count, const TArray<UGP_SkillAugmentData*>& ExcludedAugments) const
+{
 	TArray<UGP_SkillAugmentData*> AvailableAugments;
 	AvailableAugments.Reserve(Augments.Num());
 
 	for (UGP_SkillAugmentData* Augment : Augments)
 	{
-		if (IsValid(Augment))
+		if (IsValid(Augment) && !ExcludedAugments.Contains(Augment))
 		{
 			AvailableAugments.Add(Augment);
 		}

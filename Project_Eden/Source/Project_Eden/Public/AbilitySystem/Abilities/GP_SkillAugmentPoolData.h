@@ -17,4 +17,7 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Skill|Augment|Pool")
 	TArray<UGP_SkillAugmentData*> PickRandomAugments(int32 Count) const;
+
+	UFUNCTION(BlueprintCallable, Category = "Skill|Augment|Pool")
+	TArray<UGP_SkillAugmentData*> PickRandomAugmentsExcluding(int32 Count, const TArray<UGP_SkillAugmentData*>& ExcludedAugments) const;
 };

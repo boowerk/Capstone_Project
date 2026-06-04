@@ -69,6 +69,11 @@ void AGP_PlayerState::AddSkillAugment(UGP_SkillAugmentData* AugmentData)
 		return;
 	}
 
+	if (SelectedSkillAugments.Contains(AugmentData))
+	{
+		return;
+	}
+
 	SelectedSkillAugments.Add(AugmentData);
 
 	if (AugmentData->GrantedElementTag.IsValid())
