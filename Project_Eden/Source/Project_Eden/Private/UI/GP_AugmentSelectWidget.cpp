@@ -5,6 +5,7 @@
 #include "Components/Image.h"
 #include "Components/TextBlock.h"
 #include "Engine/Texture2D.h"
+#include "Player/GP_PlayerController.h"
 #include "Player/GP_PlayerState.h"
 
 UGP_AugmentSelectWidget::UGP_AugmentSelectWidget(const FObjectInitializer& ObjectInitializer)
@@ -59,7 +60,14 @@ bool UGP_AugmentSelectWidget::SelectCandidateIndex(int32 CandidateIndex)
 
 	if (bRemoveOnSelection)
 	{
-		RemoveFromParent();
+		if (AGP_PlayerController* PlayerController = Cast<AGP_PlayerController>(GetOwningPlayer()))
+		{
+			PlayerController->CloseAugmentSelectWidget();
+		}
+		else
+		{
+			RemoveFromParent();
+		}
 	}
 
 	return true;

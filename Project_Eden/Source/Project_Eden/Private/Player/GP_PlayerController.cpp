@@ -2,6 +2,8 @@
 
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
+#include "AbilitySystem/Abilities/GP_SkillAugmentData.h"
+#include "AbilitySystem/Abilities/GP_SkillAugmentPoolData.h"
 #include "AbilitySystem/Abilities/GP_TestSkillSet.h"
 #include "Blueprint/UserWidget.h"
 #include "Characters/GP_EnemyCharacter.h"
@@ -16,6 +18,8 @@
 #include "InputCoreTypes.h"
 #include "Kismet/GameplayStatics.h"
 #include "Logging/LogMacros.h"
+#include "Player/GP_PlayerState.h"
+#include "UI/GP_AugmentSelectWidget.h"
 #include "UI/GP_CharacterStatsMenuWidget.h"
 #include "UI/GP_PlayerHUDWidget.h"
 
@@ -62,6 +66,85 @@ void AGP_PlayerController::BeginPlay()
 			}
 		}
 	}
+}
+
+bool AGP_PlayerController::RequestOpenAugmentSelect()
+{
+	if (!IsLocalController())
+	{
+		return false;
+	}
+
+	if (!IsValid(AugmentPoolData))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("AugmentPoolData is not set on %s."), *GetName());
+		return false;
+	}
+
+	AGP_PlayerState* GPPlayerState = GetPlayerState<AGP_PlayerState>();
+	TArray<UGP_SkillAugmentData*> ExcludedAugments;
+	if (IsValid(GPPlayerState))
+	{
+		ExcludedAugments = GPPlayerState->GetSelectedSkillAugments();
+	}
+
+	TArray<UGP_SkillAugmentData*> CandidateAugments = AugmentPoolData->PickRandomAugmentsExcluding(AugmentCandidateCount, ExcludedAugments);
+	return OpenAugmentSelectWidget(CandidateAugments);
+}
+
+bool AGP_PlayerController::OpenAugmentSelectWidget(const TArray<UGP_SkillAugmentData*>& Candidates)
+{
+	if (!IsLocalController() || Candidates.IsEmpty())
+	{
+		return false;
+	}
+
+	if (!IsValid(AugmentSelectWidget))
+	{
+		if (!AugmentSelectWidgetClass)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("AugmentSelectWidgetClass is not set on %s."), *GetName());
+			return false;
+		}
+
+		AugmentSelectWidget = CreateWidget<UGP_AugmentSelectWidget>(this, AugmentSelectWidgetClass);
+		if (!IsValid(AugmentSelectWidget))
+		{
+			return false;
+		}
+	}
+
+	AugmentSelectWidget->SetCandidateAugments(Candidates);
+	if (!AugmentSelectWidget->IsInViewport())
+	{
+		AugmentSelectWidget->AddToViewport(80);
+	}
+
+	bShowMouseCursor = true;
+	SetIgnoreMoveInput(true);
+	SetIgnoreLookInput(true);
+
+	FInputModeGameAndUI InputMode;
+	InputMode.SetWidgetToFocus(AugmentSelectWidget->TakeWidget());
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	InputMode.SetHideCursorDuringCapture(false);
+	SetInputMode(InputMode);
+
+	return true;
+}
+
+void AGP_PlayerController::CloseAugmentSelectWidget()
+{
+	if (IsValid(AugmentSelectWidget))
+	{
+		AugmentSelectWidget->RemoveFromParent();
+		AugmentSelectWidget = nullptr;
+	}
+
+	bShowMouseCursor = false;
+	SetIgnoreMoveInput(false);
+	SetIgnoreLookInput(false);
+	SetInputMode(FInputModeGameOnly());
 }
 
 void AGP_PlayerController::Tick(float DeltaSeconds)

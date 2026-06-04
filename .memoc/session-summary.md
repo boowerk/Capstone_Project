@@ -14,6 +14,7 @@ Last: 2026-06-04T00:00:00+09:00
 Replace, do not append. Keep <800B.
 
 ## Status
+- PlayerController now owns augment UI flow: `RequestOpenAugmentSelect`, `OpenAugmentSelectWidget`, and `CloseAugmentSelectWidget`.
 - Augment selection now supports duplicate prevention: pools can pick random augments while excluding already selected augments, and PlayerState ignores duplicate `AddSkillAugment` requests.
 - Augment `TargetSkillTags` empty now means all skills.
 - `RequiredElementTag` gates augment modifiers by current tech element; `GrantedElementTag` still changes tech.
@@ -22,4 +23,4 @@ Replace, do not append. Keep <800B.
 
 ## Verify
 - `git diff --check` passed for touched source files (CRLF warnings only).
-- Full build not run after duplicate-prevention change.
+- Full build not run after augment UI flow change.
