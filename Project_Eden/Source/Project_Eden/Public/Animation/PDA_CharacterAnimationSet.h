@@ -41,7 +41,6 @@ struct FGPRetargetVisualScaleProfile
 	GENERATED_BODY()
 
 	// Desired uniform CharacterMesh0 scale in the character/capsule space.
-	// If UEFNSourceMesh is scaled, runtime compensates the child-relative scale.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Retarget", meta = (ClampMin = "0.01"))
 	float CharacterMeshScale = 1.0f;
 

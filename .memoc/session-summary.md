@@ -2,25 +2,23 @@
 memoc: true
 type: state
 scope: project-memory
-created: 2026-06-01T04:41:15
-updated: 2026-06-04T03:25:00+09:00
+updated: 2026-06-04T03:45:00+09:00
 status: active
-tags:
-  - memoc
-  - memoc/state
+tags: [memoc, memoc/state]
 ---
 # Session Summary
-Last: 2026-06-04T03:25:00+09:00
+Last: 2026-06-04T05:22:00+09:00
 Replace, do not append. Keep <800B.
 
 ## Status
 - No UBT/build while editor open.
-- Primary recovery embedded; blocks sprint, resumes held sprint, logs `[PrimaryMove]`.
-- `CHT_MM_MaskMan_Root_OriginalStyle` has Stance-based Crouch Idles/Walks routing.
-- Removed unused MM LOD vars from `UGP_CharacterAnimInstance`.
-- Added hold crouch: `IA_Crouch` -> C, controller Crouch/UnCrouch, player can crouch.
-- Fixed chooser apply: crouch DB updates graph DB var + state.
+- Primary recovery embedded; sprint resumes after Primary.
+- Crouch: C input, `bCanCrouch`, `CrouchedHalfHeight=64.f`, stance chooser routing.
+- Mesh Z hacks removed.
+- Retarget source-pin/sibling experiment reverted.
+- Runtime ensures `UEFNSourceMesh` -> capsule and `CharacterMesh0` child.
+- Source ABP PoseHistory MM node uses `RuntimePoseSearchDatabase`.
+- Jump DB changes force MM interrupt once; normal DB changes keep smooth no-interrupt.
 
 ## Open
-- LiveCoding starts, no completion line yet.
-- PIE validate crouch DB selection and Primary logs.
+- PIE validate crouch PSD and jump transition speed.

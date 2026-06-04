@@ -1,4 +1,4 @@
-﻿#include "Characters/GP_PlayerCharacter.h"
+#include "Characters/GP_PlayerCharacter.h"
 
 // Engine / Core Headers
 #include "AbilitySystemComponent.h"
@@ -59,6 +59,7 @@ AGP_PlayerCharacter::AGP_PlayerCharacter()
 	GetCharacterMovement()->JumpZVelocity = 500.f;
 	GetCharacterMovement()->AirControl = 0.2f;
 	GetCharacterMovement()->NavAgentProps.bCanCrouch = true;
+	GetCharacterMovement()->CrouchedHalfHeight = 64.0f; // 기본값 40.0f가 너무 작아 앉은키가 극단적으로 작아지므로 64.0f로 적당하게 상향 조정
 
 	// 초기 속도 세팅
 	GetCharacterMovement()->MaxWalkSpeed = GetScaledNormalWalkSpeed();
@@ -78,6 +79,7 @@ AGP_PlayerCharacter::AGP_PlayerCharacter()
 	UEFNSourceMesh->SetRelativeRotation(FRotator::ZeroRotator);
 
 	GetMesh()->SetupAttachment(UEFNSourceMesh);
+	GetMesh()->AddTickPrerequisiteComponent(UEFNSourceMesh);
 
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>("CameraBoom");
 	CameraBoom->SetupAttachment(GetRootComponent());
@@ -113,6 +115,7 @@ AGP_PlayerCharacter::~AGP_PlayerCharacter()
 void AGP_PlayerCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+
 	ApplyMovementSpeedFromAnimationSet();
 	ApplyRetargetVisualScaleFromAnimationSet();
 	if (bAutoSpawnWhiteVoidSet)
@@ -129,26 +132,27 @@ void AGP_PlayerCharacter::PostInitializeComponents()
 	{
 		MoveComp->NavAgentProps.bCanCrouch = true;
 	}
+
+	if (UEFNSourceMesh && UEFNSourceMesh->GetAttachParent() != GetCapsuleComponent())
+	{
+		UEFNSourceMesh->AttachToComponent(GetCapsuleComponent(), FAttachmentTransformRules::KeepRelativeTransform);
+	}
+
+	if (UEFNSourceMesh && GetMesh() && GetMesh()->GetAttachParent() != UEFNSourceMesh)
+	{
+		GetMesh()->AttachToComponent(UEFNSourceMesh, FAttachmentTransformRules::KeepRelativeTransform);
+		GetMesh()->AddTickPrerequisiteComponent(UEFNSourceMesh);
+	}
 }
 
 void AGP_PlayerCharacter::OnStartCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust)
 {
 	Super::OnStartCrouch(HalfHeightAdjust, ScaledHalfHeightAdjust);
-
-	if (UEFNSourceMesh)
-	{
-		UEFNSourceMesh->AddLocalOffset(FVector(0.0f, 0.0f, ScaledHalfHeightAdjust), false, nullptr, ETeleportType::TeleportPhysics);
-	}
 }
 
 void AGP_PlayerCharacter::OnEndCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust)
 {
 	Super::OnEndCrouch(HalfHeightAdjust, ScaledHalfHeightAdjust);
-
-	if (UEFNSourceMesh)
-	{
-		UEFNSourceMesh->AddLocalOffset(FVector(0.0f, 0.0f, -ScaledHalfHeightAdjust), false, nullptr, ETeleportType::TeleportPhysics);
-	}
 }
 
 void AGP_PlayerCharacter::Tick(float DeltaSeconds)
@@ -1207,8 +1211,6 @@ void AGP_PlayerCharacter::ApplyRetargetVisualScaleFromAnimationSet()
 		UEFNSourceMesh->SetRelativeScale3D(FVector(UEFNSourceScale));
 	}
 
-	// CharacterMesh0 is attached under UEFNSourceMesh, so compensate the child-relative
-	// value to keep the authored PDA scale independent from the source mesh scale.
 	const float CharacterMeshScale = FMath::Max(VisualScaleProfile.CharacterMeshScale, 0.01f);
 	GetMesh()->SetRelativeScale3D(FVector(CharacterMeshScale / UEFNSourceScale));
 }

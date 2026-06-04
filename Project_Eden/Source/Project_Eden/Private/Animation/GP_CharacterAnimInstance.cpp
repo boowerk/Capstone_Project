@@ -631,9 +631,11 @@ void UGP_CharacterAnimInstance::ApplyRuntimeDatabaseToMotionMatchingNode(const F
 
 	if (RuntimePoseSearchDatabase)
 	{
-		// ForceInterrupt causes popping. Use DoNotInterrupt for smooth transitions 
-		// unless we are specifically handling a hard state change.
-		const EPoseSearchInterruptMode InterruptMode = EPoseSearchInterruptMode::DoNotInterrupt;
+		const bool bRuntimeDatabaseChanged = RuntimePoseSearchDatabase != LastAppliedRuntimePoseSearchDatabase;
+		const bool bEnteringJumpDatabase = CurrentMotionMatchState == ESourceMotionMatchState::Jump && bRuntimeDatabaseChanged;
+		const EPoseSearchInterruptMode InterruptMode = bEnteringJumpDatabase
+			? EPoseSearchInterruptMode::ForceInterruptAndInvalidateContinuingPose
+			: EPoseSearchInterruptMode::DoNotInterrupt;
 
 		UMotionMatchingAnimNodeLibrary::SetDatabaseToSearch(
 			MotionMatchingNode,
