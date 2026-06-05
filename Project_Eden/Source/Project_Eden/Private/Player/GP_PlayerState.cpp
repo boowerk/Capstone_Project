@@ -207,6 +207,43 @@ int32 AGP_PlayerState::GetSkillAugmentProjectileCountBonus(FGameplayTag SkillIdT
 	return ProjectileCountBonus;
 }
 
+void AGP_PlayerState::AddXP(float Amount)
+{
+	if (Amount <= 0.0f)
+	{
+		return;
+	}
+
+	if (!HasAuthority())
+	{
+		ServerAddXP(Amount);
+		return;
+	}
+
+	CurrentXP += Amount;
+	bool bLeveledUp = false;
+
+	while (XPToNextLevel > 0.0f && CurrentXP >= XPToNextLevel)
+	{
+		CurrentXP -= XPToNextLevel;
+		++CurrentLevel;
+		XPToNextLevel = FMath::Max(1.0f, XPToNextLevel * LevelXPScale);
+		bLeveledUp = true;
+	}
+
+	if (bLeveledUp)
+	{
+		OnLevelUp(CurrentLevel);
+	}
+
+	ForceNetUpdate();
+}
+
+void AGP_PlayerState::ServerAddXP_Implementation(float Amount)
+{
+	AddXP(Amount);
+}
+
 bool AGP_PlayerState::DoesAugmentApplyToSkill(const UGP_SkillAugmentData* AugmentData, FGameplayTag SkillIdTag) const
 {
 	if (!IsValid(AugmentData) || !SkillIdTag.IsValid())
@@ -229,6 +266,9 @@ void AGP_PlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
 
 	DOREPLIFETIME(AGP_PlayerState, CurrentTechElementTag);
 	DOREPLIFETIME(AGP_PlayerState, SelectedSkillAugments);
+	DOREPLIFETIME(AGP_PlayerState, CurrentXP);
+	DOREPLIFETIME(AGP_PlayerState, CurrentLevel);
+	DOREPLIFETIME(AGP_PlayerState, XPToNextLevel);
 }
 
 void AGP_PlayerState::OnRep_EquippedWeaponData()
@@ -240,5 +280,21 @@ void AGP_PlayerState::OnRep_CurrentTechElementTag()
 }
 
 void AGP_PlayerState::OnRep_SelectedSkillAugments()
+{
+}
+
+void AGP_PlayerState::OnRep_CurrentXP()
+{
+}
+
+void AGP_PlayerState::OnRep_CurrentLevel(int32 PreviousLevel)
+{
+	if (CurrentLevel > PreviousLevel)
+	{
+		OnLevelUp(CurrentLevel);
+	}
+}
+
+void AGP_PlayerState::OnRep_XPToNextLevel()
 {
 }

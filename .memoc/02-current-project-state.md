@@ -15,6 +15,7 @@ Last synced: 2026-06-04T00:00:00+09:00
 
 ## Current Status
 
+- PlayerState now has replicated XP/level basics: `CurrentXP`, `CurrentLevel`, `XPToNextLevel`, `LevelXPScale`, `AddXP`, server forwarding, and `OnLevelUp` Blueprint event for opening augment selection later.
 - PlayerController now owns augment UI flow: `RequestOpenAugmentSelect` rolls candidates from the assigned pool, `OpenAugmentSelectWidget` displays them with Game+UI input mode, and `CloseAugmentSelectWidget` restores Game Only input. `UGP_AugmentSelectWidget` calls controller close after a selection.
 - Augment selection now prevents duplicate picks: `UGP_SkillAugmentPoolData` can exclude already selected augments when rolling candidates, and `AGP_PlayerState::AddSkillAugment` ignores duplicate DA requests.
 - Skill augment modifiers now include cooldown, projectile count, and element requirements. Empty `TargetSkillTags` applies to all skills; `RequiredElementTag` requires current tech element match. `CooldownMultiplier` is wired through `UGP_SkillBase::ApplyCooldown` and DashSlash fallback cooldown. `ProjectileCountBonus` is wired for SplitShot, NetTestProjectile, and ThrownBurst.

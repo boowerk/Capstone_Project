@@ -60,7 +60,26 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Tech|Augment")
 	int32 GetSkillAugmentProjectileCountBonus(FGameplayTag SkillIdTag) const;
 
+	UFUNCTION(BlueprintCallable, Category = "Progression")
+	void AddXP(float Amount);
+
+	UFUNCTION(Server, Reliable)
+	void ServerAddXP(float Amount);
+
+	UFUNCTION(BlueprintPure, Category = "Progression")
+	float GetCurrentXP() const { return CurrentXP; }
+
+	UFUNCTION(BlueprintPure, Category = "Progression")
+	int32 GetCurrentLevel() const { return CurrentLevel; }
+
+	UFUNCTION(BlueprintPure, Category = "Progression")
+	float GetXPToNextLevel() const { return XPToNextLevel; }
+
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+protected:
+	UFUNCTION(BlueprintImplementableEvent, Category = "Progression")
+	void OnLevelUp(int32 NewLevel);
 
 private:
 
@@ -78,6 +97,18 @@ private:
 	UPROPERTY(ReplicatedUsing = OnRep_SelectedSkillAugments, BlueprintReadOnly, Category = "Tech|Augment", meta = (AllowPrivateAccess = "true"))
 	TArray<TObjectPtr<UGP_SkillAugmentData>> SelectedSkillAugments;
 
+	UPROPERTY(ReplicatedUsing = OnRep_CurrentXP, EditDefaultsOnly, BlueprintReadOnly, Category = "Progression", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float CurrentXP = 0.0f;
+
+	UPROPERTY(ReplicatedUsing = OnRep_CurrentLevel, EditDefaultsOnly, BlueprintReadOnly, Category = "Progression", meta = (AllowPrivateAccess = "true", ClampMin = "1"))
+	int32 CurrentLevel = 1;
+
+	UPROPERTY(ReplicatedUsing = OnRep_XPToNextLevel, EditDefaultsOnly, BlueprintReadOnly, Category = "Progression", meta = (AllowPrivateAccess = "true", ClampMin = "1.0"))
+	float XPToNextLevel = 100.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Progression", meta = (AllowPrivateAccess = "true", ClampMin = "1.0"))
+	float LevelXPScale = 1.25f;
+
 	UFUNCTION()
 	void OnRep_EquippedWeaponData();
 
@@ -86,6 +117,15 @@ private:
 
 	UFUNCTION()
 	void OnRep_SelectedSkillAugments();
+
+	UFUNCTION()
+	void OnRep_CurrentXP();
+
+	UFUNCTION()
+	void OnRep_CurrentLevel(int32 PreviousLevel);
+
+	UFUNCTION()
+	void OnRep_XPToNextLevel();
 
 	bool DoesAugmentApplyToSkill(const UGP_SkillAugmentData* AugmentData, FGameplayTag SkillIdTag) const;
 };
