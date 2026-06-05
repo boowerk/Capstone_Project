@@ -9,7 +9,7 @@ tags: [memoc, memoc/state]
 ---
 # Current Project State
 
-Last synced: 2026-06-05T00:00:00+09:00
+Last synced: 2026-06-05T21:06:33+09:00
 
 ## Current Status
 
@@ -17,6 +17,7 @@ Last synced: 2026-06-05T00:00:00+09:00
 - `UEFNSourceMesh` is the source animation mesh; `CharacterMesh0`/MaskMan receives pose through parent-based retargeting. Keep `CharacterMesh0` as a child of `UEFNSourceMesh`.
 - `ABP_UEFNSource_Player` uses motion matching with a DefaultSlot path. `UGP_CharacterAnimInstance` owns chooser-facing locomotion context such as `MovementMode`, `Stance`, `MovementState`, `Gait`, start/pivot/stop/TIP flags, and graph DB/state variables.
 - Primary melee recovery is embedded inside attack montages. `UGP_Primary` should not play separate `_Rec` montages. Primary blocks sprint while active and resumes held sprint when Primary ends.
+- `PDA_MaskMan_AnimationSet` plays Primary combo from `SourceLightAttackMontages`; VFX belongs on `/Game/Characters/UEFN_Mannequin/Animations/Montage/MeleeAttacks/Sword/Light/AM_UEFN_Sword_Light_A-D`, not old PlayerCharacter `GP_Primary_*` montages. A-D now have `TimedNiagaraEffect` trail (`NS_ArrowTrail_Magic`, `hand_r`) plus `PlayNiagaraEffect` burst (`NS_Free_Magic_Slash`, `hand_r`) around `AttackHit`.
 - Primary movement logs use `[PrimaryMove]`; moving attacks should be checked in PIE for ground/velocity issues, not by UBT.
 - `CHT_MM_MaskMan_Root_OriginalStyle` has crouch routing: root rows branch Standing/Crouching by `Stance`; `Crouch Idles` selects Dense crouch TIP vs Idle by `ShouldTurnInPlace`; `Crouch Walks` selects Dense crouch Pivot/Start/Stop/Loop by `IsPivoting`, `IsStarting`, `IsStopping`.
 - Hold crouch exists for testing: `IA_Crouch` is mapped to `C`, `AGP_PlayerController` calls `Crouch()`/`UnCrouch()`, `AGP_PlayerCharacter` enables `bCanCrouch`, and `CrouchedHalfHeight` defaults to `64.0f`.
