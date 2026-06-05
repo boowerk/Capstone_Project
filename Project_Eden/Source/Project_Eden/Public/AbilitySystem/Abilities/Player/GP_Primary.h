@@ -54,6 +54,12 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Skill|Movement", meta = (ClampMin = "0.0", ClampMax = "1.0"))
 	float MobileAttackMovementAssistSpeedRatio = 0.35f;
 
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Skill|Movement", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float MovingAttackLowerBodyMotionMatchBlendAlpha = 0.65f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Skill|Movement", meta = (ClampMin = "0.0"))
+	float IdlePrimaryComboSpeedThreshold = 15.0f;
+
 private:
 	// =========================================================================
 	// 3. 콤보 시퀀스 및 상태 제어 함수군 (Combo Sequence Helpers)
@@ -66,6 +72,9 @@ private:
 	void ScheduleSourceFallbackMontageCompletion(float Duration);
 	void OnSourceFallbackMontageCompleted();
 	bool TryStartQueuedAttackFromActionEnd();
+	bool IsPrimaryComboStartingFromIdle(const class AGP_PlayerCharacter* PlayerCharacter) const;
+	void ApplyForcedPrimaryCrouch(class AGP_PlayerCharacter* PlayerCharacter);
+	void RestoreForcedPrimaryCrouch(class AGP_PlayerCharacter* PlayerCharacter);
 
 	// =========================================================================
 	// 4. 애니메이션 몽타주 및 게임플레이 이벤트 콜백 (Gameplay Event Callbacks)
@@ -93,6 +102,9 @@ private:
 	bool bIsComboWindowOpen = false;
 	bool bCurrentSwingUsesActionMotionTracking = false;
 	bool bActionEndWindowOpen = false;
+	bool bWasCrouchedBeforePrimary = false;
+	bool bForcedPrimaryCrouchApplied = false;
+	bool bComboStartedFromIdle = false;
 
 	// Some migrated primary montages still send the ability tag as their hit notify, so each swing guards against duplicate hit events.
 	bool bHasAppliedCurrentAttackHit = false;

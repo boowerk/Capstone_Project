@@ -83,13 +83,13 @@ AGP_PlayerCharacter::AGP_PlayerCharacter()
 
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>("CameraBoom");
 	CameraBoom->SetupAttachment(GetRootComponent());
-	CameraBoom->TargetArmLength = 380.0f;
+	CameraBoom->TargetArmLength = NormalCameraArmLength;
 	CameraBoom->bUsePawnControlRotation = true;
 	CameraBoom->bEnableCameraLag = true;
 	CameraBoom->CameraLagSpeed = 12.0f;
 	CameraBoom->bEnableCameraRotationLag = true;
 	CameraBoom->CameraRotationLagSpeed = 15.0f;
-	CameraBoom->SocketOffset = FVector(0.0f, 50.0f, 20.0f);
+	CameraBoom->SocketOffset = CameraSocketOffset;
 	CameraBoom->TargetOffset = FVector(0.0f, 0.0f, 0.0f);
 
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>("FollowCamera");
@@ -241,6 +241,7 @@ void AGP_PlayerCharacter::Tick(float DeltaSeconds)
 	UpdateActionMotionTracking(DeltaSeconds);
 	UpdatePrimaryAttackAutoFacing(DeltaSeconds);
 	UpdatePrimaryAttackMovementAssist(DeltaSeconds);
+	UpdateCameraMotion(DeltaSeconds);
 }
 
 bool AGP_PlayerCharacter::AimPrimaryAttackAtBestTarget(float SearchRadius, float ForwardOffset, float Duration)
@@ -451,6 +452,15 @@ void AGP_PlayerCharacter::ClearActionRootMotionCancelMovementInput()
 void AGP_PlayerCharacter::SetActionLowerBodyMotionMatchBlendEnabled(bool bEnabled)
 {
 	bBlendActionLowerBodyToMotionMatching = bEnabled;
+	if (!bBlendActionLowerBodyToMotionMatching)
+	{
+		ActionLowerBodyMotionMatchBlendTargetAlpha = 1.0f;
+	}
+}
+
+void AGP_PlayerCharacter::SetActionLowerBodyMotionMatchBlendTargetAlpha(float TargetAlpha)
+{
+	ActionLowerBodyMotionMatchBlendTargetAlpha = FMath::Clamp(TargetAlpha, 0.0f, 1.0f);
 }
 
 void AGP_PlayerCharacter::BeginPrimaryAttackMovementAssist(float SpeedRatio)
@@ -471,6 +481,7 @@ void AGP_PlayerCharacter::BeginActionMotionTracking()
 {
 	bTrackActionMotion = true;
 	bBlendActionLowerBodyToMotionMatching = false;
+	ActionLowerBodyMotionMatchBlendTargetAlpha = 1.0f;
 	bActionRootMotionCancelledByMovementInput = false;
 	LastActionMotionSampleLocation = GetActorLocation();
 	LastActionMotionSampleTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
@@ -508,6 +519,7 @@ void AGP_PlayerCharacter::StopActionMotionTracking()
 		CurrentActionMotionVelocity.Size2D());
 	bTrackActionMotion = false;
 	bBlendActionLowerBodyToMotionMatching = false;
+	ActionLowerBodyMotionMatchBlendTargetAlpha = 1.0f;
 	bActionRootMotionCancelledByMovementInput = false;
 	ActionMotionCarryVelocity = FVector::ZeroVector;
 	LastActionCarryActualDelta = FVector::ZeroVector;
@@ -1213,6 +1225,33 @@ void AGP_PlayerCharacter::ApplyRetargetVisualScaleFromAnimationSet()
 
 	const float CharacterMeshScale = FMath::Max(VisualScaleProfile.CharacterMeshScale, 0.01f);
 	GetMesh()->SetRelativeScale3D(FVector(CharacterMeshScale / UEFNSourceScale));
+}
+
+void AGP_PlayerCharacter::UpdateCameraMotion(float DeltaSeconds)
+{
+	if (!CameraBoom)
+	{
+		return;
+	}
+
+	const float Speed2D = GetVelocity().Size2D();
+	const bool bShouldUseSprintCamera = IsSprinting() && !bPrimaryAttackInProgress;
+	const bool bShouldUseIdleCamera = Speed2D <= IdleCameraSpeedThreshold && !bShouldUseSprintCamera;
+
+	const float TargetArmLength = bShouldUseSprintCamera
+		? SprintCameraArmLength
+		: (bShouldUseIdleCamera ? IdleCameraArmLength : NormalCameraArmLength);
+
+	const float ClampedArmInterpSpeed = FMath::Max(CameraArmLengthInterpSpeed, 0.0f);
+	const float ClampedSocketInterpSpeed = FMath::Max(CameraSocketOffsetInterpSpeed, 0.0f);
+
+	CameraBoom->TargetArmLength = ClampedArmInterpSpeed > 0.0f
+		? FMath::FInterpTo(CameraBoom->TargetArmLength, TargetArmLength, DeltaSeconds, ClampedArmInterpSpeed)
+		: TargetArmLength;
+
+	CameraBoom->SocketOffset = ClampedSocketInterpSpeed > 0.0f
+		? FMath::VInterpTo(CameraBoom->SocketOffset, CameraSocketOffset, DeltaSeconds, ClampedSocketInterpSpeed)
+		: CameraSocketOffset;
 }
 
 bool AGP_PlayerCharacter::TryPerformDash()

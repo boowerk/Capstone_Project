@@ -201,16 +201,21 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	const bool bCanUseRuntimePoseSearchChooser = PlayerCharacter && PlayerCharacter->GetUEFNSourceAnimInstance() == this;
 	const bool bSourceFallbackMontageActive = PlayerCharacter && PlayerCharacter->IsPlayingUEFNSourceFallbackMontage();
 	bool bBlendActionLowerBodyToMM = false;
+	float LowerBodyMotionMatchTargetAlpha = 0.f;
 	if (PlayerCharacter && PlayerCharacter->ShouldBlendActionLowerBodyToMotionMatching())
 	{
 		bBlendActionLowerBodyToMM = bCanUseRuntimePoseSearchChooser
 			? bSourceFallbackMontageActive
 			: !bSourceFallbackMontageActive;
+		if (bBlendActionLowerBodyToMM)
+		{
+			LowerBodyMotionMatchTargetAlpha = PlayerCharacter->GetActionLowerBodyMotionMatchBlendTargetAlpha();
+		}
 	}
 	const float LowerBodyBlendSpeed = bBlendActionLowerBodyToMM ? ActionLowerBodyMotionMatchBlendInSpeed : ActionLowerBodyMotionMatchBlendOutSpeed;
 	ActionLowerBodyMotionMatchBlendAlpha = FMath::FInterpTo(
 		ActionLowerBodyMotionMatchBlendAlpha,
-		bBlendActionLowerBodyToMM ? 1.f : 0.f,
+		LowerBodyMotionMatchTargetAlpha,
 		DeltaSeconds,
 		LowerBodyBlendSpeed);
 

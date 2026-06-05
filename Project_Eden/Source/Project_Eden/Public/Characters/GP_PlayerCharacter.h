@@ -129,7 +129,9 @@ public:
 	bool IsUsingPostActionAnimVelocity() const;
 
 	void SetActionLowerBodyMotionMatchBlendEnabled(bool bEnabled);
+	void SetActionLowerBodyMotionMatchBlendTargetAlpha(float TargetAlpha);
 	bool ShouldBlendActionLowerBodyToMotionMatching() const { return bBlendActionLowerBodyToMotionMatching; }
+	float GetActionLowerBodyMotionMatchBlendTargetAlpha() const { return ActionLowerBodyMotionMatchBlendTargetAlpha; }
 
 	FOnActionRootMotionCancelInput OnActionRootMotionCancelInput;
 
@@ -161,6 +163,7 @@ protected:
 	void OnFixedTagChanged(const FGameplayTag CallbackTag, int32 NewCount);
 	void ApplyMovementSpeedFromAnimationSet();
 	void ApplyRetargetVisualScaleFromAnimationSet();
+	void UpdateCameraMotion(float DeltaSeconds);
 	void RefreshCurrentMaxWalkSpeed();
 	void PushMovementSpeedScaleRatioToAnimInstances();
 
@@ -230,6 +233,27 @@ private:
 
 	UPROPERTY(VisibleAnywhere, Category = "Camera")
 	TObjectPtr<UCameraComponent> FollowCamera;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|Motion", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float IdleCameraArmLength = 340.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|Motion", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float NormalCameraArmLength = 380.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|Motion", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float SprintCameraArmLength = 460.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|Motion", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float CameraArmLengthInterpSpeed = 6.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|Motion", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float IdleCameraSpeedThreshold = 15.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|Composition", meta = (AllowPrivateAccess = "true"))
+	FVector CameraSocketOffset = FVector(0.0f, 65.0f, 20.0f);
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|Composition", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float CameraSocketOffsetInterpSpeed = 8.0f;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Animation|Retarget", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USkeletalMeshComponent> UEFNSourceMesh;
@@ -329,6 +353,7 @@ private:
 	bool bApplyUEFNSourceFallbackRootMotion = false;
 	bool bActionRootMotionInputCancelEnabled = false;
 	bool bBlendActionLowerBodyToMotionMatching = false;
+	float ActionLowerBodyMotionMatchBlendTargetAlpha = 1.0f;
 	bool bActionRootMotionCancelledByMovementInput = false;
 	FVector LastActionRootMotionCancelMovementDirection = FVector::ZeroVector;
 	float LastActionRootMotionCancelMovementScale = 0.0f;

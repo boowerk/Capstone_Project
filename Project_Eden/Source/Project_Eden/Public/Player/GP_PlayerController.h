@@ -26,6 +26,7 @@ public:
 	AGP_PlayerController();
 	FVector2D GetCurrentMoveInput() const { return CurrentMoveInput; }
 	bool ShouldResumeHeldSprint() const { return !bIsSprintToggle && bSprintInputHeld; }
+	bool IsCrouchInputHeld() const { return bCrouchInputHeld; }
 
 protected:
 	virtual void BeginPlay() override;
@@ -130,6 +131,7 @@ private:
 	float TargetMaxWalkSpeed = 0.0f;
 	bool bHasTargetMaxWalkSpeed = false;
 	bool bSprintInputHeld = false;
+	bool bCrouchInputHeld = false;
 	void Input_Move(const FInputActionValue& Value);
 	void Input_Look(const FInputActionValue& Value);
 	void Input_Jump();

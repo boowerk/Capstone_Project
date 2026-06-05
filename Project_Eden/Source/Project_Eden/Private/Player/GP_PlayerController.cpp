@@ -253,6 +253,7 @@ void AGP_PlayerController::Input_StopJump()
 void AGP_PlayerController::Input_CrouchPressed()
 {
 	CancelSkillSelectionIfActive();
+	bCrouchInputHeld = true;
 
 	if (AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetCharacter()))
 	{
@@ -267,11 +268,17 @@ void AGP_PlayerController::Input_CrouchPressed()
 
 void AGP_PlayerController::Input_CrouchReleased()
 {
+	bCrouchInputHeld = false;
 	if (AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetCharacter()))
 	{
 		UE_LOG(LogTemp, Warning, TEXT("[CrouchInput] Released Actor=%s IsCrouched=%d"),
 			*PC->GetName(),
 			PC->bIsCrouched ? 1 : 0);
+		if (PC->IsPrimaryAttackInProgress())
+		{
+			return;
+		}
+
 		PC->UnCrouch();
 
 		if (ShouldResumeHeldSprint())

@@ -7,6 +7,7 @@
 #include "Abilities/Tasks/AbilityTask_WaitInputPress.h"
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Player/GP_PlayerController.h"
 #include "Utils/GP_BlueprintLibrary.h"
 
 UGP_Primary::UGP_Primary()
@@ -33,6 +34,9 @@ void UGP_Primary::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 	}
 
 	CurrentComboIndex = 0;
+	bWasCrouchedBeforePrimary = false;
+	bForcedPrimaryCrouchApplied = false;
+	bComboStartedFromIdle = false;
 	StartComboSequence();
 }
 
@@ -55,7 +59,6 @@ void UGP_Primary::StartComboSequence()
 	bHasQueuedNextAttack = false;
 	bIsComboWindowOpen = false;
 	bHasAppliedCurrentAttackHit = false;
-	bCurrentSwingUsesActionMotionTracking = ShouldUseActionMotionTrackingForComboIndex(CurrentComboIndex);
 
 	AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo());
 	if (!IsValid(PC))
@@ -63,6 +66,12 @@ void UGP_Primary::StartComboSequence()
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 		return;
 	}
+	if (!bForcedPrimaryCrouchApplied)
+	{
+		bComboStartedFromIdle = IsPrimaryComboStartingFromIdle(PC);
+	}
+	bCurrentSwingUsesActionMotionTracking = bComboStartedFromIdle || ShouldUseActionMotionTrackingForComboIndex(CurrentComboIndex);
+	ApplyForcedPrimaryCrouch(PC);
 	PC->SetPrimaryAttackInProgress(true);
 	if (const UCharacterMovementComponent* MoveComp = PC->GetCharacterMovement())
 	{
@@ -123,6 +132,7 @@ void UGP_Primary::StartComboSequence()
 	else
 	{
 		PC->StopActionMotionTracking();
+		PC->SetActionLowerBodyMotionMatchBlendTargetAlpha(MovingAttackLowerBodyMotionMatchBlendAlpha);
 		PC->SetActionLowerBodyMotionMatchBlendEnabled(true);
 		PC->BeginPrimaryAttackMovementAssist(MobileAttackMovementAssistSpeedRatio);
 	}
@@ -203,6 +213,41 @@ void UGP_Primary::OnSourceFallbackMontageCompleted()
 	OnMontageCompleted();
 }
 
+void UGP_Primary::ApplyForcedPrimaryCrouch(AGP_PlayerCharacter* PlayerCharacter)
+{
+	if (!IsValid(PlayerCharacter))
+	{
+		return;
+	}
+
+	if (!bForcedPrimaryCrouchApplied)
+	{
+		bWasCrouchedBeforePrimary = PlayerCharacter->bIsCrouched;
+		bForcedPrimaryCrouchApplied = true;
+	}
+
+	PlayerCharacter->StopSprinting();
+	PlayerCharacter->Crouch();
+}
+
+void UGP_Primary::RestoreForcedPrimaryCrouch(AGP_PlayerCharacter* PlayerCharacter)
+{
+	if (!IsValid(PlayerCharacter) || !bForcedPrimaryCrouchApplied)
+	{
+		return;
+	}
+
+	const AGP_PlayerController* PlayerController = Cast<AGP_PlayerController>(PlayerCharacter->GetController());
+	const bool bShouldRemainCrouched = PlayerController ? PlayerController->IsCrouchInputHeld() : bWasCrouchedBeforePrimary;
+	if (!bShouldRemainCrouched)
+	{
+		PlayerCharacter->UnCrouch();
+	}
+
+	bForcedPrimaryCrouchApplied = false;
+	bWasCrouchedBeforePrimary = false;
+}
+
 bool UGP_Primary::TryStartQueuedAttackFromActionEnd()
 {
 	if (!bActionEndWindowOpen || !bHasQueuedNextAttack)
@@ -234,6 +279,20 @@ bool UGP_Primary::ShouldUseActionMotionTrackingForComboIndex(int32 ComboIndex) c
 	return ActionMotionComboIndices.Contains(ComboIndex);
 }
 
+bool UGP_Primary::IsPrimaryComboStartingFromIdle(const AGP_PlayerCharacter* PlayerCharacter) const
+{
+	if (!IsValid(PlayerCharacter))
+	{
+		return false;
+	}
+
+	const UCharacterMovementComponent* MoveComp = PlayerCharacter->GetCharacterMovement();
+	const AGP_PlayerController* PlayerController = Cast<AGP_PlayerController>(PlayerCharacter->GetController());
+	const bool bHasMoveInput = (MoveComp && !MoveComp->GetCurrentAcceleration().IsNearlyZero())
+		|| (PlayerController && !PlayerController->GetCurrentMoveInput().IsNearlyZero());
+
+	return PlayerCharacter->GetVelocity().Size2D() <= IdlePrimaryComboSpeedThreshold && !bHasMoveInput;
+}
 
 void UGP_Primary::OnComboEnableEventReceived(FGameplayEventData Payload)
 {
@@ -298,6 +357,7 @@ void UGP_Primary::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGam
 	if (AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo()))
 	{
 		PC->SetPrimaryAttackInProgress(false);
+		RestoreForcedPrimaryCrouch(PC);
 		if (!bWasCancelled && bCurrentSwingUsesActionMotionTracking)
 		{
 			PC->ApplyCurrentActionInertia();
