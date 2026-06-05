@@ -1,37 +1,29 @@
----
+﻿---
 memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-06-04T03:45:00+09:00
+updated: 2026-06-06T00:00:00+09:00
 status: active
 tags: [memoc, memoc/state]
 ---
 # Current Project State
 
-Last synced: 2026-06-05T22:35:14+09:00
+Last synced: 2026-06-06T00:00:00+09:00
 
 ## Current Status
 
-- Do not run UBT/build while the editor is open. User uses Live Coding for C++ changes.
-- `UEFNSourceMesh` is the source animation mesh; `CharacterMesh0`/MaskMan receives pose through parent-based retargeting. Keep `CharacterMesh0` as a child of `UEFNSourceMesh`.
-- `ABP_UEFNSource_Player` uses motion matching with a DefaultSlot path. `UGP_CharacterAnimInstance` owns chooser-facing locomotion context such as `MovementMode`, `Stance`, `MovementState`, `Gait`, start/pivot/stop/TIP flags, and graph DB/state variables.
-- Primary melee recovery is embedded inside attack montages. `UGP_Primary` should not play separate `_Rec` montages. Primary blocks sprint while active and resumes held sprint when Primary ends.
-- `UGP_Primary` forces crouch during primary attacks: it stops sprinting, calls `Crouch()` at combo start, ignores crouch release while primary is active, and restores `UnCrouch()` on end unless crouch input is still held.
-- Primary combo lower-body rule: `UGP_Primary` records whether the combo started from idle (`Velocity2D <= 15`, no acceleration, no move input). Idle-start combos use full-body montage/action motion for every hit; moving-start combos keep lower body motion matching except `ActionMotionComboIndices` (default 3rd hit/index 2), which still uses full-body montage.
-- Moving primary lower body now supports montage/MM blending: `UGP_Primary::MovingAttackLowerBodyMotionMatchBlendAlpha` defaults to `0.65`; `AGP_PlayerCharacter` stores the target alpha; `UGP_CharacterAnimInstance` interpolates `ActionLowerBodyMotionMatchBlendAlpha` toward that target instead of hard 1.0.
-- `PDA_MaskMan_AnimationSet` plays Primary combo from `SourceLightAttackMontages`; VFX belongs on `/Game/Characters/UEFN_Mannequin/Animations/Montage/MeleeAttacks/Sword/Light/AM_UEFN_Sword_Light_A-D`, not old PlayerCharacter `GP_Primary_*` montages. A-D now have `TimedNiagaraEffect` trail (`NS_ArrowTrail_Magic`, `hand_r`) plus `PlayNiagaraEffect` burst (`NS_Free_Magic_Slash`, `hand_r`) around `AttackHit`.
-- Primary movement logs use `[PrimaryMove]`; moving attacks should be checked in PIE for ground/velocity issues, not by UBT.
-- Player camera now interpolates spring arm length by state in `AGP_PlayerCharacter`: idle 340, normal 380, sprint 460, with socket offset `(0,65,20)` so the player sits slightly farther left in frame. Tune via `Camera|Motion` and `Camera|Composition`.
-- `CHT_MM_MaskMan_Root_OriginalStyle` has crouch routing: root rows branch Standing/Crouching by `Stance`; `Crouch Idles` selects Dense crouch TIP vs Idle by `ShouldTurnInPlace`; `Crouch Walks` selects Dense crouch Pivot/Start/Stop/Loop by `IsPivoting`, `IsStarting`, `IsStopping`.
-- Hold crouch exists for testing: `IA_Crouch` is mapped to `C`, `AGP_PlayerController` calls `Crouch()`/`UnCrouch()`, `AGP_PlayerCharacter` enables `bCanCrouch`, and `CrouchedHalfHeight` defaults to `64.0f`.
-- `UGP_CharacterAnimInstance::ApplyChosenDatabase` must route selected crouch DBs into the correct graph database variable and `CurrentMotionMatchState`, because the ABP graph does not rely on `RuntimePoseSearchDatabase` alone.
-- Crouch mesh-position hacks were removed. C++ should leave `BaseTranslationOffset` and mesh relative Z alone during crouch while testing theory. `ABP_MaskMan_Player` Retarget Pose From Mesh source-pin experiment was reverted; keep the pin unlinked and rely on attached parent. `AGP_PlayerCharacter::PostInitializeComponents` reattaches `UEFNSourceMesh` to the capsule if the BP CDO lost its parent, then ensures `CharacterMesh0` is under `UEFNSourceMesh`. Current investigation: default UE crouch capsule-bottom movement vs animation foot/root basis.
-- `ABP_UEFNSource_Player` actual output path is MotionMatching -> PoseHistory -> LocomotionPose, not the old state BlendList. The PoseHistory source MotionMatching node was rewired so its `Database` pin uses `RuntimePoseSearchDatabase`; this should allow crouch Chooser-selected PSDs to drive the visible retarget pose.
-- `UGP_CharacterAnimInstance::ApplyRuntimeDatabaseToMotionMatchingNode` uses `ForceInterruptAndInvalidateContinuingPose` only when `CurrentMotionMatchState` enters Jump with a changed runtime DB; normal DB changes remain `DoNotInterrupt` for smooth locomotion.
-- `UGP_RootMotionExtractionEditorLibrary` extracts selected source bones in component space, disables forced root lock, and logs `rootNet2D/rootPath2D/sourceNet2D/zeroSourceXY`. Foot-plant inference has `bUseConstantSpeedFootPlantRootMotion`: true samples the inferred path's max horizontal speed, scales it by `FootPlantMaxSpeedScale` (default 0.85), snaps direction by `FootPlantDirectionSnapDegrees` (default 15), then linearizes root keys; false keeps the snapped smoothed contact-following path. Default `bZeroMotionSourceHorizontalTranslation=false`; old BP nodes may cache true.
+- Do not run UBT/build while the editor is open. User prefers Live Coding for C++ changes.
+- `UEFNSourceMesh` is the source animation mesh. `CharacterMesh0`/MaskMan should stay parented under `UEFNSourceMesh`; avoid reintroducing mesh Z hacks or detached retarget experiments.
+- `ABP_UEFNSource_Player` uses motion matching with chooser-selected pose-search DBs, and `UGP_CharacterAnimInstance` owns locomotion context (`MovementMode`, `Stance`, `MovementState`, `Gait`, start/pivot/stop/TIP flags, graph DB state).
+- Primary melee currently embeds recovery inside attack montages, blocks sprint while active, forces crouch during the combo, and restores uncrouch only if crouch input is no longer held.
+- Idle-start primaries stay full-body for the whole combo; moving-start primaries keep lower-body MM except configured combo indices, with moving lower-body blend alpha currently tuned to `0.65`.
+- Current crouch/MM work depends on `CHT_MM_MaskMan_Root_OriginalStyle`, `ApplyChosenDatabase`, and the `ABP_UEFNSource_Player` MotionMatching -> PoseHistory -> LocomotionPose path using `RuntimePoseSearchDatabase`.
+- Root-motion extraction tuning is in progress in `UGP_RootMotionExtractionEditorLibrary`, including snapped direction (`15` degrees) and foot-plant max-speed scale (`0.85`).
+- Camera composition currently targets spring arm lengths `340/380/460` for idle/normal/sprint with socket offset `(0,65,20)`.
 
 ## Open Tasks
 
-- PIE validate that pressing/releasing C visibly plays crouch locomotion, and running jump switches to jump without waiting for run playback.
-- Live Coding compile and editor-validate newly extracted root-motion assets, especially foot-bone sourced extraction.
+- PIE validate crouch start/hold/release behavior, visible crouch locomotion, and running jump transition without waiting on run playback.
+- Live Coding compile and editor-validate the latest extracted root-motion assets, especially foot-bone sourced extraction.
+- Refresh any stale Blueprint pins after the latest animation / root-motion updates.
