@@ -2,23 +2,24 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-06-04T03:45:00+09:00
+updated: 2026-06-05T00:00:00+09:00
 status: active
 tags: [memoc, memoc/state]
 ---
 # Session Summary
-Last: 2026-06-04T05:22:00+09:00
+Last: 2026-06-05T00:00:00+09:00
 Replace, do not append. Keep <800B.
 
 ## Status
 - No UBT/build while editor open.
-- Primary recovery embedded; sprint resumes after Primary.
 - Crouch: C input, `bCanCrouch`, `CrouchedHalfHeight=64.f`, stance chooser routing.
 - Mesh Z hacks removed.
-- Retarget source-pin/sibling experiment reverted.
-- Runtime ensures `UEFNSourceMesh` -> capsule and `CharacterMesh0` child.
-- Source ABP PoseHistory MM node uses `RuntimePoseSearchDatabase`.
-- Jump DB changes force MM interrupt once; normal DB changes keep smooth no-interrupt.
+- Runtime UEFNSourceMesh -> capsule structure remains intact.
+- Removed C++ RuntimePoseSearchDatabase path: ABP OnUpdate now directly evaluates Chooser and sets search DB.
+- Cleaned up ApplyRuntimeDatabaseToMotionMatchingNode and ApplyChosenDatabase in GP_CharacterAnimInstance.
+- Obsolete DB pin linking/binding code commented out in GP_AnimBlueprintEditorLibrary.
+- Root motion extraction snaps inferred direction to 15deg by default and scales max sampled speed by 0.85 for constant mode.
 
 ## Open
-- PIE validate crouch PSD and jump transition speed.
+- Validate Live Coding compilation and PIE tests (crouch PSD, jump response).
+- Validate extracted RM assets in editor; refresh BP node pins for `FootPlantMaxSpeedScale` and `FootPlantDirectionSnapDegrees`.

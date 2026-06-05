@@ -19,7 +19,10 @@ public:
 		FName MotionSourceBoneName = TEXT("pelvis"),
 		bool bExtractHorizontalTranslation = true,
 		bool bExtractYawRotation = false,
-		bool bZeroMotionSourceHorizontalTranslation = true,
+		bool bZeroMotionSourceHorizontalTranslation = false,
+		bool bUseConstantSpeedFootPlantRootMotion = true,
+		float FootPlantMaxSpeedScale = 0.85f,
+		float FootPlantDirectionSnapDegrees = 15.0f,
 		bool bEnableRootMotionOnResult = true,
 		const FString& AssetSuffix = TEXT("_RM"));
 
@@ -29,7 +32,10 @@ public:
 		FName MotionSourceBoneName = TEXT("pelvis"),
 		bool bExtractHorizontalTranslation = true,
 		bool bExtractYawRotation = false,
-		bool bZeroMotionSourceHorizontalTranslation = true,
+		bool bZeroMotionSourceHorizontalTranslation = false,
+		bool bUseConstantSpeedFootPlantRootMotion = true,
+		float FootPlantMaxSpeedScale = 0.85f,
+		float FootPlantDirectionSnapDegrees = 15.0f,
 		bool bEnableRootMotionOnResult = true,
 		const FString& AssetSuffix = TEXT("_RM"));
 
@@ -37,7 +43,10 @@ public:
 	static UAnimSequence* ExtractRootMotionFromDirectionalDodgeAnimation(
 		UAnimSequence* SourceSequence,
 		FName MotionSourceBoneName = TEXT("pelvis"),
-		bool bZeroMotionSourceHorizontalTranslation = true,
+		bool bZeroMotionSourceHorizontalTranslation = false,
+		bool bUseConstantSpeedFootPlantRootMotion = true,
+		float FootPlantMaxSpeedScale = 0.85f,
+		float FootPlantDirectionSnapDegrees = 15.0f,
 		bool bEnableRootMotionOnResult = true,
 		const FString& AssetSuffix = TEXT("_DodgeRM"));
 
@@ -45,7 +54,10 @@ public:
 	static TArray<UAnimSequence*> ExtractRootMotionFromDirectionalDodgeAnimations(
 		const TArray<UAnimSequence*>& SourceSequences,
 		FName MotionSourceBoneName = TEXT("pelvis"),
-		bool bZeroMotionSourceHorizontalTranslation = true,
+		bool bZeroMotionSourceHorizontalTranslation = false,
+		bool bUseConstantSpeedFootPlantRootMotion = true,
+		float FootPlantMaxSpeedScale = 0.85f,
+		float FootPlantDirectionSnapDegrees = 15.0f,
 		bool bEnableRootMotionOnResult = true,
 		const FString& AssetSuffix = TEXT("_DodgeRM"));
 };

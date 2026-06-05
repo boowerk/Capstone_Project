@@ -440,64 +440,8 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 			GeneratedTrajectory.Samples.Num());
 	}
 
-	if (bCanUseRuntimePoseSearchChooser && PoseSearchChooser)
-	{
-		if (UPoseSearchDatabase* SelectedDatabase = Cast<UPoseSearchDatabase>(
-			UChooserFunctionLibrary::EvaluateChooser(this, PoseSearchChooser, UPoseSearchDatabase::StaticClass())))
-		{
-			ApplyChosenDatabase(SelectedDatabase);
-		}
-	}
-	else if (bIsFalling && JumpPoseSearchDatabase)
-	{
-		CurrentMotionMatchState = ESourceMotionMatchState::Jump;
-		RuntimePoseSearchDatabase = JumpPoseSearchDatabase;
-	}
-	else if (bIsSprinting && bIsMovingNow && SprintPoseSearchDatabase)
-	{
-		CurrentMotionMatchState = ESourceMotionMatchState::Sprint;
-		RuntimePoseSearchDatabase = SprintPoseSearchDatabase;
-	}
-	else if (!bIsMovingNow && IdlePoseSearchDatabase)
-	{
-		CurrentMotionMatchState = ESourceMotionMatchState::Idle;
-		RuntimePoseSearchDatabase = IdlePoseSearchDatabase;
-	}
-	else if ((Speed2D > WalkSpeedThreshold || bRecentlyStartedMoving) && RunPoseSearchDatabase)
-	{
-		CurrentMotionMatchState = ESourceMotionMatchState::Run;
-		RuntimePoseSearchDatabase = RunPoseSearchDatabase;
-	}
-	else if (Speed2D <= WalkSpeedThreshold && WalkPoseSearchDatabase)
-	{
-		CurrentMotionMatchState = ESourceMotionMatchState::Walk;
-		RuntimePoseSearchDatabase = WalkPoseSearchDatabase;
-	}
-	else if (Speed2D <= RunSpeedThreshold && RunPoseSearchDatabase)
-	{
-		CurrentMotionMatchState = ESourceMotionMatchState::Run;
-		RuntimePoseSearchDatabase = RunPoseSearchDatabase;
-	}
-	else if (SprintPoseSearchDatabase)
-	{
-		CurrentMotionMatchState = ESourceMotionMatchState::Sprint;
-		RuntimePoseSearchDatabase = SprintPoseSearchDatabase;
-	}
-	else if (RunPoseSearchDatabase)
-	{
-		CurrentMotionMatchState = ESourceMotionMatchState::Run;
-		RuntimePoseSearchDatabase = RunPoseSearchDatabase;
-	}
-	else if (WalkPoseSearchDatabase)
-	{
-		CurrentMotionMatchState = ESourceMotionMatchState::Walk;
-		RuntimePoseSearchDatabase = WalkPoseSearchDatabase;
-	}
-	else
-	{
-		CurrentMotionMatchState = ESourceMotionMatchState::Idle;
-		RuntimePoseSearchDatabase = IdlePoseSearchDatabase;
-	}
+	CurrentMotionMatchState = ResolveMotionMatchState(MovementMode, MovementState, Gait);
+
 
 	bWasMovingLastFrame = bIsMovingNow;
 	LastLocalVelocityDirection = LocalVelocityDirection;
@@ -512,7 +456,7 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 			? (MotionMatchingSelectedAnimName.IsNone() ? TEXT("Null Asset") : MotionMatchingSelectedAnimName.ToString())
 			: TEXT("Invalid Result");
 		const FString DebugText = FString::Printf(
-			TEXT("DBG v3 Mesh: %s (UEFNSource) \nMM Speed2D: %.1f \nRaw Speed: %.1f \nSpeed Scale: %.2f \nProfile Scale: %.2f \nMaxWalk: %.1f \nGait: %s \nState: %s \nTurn:%d \nStop:%d \nPivot:%d \nSpin:%d \nPivotDot: %.2f \nYawRate: %.1f \nIdleT: %.2f \nStopT: %.2f \nPivotT: %.2f \nLandT: %.2f"),
+			TEXT("DBG v3 Mesh: %s (UEFNSource) \nMM Speed2D: %.1f \nRaw Speed: %.1f \nSpeed Scale: %.2f \nProfile Scale: %.2f \nMaxWalk: %.1f \nGait: %s \nState: %s \nStance: %s \nMoveMode: %s \nTurn:%d \nStop:%d \nPivot:%d \nSpin:%d \nPivotDot: %.2f \nYawRate: %.1f \nIdleT: %.2f \nStopT: %.2f \nPivotT: %.2f \nLandT: %.2f"),
 			*GetNameSafe(GetSkelMeshComponent()),
 			Speed2D,
 			GroundSpeed,
@@ -521,6 +465,8 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 			MovementComponent ? MovementComponent->MaxWalkSpeed : 0.0f,
 			*UEnum::GetValueAsString(Gait),
 			*UEnum::GetValueAsString(CurrentMotionMatchState),
+			*UEnum::GetValueAsString(Stance),
+			*UEnum::GetValueAsString(MovementMode),
 			ShouldTurnInPlace ? 1 : 0,
 			IsStopping ? 1 : 0,
 			IsPivoting ? 1 : 0,
@@ -531,62 +477,16 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 			TimeSinceStopStarted,
 			TimeSincePivotStarted,
 			TimeSinceLastLanded);
-		const FString DebugAssetText = FString::Printf(
-			TEXT("MM DB: %s \nApplied DB: %s \nValid:%d \nAnim: %s"),
-			*GetNameSafe(RuntimePoseSearchDatabase),
-			*GetNameSafe(LastAppliedRuntimePoseSearchDatabase),
-			bMotionMatchingResultValid ? 1 : 0,
-			*SelectedAnimText);
 		GEngine->AddOnScreenDebugMessage(
 			0x4D4D4452,
 			0.f,
 			FColor::Cyan,
 			DebugText);
-		GEngine->AddOnScreenDebugMessage(
-			0x4D4D4453,
-			0.f,
-			FColor::Green,
-			DebugAssetText);
 	}
 #endif
 }
 
-void UGP_CharacterAnimInstance::ApplyChosenDatabase(UPoseSearchDatabase* SelectedDatabase)
-{
-	if (!SelectedDatabase)
-	{
-		return;
-	}
 
-	RuntimePoseSearchDatabase = SelectedDatabase;
-
-	const FString DatabaseName = SelectedDatabase->GetName();
-	if (DatabaseName.Contains(TEXT("Sprint")))
-	{
-		CurrentMotionMatchState = ESourceMotionMatchState::Sprint;
-		SprintPoseSearchDatabase = SelectedDatabase;
-	}
-	else if (DatabaseName.Contains(TEXT("Run")))
-	{
-		CurrentMotionMatchState = ESourceMotionMatchState::Run;
-		RunPoseSearchDatabase = SelectedDatabase;
-	}
-	else if (DatabaseName.Contains(TEXT("Walk")))
-	{
-		CurrentMotionMatchState = ESourceMotionMatchState::Walk;
-		WalkPoseSearchDatabase = SelectedDatabase;
-	}
-	else if (DatabaseName.Contains(TEXT("Jump")) || DatabaseName.Contains(TEXT("Land")))
-	{
-		CurrentMotionMatchState = ESourceMotionMatchState::Jump;
-		JumpPoseSearchDatabase = SelectedDatabase;
-	}
-	else
-	{
-		CurrentMotionMatchState = ESourceMotionMatchState::Idle;
-		IdlePoseSearchDatabase = SelectedDatabase;
-	}
-}
 
 void UGP_CharacterAnimInstance::SetAnimationSet(UPDA_CharacterAnimationSet* NewSet)
 {
@@ -606,65 +506,4 @@ void UGP_CharacterAnimInstance::SuppressMotionMatchingUpdate(float Duration)
 	MotionMatchingSuppressTimeRemaining = FMath::Max(MotionMatchingSuppressTimeRemaining, Duration);
 }
 
-void UGP_CharacterAnimInstance::ApplyRuntimeDatabaseToMotionMatchingNode(const FAnimUpdateContext& Context, const FAnimNodeReference& Node)
-{
-	EAnimNodeReferenceConversionResult ConversionResult = EAnimNodeReferenceConversionResult::Failed;
-	const FMotionMatchingAnimNodeReference MotionMatchingNode =
-		UMotionMatchingAnimNodeLibrary::ConvertToMotionMatchingNode(Node, ConversionResult);
 
-	if (ConversionResult != EAnimNodeReferenceConversionResult::Succeeded)
-	{
-		return;
-	}
-
-	if (MotionMatchingSuppressTimeRemaining > 0.f)
-	{
-		UMotionMatchingAnimNodeLibrary::ResetDatabasesToSearch(
-			MotionMatchingNode,
-			EPoseSearchInterruptMode::DoNotInterrupt);
-
-		LastAppliedRuntimePoseSearchDatabase = nullptr;
-		bMotionMatchingResultValid = false;
-		MotionMatchingSelectedAnimName = NAME_None;
-		return;
-	}
-
-	if (RuntimePoseSearchDatabase)
-	{
-		const bool bRuntimeDatabaseChanged = RuntimePoseSearchDatabase != LastAppliedRuntimePoseSearchDatabase;
-		const bool bEnteringJumpDatabase = CurrentMotionMatchState == ESourceMotionMatchState::Jump && bRuntimeDatabaseChanged;
-		const EPoseSearchInterruptMode InterruptMode = bEnteringJumpDatabase
-			? EPoseSearchInterruptMode::ForceInterruptAndInvalidateContinuingPose
-			: EPoseSearchInterruptMode::DoNotInterrupt;
-
-		UMotionMatchingAnimNodeLibrary::SetDatabaseToSearch(
-			MotionMatchingNode,
-			RuntimePoseSearchDatabase,
-			InterruptMode);
-
-		LastAppliedRuntimePoseSearchDatabase = RuntimePoseSearchDatabase;
-	}
-	else
-	{
-		UMotionMatchingAnimNodeLibrary::ResetDatabasesToSearch(
-			MotionMatchingNode,
-			EPoseSearchInterruptMode::DoNotInterrupt);
-
-		LastAppliedRuntimePoseSearchDatabase = nullptr;
-	}
-
-	FPoseSearchBlueprintResult SearchResult;
-	bool bIsResultValid = false;
-	UMotionMatchingAnimNodeLibrary::GetMotionMatchingSearchResult(MotionMatchingNode, SearchResult, bIsResultValid);
-	bMotionMatchingResultValid = bIsResultValid;
-	
-	// SelectedAnim이 유효한지 체크 강화
-	MotionMatchingSelectedAnimName = NAME_None;
-	if (bIsResultValid)
-	{
-		if (SearchResult.SelectedAnim)
-		{
-			MotionMatchingSelectedAnimName = SearchResult.SelectedAnim->GetFName();
-		}
-	}
-}

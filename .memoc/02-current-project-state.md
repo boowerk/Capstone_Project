@@ -9,7 +9,7 @@ tags: [memoc, memoc/state]
 ---
 # Current Project State
 
-Last synced: 2026-06-04T03:45:00+09:00
+Last synced: 2026-06-05T00:00:00+09:00
 
 ## Current Status
 
@@ -24,7 +24,9 @@ Last synced: 2026-06-04T03:45:00+09:00
 - Crouch mesh-position hacks were removed. C++ should leave `BaseTranslationOffset` and mesh relative Z alone during crouch while testing theory. `ABP_MaskMan_Player` Retarget Pose From Mesh source-pin experiment was reverted; keep the pin unlinked and rely on attached parent. `AGP_PlayerCharacter::PostInitializeComponents` reattaches `UEFNSourceMesh` to the capsule if the BP CDO lost its parent, then ensures `CharacterMesh0` is under `UEFNSourceMesh`. Current investigation: default UE crouch capsule-bottom movement vs animation foot/root basis.
 - `ABP_UEFNSource_Player` actual output path is MotionMatching -> PoseHistory -> LocomotionPose, not the old state BlendList. The PoseHistory source MotionMatching node was rewired so its `Database` pin uses `RuntimePoseSearchDatabase`; this should allow crouch Chooser-selected PSDs to drive the visible retarget pose.
 - `UGP_CharacterAnimInstance::ApplyRuntimeDatabaseToMotionMatchingNode` uses `ForceInterruptAndInvalidateContinuingPose` only when `CurrentMotionMatchState` enters Jump with a changed runtime DB; normal DB changes remain `DoNotInterrupt` for smooth locomotion.
+- `UGP_RootMotionExtractionEditorLibrary` extracts selected source bones in component space, disables forced root lock, and logs `rootNet2D/rootPath2D/sourceNet2D/zeroSourceXY`. Foot-plant inference has `bUseConstantSpeedFootPlantRootMotion`: true samples the inferred path's max horizontal speed, scales it by `FootPlantMaxSpeedScale` (default 0.85), snaps direction by `FootPlantDirectionSnapDegrees` (default 15), then linearizes root keys; false keeps the snapped smoothed contact-following path. Default `bZeroMotionSourceHorizontalTranslation=false`; old BP nodes may cache true.
 
 ## Open Tasks
 
 - PIE validate that pressing/releasing C visibly plays crouch locomotion, and running jump switches to jump without waiting for run playback.
+- Live Coding compile and editor-validate newly extracted root-motion assets, especially foot-bone sourced extraction.

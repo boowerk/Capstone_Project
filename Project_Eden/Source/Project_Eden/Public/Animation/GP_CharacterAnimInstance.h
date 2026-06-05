@@ -95,8 +95,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "MotionMatching|State")
 	float GetTimeSinceTurnInPlaceStarted() const { return TimeSinceTurnInPlaceStarted; }
 
-	UFUNCTION(BlueprintCallable, Category = "MotionMatching", meta = (BlueprintThreadSafe))
-	void ApplyRuntimeDatabaseToMotionMatchingNode(const FAnimUpdateContext& Context, const FAnimNodeReference& Node);
+
 
 protected:
 	/** 캐릭터별 애니메이션 세트 에셋 */
@@ -247,14 +246,12 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MotionMatching|Chooser")
 	TObjectPtr<UChooserTable> PoseSearchChooser;
 
-	UPROPERTY(BlueprintReadOnly, Category = "MotionMatching|Databases")
-	TObjectPtr<UPoseSearchDatabase> RuntimePoseSearchDatabase;
+
 
 	UPROPERTY(BlueprintReadOnly, Category = "MotionMatching|State")
 	ESourceMotionMatchState CurrentMotionMatchState = ESourceMotionMatchState::Idle;
 
-	UPROPERTY(Transient, BlueprintReadOnly, Category = "MotionMatching|State")
-	TObjectPtr<UPoseSearchDatabase> LastAppliedRuntimePoseSearchDatabase;
+
 
 	UPROPERTY(Transient, BlueprintReadOnly, Category = "MotionMatching|State")
 	float MotionMatchingSuppressTimeRemaining = 0.f;
@@ -346,5 +343,4 @@ protected:
 	UPROPERTY(BlueprintReadOnly, Category = "Chooser|State")
 	float LastActorYaw = 0.f;
 
-	void ApplyChosenDatabase(UPoseSearchDatabase* SelectedDatabase);
 };
