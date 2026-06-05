@@ -2,6 +2,7 @@
 #include "AbilitySystem/GP_AbilitySystemComponent.h"
 #include "AbilitySystem/Abilities/GP_SkillAugmentData.h"
 #include "AbilitySystemComponent.h"
+#include "Engine/Engine.h"
 #include "Net/UnrealNetwork.h"
 #include "AbilitySystem/GP_AttributeSet.h"
 
@@ -220,6 +221,7 @@ void AGP_PlayerState::AddXP(float Amount)
 		return;
 	}
 
+	const int32 PreviousLevel = CurrentLevel;
 	CurrentXP += Amount;
 	bool bLeveledUp = false;
 
@@ -236,12 +238,40 @@ void AGP_PlayerState::AddXP(float Amount)
 		OnLevelUp(CurrentLevel);
 	}
 
+	if (bDebugXPChanges)
+	{
+		MulticastShowXPDebug(Amount, PreviousLevel, CurrentLevel, CurrentXP, XPToNextLevel);
+	}
+
 	ForceNetUpdate();
 }
 
 void AGP_PlayerState::ServerAddXP_Implementation(float Amount)
 {
 	AddXP(Amount);
+}
+
+void AGP_PlayerState::MulticastShowXPDebug_Implementation(float AddedXP, int32 PreviousLevel, int32 NewLevel, float NewXP, float NewXPToNextLevel)
+{
+	if (!bDebugXPChanges)
+	{
+		return;
+	}
+
+	const FString DebugMessage = FString::Printf(
+		TEXT("[XP Debug] +%.1f XP | Lv %d -> %d | %.1f / %.1f"),
+		AddedXP,
+		PreviousLevel,
+		NewLevel,
+		NewXP,
+		NewXPToNextLevel);
+
+	UE_LOG(LogTemp, Log, TEXT("%s"), *DebugMessage);
+
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(INDEX_NONE, DebugXPMessageDuration, FColor::Green, DebugMessage);
+	}
 }
 
 bool AGP_PlayerState::DoesAugmentApplyToSkill(const UGP_SkillAugmentData* AugmentData, FGameplayTag SkillIdTag) const

@@ -16,6 +16,7 @@ Last synced: 2026-06-04T00:00:00+09:00
 ## Current Status
 
 - Enemy death now grants XP directly: `AGP_BaseCharacter` exposes a post-damage hook, and `AGP_EnemyCharacter` awards its editable `XPReward` once when health reaches zero by resolving the instigator's `AGP_PlayerState`.
+- PlayerState XP debug can be enabled with `bDebugXPChanges`; `AddXP` multicasts a green on-screen/log message showing added XP, level transition, and current XP progress.
 - PlayerState now has replicated XP/level basics: `CurrentXP`, `CurrentLevel`, `XPToNextLevel`, `LevelXPScale`, `AddXP`, server forwarding, and `OnLevelUp` Blueprint event for opening augment selection later.
 - PlayerController now owns augment UI flow: `RequestOpenAugmentSelect` rolls candidates from the assigned pool, `OpenAugmentSelectWidget` displays them with Game+UI input mode, and `CloseAugmentSelectWidget` restores Game Only input. `UGP_AugmentSelectWidget` calls controller close after a selection.
 - Augment selection now prevents duplicate picks: `UGP_SkillAugmentPoolData` can exclude already selected augments when rolling candidates, and `AGP_PlayerState::AddSkillAugment` ignores duplicate DA requests.

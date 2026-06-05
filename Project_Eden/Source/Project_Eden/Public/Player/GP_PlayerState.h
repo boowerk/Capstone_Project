@@ -109,6 +109,12 @@ private:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Progression", meta = (AllowPrivateAccess = "true", ClampMin = "1.0"))
 	float LevelXPScale = 1.25f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Debug|Progression", meta = (AllowPrivateAccess = "true"))
+	bool bDebugXPChanges = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Debug|Progression", meta = (AllowPrivateAccess = "true", EditCondition = "bDebugXPChanges", ClampMin = "0.1", Units = "s"))
+	float DebugXPMessageDuration = 2.0f;
+
 	UFUNCTION()
 	void OnRep_EquippedWeaponData();
 
@@ -126,6 +132,9 @@ private:
 
 	UFUNCTION()
 	void OnRep_XPToNextLevel();
+
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastShowXPDebug(float AddedXP, int32 PreviousLevel, int32 NewLevel, float NewXP, float NewXPToNextLevel);
 
 	bool DoesAugmentApplyToSkill(const UGP_SkillAugmentData* AugmentData, FGameplayTag SkillIdTag) const;
 };
