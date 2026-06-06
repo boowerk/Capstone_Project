@@ -71,6 +71,8 @@ namespace GPTags
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Utility_Buff);   // 자버프
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Utility_BossSummon);     // 보스 소환 패턴
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Utility_BossPhaseShift); // 보스 페이즈 전환 패턴
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Utility_MatadorBullPattern); // Matador bull decoy charge pattern
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Utility_MatadorGroggy);      // Matador groggy/recover state ability
             
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Death);          // 뒤져요
 		}
@@ -121,6 +123,8 @@ namespace GPTags
 			{
 				UE_DECLARE_GAMEPLAY_TAG_EXTERN(Aggroed);    // 어그로
 				UE_DECLARE_GAMEPLAY_TAG_EXTERN(Enraged);    // 광폭화
+				UE_DECLARE_GAMEPLAY_TAG_EXTERN(MatadorGuarded); // Matador guarded damage reduction state
+				UE_DECLARE_GAMEPLAY_TAG_EXTERN(Groggy);         // Groggy removes guarded damage reduction
 			}
 		}
 		namespace Movement

@@ -15,8 +15,11 @@ struct PROJECT_EDEN_API FGPBossAttackPatternRanges
 	static constexpr float BasicAttackReach = 360.0f;
 	static constexpr float SweepAttackReach = 830.0f;
 	static constexpr float AreaAttackReach = 850.0f;
+	static constexpr float BullPatternMinRange = 450.0f;
+	static constexpr float BullPatternMaxRange = 2400.0f;
 
 	static bool IsWithinReach(float DistanceToTarget, float AttackReach);
+	static bool IsWithinBullPatternRange(float DistanceToTarget);
 };
 
 // Snapshot of the blackboard/evaluation state used to score the next boss attack pattern.
@@ -34,6 +37,14 @@ struct FGPBossAttackPatternContext
 	bool bCanUseBossSweepAttack = false;
 	bool bCanUseBossAreaAttack = false;
 	bool bCanSummonAdds = false;
+	int32 ChainBreakCount = 0;
+	int32 ChainBreakTarget = 3;
+	bool bIsGroggy = false;
+	bool bCanUseBullPattern = false;
+	bool bBullPatternActive = false;
+	bool bShouldTeleport = false;
+	float PreferredHoverHeight = 650.0f;
+	float PreferredAirRange = 1100.0f;
 };
 
 // Shared deterministic selector used by the BT task and automation tests.

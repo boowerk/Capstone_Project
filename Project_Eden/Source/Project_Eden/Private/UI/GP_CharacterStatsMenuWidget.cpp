@@ -4,8 +4,11 @@
 #include "AbilitySystem/GP_AttributeSet.h"
 #include "Blueprint/WidgetTree.h"
 #include "Characters/GP_BaseCharacter.h"
+#include "Components/Button.h"
 #include "Components/TextBlock.h"
 #include "Components/Widget.h"
+#include "Components/WidgetSwitcher.h"
+#include "InputCoreTypes.h"
 #include "UI/GP_AttributeWidget.h"
 
 UGP_CharacterStatsMenuWidget::UGP_CharacterStatsMenuWidget(const FObjectInitializer& ObjectInitializer)
@@ -21,6 +24,14 @@ UGP_CharacterStatsMenuWidget::UGP_CharacterStatsMenuWidget(const FObjectInitiali
 		FGPCharacterStatTextBinding(FName(TEXT("MagicPower")), FName(TEXT("MagicValueText"))),
 		FGPCharacterStatTextBinding(FName(TEXT("MoveSpeed")), FName(TEXT("SpeedValueText")))
 	};
+
+	ContentSwitcherNames =
+	{
+		FName(TEXT("TabContentSwitcher")),
+		FName(TEXT("MenuContentSwitcher")),
+		FName(TEXT("ContentSwitcher")),
+		FName(TEXT("CharacterMenuContentSwitcher"))
+	};
 }
 
 void UGP_CharacterStatsMenuWidget::NativeConstruct()
@@ -28,6 +39,7 @@ void UGP_CharacterStatsMenuWidget::NativeConstruct()
 	Super::NativeConstruct();
 
 	RebuildStatTextBindings();
+	RebuildNativeTabBindings();
 
 	// Auto-bind from the owning pawn as a fallback when the PlayerController did not initialize the widget yet.
 	if (!BoundCharacter.IsValid())
@@ -37,6 +49,21 @@ void UGP_CharacterStatsMenuWidget::NativeConstruct()
 	}
 
 	SetActiveTab(DefaultTab);
+}
+
+FReply UGP_CharacterStatsMenuWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	if (bEnableNativeTabHitTesting && InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
+	{
+		EGPCharacterMenuTab HitTab = ActiveTab;
+		if (FindTabAtScreenPosition(InMouseEvent.GetScreenSpacePosition(), HitTab))
+		{
+			SetActiveTab(HitTab);
+			return FReply::Handled();
+		}
+	}
+
+	return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
 }
 
 void UGP_CharacterStatsMenuWidget::NativeDestruct()
@@ -126,7 +153,44 @@ void UGP_CharacterStatsMenuWidget::ClearASC()
 void UGP_CharacterStatsMenuWidget::SetActiveTab(EGPCharacterMenuTab NewTab)
 {
 	ActiveTab = NewTab;
+	ApplyActiveTabState();
+	OnActiveTabChanged.Broadcast(ActiveTab);
 	BP_OnActiveTabChanged(ActiveTab);
+}
+
+void UGP_CharacterStatsMenuWidget::SelectMapTab()
+{
+	SetActiveTab(EGPCharacterMenuTab::Map);
+}
+
+void UGP_CharacterStatsMenuWidget::SelectJournalTab()
+{
+	SetActiveTab(EGPCharacterMenuTab::Journal);
+}
+
+void UGP_CharacterStatsMenuWidget::SelectItemsTab()
+{
+	SetActiveTab(EGPCharacterMenuTab::Items);
+}
+
+void UGP_CharacterStatsMenuWidget::SelectAttributesTab()
+{
+	SetActiveTab(EGPCharacterMenuTab::Attributes);
+}
+
+void UGP_CharacterStatsMenuWidget::SelectGearTab()
+{
+	SetActiveTab(EGPCharacterMenuTab::Gear);
+}
+
+void UGP_CharacterStatsMenuWidget::SelectAbilitiesTab()
+{
+	SetActiveTab(EGPCharacterMenuTab::Abilities);
+}
+
+void UGP_CharacterStatsMenuWidget::SelectSystemTab()
+{
+	SetActiveTab(EGPCharacterMenuTab::System);
 }
 
 void UGP_CharacterStatsMenuWidget::RefreshAttributeSnapshots()
@@ -392,6 +456,248 @@ UTextBlock* UGP_CharacterStatsMenuWidget::ResolveStatTextBlock(const FName& Widg
 	return FindTextBlockByNormalizedName(WidgetName);
 }
 
+void UGP_CharacterStatsMenuWidget::RebuildNativeTabBindings()
+{
+	NativeTabBindings.Reset();
+	TabContentSwitcher = ResolveContentSwitcher();
+
+	for (const EGPCharacterMenuTab Tab : GetMenuTabOrder())
+	{
+		FGPCharacterMenuTabWidgetBinding Binding;
+		Binding.Tab = Tab;
+		Binding.TabWidget = ResolveWidgetByNames(GetTabWidgetCandidateNames(Tab));
+		Binding.ContentWidget = ResolveWidgetByNames(GetContentWidgetCandidateNames(Tab));
+		Binding.SelectedIndicatorWidget = ResolveWidgetByNames(GetSelectedIndicatorCandidateNames(Tab));
+
+		BindNativeTabButton(Binding.TabWidget.Get(), Tab);
+		NativeTabBindings.Add(Binding);
+	}
+
+	ApplyActiveTabState();
+}
+
+void UGP_CharacterStatsMenuWidget::BindNativeTabButton(UWidget* TabWidget, EGPCharacterMenuTab Tab)
+{
+	UButton* Button = Cast<UButton>(TabWidget);
+	if (!IsValid(Button))
+	{
+		return;
+	}
+
+	// UButton tabs use direct delegates; text/border tabs are handled by NativeOnMouseButtonDown hit-testing.
+	switch (Tab)
+	{
+	case EGPCharacterMenuTab::Map:
+		Button->OnClicked.RemoveDynamic(this, &ThisClass::SelectMapTab);
+		Button->OnClicked.AddDynamic(this, &ThisClass::SelectMapTab);
+		break;
+	case EGPCharacterMenuTab::Journal:
+		Button->OnClicked.RemoveDynamic(this, &ThisClass::SelectJournalTab);
+		Button->OnClicked.AddDynamic(this, &ThisClass::SelectJournalTab);
+		break;
+	case EGPCharacterMenuTab::Items:
+		Button->OnClicked.RemoveDynamic(this, &ThisClass::SelectItemsTab);
+		Button->OnClicked.AddDynamic(this, &ThisClass::SelectItemsTab);
+		break;
+	case EGPCharacterMenuTab::Attributes:
+		Button->OnClicked.RemoveDynamic(this, &ThisClass::SelectAttributesTab);
+		Button->OnClicked.AddDynamic(this, &ThisClass::SelectAttributesTab);
+		break;
+	case EGPCharacterMenuTab::Gear:
+		Button->OnClicked.RemoveDynamic(this, &ThisClass::SelectGearTab);
+		Button->OnClicked.AddDynamic(this, &ThisClass::SelectGearTab);
+		break;
+	case EGPCharacterMenuTab::Abilities:
+		Button->OnClicked.RemoveDynamic(this, &ThisClass::SelectAbilitiesTab);
+		Button->OnClicked.AddDynamic(this, &ThisClass::SelectAbilitiesTab);
+		break;
+	case EGPCharacterMenuTab::System:
+		Button->OnClicked.RemoveDynamic(this, &ThisClass::SelectSystemTab);
+		Button->OnClicked.AddDynamic(this, &ThisClass::SelectSystemTab);
+		break;
+	default:
+		break;
+	}
+}
+
+void UGP_CharacterStatsMenuWidget::ApplyActiveTabState()
+{
+	ApplyTabVisualState();
+
+	if (!TryActivateSwitcherTab(ActiveTab))
+	{
+		ApplyNamedContentVisibility();
+	}
+
+	if (UTextBlock* TitleTextBlock = Cast<UTextBlock>(ResolveWidgetByNames({ FName(TEXT("TitleText")), FName(TEXT("ActiveTabTitleText")), FName(TEXT("HeaderTitleText")) })))
+	{
+		TitleTextBlock->SetText(GetMenuTabDisplayName(ActiveTab));
+	}
+}
+
+void UGP_CharacterStatsMenuWidget::ApplyTabVisualState()
+{
+	for (const FGPCharacterMenuTabWidgetBinding& Binding : NativeTabBindings)
+	{
+		const bool bIsActiveTab = Binding.Tab == ActiveTab;
+		if (UWidget* TabWidget = Binding.TabWidget.Get())
+		{
+			if (bEnableNativeTabOpacity)
+			{
+				TabWidget->SetRenderOpacity(bIsActiveTab ? ActiveTabRenderOpacity : InactiveTabRenderOpacity);
+			}
+		}
+
+		if (UWidget* IndicatorWidget = Binding.SelectedIndicatorWidget.Get())
+		{
+			IndicatorWidget->SetVisibility(bIsActiveTab ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+		}
+	}
+}
+
+bool UGP_CharacterStatsMenuWidget::TryActivateSwitcherTab(EGPCharacterMenuTab NewTab) const
+{
+	UWidgetSwitcher* Switcher = TabContentSwitcher.Get();
+	if (!IsValid(Switcher) || Switcher->GetChildrenCount() == 0)
+	{
+		return false;
+	}
+
+	for (const FGPCharacterMenuTabWidgetBinding& Binding : NativeTabBindings)
+	{
+		if (Binding.Tab != NewTab)
+		{
+			continue;
+		}
+
+		if (UWidget* ContentWidget = Binding.ContentWidget.Get())
+		{
+			const int32 ContentIndex = Switcher->GetChildIndex(ContentWidget);
+			if (ContentIndex != INDEX_NONE)
+			{
+				Switcher->SetActiveWidgetIndex(ContentIndex);
+				return true;
+			}
+		}
+
+		break;
+	}
+
+	const int32 TabIndex = GetMenuTabOrder().Find(NewTab);
+	if (TabIndex != INDEX_NONE && TabIndex < Switcher->GetChildrenCount())
+	{
+		Switcher->SetActiveWidgetIndex(TabIndex);
+		return true;
+	}
+
+	return false;
+}
+
+void UGP_CharacterStatsMenuWidget::ApplyNamedContentVisibility() const
+{
+	bool bHasAnyNamedContent = false;
+	for (const FGPCharacterMenuTabWidgetBinding& Binding : NativeTabBindings)
+	{
+		if (Binding.ContentWidget.IsValid())
+		{
+			bHasAnyNamedContent = true;
+			break;
+		}
+	}
+
+	if (!bHasAnyNamedContent)
+	{
+		return;
+	}
+
+	for (const FGPCharacterMenuTabWidgetBinding& Binding : NativeTabBindings)
+	{
+		if (UWidget* ContentWidget = Binding.ContentWidget.Get())
+		{
+			ContentWidget->SetVisibility(Binding.Tab == ActiveTab ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+		}
+	}
+}
+
+bool UGP_CharacterStatsMenuWidget::FindTabAtScreenPosition(const FVector2D& ScreenPosition, EGPCharacterMenuTab& OutTab) const
+{
+	for (const FGPCharacterMenuTabWidgetBinding& Binding : NativeTabBindings)
+	{
+		const UWidget* TabWidget = Binding.TabWidget.Get();
+		if (!IsValid(TabWidget))
+		{
+			continue;
+		}
+
+		if (TabWidget->GetCachedGeometry().IsUnderLocation(ScreenPosition))
+		{
+			OutTab = Binding.Tab;
+			return true;
+		}
+	}
+
+	return false;
+}
+
+UWidget* UGP_CharacterStatsMenuWidget::ResolveWidgetByNames(const TArray<FName>& WidgetNames) const
+{
+	if (!WidgetTree)
+	{
+		return nullptr;
+	}
+
+	for (const FName& WidgetName : WidgetNames)
+	{
+		if (WidgetName.IsNone())
+		{
+			continue;
+		}
+
+		if (UWidget* ExactWidget = WidgetTree->FindWidget(WidgetName))
+		{
+			return ExactWidget;
+		}
+
+		if (UWidget* NormalizedWidget = FindWidgetByNormalizedName(WidgetName))
+		{
+			return NormalizedWidget;
+		}
+	}
+
+	return nullptr;
+}
+
+UWidget* UGP_CharacterStatsMenuWidget::FindWidgetByNormalizedName(const FName& WidgetName) const
+{
+	if (!WidgetTree)
+	{
+		return nullptr;
+	}
+
+	const FString TargetName = NormalizeWidgetLookupName(WidgetName);
+	UWidget* FoundWidget = nullptr;
+
+	WidgetTree->ForEachWidget([&FoundWidget, &TargetName](UWidget* ChildWidget)
+	{
+		if (FoundWidget || !IsValid(ChildWidget))
+		{
+			return;
+		}
+
+		if (NormalizeWidgetLookupName(ChildWidget->GetFName()).Equals(TargetName, ESearchCase::IgnoreCase))
+		{
+			FoundWidget = ChildWidget;
+		}
+	});
+
+	return FoundWidget;
+}
+
+UWidgetSwitcher* UGP_CharacterStatsMenuWidget::ResolveContentSwitcher() const
+{
+	return Cast<UWidgetSwitcher>(ResolveWidgetByNames(ContentSwitcherNames));
+}
+
 UTextBlock* UGP_CharacterStatsMenuWidget::FindTextBlockByNormalizedName(const FName& WidgetName) const
 {
 	if (!WidgetTree)
@@ -450,4 +756,110 @@ FText UGP_CharacterStatsMenuWidget::FormatStatText(const FGPCharacterStatSnapsho
 	}
 
 	return CurrentValueText;
+}
+
+TArray<EGPCharacterMenuTab> UGP_CharacterStatsMenuWidget::GetMenuTabOrder()
+{
+	return
+	{
+		EGPCharacterMenuTab::Map,
+		EGPCharacterMenuTab::Journal,
+		EGPCharacterMenuTab::Items,
+		EGPCharacterMenuTab::Attributes,
+		EGPCharacterMenuTab::Gear,
+		EGPCharacterMenuTab::Abilities,
+		EGPCharacterMenuTab::System
+	};
+}
+
+TArray<FName> UGP_CharacterStatsMenuWidget::GetTabWidgetCandidateNames(EGPCharacterMenuTab Tab)
+{
+	switch (Tab)
+	{
+	case EGPCharacterMenuTab::Map:
+		return { FName(TEXT("Button_Map")), FName(TEXT("Button_MapTab")), FName(TEXT("MapTabButton")), FName(TEXT("MapTabWrap")), FName(TEXT("MapTab")) };
+	case EGPCharacterMenuTab::Journal:
+		return { FName(TEXT("Button_Journal")), FName(TEXT("Button_JournalTab")), FName(TEXT("JournalTabButton")), FName(TEXT("JournalTabWrap")), FName(TEXT("JournalTab")) };
+	case EGPCharacterMenuTab::Items:
+		return { FName(TEXT("Button_Item")), FName(TEXT("Button_Items")), FName(TEXT("Button_ItemsTab")), FName(TEXT("ItemsTabButton")), FName(TEXT("ItemTabWrap")), FName(TEXT("ItemsTabWrap")), FName(TEXT("ItemsTab")), FName(TEXT("ItemTab")) };
+	case EGPCharacterMenuTab::Attributes:
+		return { FName(TEXT("Button_Attributes")), FName(TEXT("Button_AttributesTab")), FName(TEXT("AttributesTabButton")), FName(TEXT("AttrributesTabWrap")), FName(TEXT("AttributesTabWrap")), FName(TEXT("AttributesTab")) };
+	case EGPCharacterMenuTab::Gear:
+		return { FName(TEXT("Button_Gear")), FName(TEXT("Button_GearTab")), FName(TEXT("GearTabButton")), FName(TEXT("GearTabWrap")), FName(TEXT("GearTab")) };
+	case EGPCharacterMenuTab::Abilities:
+		return { FName(TEXT("Button_Abilities")), FName(TEXT("Button_AbilitiesTab")), FName(TEXT("AbilitiesTabButton")), FName(TEXT("AbilitiesTabWrap")), FName(TEXT("AblitiesTabWrap")), FName(TEXT("AbilitiesTab")), FName(TEXT("AblitiesTab")) };
+	case EGPCharacterMenuTab::System:
+		return { FName(TEXT("Button_System")), FName(TEXT("Button_SystemTab")), FName(TEXT("SystemTabButton")), FName(TEXT("SystemTabWrap")), FName(TEXT("SystemTab")) };
+	default:
+		return {};
+	}
+}
+
+TArray<FName> UGP_CharacterStatsMenuWidget::GetContentWidgetCandidateNames(EGPCharacterMenuTab Tab)
+{
+	switch (Tab)
+	{
+	case EGPCharacterMenuTab::Map:
+		return { FName(TEXT("MapPanel")), FName(TEXT("MapPage")), FName(TEXT("MapContent")) };
+	case EGPCharacterMenuTab::Journal:
+		return { FName(TEXT("JournalPanel")), FName(TEXT("JournalPage")), FName(TEXT("JournalContent")) };
+	case EGPCharacterMenuTab::Items:
+		return { FName(TEXT("ItemsPanel")), FName(TEXT("ItemPanel")), FName(TEXT("InventoryPanel")), FName(TEXT("ItemsPage")), FName(TEXT("ItemPage")), FName(TEXT("InventoryPage")) };
+	case EGPCharacterMenuTab::Attributes:
+		return { FName(TEXT("AttributesPanel")), FName(TEXT("AttributePanel")), FName(TEXT("AttributesPage")), FName(TEXT("AttributePage")) };
+	case EGPCharacterMenuTab::Gear:
+		return { FName(TEXT("GearPanel")), FName(TEXT("GearPage")), FName(TEXT("GearContent")) };
+	case EGPCharacterMenuTab::Abilities:
+		return { FName(TEXT("AbilitiesPanel")), FName(TEXT("AblitiesPanel")), FName(TEXT("AbilitiesPage")), FName(TEXT("AbilityPage")) };
+	case EGPCharacterMenuTab::System:
+		return { FName(TEXT("SystemPanel")), FName(TEXT("SystemPage")), FName(TEXT("SystemContent")) };
+	default:
+		return {};
+	}
+}
+
+TArray<FName> UGP_CharacterStatsMenuWidget::GetSelectedIndicatorCandidateNames(EGPCharacterMenuTab Tab)
+{
+	switch (Tab)
+	{
+	case EGPCharacterMenuTab::Map:
+		return { FName(TEXT("MapUnderline")), FName(TEXT("MapSelectedIndicator")), FName(TEXT("MapSelectionBar")) };
+	case EGPCharacterMenuTab::Journal:
+		return { FName(TEXT("JournalUnderline")), FName(TEXT("JournalSelectedIndicator")), FName(TEXT("JournalSelectionBar")) };
+	case EGPCharacterMenuTab::Items:
+		return { FName(TEXT("ItemsUnderline")), FName(TEXT("ItemUnderline")), FName(TEXT("ItemsSelectedIndicator")), FName(TEXT("ItemSelectionBar")) };
+	case EGPCharacterMenuTab::Attributes:
+		return { FName(TEXT("AttributesUnderline")), FName(TEXT("AttributeUnderline")), FName(TEXT("AttributesSelectedIndicator")), FName(TEXT("AttributesSelectionBar")) };
+	case EGPCharacterMenuTab::Gear:
+		return { FName(TEXT("GearUnderline")), FName(TEXT("GearSelectedIndicator")), FName(TEXT("GearSelectionBar")) };
+	case EGPCharacterMenuTab::Abilities:
+		return { FName(TEXT("AbilitiesUnderline")), FName(TEXT("AblitiesUnderline")), FName(TEXT("AbilitiesSelectedIndicator")), FName(TEXT("AbilitiesSelectionBar")) };
+	case EGPCharacterMenuTab::System:
+		return { FName(TEXT("SystemUnderline")), FName(TEXT("SystemSelectedIndicator")), FName(TEXT("SystemSelectionBar")) };
+	default:
+		return {};
+	}
+}
+
+FText UGP_CharacterStatsMenuWidget::GetMenuTabDisplayName(EGPCharacterMenuTab Tab)
+{
+	switch (Tab)
+	{
+	case EGPCharacterMenuTab::Map:
+		return NSLOCTEXT("GPCharacterStatsMenu", "MapTab", "Map");
+	case EGPCharacterMenuTab::Journal:
+		return NSLOCTEXT("GPCharacterStatsMenu", "JournalTab", "Journal");
+	case EGPCharacterMenuTab::Items:
+		return NSLOCTEXT("GPCharacterStatsMenu", "ItemTab", "Item");
+	case EGPCharacterMenuTab::Attributes:
+		return NSLOCTEXT("GPCharacterStatsMenu", "AttributesTab", "Attributes");
+	case EGPCharacterMenuTab::Gear:
+		return NSLOCTEXT("GPCharacterStatsMenu", "GearTab", "Gear");
+	case EGPCharacterMenuTab::Abilities:
+		return NSLOCTEXT("GPCharacterStatsMenu", "AbilitiesTab", "Abilities");
+	case EGPCharacterMenuTab::System:
+		return NSLOCTEXT("GPCharacterStatsMenu", "SystemTab", "System");
+	default:
+		return FText::GetEmpty();
+	}
 }

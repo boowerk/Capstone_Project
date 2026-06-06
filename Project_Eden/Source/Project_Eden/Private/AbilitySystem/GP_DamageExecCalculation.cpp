@@ -11,6 +11,11 @@ static TAutoConsoleVariable<int32> CVarGPDamageExecLog(
     TEXT("Logs GP damage execution values when non-zero."),
     ECVF_Default);
 
+namespace GPDamageExec
+{
+    constexpr float MatadorGuardedFinalDamageMultiplier = 0.1f;
+}
+
 struct FGP_DamageStatics
 {
     DECLARE_ATTRIBUTE_CAPTUREDEF(AttackPower);
@@ -157,9 +162,17 @@ void UGP_DamageExecCalculation::Execute_Implementation(const FGameplayEffectCust
     
     float Damage_Final = Damage_Modified * ArmorMitigation * (1.0f - Resistance_Elem);
 
+    // Matador guarded reduction is a final-state modifier: normal combat takes 10%, groggy takes full damage.
+    const bool bTargetGroggy = TargetTags != nullptr && TargetTags->HasTagExact(GPTags::State::Status::Enemy::Groggy);
+    const bool bTargetMatadorGuarded = TargetTags != nullptr && TargetTags->HasTagExact(GPTags::State::Status::Enemy::MatadorGuarded);
+    const float BossStateDamageMultiplier = bTargetMatadorGuarded && !bTargetGroggy
+        ? GPDamageExec::MatadorGuardedFinalDamageMultiplier
+        : 1.0f;
+    Damage_Final *= BossStateDamageMultiplier;
+
     if (CVarGPDamageExecLog.GetValueOnAnyThread() != 0)
     {
-        UE_LOG(LogTemp, Log, TEXT("[DamageExec] Element=%s Base=%.2f Critical=%s CritMult=%.2f Modified=%.2f Armor=%.2f ArmorMitigation=%.3f Resistance=%.3f Final=%.2f"),
+        UE_LOG(LogTemp, Log, TEXT("[DamageExec] Element=%s Base=%.2f Critical=%s CritMult=%.2f Modified=%.2f Armor=%.2f ArmorMitigation=%.3f Resistance=%.3f BossStateMult=%.2f Final=%.2f"),
             ElementName,
             BaseDamage,
             bCritical ? TEXT("true") : TEXT("false"),
@@ -168,6 +181,7 @@ void UGP_DamageExecCalculation::Execute_Implementation(const FGameplayEffectCust
             Armor,
             ArmorMitigation,
             Resistance_Elem,
+            BossStateDamageMultiplier,
             Damage_Final);
     }
 
