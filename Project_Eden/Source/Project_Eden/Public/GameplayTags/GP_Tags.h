@@ -37,6 +37,7 @@ namespace GPTags
 		namespace Skill
 		{
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(SkillRoot); // 부모 태그용
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Selection); // 스킬 선택/조준 상태 어빌리티
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Primary); // 평타
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Slot01);  // 스킬 1
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Slot02);  // 스킬 2
@@ -119,6 +120,14 @@ namespace GPTags
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Sprinting);		// 달리기
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Dash);		// 회피 대쉬
 		}
+		namespace Skill
+		{
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Selecting);
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Previewing);
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Projectile);
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ray);
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(TargetActor);
+		}
 		namespace Buff
 		{
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Shield);			// 보호막
@@ -173,6 +182,12 @@ namespace GPTags
 			
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(ComboEnable);// Player 콤보 액션
 		}
+		namespace Skill
+		{
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(ConfirmPrimary);
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(ConfirmSecondary);
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Cancel);
+		}
 		
 		namespace Enemy
 		{
@@ -206,6 +221,8 @@ namespace GPTags
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(ConeSlash);
 
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(DashSlash);
+
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(LifeDrainTarget);
 		}
 		namespace Data
 		{

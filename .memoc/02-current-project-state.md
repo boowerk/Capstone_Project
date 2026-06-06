@@ -11,12 +11,12 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-06-02T17:49:29+09:00
+Last synced: 2026-06-01T00:29:00+09:00
 
 ## Current Status
 
-- Matador Mage Boss native pass is implemented and build-verified. Feature commits added Matador guarded/groggy tags, the state component, guarded damage reduction, decoy/bull/chain actors, `AGP_MatadorMageBossCharacter`, Matador bull/groggy abilities, Blackboard keys, and boss selector/service/task wiring.
-- Matador default visual uses `/Game/Characters/MaskMan/SK_MaskMan`. Blackboard key constants now include `ChainBreakCount`, `bIsGroggy`, `bCanUseBullPattern`, `bBullPatternActive`, `DecoyActor`, `MainBossActor`, `PreferredHoverHeight`, `PreferredAirRange`, and `bShouldTeleport`.
+- Selectable skill structure is now in C++: `UGP_TargetedSkillBase` supports `Instant`, `Projectile`, `Ray`, and `TargetActor` selection modes, preview actor/debug target updates, primary/secondary confirm, cancel, server-forwarded selection events, and aim-assist target actor selection near the aim line with range/LoS/filter checks. `UGP_Skill_NetTestProjectile` now uses projectile selection before commit/spawn; Dash/DashSlash cancel `GPTags.Ability.Skill.Selection`. `UGP_Skill_LifeDrainTarget` is a channeled target-select drain sample that continues while target distance <= selection range * 5 and LoS remains clear. Damage uses the configured/fallback damage GE; healing uses `/Game/GAS_Pattern/AbilitySystem/GameplayEffects/Healing/GE_Heal_Generic` with SetByCaller DataName `GPTags.Healing.Data.Base`.
+- memoc commands now use project-local `.memoc/runtime` first. This avoids Codex sandbox timeouts when `.memoc/bin/memoc.cmd summary/search/doctor` tries to execute the global AppData runtime outside the workspace.
 - ActionEnd lower-body handoff signal exists in C++ only for now. `Dash` and `DashSlash` request `SetActionLowerBodyMotionMatchBlendEnabled(true)` at ActionEnd/fallback ActionEnd, and `UGP_CharacterAnimInstance` exposes `ActionLowerBodyMotionMatchBlendAlpha` with interp speeds. The attempted AnimBP `LayeredBlendPerBone` graph insertion was reverted because it broke `DefaultSlot.Source` and caused non-montage animation A-pose. `ABP_UEFNSource_Player` and `ABP_MaskMan_Player` are restored to `pre-slot pose -> DefaultSlot -> Output`; a future lower-body handoff should use a cached-pose/safe single-consumer graph.
 - Held movement now cancels action RM at ActionEnd without requiring a fresh key press. `AGP_PlayerCharacter` caches non-zero movement input even while `Fixed`, clears it on `Input_MoveCompleted`, and when `SetActionRootMotionInputCancelEnabled(true)` is called it broadcasts `OnActionRootMotionCancelInput` immediately if cached input is recent. `UGP_Skill_DashSlash` now registers/removes the same cancel delegate path as `UGP_Dash`.
 - Log verification showed held cancel does fire for sprint-held fallback roll, but `ApplyCurrentActionInertia()` skipped because `ActionMotionCarryVelocity` had decayed to ~54 while entry speed was ~854. Held-input cancel now sets `bActionRootMotionCancelledByMovementInput` and seeds handoff velocity from max(carry, `ActionMotionEntryVelocity`, `CharacterMovement.MaxWalkSpeed`) in the held input direction, logging `[ActionRM][ApplyHeldInput]`.
@@ -35,7 +35,6 @@ Last synced: 2026-06-02T17:49:29+09:00
 - `UGP_Primary::StartComboSequence` no longer rotates the player toward current movement input before starting a combo montage, so primary attacks use the character's current forward direction only.
 - GAS damage/HUD triage: enemy and boss attacks now point/fallback to `/Game/GAS_Pattern/AbilitySystem/GameplayEffects/Damage/GE_PrimaryDamage`; player AttributeSet damage broadcasts use avatar fallback for PlayerState-owned ASCs.
 - Player HUD GAS binding now resolves attribute widgets by name and binds boss health through `UGP_AttributeWidget`; `/Game/UI/HUD/WBP_PlayerHUDWidget.BossBar` is expected to be a `WBP_BossBar` child with Health/MaxHealth attributes.
-- Character stats menu now has native tab navigation in `UGP_CharacterStatsMenuWidget`: it auto-detects `MapTab`, `JournalTab`, `ItemsTab`, `AttributesTab`, `GearTab`, `AbilitiesTab`, and `SystemTab`, supports text/border hit-testing or `UButton` delegates, updates title/selected opacity, keeps Attributes bound to GAS snapshots, and can drive a `TabContentSwitcher`/named page panels in UMG.
 - `BP_GP_PlayerCharacter` has a visible `UEFNSourceMesh` native skeletal mesh component attached above `CharacterMesh0`.
 - `UEFNSourceMesh` now uses `/Game/Characters/PlayerCharacter/ABP_UEFNSource_Player` as its AnimBP.
 - `CharacterMesh0` still uses `/Game/Asset/CharacterAction/MaskMan/ABP_MaskMan_Player` to retarget from the parent mesh.
@@ -104,7 +103,7 @@ Last synced: 2026-05-23T00:00:00
 ## Project Snapshot
 
 <!-- memoc:snapshot:start -->
-- Last synced: 2026-05-31T12:33:05
+- Last synced: 2026-06-01T10:10:30
 - Detected stack: Not detected
 
 ### Source Directories

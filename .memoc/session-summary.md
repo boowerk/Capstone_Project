@@ -2,27 +2,23 @@
 memoc: true
 type: state
 scope: project-memory
-created: 2026-05-31T12:33:05
-updated: 2026-05-31T23:14:00+09:00
+created: 2026-06-01T04:41:15
+updated: 2026-06-01T04:41:15
 status: active
 tags:
   - memoc
   - memoc/state
 ---
 # Session Summary
-Last: 2026-06-02T17:49+09:00
-Replace, do not append. Keep <800B.
-History: worklog. Resume risks: 04-handoff.md.
-
+Last: 2026-06-02T00:45:00+09:00
 ## Status
-- Matador Mage Boss C++ pass completed in three feature commits.
-- Full `Project_EdenEditor Win64 Development` build succeeded.
-
-## Changed
-- State/damage tags, decoy-bull-chain actors, Matador boss character, bull/groggy abilities, boss AI keys/selector.
+- Reworked the aerial matador mage boss instruction document after checking current AI/GAS hooks.
+- Added project copy at `Project_Eden/Docs/MatadorMageBoss_ImplementationInstructions.md` and replaced the Desktop source document.
+- LifeDrain LoS now ignores pawns and movable/physics actors. Static wall-like hits still block.
+- LifeDrain no longer ends on temporary blocked LoS/range; ticks pause and resume if clear before duration ends. Missing/dead target still ends.
 
 ## Open Tasks
-- Editor: add optional Matador BB keys, create/use BP child, tune VFX/BT in PIE.
+- Re-run full C++ build after disabling/triggering Live Coding.
 
 ## Resume
-- Unrelated: modified `WBP_CharacterStatsMenu.uasset`; untracked instruction file.
+- UHT passed. Full build still stops with "Unable to build while Live Coding is active."

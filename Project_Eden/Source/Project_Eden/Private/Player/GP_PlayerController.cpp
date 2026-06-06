@@ -1,4 +1,4 @@
-#include "Player/GP_PlayerController.h"
+﻿#include "Player/GP_PlayerController.h"
 
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
@@ -11,6 +11,7 @@
 #include "EnhancedInputSubsystems.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Abilities/GameplayAbilityTypes.h"
 #include "GameplayTags/GP_Tags.h"
 #include "InputCoreTypes.h"
 #include "Kismet/GameplayStatics.h"
@@ -89,7 +90,7 @@ void AGP_PlayerController::SetupInputComponent()
 	{
 		InputSubsystem->AddMappingContext(Context, 0);
 	}
-	
+
 
 	UEnhancedInputComponent* EnhancedInputComponent = CastChecked<UEnhancedInputComponent>(InputComponent);
 
@@ -111,9 +112,11 @@ void AGP_PlayerController::SetupInputComponent()
 
 	// --- [어빌리티 및 스킬] ---
 	if (PrimaryAttackAction)  EnhancedInputComponent->BindAction(PrimaryAttackAction,  ETriggerEvent::Started,   this, &ThisClass::Input_PrimaryAttack);
-	if (SkillSlot1Action) EnhancedInputComponent->BindAction(SkillSlot1Action, ETriggerEvent::Triggered, this, &ThisClass::Input_SkillSlot1);
-	if (SkillSlot2Action) EnhancedInputComponent->BindAction(SkillSlot2Action, ETriggerEvent::Triggered, this, &ThisClass::Input_SkillSlot2);
-	if (UltimateAction) EnhancedInputComponent->BindAction(UltimateAction, ETriggerEvent::Triggered, this, &ThisClass::Input_UltimateSkill);
+	if (SecondarySkillConfirmAction) EnhancedInputComponent->BindAction(SecondarySkillConfirmAction, ETriggerEvent::Started, this, &ThisClass::Input_SecondarySkillConfirm);
+	if (CancelSkillSelectionAction) EnhancedInputComponent->BindAction(CancelSkillSelectionAction, ETriggerEvent::Started, this, &ThisClass::Input_CancelSkillSelection);
+	if (SkillSlot1Action) EnhancedInputComponent->BindAction(SkillSlot1Action, ETriggerEvent::Started, this, &ThisClass::Input_SkillSlot1);
+	if (SkillSlot2Action) EnhancedInputComponent->BindAction(SkillSlot2Action, ETriggerEvent::Started, this, &ThisClass::Input_SkillSlot2);
+	if (UltimateAction) EnhancedInputComponent->BindAction(UltimateAction, ETriggerEvent::Started, this, &ThisClass::Input_UltimateSkill);
 	if (TestToggleSkillAction) EnhancedInputComponent->BindAction(TestToggleSkillAction, ETriggerEvent::Started, this, &ThisClass::Input_TestToggleSkill);
 	// Keep both debug bindings after the PR merge so neither test preset rotation nor White Void input is dropped.
 	if (RotateTestSkillAction) EnhancedInputComponent->BindAction(RotateTestSkillAction, ETriggerEvent::Started, this, &ThisClass::Input_RotateTestSkill);
@@ -250,6 +253,8 @@ void AGP_PlayerController::Input_ToggleSprint()
 
 void AGP_PlayerController::Input_SprintPressed()
 {
+	CancelSkillSelectionIfActive();
+
 	if (AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetPawn()))
 	{
 		if (bIsSprintToggle) PC->ToggleSprinting();
@@ -266,6 +271,8 @@ void AGP_PlayerController::Input_SprintReleased()
 }
 void AGP_PlayerController::Input_Dash()
 {
+	CancelSkillSelectionIfActive();
+
 	if (AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetCharacter()))
 	{
 
@@ -281,6 +288,12 @@ void AGP_PlayerController::Input_Dash()
 
 void AGP_PlayerController::Input_PrimaryAttack()
 {
+	if (IsSkillSelectionActive())
+	{
+		SendSkillSelectionEvent(GPTags::Event::Skill::ConfirmPrimary);
+		return;
+	}
+
 	APawn* ControlledPawn = GetPawn();
 	if (!IsValid(ControlledPawn)) return;
 
@@ -295,7 +308,7 @@ void AGP_PlayerController::Input_PrimaryAttack()
 	for (FGameplayAbilitySpec& Spec : ASC->GetActivatableAbilities())
 	{
 		// 부여된 동적 태그나 어빌리티 기본 태그 중 PrimaryTag가 있는지 검사
-		if (Spec.GetDynamicSpecSourceTags().HasTagExact(PrimaryTag) || 
+		if (Spec.GetDynamicSpecSourceTags().HasTagExact(PrimaryTag) ||
 		   (Spec.Ability && Spec.Ability->GetAssetTags().HasTagExact(PrimaryTag)))
 		{
 			if (Spec.IsActive())
@@ -315,19 +328,35 @@ void AGP_PlayerController::Input_PrimaryAttack()
 	}
 }
 
+void AGP_PlayerController::Input_SecondarySkillConfirm()
+{
+	if (IsSkillSelectionActive())
+	{
+		SendSkillSelectionEvent(GPTags::Event::Skill::ConfirmSecondary);
+	}
+}
+
+void AGP_PlayerController::Input_CancelSkillSelection()
+{
+	SendSkillSelectionEvent(GPTags::Event::Skill::Cancel);
+}
+
 void AGP_PlayerController::Input_SkillSlot1()
 {
+	CancelSkillSelectionIfActive();
 	UE_LOG(LogTemp, Warning, TEXT("Targeting"));
 	ActivateAbilityByTag(GPTags::Ability::Skill::Slot01);
 }
 
 void AGP_PlayerController::Input_SkillSlot2()
 {
+	CancelSkillSelectionIfActive();
 	ActivateAbilityByTag(GPTags::Ability::Skill::Slot02);
 }
 
 void AGP_PlayerController::Input_UltimateSkill()
 {
+	CancelSkillSelectionIfActive();
 	ActivateAbilityByTag(GPTags::Ability::Skill::Ultimate);
 }
 
@@ -346,6 +375,64 @@ bool AGP_PlayerController::ActivateAbilityByTag(const FGameplayTag& AbilityTag) 
 	}
 
 	return ASC->TryActivateAbilitiesByTag(AbilityTag.GetSingleTagContainer());
+}
+
+bool AGP_PlayerController::IsSkillSelectionActive() const
+{
+	UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn());
+	return IsValid(ASC) && ASC->HasMatchingGameplayTag(GPTags::State::Skill::Selecting);
+}
+
+bool AGP_PlayerController::SendSkillSelectionEvent(const FGameplayTag& EventTag) const
+{
+	APawn* ControlledPawn = GetPawn();
+	if (!IsValid(ControlledPawn) || !EventTag.IsValid())
+	{
+		return false;
+	}
+
+	FGameplayEventData Payload;
+	Payload.EventTag = EventTag;
+	Payload.Instigator = ControlledPawn;
+	Payload.Target = ControlledPawn;
+	UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(ControlledPawn, EventTag, Payload);
+
+	if (!HasAuthority())
+	{
+		const_cast<AGP_PlayerController*>(this)->Server_SendSkillSelectionEvent(EventTag);
+	}
+
+	return true;
+}
+
+void AGP_PlayerController::CancelSkillSelectionIfActive() const
+{
+	if (IsSkillSelectionActive())
+	{
+		SendSkillSelectionEvent(GPTags::Event::Skill::Cancel);
+	}
+}
+
+bool AGP_PlayerController::Server_SendSkillSelectionEvent_Validate(FGameplayTag EventTag)
+{
+	return EventTag.MatchesTagExact(GPTags::Event::Skill::ConfirmPrimary)
+		|| EventTag.MatchesTagExact(GPTags::Event::Skill::ConfirmSecondary)
+		|| EventTag.MatchesTagExact(GPTags::Event::Skill::Cancel);
+}
+
+void AGP_PlayerController::Server_SendSkillSelectionEvent_Implementation(FGameplayTag EventTag)
+{
+	APawn* ControlledPawn = GetPawn();
+	if (!IsValid(ControlledPawn) || !EventTag.IsValid())
+	{
+		return;
+	}
+
+	FGameplayEventData Payload;
+	Payload.EventTag = EventTag;
+	Payload.Instigator = ControlledPawn;
+	Payload.Target = ControlledPawn;
+	UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(ControlledPawn, EventTag, Payload);
 }
 
 void AGP_PlayerController::RefreshBossHUD()
@@ -545,7 +632,7 @@ void AGP_PlayerController::Server_TestToggleSkill_Implementation()
 			PC->EquipSkillByClass(GPTags::Ability::Skill::Slot01, WaterPuddleAbilityClass);
 			PC->EquipSkillByClass(GPTags::Ability::Skill::Slot02, WaterPuddleAbilityClass);
 			bSkillsEquipped = true;
-			
+
 			if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Cyan, TEXT("Skills Equipped to Slot 1 & 2!"));
 			UE_LOG(LogTemp, Warning, TEXT("Server: WaterPuddle equipped to Slot 1 & 2"));
 		}
@@ -555,7 +642,7 @@ void AGP_PlayerController::Server_TestToggleSkill_Implementation()
 		// 해제 로직
 		TArray<FGameplayTag> SlotTags = { GPTags::Ability::Skill::Slot01, GPTags::Ability::Skill::Slot02 };
 		TArray<FGameplayAbilitySpecHandle> HandlesToRemove;
-		
+
 		for (const FGameplayAbilitySpec& Spec : ASC->GetActivatableAbilities())
 		{
 			for (const FGameplayTag& SlotTag : SlotTags)
