@@ -13,6 +13,7 @@ class UAbilitySystemComponent;
 class UGP_WeaponAttributeSet;
 class UPDA_WeaponItemCollection;
 class UGP_SkillAugmentData;
+class UNiagaraSystem;
 
 UCLASS()
 class PROJECT_EDEN_API AGP_PlayerState : public APlayerState, public IAbilitySystemInterface
@@ -59,6 +60,12 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Tech|Augment")
 	int32 GetSkillAugmentProjectileCountBonus(FGameplayTag SkillIdTag) const;
+
+	UFUNCTION(BlueprintPure, Category = "Tech|Augment")
+	TSubclassOf<AActor> GetSkillAugmentImpactVisualActorOverride(FGameplayTag SkillIdTag) const;
+
+	UFUNCTION(BlueprintPure, Category = "Tech|Augment")
+	UNiagaraSystem* GetSkillAugmentActiveVFXOverride(FGameplayTag SkillIdTag) const;
 
 	UFUNCTION(BlueprintCallable, Category = "Progression")
 	void AddXP(float Amount);

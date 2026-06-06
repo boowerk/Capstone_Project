@@ -373,9 +373,10 @@ void UGP_BlueprintLibrary::ApplyGameplayEffectToActors(AActor* Instigator, const
 				if (SkillData)
 				{
 					const float SkillDamageMultiplier = GetSkillAugmentDamageMultiplierFromActor(Instigator, SkillData);
-					SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Data::Base, SkillData->BaseDamage * SkillDamageMultiplier);
-					SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Data::BaseSpell, SkillData->BaseSpellDamage * SkillDamageMultiplier);
+					SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Data::Base, SkillData->BaseDamage);
+					SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Data::BaseSpell, SkillData->BaseSpellDamage);
 					SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Data::ToughnessBase, SkillData->ToughnessDamage);
+					SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Data::Multiplier, SkillDamageMultiplier);
 					SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Coef::Atk, SkillData->AttackPowerCoefficient);
 					SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Coef::M_Atk, SkillData->MagicPowerCoefficient);
 					SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Coef::Def, SkillData->DefenseCoefficient);

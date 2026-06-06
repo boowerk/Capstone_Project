@@ -208,6 +208,34 @@ int32 AGP_PlayerState::GetSkillAugmentProjectileCountBonus(FGameplayTag SkillIdT
 	return ProjectileCountBonus;
 }
 
+TSubclassOf<AActor> AGP_PlayerState::GetSkillAugmentImpactVisualActorOverride(FGameplayTag SkillIdTag) const
+{
+	for (int32 Index = SelectedSkillAugments.Num() - 1; Index >= 0; --Index)
+	{
+		const UGP_SkillAugmentData* Augment = SelectedSkillAugments[Index];
+		if (DoesAugmentApplyToSkill(Augment, SkillIdTag) && Augment->ImpactVisualActorOverride)
+		{
+			return Augment->ImpactVisualActorOverride;
+		}
+	}
+
+	return nullptr;
+}
+
+UNiagaraSystem* AGP_PlayerState::GetSkillAugmentActiveVFXOverride(FGameplayTag SkillIdTag) const
+{
+	for (int32 Index = SelectedSkillAugments.Num() - 1; Index >= 0; --Index)
+	{
+		const UGP_SkillAugmentData* Augment = SelectedSkillAugments[Index];
+		if (DoesAugmentApplyToSkill(Augment, SkillIdTag) && Augment->ActiveVFXOverride)
+		{
+			return Augment->ActiveVFXOverride;
+		}
+	}
+
+	return nullptr;
+}
+
 void AGP_PlayerState::AddXP(float Amount)
 {
 	if (Amount <= 0.0f)

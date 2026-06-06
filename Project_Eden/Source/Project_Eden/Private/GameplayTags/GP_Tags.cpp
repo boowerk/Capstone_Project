@@ -102,6 +102,7 @@ namespace GPTags
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Base, "Damage.Base", "SetByCaller 물리/공통 기본 데미지");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(BaseSpell, "Damage.BaseSpell", "SetByCaller 마법 기본 데미지");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(ToughnessBase, "Damage.ToughnessBase", "SetByCaller 강인도 기본 데미지");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Multiplier, "Damage.Multiplier", "SetByCaller 최종 스킬 피해 배율");
         }
     }
 

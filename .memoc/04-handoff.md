@@ -19,6 +19,9 @@ Last synced: 2026-06-03T19:04:50
 - `UGP_SkillAugmentData.RequiredElementTag` gates modifier application by `AGP_PlayerState.CurrentTechElementTag`; empty means no element requirement.
 - `GrantedElementTag` remains the "change current tech element" field and is separate from `RequiredElementTag`.
 - `AGP_PlayerState` exposes damage, radius, range, cooldown multiplier, and projectile count bonus resolution.
+- `AGP_PlayerState` now resolves `ActiveVFXOverride` and `ImpactVisualActorOverride`; `UGP_SkillBase` applies the latest matching selected augment override before SkillData element/default visuals.
+- Next PIE test: create a Pyros-only projectile augment targeting NetTestProjectile, assign `NS_Free_Magic_Projectile1` to `ActiveVFXOverride`, select it, and verify the projectile Niagara changes.
+- `DamageMultiplier` is passed as `Damage.Multiplier` and applied once to computed base damage before crit/increase/mitigation. Verify NetTestProjectile damage changes from 10 to 15 with a 1.5 augment.
 - `UGP_SkillBase::ApplyCooldown` applies `CooldownMultiplier`; `UGP_Skill_DashSlash` also applies it to its fallback cooldown.
 - `ProjectileCountBonus` is wired for `SplitShot`, `NetTestProjectile`, and `ThrownBurst`; NetTest/ThrownBurst fan extra projectiles across a small 10-degree yaw spread.
 - PIE test still needed: cooldown DA (`CooldownMultiplier=0.5`), projectile DA (`ProjectileCountBonus=1`), and element-gated DA (`RequiredElementTag=Volt`) via augment picker.

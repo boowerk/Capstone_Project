@@ -106,6 +106,7 @@ namespace GPTags
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Base);			// 물리/공통 기본 데미지
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(BaseSpell);		// 마법 기본 데미지
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(ToughnessBase);	// 강인도 기본 데미지
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Multiplier);
 		}
 	}
 

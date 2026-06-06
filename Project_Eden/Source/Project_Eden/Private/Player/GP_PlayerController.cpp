@@ -83,12 +83,17 @@ bool AGP_PlayerController::RequestOpenAugmentSelect()
 
 	AGP_PlayerState* GPPlayerState = GetPlayerState<AGP_PlayerState>();
 	TArray<UGP_SkillAugmentData*> ExcludedAugments;
+	FGameplayTag CurrentElementTag;
 	if (IsValid(GPPlayerState))
 	{
 		ExcludedAugments = GPPlayerState->GetSelectedSkillAugments();
+		CurrentElementTag = GPPlayerState->GetCurrentTechElementTag();
 	}
 
-	TArray<UGP_SkillAugmentData*> CandidateAugments = AugmentPoolData->PickRandomAugmentsExcluding(AugmentCandidateCount, ExcludedAugments);
+	TArray<UGP_SkillAugmentData*> CandidateAugments = AugmentPoolData->PickRandomAugmentsExcludingForElement(
+		AugmentCandidateCount,
+		ExcludedAugments,
+		CurrentElementTag);
 	return OpenAugmentSelectWidget(CandidateAugments);
 }
 
