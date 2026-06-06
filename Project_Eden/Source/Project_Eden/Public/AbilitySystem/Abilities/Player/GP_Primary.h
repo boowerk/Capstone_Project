@@ -9,6 +9,9 @@
 class UAnimMontage;
 class UAbilityTask_PlayMontageAndWait;
 class UAbilityTask_WaitGameplayEvent;
+class UNiagaraComponent;
+class UNiagaraSystem;
+class UGP_SkillData;
 
 /**
  * UGP_Primary
@@ -60,6 +63,21 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Skill|Movement", meta = (ClampMin = "0.0"))
 	float IdlePrimaryComboSpeedThreshold = 15.0f;
 
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Skill|Visuals", meta = (Categories = "GameplayCue", ToolTip = "Cue key used to resolve the active sword trail Niagara from SkillData.VisualCues."))
+	FGameplayTag PrimaryTrailCueTag;
+
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Skill|Visuals", meta = (Categories = "GameplayCue", ToolTip = "Cue key used to resolve the hit-frame burst Niagara from SkillData.VisualCues."))
+	FGameplayTag PrimaryBurstCueTag;
+
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Skill|Visuals")
+	FName PrimaryVFXSocketName = TEXT("hand_r");
+
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Skill|Visuals")
+	FVector PrimaryVFXLocationOffset = FVector::ZeroVector;
+
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Skill|Visuals")
+	FRotator PrimaryVFXRotationOffset = FRotator::ZeroRotator;
+
 private:
 	// =========================================================================
 	// 3. 콤보 시퀀스 및 상태 제어 함수군 (Combo Sequence Helpers)
@@ -75,6 +93,11 @@ private:
 	bool IsPrimaryComboStartingFromIdle(const class AGP_PlayerCharacter* PlayerCharacter) const;
 	void ApplyForcedPrimaryCrouch(class AGP_PlayerCharacter* PlayerCharacter);
 	void RestoreForcedPrimaryCrouch(class AGP_PlayerCharacter* PlayerCharacter);
+	const UGP_SkillData* ResolvePrimarySkillData() const;
+	UNiagaraSystem* ResolvePrimaryNiagaraSystem(FGameplayTag CueTag, int32 FallbackVisualCueIndex) const;
+	void StartPrimaryTrailVFX();
+	void StopPrimaryTrailVFX();
+	void SpawnPrimaryBurstVFX();
 
 	// =========================================================================
 	// 4. 애니메이션 몽타주 및 게임플레이 이벤트 콜백 (Gameplay Event Callbacks)
@@ -114,6 +137,9 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<UAnimMontage> CurrentSourceAttackMontage;
+
+	UPROPERTY()
+	TObjectPtr<UNiagaraComponent> ActivePrimaryTrailVFX;
 
 	// =========================================================================
 	// 6. GAS 어빌리티 태스크 변수군 (Gameplay Ability Tasks)

@@ -179,6 +179,16 @@ namespace GPTags
 		}
 	}
 
+	// GameplayCue tags keep the engine-required "GameplayCue." root while staying in native project tag declarations.
+	namespace GameplayCue
+	{
+		namespace Ability
+		{
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Trail_Magic);
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Burst_Magic);
+		}
+	}
+
 	// [6] Event : 일회성 이벤트 트리거
 	namespace Event
 	{

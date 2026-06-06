@@ -58,6 +58,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Skill|Visuals")
 	TObjectPtr<UAnimMontage> SkillMontage;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS|Skill|Data", meta = (DisplayName = "Default Skill Data", ToolTip = "Fallback data asset used when this ability was granted without a UGP_SkillData SourceObject. Runtime-equipped skills still prefer the spec SourceObject."))
+	TObjectPtr<UGP_SkillData> DefaultSkillData;
+
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Skill|Values")
 	TSubclassOf<UGameplayEffect> DamageEffectClass;
 

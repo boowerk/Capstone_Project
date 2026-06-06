@@ -176,6 +176,15 @@ namespace GPTags
         }
     }
 
+    namespace GameplayCue
+    {
+        namespace Ability
+        {
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Trail_Magic, "GameplayCue.Ability.Trail.Magic", "Ability magic trail VFX cue");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Burst_Magic, "GameplayCue.Ability.Burst.Magic", "Ability magic burst VFX cue");
+        }
+    }
+
     // [6] Event : 일회성 이벤트 트리거
     namespace Event
     {

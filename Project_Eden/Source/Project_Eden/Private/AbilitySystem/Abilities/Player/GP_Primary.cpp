@@ -1,14 +1,26 @@
 #include "AbilitySystem/Abilities/Player/GP_Primary.h"
 #include "AbilitySystemBlueprintLibrary.h"
+#include "AbilitySystem/Abilities/GP_SkillData.h"
 #include "Characters/GP_PlayerCharacter.h"
 #include "GameplayTags/GP_Tags.h"
 #include "Animation/PDA_CharacterAnimationSet.h"
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 #include "Abilities/Tasks/AbilityTask_WaitInputPress.h"
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "NiagaraComponent.h"
+#include "NiagaraFunctionLibrary.h"
+#include "NiagaraSystem.h"
 #include "Player/GP_PlayerController.h"
 #include "Utils/GP_BlueprintLibrary.h"
+
+namespace GP_Primary_VFX
+{
+	constexpr int32 TrailVisualCueIndex = 0;
+	constexpr int32 BurstVisualCueIndex = 1;
+	const TCHAR* PrimarySkillDataFallbackPath = TEXT("/Game/GAS_Pattern/AbilitySystem/SkillData/DA_Skill_Primary.DA_Skill_Primary");
+}
 
 UGP_Primary::UGP_Primary()
 {
@@ -21,6 +33,8 @@ UGP_Primary::UGP_Primary()
 	// 부모 클래스 수치 기본값 설정
 	AttackRadius = 100.0f;
 	ForwardOffset = 200.0f;
+	PrimaryTrailCueTag = GPTags::GameplayCue::Ability::Trail_Magic;
+	PrimaryBurstCueTag = GPTags::GameplayCue::Ability::Burst_Magic;
 }
 
 void UGP_Primary::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
@@ -153,6 +167,8 @@ void UGP_Primary::StartComboSequence()
 	WaitEndTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(this, GPTags::Event::Player::ActionEnd);
 	WaitEndTask->EventReceived.AddDynamic(this, &ThisClass::OnActionEndEventReceived);
 	WaitEndTask->ReadyForActivation();
+
+	StartPrimaryTrailVFX();
 
 	if (IsValid(MontageToPlay))
 	{
@@ -301,6 +317,7 @@ void UGP_Primary::OnComboEnableEventReceived(FGameplayEventData Payload)
 
 void UGP_Primary::OnActionEndEventReceived(FGameplayEventData Payload)
 {
+	StopPrimaryTrailVFX();
 	bActionEndWindowOpen = true;
 	if (TryStartQueuedAttackFromActionEnd())
 	{
@@ -340,9 +357,110 @@ void UGP_Primary::OnAttackHitEventReceived(FGameplayEventData Payload)
 	}
 
 	bHasAppliedCurrentAttackHit = true;
+	SpawnPrimaryBurstVFX();
 
 	// 메커니즘: 부모 클래스의 공통 공격 판정 실행
 	PerformAreaAttack();
+}
+
+const UGP_SkillData* UGP_Primary::ResolvePrimarySkillData() const
+{
+	if (const UGP_SkillData* SkillData = GetSkillDataFromSpec(CurrentSpecHandle, CurrentActorInfo))
+	{
+		return SkillData;
+	}
+
+	return LoadObject<UGP_SkillData>(nullptr, GP_Primary_VFX::PrimarySkillDataFallbackPath);
+}
+
+UNiagaraSystem* UGP_Primary::ResolvePrimaryNiagaraSystem(FGameplayTag CueTag, int32 FallbackVisualCueIndex) const
+{
+	const UGP_SkillData* SkillData = ResolvePrimarySkillData();
+	UNiagaraSystem* NiagaraSystem = GetSkillNiagaraSystem(SkillData, GetCurrentTechElementTag(CurrentActorInfo), CueTag);
+	if (IsValid(NiagaraSystem))
+	{
+		return NiagaraSystem;
+	}
+
+	if (SkillData && SkillData->VisualCues.IsValidIndex(FallbackVisualCueIndex))
+	{
+		const FGP_SkillVisualCueEntry& Entry = SkillData->VisualCues[FallbackVisualCueIndex];
+		if (Entry.VisualType == EGP_SkillVisualType::Niagara && IsValid(Entry.NiagaraSystem))
+		{
+			return Entry.NiagaraSystem;
+		}
+	}
+
+	return nullptr;
+}
+
+void UGP_Primary::StartPrimaryTrailVFX()
+{
+	StopPrimaryTrailVFX();
+
+	AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo());
+	USkeletalMeshComponent* AttachMesh = IsValid(PC) ? PC->GetMesh() : nullptr;
+	if (!IsValid(AttachMesh))
+	{
+		return;
+	}
+
+	UNiagaraSystem* TrailSystem = ResolvePrimaryNiagaraSystem(PrimaryTrailCueTag, GP_Primary_VFX::TrailVisualCueIndex);
+	if (!IsValid(TrailSystem))
+	{
+		return;
+	}
+
+	ActivePrimaryTrailVFX = UNiagaraFunctionLibrary::SpawnSystemAttached(
+		TrailSystem,
+		AttachMesh,
+		PrimaryVFXSocketName,
+		PrimaryVFXLocationOffset,
+		PrimaryVFXRotationOffset,
+		EAttachLocation::KeepRelativeOffset,
+		false,
+		true,
+		ENCPoolMethod::None,
+		true);
+}
+
+void UGP_Primary::StopPrimaryTrailVFX()
+{
+	if (IsValid(ActivePrimaryTrailVFX))
+	{
+		ActivePrimaryTrailVFX->Deactivate();
+		ActivePrimaryTrailVFX->DestroyComponent();
+	}
+
+	ActivePrimaryTrailVFX = nullptr;
+}
+
+void UGP_Primary::SpawnPrimaryBurstVFX()
+{
+	AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo());
+	USkeletalMeshComponent* AttachMesh = IsValid(PC) ? PC->GetMesh() : nullptr;
+	if (!IsValid(AttachMesh))
+	{
+		return;
+	}
+
+	UNiagaraSystem* BurstSystem = ResolvePrimaryNiagaraSystem(PrimaryBurstCueTag, GP_Primary_VFX::BurstVisualCueIndex);
+	if (!IsValid(BurstSystem))
+	{
+		return;
+	}
+
+	UNiagaraFunctionLibrary::SpawnSystemAttached(
+		BurstSystem,
+		AttachMesh,
+		PrimaryVFXSocketName,
+		PrimaryVFXLocationOffset,
+		PrimaryVFXRotationOffset,
+		EAttachLocation::KeepRelativeOffset,
+		true,
+		true,
+		ENCPoolMethod::AutoRelease,
+		true);
 }
 
 void UGP_Primary::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
@@ -352,6 +470,7 @@ void UGP_Primary::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGam
 		World->GetTimerManager().ClearTimer(SourceFallbackCompletionTimerHandle);
 	}
 	bActionEndWindowOpen = false;
+	StopPrimaryTrailVFX();
 	ClearExistingTasks();
 
 	if (AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo()))

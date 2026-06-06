@@ -101,7 +101,12 @@ UGP_SkillData* UGP_SkillBase::GetSkillDataFromSpec(const FGameplayAbilitySpecHan
 	}
 
 	const FGameplayAbilitySpec* Spec = ASC->FindAbilitySpecFromHandle(Handle);
-	return Spec ? Cast<UGP_SkillData>(Spec->SourceObject.Get()) : nullptr;
+	if (UGP_SkillData* SpecSkillData = Spec ? Cast<UGP_SkillData>(Spec->SourceObject.Get()) : nullptr)
+	{
+		return SpecSkillData;
+	}
+
+	return DefaultSkillData;
 }
 
 FGameplayTag UGP_SkillBase::GetCurrentTechElementTag(const FGameplayAbilityActorInfo* ActorInfo) const
