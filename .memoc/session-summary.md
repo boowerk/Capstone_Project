@@ -1,29 +1,36 @@
-﻿---
+---
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-06-06T21:30:00+09:00
+created: 2026-06-06T06:43:32
+updated: 2026-06-06T22:35:00+09:00
 status: active
-tags: [memoc, memoc/state]
+tags:
+  - memoc
+  - memoc/state
 ---
 # Session Summary
-
-Last: 2026-06-06T21:30:00+09:00
+Last: 2026-06-06T23:05:00+09:00
 
 ## Status
-- No UBT/build while the editor is open; use Live Coding.
-- Reworked Primary/Sword_Light VFX toward SkillData VisualCues: no direct Niagara notifies; Primary resolves trail/burst from SkillData and attaches to `hand_r`.
-- After editor reload, set `GA_Primary.DefaultSkillData` to `/Game/GAS_Pattern/AbilitySystem/SkillData/DA_Skill_Primary`; VisualCues[0]=`GameplayCue.Ability.Trail.Magic` -> `NS_ArrowTrail_Magic`, [1]=`GameplayCue.Ability.Burst.Magic` -> `NS_Free_Magic_Slash`.
-- Moved VFX GameplayCue tags into native `GP_Tags.h/.cpp` (`GPTags::GameplayCue::Ability::*`) and removed config-only GameplayCue/VFX tag list entries.
-- Added `DefaultSkillData` fallback to `UGP_SkillBase` for always-granted abilities without SourceObject.
-- Added usage doc: `Project_Eden/Docs/SkillVisualCueStructure.md`.
-- `UEFNSourceMesh` remains the source animation mesh and `CharacterMesh0` stays attached under it.
-- Current work is motion matching, crouch routing, chooser DB application, and root-motion extraction tuning.
+- Matador BP now parented to `GP_MatadorMageBossCharacter`; BP/C++ defaults now point at dedicated `BT_Boss_Matador` + `BB_Boss_Matador`.
+- DamageExec now checks target ASC tags directly, not only captured tags, for Matador guarded/groggy multiplier.
+- Commit audit found no team-made Matador-specific BT asset; dedicated Matador BT/BB were created by duplicating boss common assets as a temporary base.
+- Asset audit found `BT_Boss_Matador`/`BT_BossCommon` still contain generic `BTT_ExecuteEnemyAttack`, not boss `BTS_UpdateBossTactics`/`BTT_ExecuteBossAttack`; `BT_Boss_Sans` is the real boss BT template.
+
+## Changed
+- Fixed shared AI fallback paths to actual `/BT/Common/*`.
+- Matador native constructor assigns dedicated Matador BT/BB defaults; BP asset also saved with these overrides.
+- Temporary cleanup: bull impact disables collision after first hit, decoy no longer uses Pawn object type, Matador tactics suppress generic melee/summon and prefer range reposition/area/bull.
+- Added temporary Matador fallback pattern loop: every 6s, if target is 450-2400cm away and no bull is active, spawn bull; target falls back to player pawn if BT/BB target is missing.
+- Fallback loop default is now off; current broken Matador BT is handled by common `BTS_UpdateEnemyTactics` opening bull-pattern attack windows and `BTT_ExecuteEnemyAttack` selecting `Utility_MatadorBullPattern` for Matador.
 
 ## Open Tasks
-- PIE validate crouch locomotion, primary crouch/sprint interaction, and running jump transition.
-- Live Coding compile and editor-check the latest root-motion extraction changes.
-- PIE validate Primary Sword_Light VFX.
+- Live Coding compile. MCP UBT returned code 6 without useful project-log details.
+- Later MCP UBT/Python calls were blocked by usage limit; compile must be done in editor/IDE.
+- PIE check `gp.DamageExec.Log 1`: guarded should show `TargetGuarded=1 BossStateMult=0.10`; groggy should show `TargetGroggy=1 BossStateMult=1.00`.
+- DataAsset plan: move Matador classes/tuning/damage/BT/BB into a dedicated boss config asset instead of scattered BP defaults.
+- Replace temporary `BTS_UpdateBossTactics` hacks with real Matador BT/config once design is stable.
 
 ## Resume
-- Start with `02-current-project-state.md` and `04-handoff.md`, then verify the live AnimBP / chooser path in PIE.
+- If damage number should appear at decoy impact, add hit-proxy location support; current ASC damage event reports boss avatar.

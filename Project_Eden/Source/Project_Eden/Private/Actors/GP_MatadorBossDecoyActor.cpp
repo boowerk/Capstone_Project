@@ -15,10 +15,10 @@ AGP_MatadorBossDecoyActor::AGP_MatadorBossDecoyActor()
 
 	CollisionCapsule = CreateDefaultSubobject<UCapsuleComponent>(TEXT("CollisionCapsule"));
 	CollisionCapsule->InitCapsuleSize(78.0f, 128.0f);
-	CollisionCapsule->SetCollisionObjectType(ECC_Pawn);
+	CollisionCapsule->SetCollisionObjectType(ECC_WorldDynamic);
 	CollisionCapsule->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 	CollisionCapsule->SetCollisionResponseToAllChannels(ECR_Ignore);
-	CollisionCapsule->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
+	CollisionCapsule->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
 	CollisionCapsule->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
 	SetRootComponent(CollisionCapsule);
 

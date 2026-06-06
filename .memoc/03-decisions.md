@@ -5,7 +5,9 @@ scope: project-memory
 created: 2026-05-21T07:03:24
 updated: 2026-06-04T03:45:00+09:00
 status: active
-tags: [memoc, memoc/state]
+tags:
+  - memoc
+  - memoc/state
 ---
 # Decisions
 

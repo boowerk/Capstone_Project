@@ -354,11 +354,13 @@ void UGP_SkillBase::PerformAreaAttack()
 
 	if (HasAuthority(&CurrentActivationInfo) && ResolvedDamageEffectClass)
 	{
+		UGP_SkillData* SkillData = GetSkillDataFromSpec(CurrentSpecHandle, CurrentActorInfo);
 		UGP_BlueprintLibrary::ApplyGameplayEffectToActors(
 			Avatar,
 			HitActors,
 			ResolvedDamageEffectClass,
-			GetAbilityLevel());
+			GetAbilityLevel(),
+			SkillData);
 	}
 
 	// 3. (옵션) 피격 반응 태그 전송 등 공통 로직 처리

@@ -55,12 +55,12 @@ namespace
 
 	const TCHAR* GetSharedBehaviorTreeFallbackPath()
 	{
-		return TEXT("/Game/Characters/EnemyCharacter/BT/BT_EnemyCommon.BT_EnemyCommon");
+		return TEXT("/Game/Characters/EnemyCharacter/BT/Common/BT_EnemyCommon.BT_EnemyCommon");
 	}
 
 	const TCHAR* GetSharedBlackboardFallbackPath()
 	{
-		return TEXT("/Game/Characters/EnemyCharacter/BT/BB_EnemyCommon.BB_EnemyCommon");
+		return TEXT("/Game/Characters/EnemyCharacter/BT/Common/BB_EnemyCommon.BB_EnemyCommon");
 	}
 
 	FEnemyLLMEvaluation BuildBossRuntimeEvaluationTestSample(int32 SampleIndex)

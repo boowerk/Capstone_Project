@@ -1,11 +1,15 @@
 #include "AI/Tasks/BTT_ExecuteEnemyAttack.h"
 
 #include "AI/Tasks/EnemyBTTaskCommon.h"
+#include "AI/Tasks/BossAttackPatternSelector.h"
 #include "AbilitySystem/GP_AbilitySystemComponent.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
 #include "AIController.h"
 #include "BehaviorTree/BlackboardComponent.h"
+#include "Characters/GP_MatadorBossStateComponent.h"
+#include "Characters/GP_MatadorMageBossCharacter.h"
+#include "Engine/World.h"
 #include "GameplayTags/GP_Tags.h"
 
 namespace BTT_ExecuteEnemyAttack_Internal
@@ -16,9 +20,24 @@ namespace BTT_ExecuteEnemyAttack_Internal
 		const FGameplayTag& DefaultAttackAbilityTag,
 		float BossSweepAttackChance)
 	{
-		(void)ControlledPawn;
-		(void)BlackboardComponent;
 		(void)BossSweepAttackChance;
+
+		const AGP_MatadorMageBossCharacter* MatadorBoss = Cast<AGP_MatadorMageBossCharacter>(ControlledPawn);
+		const UGP_MatadorBossStateComponent* MatadorStateComponent = IsValid(ControlledPawn)
+			? ControlledPawn->FindComponentByClass<UGP_MatadorBossStateComponent>()
+			: nullptr;
+		const AActor* TargetActor = EnemyBTTaskCommon::GetTargetActor(BlackboardComponent);
+		if (IsValid(MatadorBoss) && IsValid(MatadorStateComponent) && !MatadorStateComponent->IsGroggy() && !IsValid(MatadorStateComponent->GetActiveBullActor()) && IsValid(TargetActor))
+		{
+			const float DistanceToTarget = FVector::Dist2D(ControlledPawn->GetActorLocation(), TargetActor->GetActorLocation());
+			const UWorld* World = ControlledPawn->GetWorld();
+			const float WorldTimeSeconds = World != nullptr ? World->GetTimeSeconds() : 0.0f;
+			const bool bPatternWindowOpen = FMath::Fmod(FMath::Max(0.0f, WorldTimeSeconds), 6.0f) <= 3.0f;
+			if (FGPBossAttackPatternRanges::IsWithinBullPatternRange(DistanceToTarget) && bPatternWindowOpen)
+			{
+				return GPTags::Ability::Enemy::Utility_MatadorBullPattern;
+			}
+		}
 
 		// Generic attack tasks now execute their configured tag literally.
 		// Boss pattern switching belongs to UBTT_ExecuteBossAttack or explicit boss task nodes in the BT.
