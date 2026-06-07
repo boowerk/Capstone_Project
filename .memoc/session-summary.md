@@ -17,6 +17,7 @@ Last: 2026-06-06T00:00:00+09:00
 - Existing XP/level, enemy XP reward, augment UI, duplicate prevention, numeric modifiers, and element requirements remain.
 
 ## Next
+- Later: evolved skill-slot UI. Selected upgrade augment should override base skill name, description, and icon.
 - Build.
 - Create Pyros projectile augment targeting NetTestProjectile with `NS_Free_Magic_Projectile1`.
 - Select augment in PIE and verify projectile VFX replacement.
