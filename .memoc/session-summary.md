@@ -10,15 +10,15 @@ tags:
   - memoc/state
 ---
 # Session Summary
-Last: 2026-06-07T21:07:00+09:00
+Last: 2026-06-07T22:00:00+09:00
 ## Status
-- Added dark fantasy minimap PNG source assets under `Project_Eden/Content/UI/HUD/Minimap/Textures`.
-- `UGP_PlayerHUDWidget` rotates an optional `MinimapPlayerArrow`/fallback-named widget from owning pawn yaw via `SetRenderTransformAngle`.
-- `AGP_PlayerController::Tick` also calls HUD minimap rotation refresh so it no longer depends on UserWidget native tick.
+- Added dynamic minimap capture stack: `AGP_MinimapCaptureActor`, `UGP_MinimapSubsystem`, PCG completion notification, and HUD RenderTarget binding.
+- `WBP_PlayerHUDWidget` can bind `MinimapBackgroundImage`/fallback-named Image to the current minimap RenderTarget.
+- Full `Project_EdenEditor Win64 Development` build succeeded.
 
 ## Open Tasks
-- In `WBP_PlayerHUDWidget`, keep the arrow image named `MinimapPlayerArrow` or another name containing Arrow plus Minimap/Player/Direction, set Render Transform Pivot to `(0.5, 0.5)`, and tune offset/invert if needed.
+- Place/configure `AGP_MinimapCaptureActor` in the level, set bounds/follow mode, and name the HUD background Image `MinimapBackgroundImage`.
+- If PCG graph finishes asynchronously, call `NotifyPcgGenerationFinished` from BP after the actual generation completion point.
 
 ## Resume
-- Full `Project_EdenEditor Win64 Development` build succeeded after Unreal Editor was closed.
-- Existing unrelated changes remain: `TestMap.umap` and `.memoc/MatadorMageBoss_ImplementationInstructions.md`.
+- Existing unrelated untracked file remains: `.memoc/MatadorMageBoss_ImplementationInstructions.md`.

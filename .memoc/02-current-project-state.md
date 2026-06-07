@@ -11,10 +11,11 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-06-07T21:07:00+09:00
+Last synced: 2026-06-07T22:00:00+09:00
 
 ## Current Status
 
+- Dynamic minimap capture is now in C++: `AGP_MinimapCaptureActor` owns a top-down `USceneCaptureComponent2D` and generated/assigned `UTextureRenderTarget2D`; `UGP_MinimapSubsystem` registers the active capture actor and recaptures after PCG layout readiness; `APcgControllerActor::NotifyPcgGenerationFinished` broadcasts PCG readiness and requests delayed minimap recapture; `UGP_PlayerHUDWidget` binds `MinimapBackgroundImage`/fallback-named Image to the subsystem RenderTarget.
 - HUD minimap source PNG assets live under `Project_Eden/Content/UI/HUD/Minimap/Textures`. `UGP_PlayerHUDWidget` rotates an optional `MinimapPlayerArrow`/fallback-named widget from owning pawn yaw through `SetRenderTransformAngle`, with WBP-exposed enable/offset/invert tuning. `AGP_PlayerController::Tick` now also calls the HUD refresh so rotation does not depend on UUserWidget native tick; `Project_EdenEditor Win64 Development` build succeeded after the editor was closed.
 - Selectable skill structure is now in C++: `UGP_TargetedSkillBase` supports `Instant`, `Projectile`, `Ray`, and `TargetActor` selection modes, preview actor/debug target updates, primary/secondary confirm, cancel, server-forwarded selection events, and aim-assist target actor selection near the aim line with range/LoS/filter checks. `UGP_Skill_NetTestProjectile` now uses projectile selection before commit/spawn; Dash/DashSlash cancel `GPTags.Ability.Skill.Selection`. `UGP_Skill_LifeDrainTarget` is a channeled target-select drain sample that continues while target distance <= selection range * 5 and LoS remains clear. Damage uses the configured/fallback damage GE; healing uses `/Game/GAS_Pattern/AbilitySystem/GameplayEffects/Healing/GE_Heal_Generic` with SetByCaller DataName `GPTags.Healing.Data.Base`.
 - memoc commands now use project-local `.memoc/runtime` first. This avoids Codex sandbox timeouts when `.memoc/bin/memoc.cmd summary/search/doctor` tries to execute the global AppData runtime outside the workspace.

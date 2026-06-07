@@ -11,7 +11,7 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-06-02T17:49:29+09:00
+Last synced: 2026-06-07T22:00:00+09:00
 
 ## Current Matador Mage Boss Handoff
 
@@ -19,6 +19,14 @@ Last synced: 2026-06-02T17:49:29+09:00
 - Runtime pattern flow: boss selector can choose `GPTags.Ability.Enemy.Utility_MatadorBullPattern`; the ability spawns `AGP_BullChargeActor`; bull collision with `AGP_MatadorBossDecoyActor` calls the state component; 3 chain breaks enter Groggy and remove guarded damage reduction.
 - Editor setup still needed: add optional Blackboard keys `ChainBreakCount`, `bIsGroggy`, `bCanUseBullPattern`, `bBullPatternActive`, `DecoyActor`, `MainBossActor`, `PreferredHoverHeight`, `PreferredAirRange`, `bShouldTeleport` to the boss Blackboard asset if designers want to inspect/branch on them.
 - PIE checklist: verify guarded damage is 10% while `MatadorGuarded`, normal damage while `Groggy`, decoy damage routes to the real boss ASC, bull hit on decoy increments chain stage 0/1/2/3, and Groggy recovers after `GroggyDuration`.
+
+## Current Minimap Handoff
+
+- Dynamic minimap C++ is build-verified. Place `AGP_MinimapCaptureActor` or a BP child in the playable level.
+- For local minimap, leave `bStartFollowingPlayer=true`, `CaptureMode=FollowTarget`, tune `FollowOrthoWidth`, and keep `bRotateCaptureWithTarget=false` so the player arrow yaw remains the rotation source.
+- For a whole-map snapshot, assign `DefaultBoundsActor` to an actor covering the PCG play area and call `CaptureFullMap`.
+- `APcgControllerActor` now auto-calls `NotifyPcgGenerationFinished(AutoMinimapCaptureDelay)` after `ApplyPcgParameters`; if the actual PCG graph finishes later/asynchronously, call `NotifyPcgGenerationFinished` manually from BP at the real completion point.
+- In `WBP_PlayerHUDWidget`, name the minimap background Image `MinimapBackgroundImage` or use a name containing `Minimap`/`MiniMap` plus `Background`/`MapImage`; HUD will set its brush resource to the active RenderTarget.
 
 ## Current Tech UI Handoff
 
