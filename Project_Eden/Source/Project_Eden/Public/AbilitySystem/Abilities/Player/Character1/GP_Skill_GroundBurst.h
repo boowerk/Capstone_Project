@@ -37,8 +37,5 @@ protected:
 	float TraceDepth = 1000.f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS|Skill|GroundBurst")
-	TEnumAsByte<ECollisionChannel> GroundTraceChannel = ECC_Visibility;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS|Skill|GroundBurst")
 	FGameplayTag HitEventTag;
 };

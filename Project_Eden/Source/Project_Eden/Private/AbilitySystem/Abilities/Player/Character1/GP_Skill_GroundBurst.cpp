@@ -51,13 +51,15 @@ void UGP_Skill_GroundBurst::ActivateAbility(const FGameplayAbilitySpecHandle Han
 
 		FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(GroundBurstTrace), false);
 		QueryParams.AddIgnoredActor(Avatar);
+		FCollisionObjectQueryParams ObjectQueryParams;
+		ObjectQueryParams.AddObjectTypesToQuery(ECC_WorldStatic);
 
 		FHitResult HitResult;
-		const bool bHitGround = Avatar->GetWorld()->LineTraceSingleByChannel(
+		const bool bHitGround = Avatar->GetWorld()->LineTraceSingleByObjectType(
 			HitResult,
 			TraceStart,
 			TraceEnd,
-			GroundTraceChannel,
+			ObjectQueryParams,
 			QueryParams
 		);
 
