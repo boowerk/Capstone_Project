@@ -25,7 +25,7 @@ void UGP_PlayerHUDWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 	RefreshPreview();
-	UpdateMinimapPlayerArrowRotation();
+	RefreshMinimapPlayerArrowRotation();
 
 	// 1. 즉시 시도
 	APawn* OwningPawn = GetOwningPlayerPawn();
@@ -50,10 +50,10 @@ void UGP_PlayerHUDWidget::NativeConstruct()
 void UGP_PlayerHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
-	UpdateMinimapPlayerArrowRotation();
+	RefreshMinimapPlayerArrowRotation();
 }
 
-void UGP_PlayerHUDWidget::UpdateMinimapPlayerArrowRotation()
+void UGP_PlayerHUDWidget::RefreshMinimapPlayerArrowRotation()
 {
 	if (!bRotateMinimapPlayerArrow)
 	{
@@ -93,7 +93,12 @@ UWidget* UGP_PlayerHUDWidget::ResolveMinimapPlayerArrowWidget() const
 	{
 		TEXT("MinimapPlayerArrow"),
 		TEXT("MiniMapPlayerArrow"),
+		TEXT("MinimapPlayerArrowImage"),
+		TEXT("MiniMapPlayerArrowImage"),
+		TEXT("MinimapArrow"),
+		TEXT("MiniMapArrow"),
 		TEXT("PlayerArrow"),
+		TEXT("PlayerArrowImage"),
 		TEXT("PlayerDirectionArrow"),
 		TEXT("MapPlayerArrow")
 	};
@@ -104,6 +109,39 @@ UWidget* UGP_PlayerHUDWidget::ResolveMinimapPlayerArrowWidget() const
 		{
 			return CandidateWidget;
 		}
+	}
+
+	if (!WidgetTree)
+	{
+		return nullptr;
+	}
+
+	UWidget* FoundArrowWidget = nullptr;
+	WidgetTree->ForEachWidget([&FoundArrowWidget](UWidget* ChildWidget)
+	{
+		if (FoundArrowWidget || !ChildWidget)
+		{
+			return;
+		}
+
+		const FString WidgetName = ChildWidget->GetName();
+		const bool bLooksLikeArrow = WidgetName.Contains(TEXT("Arrow"));
+		const bool bLooksLikeMinimapPlayer =
+			WidgetName.Contains(TEXT("Minimap")) ||
+			WidgetName.Contains(TEXT("MiniMap")) ||
+			WidgetName.Contains(TEXT("Player")) ||
+			WidgetName.Contains(TEXT("Direction"));
+
+		// 에디터에서 이름이 약간 달라도 미니맵 플레이어 방향 위젯을 최대한 안전하게 찾습니다.
+		if (bLooksLikeArrow && bLooksLikeMinimapPlayer)
+		{
+			FoundArrowWidget = ChildWidget;
+		}
+	});
+
+	if (FoundArrowWidget)
+	{
+		return FoundArrowWidget;
 	}
 
 	return nullptr;

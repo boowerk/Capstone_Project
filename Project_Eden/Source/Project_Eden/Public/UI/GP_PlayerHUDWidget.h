@@ -52,6 +52,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "EldenRing HUD")
 	void SetBossVisible(bool bIsVisible);
 
+	// PlayerController tick에서도 호출해 UUserWidget native tick 설정과 무관하게 미니맵 방향을 갱신합니다.
+	UFUNCTION(BlueprintCallable, Category = "EldenRing HUD|Minimap")
+	void RefreshMinimapPlayerArrowRotation();
+
 protected:
 	virtual void NativePreConstruct() override;
 	virtual void NativeConstruct() override;
@@ -59,7 +63,6 @@ protected:
 
 private:
 	void RefreshPreview();
-	void UpdateMinimapPlayerArrowRotation();
 	UWidget* ResolveMinimapPlayerArrowWidget() const;
 	void BindAttributeWidgetToASC(UAbilitySystemComponent* InASC, UGP_AttributeWidget* Widget, UGP_AttributeSet* AttributeSet, TArray<FGPAttributeDelegateBinding>& DelegateHandles);
 	void RemoveAttributeDelegateHandles(TWeakObjectPtr<UAbilitySystemComponent>& BoundASC, TArray<FGPAttributeDelegateBinding>& DelegateHandles);
