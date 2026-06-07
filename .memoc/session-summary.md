@@ -10,15 +10,15 @@ tags:
   - memoc/state
 ---
 # Session Summary
-Last: 2026-06-02T00:45:00+09:00
+Last: 2026-06-07T20:49:00+09:00
 ## Status
-- Reworked the aerial matador mage boss instruction document after checking current AI/GAS hooks.
-- Added project copy at `Project_Eden/Docs/MatadorMageBoss_ImplementationInstructions.md` and replaced the Desktop source document.
-- LifeDrain LoS now ignores pawns and movable/physics actors. Static wall-like hits still block.
-- LifeDrain no longer ends on temporary blocked LoS/range; ticks pause and resume if clear before duration ends. Missing/dead target still ends.
+- Added dark fantasy minimap PNG source assets under `Project_Eden/Content/UI/HUD/Minimap/Textures`.
+- `UGP_PlayerHUDWidget` now rotates an optional `MinimapPlayerArrow`/fallback-named widget from the owning pawn yaw via `SetRenderTransformAngle`.
+- Minimap arrow rotation exposes enable, angle offset, and invert options for WBP tuning.
 
 ## Open Tasks
-- Re-run full C++ build after disabling/triggering Live Coding.
+- In `WBP_PlayerHUDWidget`, name the arrow image `MinimapPlayerArrow`, set Render Transform Pivot to `(0.5, 0.5)`, and tune offset/invert if the arrow points the wrong way.
+- Re-run full C++ build after closing Unreal Editor; compile passed, but link failed because `UnrealEditor-Project_Eden.dll` was locked by `UnrealEditor.exe`.
 
 ## Resume
-- UHT passed. Full build still stops with "Unable to build while Live Coding is active."
+- Existing editor-side changes remain: `TestMap.umap` and `WBP_PlayerHUDWidget.uasset`.
