@@ -10,6 +10,12 @@ bool FGPBossAttackPatternRanges::IsWithinReach(float DistanceToTarget, float Att
 	return FMath::Max(0.0f, DistanceToTarget) <= AttackReach + ReachTolerance;
 }
 
+bool FGPBossAttackPatternRanges::IsWithinBullPatternRange(float DistanceToTarget)
+{
+	const float SafeDistance = FMath::Max(0.0f, DistanceToTarget);
+	return SafeDistance >= BullPatternMinRange && SafeDistance <= BullPatternMaxRange;
+}
+
 void FGPBossAttackPatternSelector::AddCandidate(TArray<FGPBossAttackPatternCandidate>& Candidates, const FGameplayTag& AbilityTag, float Score, FName DebugName)
 {
 	if (!AbilityTag.IsValid() || Score <= KINDA_SMALL_NUMBER)
@@ -43,6 +49,21 @@ TArray<FGPBossAttackPatternCandidate> FGPBossAttackPatternSelector::BuildCandida
 	const float PreferredRange = FMath::Max(100.0f, Context.PreferredRange);
 	const float HealthRatio = FMath::Clamp(Context.HealthRatio, 0.0f, 1.0f);
 	const int32 BossPhase = FMath::Max(1, Context.BossPhase);
+	const int32 ChainBreakTarget = FMath::Max(1, Context.ChainBreakTarget);
+	const int32 ChainBreakCount = FMath::Clamp(Context.ChainBreakCount, 0, ChainBreakTarget);
+	const float PreferredAirRange = FMath::Max(100.0f, Context.PreferredAirRange);
+
+	if (Context.bIsGroggy)
+	{
+		// During groggy the boss is intentionally open, so the selector should not start new attacks.
+		return Candidates;
+	}
+
+	if (ChainBreakCount >= ChainBreakTarget)
+	{
+		AddCandidate(Candidates, GPTags::Ability::Enemy::Utility_MatadorGroggy, 5.0f, TEXT("MatadorGroggy"));
+		return Candidates;
+	}
 
 	const bool bPressureMode = Context.EnemyMode == FEnemyLLMEvaluationParser::ToBlackboardName(EEnemyMode::Pressure);
 	const bool bHoldMode = Context.EnemyMode == FEnemyLLMEvaluationParser::ToBlackboardName(EEnemyMode::Hold);
@@ -54,6 +75,19 @@ TArray<FGPBossAttackPatternCandidate> FGPBossAttackPatternSelector::BuildCandida
 	const float ClosePressure = 1.0f - FMath::Clamp(DistanceToTarget / PreferredRange, 0.0f, 1.0f);
 	const float FarPressure = FMath::Clamp((DistanceToTarget - PreferredRange) / PreferredRange, 0.0f, 1.0f);
 	const float PhaseBonus = FMath::Clamp(static_cast<float>(BossPhase - 1) * 0.15f, 0.0f, 0.35f);
+	const float AirRangeFit = 1.0f - FMath::Clamp(FMath::Abs(DistanceToTarget - PreferredAirRange) / PreferredAirRange, 0.0f, 1.0f);
+
+	if (Context.bCanUseBullPattern && !Context.bBullPatternActive && FGPBossAttackPatternRanges::IsWithinBullPatternRange(DistanceToTarget))
+	{
+		const float ChainPressure = static_cast<float>(ChainBreakCount) / static_cast<float>(ChainBreakTarget);
+		const float BullScore = 0.95f
+			+ PhaseBonus
+			+ AirRangeFit * 0.35f
+			+ ChainPressure * 0.25f
+			+ (bPressureMode ? 0.12f : 0.0f)
+			+ (Context.bShouldTeleport ? 0.1f : 0.0f);
+		AddCandidate(Candidates, GPTags::Ability::Enemy::Utility_MatadorBullPattern, BullScore, TEXT("MatadorBull"));
+	}
 
 	if (FGPBossAttackPatternRanges::IsWithinReach(DistanceToTarget, FGPBossAttackPatternRanges::BasicAttackReach))
 	{

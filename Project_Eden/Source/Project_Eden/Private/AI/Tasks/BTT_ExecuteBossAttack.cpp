@@ -10,6 +10,7 @@
 #include "AI/Tasks/EnemyBTTaskCommon.h"
 #include "Abilities/GameplayAbility.h"
 #include "BehaviorTree/BlackboardComponent.h"
+#include "Characters/GP_MatadorBossStateComponent.h"
 #include "GameplayTags/GP_Tags.h"
 
 namespace BossAttackTask
@@ -68,6 +69,23 @@ namespace BossAttackTask
 		Context.bCanUseBossSweepAttack = GetBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossSweepAttack);
 		Context.bCanUseBossAreaAttack = GetBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossAreaAttack);
 		Context.bCanSummonAdds = GetBool(BlackboardComponent, EnemyBlackboardKeys::bCanSummonAdds);
+		Context.ChainBreakCount = GetInt(BlackboardComponent, EnemyBlackboardKeys::ChainBreakCount, Context.ChainBreakCount);
+		Context.bIsGroggy = GetBool(BlackboardComponent, EnemyBlackboardKeys::bIsGroggy);
+		Context.bCanUseBullPattern = GetBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBullPattern);
+		Context.bBullPatternActive = GetBool(BlackboardComponent, EnemyBlackboardKeys::bBullPatternActive);
+		Context.bShouldTeleport = GetBool(BlackboardComponent, EnemyBlackboardKeys::bShouldTeleport);
+		Context.PreferredHoverHeight = GetFloat(BlackboardComponent, EnemyBlackboardKeys::PreferredHoverHeight, Context.PreferredHoverHeight);
+		Context.PreferredAirRange = GetFloat(BlackboardComponent, EnemyBlackboardKeys::PreferredAirRange, Context.PreferredAirRange);
+
+		if (const UGP_MatadorBossStateComponent* MatadorStateComponent = IsValid(ControlledPawn) ? ControlledPawn->FindComponentByClass<UGP_MatadorBossStateComponent>() : nullptr)
+		{
+			// The replicated state component is the authority for chain/groggy state; Blackboard remains a readable snapshot.
+			Context.ChainBreakCount = MatadorStateComponent->GetChainBreakCount();
+			Context.ChainBreakTarget = MatadorStateComponent->GetChainBreakTarget();
+			Context.bIsGroggy = MatadorStateComponent->IsGroggy();
+			Context.bBullPatternActive = IsValid(MatadorStateComponent->GetActiveBullActor());
+		}
+
 		return Context;
 	}
 

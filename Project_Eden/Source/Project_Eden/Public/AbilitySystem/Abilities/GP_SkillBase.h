@@ -43,8 +43,9 @@ protected:
 	int32 GetSkillAugmentProjectileCountBonus(const UGP_SkillData* SkillData, const FGameplayAbilityActorInfo* ActorInfo) const;
 	TSubclassOf<AActor> GetSkillAugmentImpactVisualActorOverride(const UGP_SkillData* SkillData) const;
 	UNiagaraSystem* GetSkillAugmentActiveVFXOverride(const UGP_SkillData* SkillData) const;
-	TSubclassOf<AActor> GetSkillVisualActorClass(const UGP_SkillData* SkillData, TSubclassOf<AActor> FallbackVisualActorClass, FGameplayTag ElementTag = FGameplayTag()) const;
+	TSubclassOf<AActor> GetSkillVisualActorClass(const UGP_SkillData* SkillData, TSubclassOf<AActor> FallbackVisualActorClass, FGameplayTag ElementTag = FGameplayTag(), FGameplayTag CueTag = FGameplayTag()) const;
 	TSubclassOf<AActor> GetSkillSpawnActorClass(const UGP_SkillData* SkillData, TSubclassOf<AActor> FallbackActorClass) const;
+	UNiagaraSystem* GetSkillNiagaraSystem(const UGP_SkillData* SkillData, FGameplayTag ElementTag = FGameplayTag(), FGameplayTag CueTag = FGameplayTag()) const;
 	UNiagaraSystem* GetProjectileVisualSystem(const UGP_SkillData* SkillData, FGameplayTag ElementTag = FGameplayTag()) const;
 	void SpawnVisualActor(AActor* InstigatorActor, TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation = FRotator::ZeroRotator, float VisualScale = 1.0f) const;
 	UGP_SkillData* GetSkillDataFromSpec(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo) const;
@@ -60,6 +61,9 @@ protected:
 	// =========================================================================
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Skill|Visuals")
 	TObjectPtr<UAnimMontage> SkillMontage;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS|Skill|Data", meta = (DisplayName = "Default Skill Data", ToolTip = "Fallback data asset used when this ability was granted without a UGP_SkillData SourceObject. Runtime-equipped skills still prefer the spec SourceObject."))
+	TObjectPtr<UGP_SkillData> DefaultSkillData;
 
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Skill|Values")
 	TSubclassOf<UGameplayEffect> DamageEffectClass;

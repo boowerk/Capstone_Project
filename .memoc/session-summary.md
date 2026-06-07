@@ -10,6 +10,7 @@ updated: 2026-06-06T00:00:00+09:00
 Last: 2026-06-06T00:00:00+09:00
 
 ## Status
+- Latest `origin/feature/vfx-skills-impact` merged into `feature/vfx-skills`; includes Primary VisualCues, Matador AI/BT updates, maps, and Fab assets.
 - Selected augment visual overrides now work. Latest applicable `ActiveVFXOverride` / `ImpactVisualActorOverride` wins over SkillData element/default visuals.
 - PlayerState owns override resolution; SkillBase consumes it for projectile and impact visuals.
 - Augment `DamageMultiplier` now scales the full damage formula, including AttackPower/MagicPower coefficient contributions.

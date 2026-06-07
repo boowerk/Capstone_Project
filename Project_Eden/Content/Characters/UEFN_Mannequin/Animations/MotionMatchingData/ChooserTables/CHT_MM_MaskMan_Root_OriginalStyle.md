@@ -1,73 +1,68 @@
-# Chooser Table Multi-Table Parse Report - CHT_MM_MaskMan_Root_OriginalStyle
-- **Asset Path:** `/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/CHT_MM_MaskMan_Root_OriginalStyle.uasset`
-- **File Size:** 30,337 bytes
+# Chooser Table Report - CHT_MM_MaskMan_Root_OriginalStyle
+
+- **Asset Path:** `/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/ChooserTables/CHT_MM_MaskMan_Root_OriginalStyle`
 - **Context Source ABP:** `ABP_UEFNSource_Player_C`
+- **Verification:** editor screenshots plus binary string scan of the saved `.uasset`
+- **Note:** Direct MCP inspection was unavailable because the Unreal MCP session was expired.
 
 ## Overview
-This asset is structured as a **Multi-Table Chooser Asset**, containing **6 sub-tables** inside a single `.uasset` file.
 
-### [Sub-Table #1] CHT_MM_MaskMan_Root_OriginalStyle
-- Offset Range: 9795 ~ 15651
-- Row Count: 5
+This chooser is now configured as the original-style MaskMan motion matching root with explicit `Stance` routing. Standing locomotion keeps the existing stand tables, while crouching routes to new crouch idle / walk subtables that use existing dense crouch Pose Search Databases.
 
-| Row | MovementMode | Unknown | MovementState | Gait | Target Result |
-| --- | --- | --- | --- | --- | --- |
-| 0 | Grounded | val(0) | Idle | Idle | Sub-Table #2 (InAir) |
-| 1 | Grounded | val(0) | Move | Idle | Sub-Table #3 (Stand Idles) |
-| 2 | Grounded | val(0) | Move | Walk | Sub-Table #4 (Stand Runs) |
-| 3 | Grounded | val(0) | Move | Run | Sub-Table #5 (Stand Sprint) |
-| 4 | InAir | val(0) | Idle | Idle | Sub-Table #6 (Stand Walks) |
+The obsolete C++ compatibility variables `EMMDatabaseLOD`, `MMDatabaseLOD`, and `MMDatabaseLODEnum` are not used by this table.
 
-### [Sub-Table #2] InAir
-- Offset Range: 15651 ~ 17347
-- Row Count: 2
+## Root Table
 
-| Row | Speed2D | JustTraversed | Target Result |
+| Result | Movement Mode | Stance | Movement State | Gait |
+| --- | --- | --- | --- | --- |
+| Stand Idles | Grounded | Standing | Idle | Any |
+| Stand Walks | Grounded | Standing | Moving | Walk |
+| Stand Runs | Grounded | Standing | Moving | Run |
+| Stand Sprint | Grounded | Standing | Moving | Sprint |
+| Crouch Idles | Grounded | Crouching | Idle | Any |
+| Crouch Walks | Grounded | Crouching | Moving | Any |
+| InAir | InAir | Any | Any | Any |
+
+## Crouch Idles
+
+| Result | Should Turn in Place |
+| --- | --- |
+| `PSD_Dense_Crouch_TurnInPlace` | True |
+| `PSD_Dense_Crouch_Idles` | False |
+
+## Crouch Walks
+
+| Result | Is Pivoting | Is Starting | Is Stopping |
 | --- | --- | --- | --- |
-| 0 | >= 1 | Any | `PSD_Dense_Jumps_Far` |
-| 1 | >= 0 | Any | `PSD_Extreme_Sparse_Jumps` |
+| `PSD_Dense_Crouch_Walk_Pivots` | True | Any | Any |
+| `PSD_Dense_Crouch_Walk_Starts` | Any | True | Any |
+| `PSD_Dense_Crouch_Walk_Stops` | Any | Any | True |
+| `PSD_Dense_Crouch_Walk_Loops` | False | False | False |
 
-### [Sub-Table #3] Stand Idles
-- Offset Range: 17347 ~ 20826
-- Row Count: 6
+## Existing Standing / In-Air Tables
 
-| Row | Speed2D | JustLanded_Light | JustLanded_Heavy | ShouldTurnInPlace | Target Result |
-| --- | --- | --- | --- | --- | --- |
-| 0 | 0 ~ 20 | False | False | False | `PSD_Dense_Stand_Idles` |
-| 1 | 20 ~ 200 | False | False | Any | `PSD_Sparse_Stand_Walk_Stops` |
-| 2 | >= 200 | False | False | Any | `PSD_Relaxed_Stand_Run_Stops` |
-| 3 | Any | True | False | Any | `PSD_Dense_Stand_Idle_Lands_Light` |
-| 4 | Any | False | True | Any | `PSD_Dense_Stand_Idle_Lands_Heavy` |
-| 5 | Any | False | False | True | `PSD_Extreme_Sparse_Stand_TurnInPlace` |
+The saved `.uasset` still contains the existing standing and in-air database references:
 
-### [Sub-Table #4] Stand Runs
-- Offset Range: 20826 ~ 24362
-- Row Count: 4
+- `PSD_Dense_Stand_Idles`
+- `PSD_Dense_Stand_TurnInPlace`
+- `PSD_Dense_Stand_Walk_SpinTransition`
+- `PSD_Extreme_Sparse_Stand_Walk_Starts`
+- `PSD_Extreme_Sparse_Stand_Walk_Loops`
+- `PSD_Sparse_Stand_Walk_Pivots`
+- `PSD_Sparse_Stand_Walk_Stops`
+- `PSD_Extreme_Sparse_Stand_Run_Starts`
+- `PSD_Dense_Stand_Run_Loops`
+- `PSD_Sparse_Stand_Run_Pivots`
+- `PSD_Dense_Stand_Run_SpinTransition`
+- `PSD_Dense_Stand_Sprint_Starts`
+- `PSD_Dense_Stand_Sprint_Loops`
+- `PSD_Sparse_Stand_Sprint_Pivots`
+- `PSD_Dense_Jumps_Far`
+- `PSD_Extreme_Sparse_Jumps`
 
-| Row | IsStarting | IsPivoting | JustTraversed | JustLanded_Light | JustLanded_Heavy | Unknown | Target Result |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| 0 | True | Any | Any | False | False | Any | `PSD_Extreme_Sparse_Stand_Run_Starts` |
-| 1 | Any | Any | Any | False | False | Any | `PSD_Extreme_Sparse_Stand_Run_Loops` |
-| 2 | Any | True | Any | False | False | Any | `PSD_Sparse_Stand_Run_Pivots` |
-| 3 | Any | False | Any | Any | Any | True | `PSD_Dense_Stand_Run_SpinTransition` |
+## PIE Checks
 
-### [Sub-Table #5] Stand Sprint
-- Offset Range: 24362 ~ 26778
-- Row Count: 3
-
-| Row | IsStarting | IsPivoting | JustLanded_Light | JustLanded_Heavy | Target Result |
-| --- | --- | --- | --- | --- | --- |
-| 0 | True | False | Any | Any | `PSD_Extreme_Sparse_Stand_Sprint_Starts` |
-| 1 | Any | False | Any | Any | `PSD_Extreme_Sparse_Stand_Sprint_Loops` |
-| 2 | Any | True | Any | Any | `PSD_Sparse_Stand_Sprint_Pivots` |
-
-### [Sub-Table #6] Stand Walks
-- Offset Range: 26778 ~ 30285
-- Row Count: 4
-
-| Row | IsStarting | IsPivoting | JustTraversed | JustLanded_Light | JustLanded_Heavy | Unknown | Target Result |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| 0 | True | Any | Any | False | False | Any | `PSD_Extreme_Sparse_Stand_Walk_Starts` |
-| 1 | Any | Any | Any | False | False | Any | `PSD_Extreme_Sparse_Stand_Walk_Loops` |
-| 2 | Any | True | Any | False | False | Any | `PSD_Sparse_Stand_Walk_Pivots` |
-| 3 | Any | Any | Any | Any | Any | True | `PSD_Dense_Stand_Walk_SpinTransition` |
+- Crouch idle should select `PSD_Dense_Crouch_Idles`.
+- Crouch turn-in-place should select `PSD_Dense_Crouch_TurnInPlace`.
+- Crouch moving should select pivot, start, stop, or loop by `IsPivoting`, `IsStarting`, and `IsStopping`.
+- If crouch stopping is missed in PIE, test moving the stop row above the start row.

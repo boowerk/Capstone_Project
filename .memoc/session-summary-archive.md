@@ -357,3 +357,37 @@ _Current open tasks only._
 
 ## Resume
 - LiveCoding succeeded after released-input hold patch. Git status/diff over LFS assets can fail with `.git/lfs/tmp` access denied.
+
+## [2026-06-06T06:43:32] archived summary (1959B)
+
+﻿---
+memoc: true
+type: state
+scope: project-memory
+updated: 2026-06-06T22:10:00+09:00
+status: active
+tags: [memoc, memoc/state]
+---
+# Session Summary
+
+Last: 2026-06-06T22:10:00+09:00
+
+## Status
+- No UBT/build while the editor is open; use Live Coding.
+- Reworked Primary/Sword_Light VFX toward SkillData VisualCues: no direct Niagara notifies; Primary resolves trail/burst from SkillData and attaches to `hand_r`.
+- After editor reload, set `GA_Primary.DefaultSkillData` to `/Game/GAS_Pattern/AbilitySystem/SkillData/DA_Skill_Primary`; VisualCues[0]=`GameplayCue.Ability.Trail.Magic` -> `NS_ArrowTrail_Magic`, [1]=`GameplayCue.Ability.Burst.Magic` -> `NS_Free_Magic_Slash`.
+- Moved VFX GameplayCue tags into native `GP_Tags.h/.cpp` (`GPTags::GameplayCue::Ability::*`) and removed config-only GameplayCue/VFX tag list entries.
+- Added `DefaultSkillData` fallback to `UGP_SkillBase` for always-granted abilities without SourceObject.
+- Added usage doc: `Project_Eden/Docs/SkillVisualCueStructure.md`.
+- Matador boss GAS pass: common enemy/boss area hits now pass ability SkillData into damage application; bull charge now writes explicit SetByCaller damage/toughness values before sending player hit-react.
+- `UEFNSourceMesh` remains the source animation mesh and `CharacterMesh0` stays attached under it.
+- Current work is motion matching, crouch routing, chooser DB application, and root-motion extraction tuning.
+
+## Open Tasks
+- PIE validate crouch locomotion, primary crouch/sprint interaction, and running jump transition.
+- Live Coding compile and editor-check the latest root-motion extraction changes.
+- PIE validate Primary Sword_Light VFX.
+- Live Coding compile and PIE validate Matador damage reduction, groggy full-damage window, decoy damage forwarding, and bull charge player/decoy collisions.
+
+## Resume
+- Start with `02-current-project-state.md` and `04-handoff.md`, then verify the live AnimBP / chooser path in PIE.

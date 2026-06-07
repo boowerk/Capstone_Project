@@ -61,14 +61,30 @@ void UGP_Dash::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FG
 {
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
-	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
+	AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo());
+	if (!IsValid(PC))
 	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
 
-	AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo());
-	if (!IsValid(PC))
+	const FVector InputDirection = PC->GetLastMovementInputVector();
+	if (!InputDirection.IsNearlyZero())
+	{
+		const FRotator InputBasisRotation = PC->GetController()
+			? FRotator(0.0f, PC->GetController()->GetControlRotation().Yaw, 0.0f)
+			: PC->GetActorRotation();
+		const FVector LocalInputDirection = InputBasisRotation.UnrotateVector(InputDirection);
+		const FVector2D LocalInputDirection2D(LocalInputDirection.X, LocalInputDirection.Y);
+		const FVector2D LocalInputNormal = LocalInputDirection2D.GetSafeNormal();
+		if (LocalInputNormal.X < 0.5f)
+		{
+			EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+			return;
+		}
+	}
+
+	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
 	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;

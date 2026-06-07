@@ -67,6 +67,8 @@ namespace GPTags
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Utility_Buff, "GPTags.Ability.Enemy.Utility_Buff", "적 자가 버프");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Utility_BossSummon, "GPTags.Ability.Enemy.Utility_BossSummon", "보스 소환 패턴");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Utility_BossPhaseShift, "GPTags.Ability.Enemy.Utility_BossPhaseShift", "보스 페이즈 전환 패턴");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Utility_MatadorBullPattern, "GPTags.Ability.Enemy.Utility_MatadorBullPattern", "마타도르 황소 돌진 패턴");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Utility_MatadorGroggy, "GPTags.Ability.Enemy.Utility_MatadorGroggy", "마타도르 그로기/회복 패턴");
             
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Death, "GPTags.Ability.Enemy.Death", "적 사망 처리");
         }
@@ -119,6 +121,8 @@ namespace GPTags
             {
                 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Aggroed, "GPTags.State.Status.Enemy.Aggroed", "어그로 끌린 상태");
                 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Enraged, "GPTags.State.Status.Enemy.Enraged", "광폭화 상태");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(MatadorGuarded, "GPTags.State.Status.Enemy.MatadorGuarded", "마타도르 보스 기본 피해 감쇠 상태");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(Groggy, "GPTags.State.Status.Enemy.Groggy", "적 그로기 상태");
             }
         }
         namespace Movement
@@ -174,6 +178,15 @@ namespace GPTags
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Lux, "GPTags.Tech.Element.Lux", "이번 판 빛 테크");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Chaos, "GPTags.Tech.Element.Chaos", "이번 판 혼돈 테크");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Brute, "GPTags.Tech.Element.Brute", "이번 판 강타 테크");
+        }
+    }
+
+    namespace GameplayCue
+    {
+        namespace Ability
+        {
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Trail_Magic, "GameplayCue.Ability.Trail.Magic", "Ability magic trail VFX cue");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Burst_Magic, "GameplayCue.Ability.Burst.Magic", "Ability magic burst VFX cue");
         }
     }
 

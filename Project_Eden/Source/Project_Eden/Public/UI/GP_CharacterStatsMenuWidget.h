@@ -11,6 +11,8 @@ class UAbilitySystemComponent;
 class UAttributeSet;
 class UGP_AttributeSet;
 class UTextBlock;
+class UWidget;
+class UWidgetSwitcher;
 
 UENUM(BlueprintType)
 enum class EGPCharacterMenuTab : uint8
@@ -61,6 +63,8 @@ enum class EGPCharacterStatTextFormat : uint8
 	ValueAndMax
 };
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FGPCharacterMenuTabChangedSignature, EGPCharacterMenuTab, NewTab);
+
 USTRUCT(BlueprintType)
 struct FGPCharacterStatTextBinding
 {
@@ -104,6 +108,14 @@ struct FGPResolvedCharacterStatTextBinding
 	TWeakObjectPtr<UTextBlock> TextBlock;
 };
 
+struct FGPCharacterMenuTabWidgetBinding
+{
+	EGPCharacterMenuTab Tab = EGPCharacterMenuTab::Attributes;
+	TWeakObjectPtr<UWidget> TabWidget;
+	TWeakObjectPtr<UWidget> ContentWidget;
+	TWeakObjectPtr<UWidget> SelectedIndicatorWidget;
+};
+
 UCLASS(Blueprintable)
 class PROJECT_EDEN_API UGP_CharacterStatsMenuWidget : public UUserWidget
 {
@@ -127,6 +139,27 @@ public:
 	UFUNCTION(BlueprintPure, Category = "GAS|Menu")
 	EGPCharacterMenuTab GetActiveTab() const { return ActiveTab; }
 
+	UFUNCTION(BlueprintCallable, Category = "GAS|Menu|Tabs")
+	void SelectMapTab();
+
+	UFUNCTION(BlueprintCallable, Category = "GAS|Menu|Tabs")
+	void SelectJournalTab();
+
+	UFUNCTION(BlueprintCallable, Category = "GAS|Menu|Tabs")
+	void SelectItemsTab();
+
+	UFUNCTION(BlueprintCallable, Category = "GAS|Menu|Tabs")
+	void SelectAttributesTab();
+
+	UFUNCTION(BlueprintCallable, Category = "GAS|Menu|Tabs")
+	void SelectGearTab();
+
+	UFUNCTION(BlueprintCallable, Category = "GAS|Menu|Tabs")
+	void SelectAbilitiesTab();
+
+	UFUNCTION(BlueprintCallable, Category = "GAS|Menu|Tabs")
+	void SelectSystemTab();
+
 	UFUNCTION(BlueprintCallable, Category = "GAS|Menu")
 	void RefreshAttributeSnapshots();
 
@@ -139,9 +172,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "GAS|Menu|Text")
 	void RefreshStatTextBlocks();
 
+	UPROPERTY(BlueprintAssignable, Category = "GAS|Menu")
+	FGPCharacterMenuTabChangedSignature OnActiveTabChanged;
+
 protected:
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
+	virtual FReply NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "GAS|Menu")
 	void BP_OnMenuBound(AGP_BaseCharacter* Character);
@@ -168,11 +205,31 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "GAS|Menu|Text", meta = (AllowPrivateAccess = "true"))
 	TArray<FGPCharacterStatTextBinding> StatTextBindings;
 
+	// Lets text or border based tabs behave like buttons without forcing the UMG hierarchy to use UButton.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "GAS|Menu|Tabs", meta = (AllowPrivateAccess = "true"))
+	bool bEnableNativeTabHitTesting = true;
+
+	// C++ drives simple selected/unselected tab visuals; detailed styling can still stay in the Widget Blueprint.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "GAS|Menu|Tabs", meta = (AllowPrivateAccess = "true"))
+	bool bEnableNativeTabOpacity = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "GAS|Menu|Tabs", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", ClampMax = "1.0"))
+	float ActiveTabRenderOpacity = 1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "GAS|Menu|Tabs", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", ClampMax = "1.0"))
+	float InactiveTabRenderOpacity = 0.55f;
+
+	// Name candidates for an optional UWidgetSwitcher that owns Map/Journal/Item/Attributes/Gear/Abilities/System pages.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "GAS|Menu|Tabs", meta = (AllowPrivateAccess = "true"))
+	TArray<FName> ContentSwitcherNames;
+
 	TWeakObjectPtr<AGP_BaseCharacter> BoundCharacter;
 	TWeakObjectPtr<UAbilitySystemComponent> BoundASC;
 	TWeakObjectPtr<UGP_AttributeSet> BoundAttributeSet;
 	TArray<FGPCharacterStatsMenuAttributeBinding> AttributeBindings;
 	TArray<FGPResolvedCharacterStatTextBinding> ResolvedTextBindings;
+	TArray<FGPCharacterMenuTabWidgetBinding> NativeTabBindings;
+	TWeakObjectPtr<UWidgetSwitcher> TabContentSwitcher;
 	TArray<FGPCharacterStatSnapshot> AttributeSnapshots;
 	EGPCharacterMenuTab ActiveTab = EGPCharacterMenuTab::Attributes;
 
@@ -190,6 +247,21 @@ private:
 	void RebuildStatTextBindings();
 	UTextBlock* ResolveStatTextBlock(const FName& WidgetName) const;
 	UTextBlock* FindTextBlockByNormalizedName(const FName& WidgetName) const;
+	void RebuildNativeTabBindings();
+	void BindNativeTabButton(UWidget* TabWidget, EGPCharacterMenuTab Tab);
+	void ApplyActiveTabState();
+	void ApplyTabVisualState();
+	bool TryActivateSwitcherTab(EGPCharacterMenuTab NewTab) const;
+	void ApplyNamedContentVisibility() const;
+	bool FindTabAtScreenPosition(const FVector2D& ScreenPosition, EGPCharacterMenuTab& OutTab) const;
+	UWidget* ResolveWidgetByNames(const TArray<FName>& WidgetNames) const;
+	UWidget* FindWidgetByNormalizedName(const FName& WidgetName) const;
+	UWidgetSwitcher* ResolveContentSwitcher() const;
 	static FString NormalizeWidgetLookupName(const FName& Name);
 	static FText FormatStatText(const FGPCharacterStatSnapshot& Snapshot, EGPCharacterStatTextFormat Format);
+	static TArray<EGPCharacterMenuTab> GetMenuTabOrder();
+	static TArray<FName> GetTabWidgetCandidateNames(EGPCharacterMenuTab Tab);
+	static TArray<FName> GetContentWidgetCandidateNames(EGPCharacterMenuTab Tab);
+	static TArray<FName> GetSelectedIndicatorCandidateNames(EGPCharacterMenuTab Tab);
+	static FText GetMenuTabDisplayName(EGPCharacterMenuTab Tab);
 };

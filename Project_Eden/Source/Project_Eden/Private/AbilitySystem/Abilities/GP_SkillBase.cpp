@@ -108,7 +108,12 @@ UGP_SkillData* UGP_SkillBase::GetSkillDataFromSpec(const FGameplayAbilitySpecHan
 	}
 
 	const FGameplayAbilitySpec* Spec = ASC->FindAbilitySpecFromHandle(Handle);
-	return Spec ? Cast<UGP_SkillData>(Spec->SourceObject.Get()) : nullptr;
+	if (UGP_SkillData* SpecSkillData = Spec ? Cast<UGP_SkillData>(Spec->SourceObject.Get()) : nullptr)
+	{
+		return SpecSkillData;
+	}
+
+	return DefaultSkillData;
 }
 
 FGameplayTag UGP_SkillBase::GetCurrentTechElementTag(const FGameplayAbilityActorInfo* ActorInfo) const
@@ -271,11 +276,44 @@ UNiagaraSystem* UGP_SkillBase::GetSkillAugmentActiveVFXOverride(const UGP_SkillD
 		: nullptr;
 }
 
-TSubclassOf<AActor> UGP_SkillBase::GetSkillVisualActorClass(const UGP_SkillData* SkillData, TSubclassOf<AActor> FallbackVisualActorClass, FGameplayTag ElementTag) const
+TSubclassOf<AActor> UGP_SkillBase::GetSkillVisualActorClass(const UGP_SkillData* SkillData, TSubclassOf<AActor> FallbackVisualActorClass, FGameplayTag ElementTag, FGameplayTag CueTag) const
 {
 	if (const TSubclassOf<AActor> AugmentOverride = GetSkillAugmentImpactVisualActorOverride(SkillData))
 	{
 		return AugmentOverride;
+	}
+
+	if (SkillData)
+	{
+		TSubclassOf<AActor> BestVisualActorClass;
+		int32 BestScore = INDEX_NONE;
+
+		for (const FGP_SkillVisualCueEntry& Entry : SkillData->VisualCues)
+		{
+			if (Entry.VisualType != EGP_SkillVisualType::Actor || !Entry.VisualActorClass)
+			{
+				continue;
+			}
+
+			const bool bCueMatches = !Entry.CueTag.IsValid() || (CueTag.IsValid() && Entry.CueTag.MatchesTagExact(CueTag));
+			const bool bElementMatches = !Entry.ElementTag.IsValid() || (ElementTag.IsValid() && Entry.ElementTag.MatchesTagExact(ElementTag));
+			if (!bCueMatches || !bElementMatches)
+			{
+				continue;
+			}
+
+			const int32 Score = (Entry.CueTag.IsValid() ? 2 : 0) + (Entry.ElementTag.IsValid() ? 1 : 0);
+			if (Score > BestScore)
+			{
+				BestScore = Score;
+				BestVisualActorClass = Entry.VisualActorClass;
+			}
+		}
+
+		if (BestVisualActorClass)
+		{
+			return BestVisualActorClass;
+		}
 	}
 
 	if (SkillData && ElementTag.IsValid())
@@ -323,6 +361,41 @@ TSubclassOf<AActor> UGP_SkillBase::GetSkillSpawnActorClass(const UGP_SkillData* 
 	return FallbackActorClass;
 }
 
+UNiagaraSystem* UGP_SkillBase::GetSkillNiagaraSystem(const UGP_SkillData* SkillData, FGameplayTag ElementTag, FGameplayTag CueTag) const
+{
+	if (!SkillData)
+	{
+		return nullptr;
+	}
+
+	UNiagaraSystem* BestNiagaraSystem = nullptr;
+	int32 BestScore = INDEX_NONE;
+
+	for (const FGP_SkillVisualCueEntry& Entry : SkillData->VisualCues)
+	{
+		if (Entry.VisualType != EGP_SkillVisualType::Niagara || !Entry.NiagaraSystem)
+		{
+			continue;
+		}
+
+		const bool bCueMatches = !Entry.CueTag.IsValid() || (CueTag.IsValid() && Entry.CueTag.MatchesTagExact(CueTag));
+		const bool bElementMatches = !Entry.ElementTag.IsValid() || (ElementTag.IsValid() && Entry.ElementTag.MatchesTagExact(ElementTag));
+		if (!bCueMatches || !bElementMatches)
+		{
+			continue;
+		}
+
+		const int32 Score = (Entry.CueTag.IsValid() ? 2 : 0) + (Entry.ElementTag.IsValid() ? 1 : 0);
+		if (Score > BestScore)
+		{
+			BestScore = Score;
+			BestNiagaraSystem = Entry.NiagaraSystem;
+		}
+	}
+
+	return BestNiagaraSystem;
+}
+
 UNiagaraSystem* UGP_SkillBase::GetProjectileVisualSystem(const UGP_SkillData* SkillData, FGameplayTag ElementTag) const
 {
 	if (!SkillData)
@@ -333,6 +406,11 @@ UNiagaraSystem* UGP_SkillBase::GetProjectileVisualSystem(const UGP_SkillData* Sk
 	if (UNiagaraSystem* AugmentOverride = GetSkillAugmentActiveVFXOverride(SkillData))
 	{
 		return AugmentOverride;
+	}
+
+	if (UNiagaraSystem* NiagaraSystem = GetSkillNiagaraSystem(SkillData, ElementTag))
+	{
+		return NiagaraSystem;
 	}
 
 	if (ElementTag.IsValid())
@@ -410,11 +488,13 @@ void UGP_SkillBase::PerformAreaAttack()
 
 	if (HasAuthority(&CurrentActivationInfo) && ResolvedDamageEffectClass)
 	{
+		UGP_SkillData* SkillData = GetSkillDataFromSpec(CurrentSpecHandle, CurrentActorInfo);
 		UGP_BlueprintLibrary::ApplyGameplayEffectToActors(
 			Avatar,
 			HitActors,
 			ResolvedDamageEffectClass,
-			GetAbilityLevel());
+			GetAbilityLevel(),
+			SkillData);
 	}
 
 	// 3. (옵션) 피격 반응 태그 전송 등 공통 로직 처리

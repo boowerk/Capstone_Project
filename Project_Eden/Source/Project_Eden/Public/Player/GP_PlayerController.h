@@ -28,6 +28,8 @@ class PROJECT_EDEN_API AGP_PlayerController : public APlayerController
 public:
 	AGP_PlayerController();
 	FVector2D GetCurrentMoveInput() const { return CurrentMoveInput; }
+	bool ShouldResumeHeldSprint() const { return !bIsSprintToggle && bSprintInputHeld; }
+	bool IsCrouchInputHeld() const { return bCrouchInputHeld; }
 
 	UFUNCTION(BlueprintCallable, Category = "UI|Augment")
 	bool RequestOpenAugmentSelect();
@@ -58,6 +60,9 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Movement")
 	TObjectPtr<UInputAction> JumpAction;
+
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Movement")
+	TObjectPtr<UInputAction> CrouchAction;
 
 	// --- Abilities 관련 ---
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|Abilities")
@@ -149,11 +154,14 @@ private:
 
 	float TargetMaxWalkSpeed = 0.0f;
 	bool bHasTargetMaxWalkSpeed = false;
-
+	bool bSprintInputHeld = false;
+	bool bCrouchInputHeld = false;
 	void Input_Move(const FInputActionValue& Value);
 	void Input_Look(const FInputActionValue& Value);
 	void Input_Jump();
 	void Input_StopJump();
+	void Input_CrouchPressed();
+	void Input_CrouchReleased();
 
 	// --- 상태 제어 (State) ---
 	void Input_ToggleSprint();

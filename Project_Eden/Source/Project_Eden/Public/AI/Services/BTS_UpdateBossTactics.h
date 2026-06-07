@@ -53,6 +53,28 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "AI|Boss", meta = (ClampMin = "0.0", Units = "s"))
 	float SummonWindow = 1.5f;
 
+	// Matador bull pattern opens on a rhythm like other boss specials, but only while the state component is not groggy.
+	UPROPERTY(EditAnywhere, Category = "AI|Boss|Matador", meta = (ClampMin = "0.1", Units = "s"))
+	float BullPatternInterval = 6.0f;
+
+	UPROPERTY(EditAnywhere, Category = "AI|Boss|Matador", meta = (ClampMin = "0.0", Units = "s"))
+	float BullPatternWindow = 3.0f;
+
+	UPROPERTY(EditAnywhere, Category = "AI|Boss|Matador", meta = (ClampMin = "0.0", Units = "cm"))
+	float BullPatternMinRange = 450.0f;
+
+	UPROPERTY(EditAnywhere, Category = "AI|Boss|Matador", meta = (ClampMin = "0.0", Units = "cm"))
+	float BullPatternMaxRange = 2400.0f;
+
+	UPROPERTY(EditAnywhere, Category = "AI|Boss|Matador", meta = (ClampMin = "0.0", Units = "cm"))
+	float PreferredHoverHeight = 650.0f;
+
+	UPROPERTY(EditAnywhere, Category = "AI|Boss|Matador", meta = (ClampMin = "0.0", Units = "cm"))
+	float PreferredAirRange = 1100.0f;
+
+	UPROPERTY(EditAnywhere, Category = "AI|Boss|Matador", meta = (ClampMin = "0.0", Units = "cm"))
+	float TeleportDistanceThreshold = 1800.0f;
+
 private:
 	void UpdateBossTactics(UBehaviorTreeComponent& OwnerComp) const;
 };

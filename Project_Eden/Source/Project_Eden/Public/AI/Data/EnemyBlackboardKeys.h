@@ -32,4 +32,14 @@ namespace EnemyBlackboardKeys
 	PROJECT_EDEN_API extern const FName bCanUseBossAreaAttack;
 	PROJECT_EDEN_API extern const FName bCanUseBossSweepAttack;
 	PROJECT_EDEN_API extern const FName bCanSummonAdds;
+	// Matador-specific keys are optional so existing boss Blackboard assets keep working unchanged.
+	PROJECT_EDEN_API extern const FName ChainBreakCount;
+	PROJECT_EDEN_API extern const FName bIsGroggy;
+	PROJECT_EDEN_API extern const FName bCanUseBullPattern;
+	PROJECT_EDEN_API extern const FName bBullPatternActive;
+	PROJECT_EDEN_API extern const FName DecoyActor;
+	PROJECT_EDEN_API extern const FName MainBossActor;
+	PROJECT_EDEN_API extern const FName PreferredHoverHeight;
+	PROJECT_EDEN_API extern const FName PreferredAirRange;
+	PROJECT_EDEN_API extern const FName bShouldTeleport;
 }

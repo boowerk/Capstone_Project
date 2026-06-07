@@ -42,6 +42,7 @@ public class Project_Eden : ModuleRules
 			{
 				"UnrealEd",
 				"AssetTools",
+				"AnimationDataController",
 				"AnimGraph",
 				"BlendStackEditor",
 				"BlueprintGraph",

@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "CoreMinimal.h"
 #include "Characters/GP_BaseCharacter.h"
@@ -34,8 +34,11 @@ public:
 	AGP_PlayerCharacter();
 	virtual ~AGP_PlayerCharacter() override;
 	virtual void BeginPlay() override;
+	virtual void PostInitializeComponents() override;
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void Landed(const FHitResult& Hit) override;
+	virtual void OnStartCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust) override;
+	virtual void OnEndCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	virtual void AddMovementInput(FVector WorldDirection, float ScaleValue, bool bForce = false) override;
 
@@ -54,10 +57,13 @@ public:
 	void StartSprinting();
 	void StopSprinting();
 	bool IsSprinting() const;
+	bool IsPrimaryAttackInProgress() const { return bPrimaryAttackInProgress; }
+	void SetPrimaryAttackInProgress(bool bInProgress);
 
 	bool TryPerformDash();
 	bool IsDashing() const;
 	bool IsLockOn() const { return bIsLockOn; }
+	bool AimPrimaryAttackAtBestTarget(float SearchRadius, float ForwardOffset, float Duration);
 
 	// =========================================================================
 	// 4. 화이트 보이드 API (White Void Transition)
@@ -102,9 +108,10 @@ public:
 	UPDA_CharacterAnimationSet* GetAnimationSet() const { return AnimationSet; }
 	UAnimInstance* GetUEFNSourceAnimInstance() const;
 
-	float PlayUEFNSourceFallbackMontage(UAnimMontage* Montage, float PlayRate = 1.0f);
+	float PlayUEFNSourceFallbackMontage(UAnimMontage* Montage, float PlayRate = 1.0f, float PreviousMontageBlendOutTime = 0.1f);
 	bool IsPlayingUEFNSourceFallbackMontage() const;
 	void StopUEFNSourceFallbackMontage(float BlendOutTime = 0.2f);
+	void ClearUEFNSourceFallbackMontageState();
 
 	void SetActionRootMotionInputCancelEnabled(bool bEnabled);
 	bool RequestActionRootMotionCancelIfMovementHeld();
@@ -113,6 +120,8 @@ public:
 	void BeginActionMotionTracking();
 	void StopActionMotionTracking();
 	void ApplyCurrentActionInertia();
+	void BeginPrimaryAttackMovementAssist(float SpeedRatio);
+	void StopPrimaryAttackMovementAssist();
 
 	FVector GetLastUEFNSourceRootMotionVelocity() const { return LastUEFNSourceRootMotionVelocity; }
 	FVector GetCurrentActionMotionVelocity() const { return CurrentActionMotionVelocity; }
@@ -120,7 +129,9 @@ public:
 	bool IsUsingPostActionAnimVelocity() const;
 
 	void SetActionLowerBodyMotionMatchBlendEnabled(bool bEnabled);
+	void SetActionLowerBodyMotionMatchBlendTargetAlpha(float TargetAlpha);
 	bool ShouldBlendActionLowerBodyToMotionMatching() const { return bBlendActionLowerBodyToMotionMatching; }
+	float GetActionLowerBodyMotionMatchBlendTargetAlpha() const { return ActionLowerBodyMotionMatchBlendTargetAlpha; }
 
 	FOnActionRootMotionCancelInput OnActionRootMotionCancelInput;
 
@@ -152,6 +163,7 @@ protected:
 	void OnFixedTagChanged(const FGameplayTag CallbackTag, int32 NewCount);
 	void ApplyMovementSpeedFromAnimationSet();
 	void ApplyRetargetVisualScaleFromAnimationSet();
+	void UpdateCameraMotion(float DeltaSeconds);
 	void RefreshCurrentMaxWalkSpeed();
 	void PushMovementSpeedScaleRatioToAnimInstances();
 
@@ -166,6 +178,12 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|LockOn")
 	float LockOnRotationInterpSpeed = 10.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Primary Attack", meta = (ClampMin = "0.0"))
+	float PrimaryAttackAutoFacingRotationInterpSpeed = 18.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Primary Attack", meta = (ClampMin = "0.0"))
+	float PrimaryAttackAutoFacingCameraInterpSpeed = 8.0f;
 
 	// =========================================================================
 	// 11. 장비 & 무기 관련 설정 (Equipment & Weapon Settings)
@@ -215,6 +233,27 @@ private:
 
 	UPROPERTY(VisibleAnywhere, Category = "Camera")
 	TObjectPtr<UCameraComponent> FollowCamera;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|Motion", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float IdleCameraArmLength = 340.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|Motion", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float NormalCameraArmLength = 380.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|Motion", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float SprintCameraArmLength = 460.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|Motion", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float CameraArmLengthInterpSpeed = 6.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|Motion", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float IdleCameraSpeedThreshold = 15.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|Composition", meta = (AllowPrivateAccess = "true"))
+	FVector CameraSocketOffset = FVector(0.0f, 65.0f, 20.0f);
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|Composition", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float CameraSocketOffsetInterpSpeed = 8.0f;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Animation|Retarget", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USkeletalMeshComponent> UEFNSourceMesh;
@@ -270,6 +309,11 @@ private:
 
 	FTimerHandle RestoreLagTimerHandle;
 
+	UPROPERTY(Transient)
+	TObjectPtr<AActor> PrimaryAttackAutoFacingTarget;
+
+	float PrimaryAttackAutoFacingEndTime = 0.0f;
+
 	UFUNCTION(Server, Reliable)
 	void ServerSetWhiteVoid(bool bNewInWhiteVoid);
 
@@ -284,6 +328,8 @@ private:
 	void EnsureWhiteVoidSetExists();
 	void ResetMotionTrajectoryAfterWhiteVoidTransition();
 	void SuppressMotionMatchingForWhiteVoidTransition() const;
+	AActor* FindBestPrimaryAttackTarget(float SearchRadius, float ForwardOffset) const;
+	void UpdatePrimaryAttackAutoFacing(float DeltaSeconds);
 
 	// =========================================================================
 	// 15. 액션 루트 모션, 관성 & 몽타주 트래킹 (Action Motion Tracking)
@@ -297,6 +343,7 @@ private:
 
 	void UpdateActionMotionTracking(float DeltaSeconds);
 	void UpdateActionCarryVelocity(float DeltaSeconds);
+	void UpdatePrimaryAttackMovementAssist(float DeltaSeconds);
 	void FlushActionMotionTracking();
 	FVector GetCurrentActionInertiaVelocity() const;
 
@@ -306,6 +353,7 @@ private:
 	bool bApplyUEFNSourceFallbackRootMotion = false;
 	bool bActionRootMotionInputCancelEnabled = false;
 	bool bBlendActionLowerBodyToMotionMatching = false;
+	float ActionLowerBodyMotionMatchBlendTargetAlpha = 1.0f;
 	bool bActionRootMotionCancelledByMovementInput = false;
 	FVector LastActionRootMotionCancelMovementDirection = FVector::ZeroVector;
 	float LastActionRootMotionCancelMovementScale = 0.0f;
@@ -339,6 +387,11 @@ private:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Action Inertia", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
 	float PostActionAnimVelocityHoldTime = 0.35f;
+
+	bool bPrimaryAttackMovementAssistEnabled = false;
+	float PrimaryAttackMovementAssistSpeedRatio = 0.35f;
+	bool bPrimaryAttackInProgress = false;
+	float LastPrimaryAttackMovementLogTime = -1000.0f;
 
 	bool bTrackActionMotion = false;
 	FVector LastActionMotionSampleLocation = FVector::ZeroVector;

@@ -28,4 +28,13 @@ namespace EnemyBlackboardKeys
 	const FName bCanUseBossAreaAttack(TEXT("bCanUseBossAreaAttack"));
 	const FName bCanUseBossSweepAttack(TEXT("bCanUseBossSweepAttack"));
 	const FName bCanSummonAdds(TEXT("bCanSummonAdds"));
+	const FName ChainBreakCount(TEXT("ChainBreakCount"));
+	const FName bIsGroggy(TEXT("bIsGroggy"));
+	const FName bCanUseBullPattern(TEXT("bCanUseBullPattern"));
+	const FName bBullPatternActive(TEXT("bBullPatternActive"));
+	const FName DecoyActor(TEXT("DecoyActor"));
+	const FName MainBossActor(TEXT("MainBossActor"));
+	const FName PreferredHoverHeight(TEXT("PreferredHoverHeight"));
+	const FName PreferredAirRange(TEXT("PreferredAirRange"));
+	const FName bShouldTeleport(TEXT("bShouldTeleport"));
 }

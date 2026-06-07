@@ -8,7 +8,10 @@
 #include "BehaviorTree/BehaviorTreeComponent.h"
 #include "BehaviorTree/BehaviorTreeTypes.h"
 #include "BehaviorTree/BlackboardComponent.h"
+#include "Characters/GP_MatadorBossStateComponent.h"
+#include "Characters/GP_MatadorMageBossCharacter.h"
 #include "GameFramework/Actor.h"
+#include "GameFramework/Pawn.h"
 
 namespace BTS_UpdateBossTactics_Internal
 {
@@ -30,6 +33,22 @@ namespace BTS_UpdateBossTactics_Internal
 		if (HasBlackboardKey(BlackboardComponent, KeyName))
 		{
 			BlackboardComponent->SetValueAsInt(KeyName, Value);
+		}
+	}
+
+	void SetOptionalBlackboardFloat(UBlackboardComponent* BlackboardComponent, const FName& KeyName, float Value)
+	{
+		if (HasBlackboardKey(BlackboardComponent, KeyName))
+		{
+			BlackboardComponent->SetValueAsFloat(KeyName, Value);
+		}
+	}
+
+	void SetOptionalBlackboardObject(UBlackboardComponent* BlackboardComponent, const FName& KeyName, UObject* Value)
+	{
+		if (HasBlackboardKey(BlackboardComponent, KeyName))
+		{
+			BlackboardComponent->SetValueAsObject(KeyName, Value);
 		}
 	}
 
@@ -99,7 +118,10 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 	const int32 BossPhase = HealthRatio <= PhaseThreeHealthRatio ? 3 : (HealthRatio <= PhaseTwoHealthRatio ? 2 : 1);
 	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardInt(BlackboardComponent, EnemyBlackboardKeys::BossPhase, BossPhase);
 
-	const bool bHasTarget = IsValid(Cast<AActor>(BlackboardComponent->GetValueAsObject(EnemyBlackboardKeys::TargetActor)));
+	AAIController* AIController = OwnerComp.GetAIOwner();
+	APawn* ControlledPawn = IsValid(AIController) ? AIController->GetPawn() : nullptr;
+	AActor* TargetActor = Cast<AActor>(BlackboardComponent->GetValueAsObject(EnemyBlackboardKeys::TargetActor));
+	const bool bHasTarget = IsValid(TargetActor);
 	const bool bReturningHome = BTS_UpdateBossTactics_Internal::GetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldReturnHome);
 	const bool bShouldReposition = BTS_UpdateBossTactics_Internal::GetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldReposition);
 	const bool bHasLineOfSight = BTS_UpdateBossTactics_Internal::GetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bHasLineOfSight);
@@ -139,7 +161,62 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 		&& (bBasicAttackCanReach || bSweepAttackCanReach || bAreaAttackCanReach)
 		&& BTS_UpdateBossTactics_Internal::IsPatternWindowOpen(WorldTimeSeconds, SummonInterval, SummonWindow);
 
-	if (IsValid(EnemyAIController) && EnemyAIController->IsBossRuntimeEvaluationTestCycleActive() && bHasTarget && !bReturningHome && bHasLineOfSight)
+	const UGP_MatadorBossStateComponent* MatadorStateComponent = IsValid(ControlledPawn)
+		? ControlledPawn->FindComponentByClass<UGP_MatadorBossStateComponent>()
+		: nullptr;
+	const AGP_MatadorMageBossCharacter* MatadorBoss = Cast<AGP_MatadorMageBossCharacter>(ControlledPawn);
+	const int32 ChainBreakCount = IsValid(MatadorStateComponent) ? MatadorStateComponent->GetChainBreakCount() : 0;
+	const int32 ChainBreakTarget = IsValid(MatadorStateComponent) ? MatadorStateComponent->GetChainBreakTarget() : 3;
+	const bool bMatadorGroggy = IsValid(MatadorStateComponent) && MatadorStateComponent->IsGroggy();
+	const bool bBullPatternActive = IsValid(MatadorStateComponent) && IsValid(MatadorStateComponent->GetActiveBullActor());
+	const float MatadorPreferredHoverHeight = IsValid(MatadorBoss) ? MatadorBoss->GetPreferredHoverHeight() : PreferredHoverHeight;
+	const float MatadorPreferredAirRange = IsValid(MatadorBoss) ? MatadorBoss->GetPreferredAirRange() : PreferredAirRange;
+	const bool bIsMatadorBoss = IsValid(MatadorBoss);
+	const bool bBullRangeAllowed = DistanceToTarget >= BullPatternMinRange && DistanceToTarget <= BullPatternMaxRange;
+	const bool bCanUseBullPattern = IsValid(MatadorStateComponent)
+		&& bHasTarget
+		&& !bReturningHome
+		&& !bShouldPhaseTransition
+		&& !bMatadorGroggy
+		&& !bBullPatternActive
+		&& (bHasLineOfSight || bIsMatadorBoss)
+		&& bBullRangeAllowed
+		&& BTS_UpdateBossTactics_Internal::IsPatternWindowOpen(WorldTimeSeconds, BullPatternInterval, BullPatternWindow);
+	const bool bCanTriggerMatadorGroggy = IsValid(MatadorStateComponent) && ChainBreakCount >= ChainBreakTarget && !bMatadorGroggy;
+	const bool bShouldTeleport = IsValid(MatadorBoss) && bHasTarget && !bReturningHome && MatadorBoss->ShouldTeleportForMatador(DistanceToTarget);
+	bool bMatadorForceRangeReposition = false;
+
+	if (bMatadorGroggy)
+	{
+		// Groggy makes the boss vulnerable; suppress normal attack requests until the state component recovers it.
+		bShouldPhaseTransition = false;
+		bCanUseHeavyAttack = false;
+		bCanUseAreaAttack = false;
+		bCanUseSweepAttack = false;
+		bCanSummonAdds = false;
+	}
+
+	if (bIsMatadorBoss && !bMatadorGroggy)
+	{
+		// Matador stays mage-like at range and uses bull/decoy instead of generic melee spam.
+		bCanUseHeavyAttack = false;
+		bCanUseSweepAttack = false;
+		bCanSummonAdds = false;
+		bCanUseAreaAttack = bHasTarget
+			&& !bReturningHome
+			&& !bShouldPhaseTransition
+			&& bHasLineOfSight
+			&& DistanceToTarget >= MatadorPreferredAirRange * 0.55f
+			&& bAreaAttackCanReach
+			&& BTS_UpdateBossTactics_Internal::IsPatternWindowOpen(WorldTimeSeconds, AreaAttackInterval, AreaAttackWindow);
+
+		if (!bCanUseBullPattern && DistanceToTarget < MatadorPreferredAirRange * 0.75f)
+		{
+			bMatadorForceRangeReposition = true;
+		}
+	}
+
+	if (!bMatadorGroggy && IsValid(EnemyAIController) && EnemyAIController->IsBossRuntimeEvaluationTestCycleActive() && bHasTarget && !bReturningHome && bHasLineOfSight)
 	{
 		const bool bModePrefersHold = EnemyMode == FEnemyLLMEvaluationParser::ToBlackboardName(EEnemyMode::Hold);
 		const bool bTestAreaWindow = bModePrefersHold && PreferredRange <= 250.0f;
@@ -151,9 +228,16 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 		bCanSummonAdds = EnemyMode == FEnemyLLMEvaluationParser::ToBlackboardName(EEnemyMode::Retreat) && (bBasicAttackCanReach || bSweepAttackCanReach || bAreaAttackCanReach);
 	}
 
-	const bool bBossPatternRequestsAttack = bShouldPhaseTransition || bCanSummonAdds || bCanUseAreaAttack || bCanUseSweepAttack || bCanUseHeavyAttack;
+	const bool bBossPatternRequestsAttack = bShouldPhaseTransition || bCanTriggerMatadorGroggy || bCanUseBullPattern || bCanSummonAdds || bCanUseAreaAttack || bCanUseSweepAttack || bCanUseHeavyAttack;
 
-	if (bBossPatternRequestsAttack)
+	if (bMatadorForceRangeReposition)
+	{
+		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanAttack, false);
+		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldRetreat, true);
+		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldReposition, true);
+		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldChase, false);
+	}
+	else if (bBossPatternRequestsAttack)
 	{
 		// 기존 공용 BT의 공격 분기를 그대로 타도록, 보스 특수 패턴이 준비된 순간에는 이동/후퇴 분기보다 공격 분기를 우선시한다.
 		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanAttack, true);
@@ -174,4 +258,13 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossAreaAttack, bCanUseAreaAttack);
 	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossSweepAttack, bCanUseSweepAttack);
 	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanSummonAdds, bCanSummonAdds);
+	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardInt(BlackboardComponent, EnemyBlackboardKeys::ChainBreakCount, ChainBreakCount);
+	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bIsGroggy, bMatadorGroggy);
+	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBullPattern, bCanUseBullPattern);
+	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bBullPatternActive, bBullPatternActive);
+	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardObject(BlackboardComponent, EnemyBlackboardKeys::DecoyActor, IsValid(MatadorStateComponent) ? MatadorStateComponent->GetDecoyActor() : nullptr);
+	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardObject(BlackboardComponent, EnemyBlackboardKeys::MainBossActor, IsValid(MatadorStateComponent) ? MatadorStateComponent->GetMainBossActor() : ControlledPawn);
+	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardFloat(BlackboardComponent, EnemyBlackboardKeys::PreferredHoverHeight, MatadorPreferredHoverHeight);
+	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardFloat(BlackboardComponent, EnemyBlackboardKeys::PreferredAirRange, MatadorPreferredAirRange);
+	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldTeleport, bShouldTeleport);
 }

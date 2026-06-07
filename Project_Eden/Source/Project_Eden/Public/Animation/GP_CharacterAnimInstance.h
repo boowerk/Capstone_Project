@@ -30,14 +30,6 @@ enum class ESourceMotionMatchState : uint8
 };
 
 UENUM(BlueprintType)
-enum class EMMDatabaseLOD : uint8
-{
-	Dense = 0,
-	Sparse = 1,
-	ExtremeSparse = 2
-};
-
-UENUM(BlueprintType)
 enum class E_MovementMode : uint8
 {
 	Grounded = 0,
@@ -103,8 +95,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "MotionMatching|State")
 	float GetTimeSinceTurnInPlaceStarted() const { return TimeSinceTurnInPlaceStarted; }
 
-	UFUNCTION(BlueprintCallable, Category = "MotionMatching", meta = (BlueprintThreadSafe))
-	void ApplyRuntimeDatabaseToMotionMatchingNode(const FAnimUpdateContext& Context, const FAnimNodeReference& Node);
+
 
 protected:
 	/** 캐릭터별 애니메이션 세트 에셋 */
@@ -139,13 +130,6 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, Category = "Chooser")
 	float MovementSpeedScaleRatio = 1.f;
-
-	// Root chooser compatibility with the original sample's LOD branch.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Chooser")
-	float MMDatabaseLOD = 2.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Chooser")
-	EMMDatabaseLOD MMDatabaseLODEnum = EMMDatabaseLOD::ExtremeSparse;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Locomotion")
 	FVector LocalVelocityDirection;
@@ -262,14 +246,12 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MotionMatching|Chooser")
 	TObjectPtr<UChooserTable> PoseSearchChooser;
 
-	UPROPERTY(BlueprintReadOnly, Category = "MotionMatching|Databases")
-	TObjectPtr<UPoseSearchDatabase> RuntimePoseSearchDatabase;
+
 
 	UPROPERTY(BlueprintReadOnly, Category = "MotionMatching|State")
 	ESourceMotionMatchState CurrentMotionMatchState = ESourceMotionMatchState::Idle;
 
-	UPROPERTY(Transient, BlueprintReadOnly, Category = "MotionMatching|State")
-	TObjectPtr<UPoseSearchDatabase> LastAppliedRuntimePoseSearchDatabase;
+
 
 	UPROPERTY(Transient, BlueprintReadOnly, Category = "MotionMatching|State")
 	float MotionMatchingSuppressTimeRemaining = 0.f;
@@ -361,5 +343,4 @@ protected:
 	UPROPERTY(BlueprintReadOnly, Category = "Chooser|State")
 	float LastActorYaw = 0.f;
 
-	void ApplyChosenDatabase(UPoseSearchDatabase* SelectedDatabase);
 };

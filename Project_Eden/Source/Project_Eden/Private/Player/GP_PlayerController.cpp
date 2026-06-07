@@ -192,6 +192,14 @@ void AGP_PlayerController::SetupInputComponent()
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ThisClass::Input_Jump);
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ThisClass::Input_StopJump);
 	}
+	if (CrouchAction)
+	{
+		EnhancedInputComponent->BindAction(CrouchAction, ETriggerEvent::Started, this, &ThisClass::Input_CrouchPressed);
+		EnhancedInputComponent->BindAction(CrouchAction, ETriggerEvent::Completed, this, &ThisClass::Input_CrouchReleased);
+		EnhancedInputComponent->BindAction(CrouchAction, ETriggerEvent::Canceled, this, &ThisClass::Input_CrouchReleased);
+	}
+	InputComponent->BindKey(EKeys::C, IE_Pressed, this, &ThisClass::Input_CrouchPressed);
+	InputComponent->BindKey(EKeys::C, IE_Released, this, &ThisClass::Input_CrouchReleased);
 
 	// --- [상태 전환 ] ---
 	EnhancedInputComponent->BindAction(SprintAction, ETriggerEvent::Started, this, &ThisClass::Input_SprintPressed);
@@ -248,7 +256,7 @@ void AGP_PlayerController::Input_Move(const FInputActionValue& Value)
 	const FRotator YawRotation(0.f, GetControlRotation().Yaw, 0.f);
 	const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
 	const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
-	const bool bSprinting = PlayerCharacter && PlayerCharacter->IsSprinting();
+	const bool bSprinting = PlayerCharacter && PlayerCharacter->IsSprinting() && !PlayerCharacter->IsPrimaryAttackInProgress();
 	if (PlayerCharacter)
 	{
 		TargetMaxWalkSpeed = PlayerCharacter->ResolveDirectionalMoveSpeed(MovementVector, bSprinting);
@@ -330,6 +338,44 @@ void AGP_PlayerController::Input_StopJump()
 	GetCharacter()->StopJumping();
 }
 
+void AGP_PlayerController::Input_CrouchPressed()
+{
+	CancelSkillSelectionIfActive();
+	bCrouchInputHeld = true;
+
+	if (AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetCharacter()))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[CrouchInput] Pressed Actor=%s CanCrouch=%d IsCrouched=%d"),
+			*PC->GetName(),
+			PC->GetCharacterMovement() ? (PC->GetCharacterMovement()->NavAgentProps.bCanCrouch ? 1 : 0) : 0,
+			PC->bIsCrouched ? 1 : 0);
+		PC->StopSprinting();
+		PC->Crouch();
+	}
+}
+
+void AGP_PlayerController::Input_CrouchReleased()
+{
+	bCrouchInputHeld = false;
+	if (AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetCharacter()))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[CrouchInput] Released Actor=%s IsCrouched=%d"),
+			*PC->GetName(),
+			PC->bIsCrouched ? 1 : 0);
+		if (PC->IsPrimaryAttackInProgress())
+		{
+			return;
+		}
+
+		PC->UnCrouch();
+
+		if (ShouldResumeHeldSprint())
+		{
+			PC->StartSprinting();
+		}
+	}
+}
+
 
 void AGP_PlayerController::Input_ToggleSprint()
 {
@@ -342,6 +388,7 @@ void AGP_PlayerController::Input_ToggleSprint()
 void AGP_PlayerController::Input_SprintPressed()
 {
 	CancelSkillSelectionIfActive();
+	bSprintInputHeld = true;
 
 	if (AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetPawn()))
 	{
@@ -352,6 +399,7 @@ void AGP_PlayerController::Input_SprintPressed()
 
 void AGP_PlayerController::Input_SprintReleased()
 {
+	bSprintInputHeld = false;
 	if (AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetPawn()))
 	{
 		if (!bIsSprintToggle) PC->StopSprinting();
@@ -363,14 +411,16 @@ void AGP_PlayerController::Input_Dash()
 
 	if (AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetCharacter()))
 	{
-
 		if (PlayerCharacter->TryPerformDash())
 		{
 			return;
 		}
 	}
 
-	ActivateAbilityByTag(GPTags::Ability::Movement::Dash);
+	if (ActivateAbilityByTag(GPTags::Ability::Movement::Dash))
+	{
+		return;
+	}
 }
 
 
@@ -647,7 +697,7 @@ void AGP_PlayerController::UpdateMovementSpeed(float DeltaSeconds)
 		return;
 	}
 
-	const bool bSprinting = PlayerCharacter->IsSprinting();
+	const bool bSprinting = PlayerCharacter->IsSprinting() && !PlayerCharacter->IsPrimaryAttackInProgress();
 	if (CurrentMoveInput.IsNearlyZero())
 	{
 		TargetMaxWalkSpeed = bSprinting ? PlayerCharacter->GetScaledSprintSpeed() : PlayerCharacter->GetScaledNormalWalkSpeed();

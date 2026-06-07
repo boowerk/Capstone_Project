@@ -9,6 +9,34 @@
 class AActor;
 class UNiagaraSystem;
 
+UENUM(BlueprintType)
+enum class EGP_SkillVisualType : uint8
+{
+	Actor,
+	Niagara
+};
+
+USTRUCT(BlueprintType, meta = (DisplayName = "Skill Visual Cue"))
+struct FGP_SkillVisualCueEntry
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Visual", meta = (DisplayName = "Cue Tag", ToolTip = "Situation/context tag for this visual, such as cast, active, impact, tick, or expire. Empty can be used as the default for this visual type.", DisplayPriority = "1"))
+	FGameplayTag CueTag;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Visual", meta = (DisplayName = "Element", Categories = "GPTags.Tech.Element", ToolTip = "Optional element condition. Empty means any element.", DisplayPriority = "2"))
+	FGameplayTag ElementTag;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Visual", meta = (DisplayName = "Visual Type", DisplayPriority = "3"))
+	EGP_SkillVisualType VisualType = EGP_SkillVisualType::Niagara;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Visual", meta = (DisplayName = "Visual Actor", EditCondition = "VisualType == EGP_SkillVisualType::Actor", EditConditionHides, DisplayPriority = "4"))
+	TSubclassOf<AActor> VisualActorClass;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Visual", meta = (DisplayName = "Niagara System", EditCondition = "VisualType == EGP_SkillVisualType::Niagara", EditConditionHides, DisplayPriority = "5"))
+	TObjectPtr<UNiagaraSystem> NiagaraSystem;
+};
+
 USTRUCT(BlueprintType, meta = (DisplayName = "Element Visual Override"))
 struct FGP_ElementVisualActorEntry
 {
@@ -58,6 +86,9 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Visual")
 	TSubclassOf<AActor> SkillVisualActorClass;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Visual", meta = (DisplayName = "Visual Cues", TitleProperty = "CueTag", ToolTip = "Flexible skill visuals selected by situation cue, visual type, and optional element. Use this for cast/active/impact/tick/expire variations."))
+	TArray<FGP_SkillVisualCueEntry> VisualCues;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Visual", meta = (DisplayName = "Element Visual Overrides", TitleProperty = "ElementTag", ToolTip = "Element-specific visual overrides for impact visuals and active execution VFX."))
 	TArray<FGP_ElementVisualActorEntry> ElementVisualActorClasses;
