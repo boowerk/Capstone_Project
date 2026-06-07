@@ -6,6 +6,7 @@
 #include "AbilitySystem/GP_AttributeSet.h"
 #include "Blueprint/WidgetTree.h"
 #include "Characters/GP_BaseCharacter.h"
+#include "GameFramework/Pawn.h"
 
 UGP_PlayerHUDWidget::UGP_PlayerHUDWidget(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -24,6 +25,7 @@ void UGP_PlayerHUDWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 	RefreshPreview();
+	UpdateMinimapPlayerArrowRotation();
 
 	// 1. 즉시 시도
 	APawn* OwningPawn = GetOwningPlayerPawn();
@@ -43,6 +45,68 @@ void UGP_PlayerHUDWidget::NativeConstruct()
 			NativeConstruct();
 		});
 	}
+}
+
+void UGP_PlayerHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
+{
+	Super::NativeTick(MyGeometry, InDeltaTime);
+	UpdateMinimapPlayerArrowRotation();
+}
+
+void UGP_PlayerHUDWidget::UpdateMinimapPlayerArrowRotation()
+{
+	if (!bRotateMinimapPlayerArrow)
+	{
+		return;
+	}
+
+	APawn* OwningPawn = GetOwningPlayerPawn();
+	UWidget* ArrowWidget = ResolveMinimapPlayerArrowWidget();
+	if (!IsValid(OwningPawn) || !IsValid(ArrowWidget))
+	{
+		bHasCachedMinimapPlayerArrowAngle = false;
+		return;
+	}
+
+	const float RotationSign = bInvertMinimapPlayerArrowRotation ? -1.0f : 1.0f;
+	const float DesiredAngle = FRotator::NormalizeAxis((OwningPawn->GetActorRotation().Yaw * RotationSign) + MinimapPlayerArrowAngleOffset);
+
+	// 같은 각도를 반복해서 쓰지 않도록 캐시해 Slate transform 갱신 비용을 줄입니다.
+	if (bHasCachedMinimapPlayerArrowAngle && FMath::IsNearlyEqual(CachedMinimapPlayerArrowAngle, DesiredAngle, 0.1f))
+	{
+		return;
+	}
+
+	ArrowWidget->SetRenderTransformAngle(DesiredAngle);
+	CachedMinimapPlayerArrowAngle = DesiredAngle;
+	bHasCachedMinimapPlayerArrowAngle = true;
+}
+
+UWidget* UGP_PlayerHUDWidget::ResolveMinimapPlayerArrowWidget() const
+{
+	if (IsValid(MinimapPlayerArrow))
+	{
+		return MinimapPlayerArrow.Get();
+	}
+
+	static const FName CandidateNames[] =
+	{
+		TEXT("MinimapPlayerArrow"),
+		TEXT("MiniMapPlayerArrow"),
+		TEXT("PlayerArrow"),
+		TEXT("PlayerDirectionArrow"),
+		TEXT("MapPlayerArrow")
+	};
+
+	for (const FName& CandidateName : CandidateNames)
+	{
+		if (UWidget* CandidateWidget = GetWidgetFromName(CandidateName))
+		{
+			return CandidateWidget;
+		}
+	}
+
+	return nullptr;
 }
 
 void UGP_PlayerHUDWidget::BindToASC(UAbilitySystemComponent* InASC)

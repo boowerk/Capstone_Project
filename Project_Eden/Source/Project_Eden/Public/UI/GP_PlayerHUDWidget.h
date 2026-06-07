@@ -55,9 +55,12 @@ public:
 protected:
 	virtual void NativePreConstruct() override;
 	virtual void NativeConstruct() override;
+	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
 private:
 	void RefreshPreview();
+	void UpdateMinimapPlayerArrowRotation();
+	UWidget* ResolveMinimapPlayerArrowWidget() const;
 	void BindAttributeWidgetToASC(UAbilitySystemComponent* InASC, UGP_AttributeWidget* Widget, UGP_AttributeSet* AttributeSet, TArray<FGPAttributeDelegateBinding>& DelegateHandles);
 	void RemoveAttributeDelegateHandles(TWeakObjectPtr<UAbilitySystemComponent>& BoundASC, TArray<FGPAttributeDelegateBinding>& DelegateHandles);
 	void EnsureBossHealthAttributes(UGP_AttributeWidget* Widget) const;
@@ -89,6 +92,9 @@ private:
 	UPROPERTY(BlueprintReadOnly, Category = "HUD", meta = (BindWidgetOptional, AllowPrivateAccess = "true"))
 	TObjectPtr<UWidget> BossFrame;
 
+	UPROPERTY(BlueprintReadOnly, Category = "HUD|Minimap", meta = (BindWidgetOptional, AllowPrivateAccess = "true"))
+	TObjectPtr<UWidget> MinimapPlayerArrow;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EldenRing HUD|Preview", meta = (AllowPrivateAccess = "true"))
 	FText LocationText;
 
@@ -98,8 +104,21 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EldenRing HUD|Preview", meta = (AllowPrivateAccess = "true"))
 	bool bShowBossFrame = false;
 
+	// 미니맵 화살표는 에디터 배치 위젯을 유지하고, C++에서는 플레이어 yaw만 RenderTransformAngle에 반영합니다.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EldenRing HUD|Minimap", meta = (AllowPrivateAccess = "true"))
+	bool bRotateMinimapPlayerArrow = true;
+
+	// 화살표 이미지의 기본 방향이 프로젝트 기준과 다를 때 에디터에서 보정할 수 있는 각도입니다.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EldenRing HUD|Minimap", meta = (AllowPrivateAccess = "true", ClampMin = "-360.0", ClampMax = "360.0"))
+	float MinimapPlayerArrowAngleOffset = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EldenRing HUD|Minimap", meta = (AllowPrivateAccess = "true"))
+	bool bInvertMinimapPlayerArrowRotation = false;
+
 	TWeakObjectPtr<UAbilitySystemComponent> BoundPlayerASC;
 	TWeakObjectPtr<UAbilitySystemComponent> BoundBossASC;
 	TArray<FGPAttributeDelegateBinding> PlayerAttributeDelegateHandles;
 	TArray<FGPAttributeDelegateBinding> BossAttributeDelegateHandles;
+	bool bHasCachedMinimapPlayerArrowAngle = false;
+	float CachedMinimapPlayerArrowAngle = 0.0f;
 };
