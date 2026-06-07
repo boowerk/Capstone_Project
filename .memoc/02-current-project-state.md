@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-06-06T22:35:00+09:00
+updated: 2026-06-08T00:00:00+09:00
 status: active
 tags:
   - memoc
@@ -11,7 +11,7 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-06-06T23:05:00+09:00
+Last synced: 2026-06-08T00:00:00+09:00
 
 ## Current Status
 
@@ -27,6 +27,7 @@ Last synced: 2026-06-06T23:05:00+09:00
 - Current crouch/MM work depends on `CHT_MM_MaskMan_Root_OriginalStyle`, `ApplyChosenDatabase`, and the `ABP_UEFNSource_Player` MotionMatching -> PoseHistory -> LocomotionPose path using `RuntimePoseSearchDatabase`.
 - Root-motion extraction tuning is in progress in `UGP_RootMotionExtractionEditorLibrary`, including snapped direction (`15` degrees) and foot-plant max-speed scale (`0.85`).
 - Camera composition currently targets spring arm lengths `340/380/460` for idle/normal/sprint with socket offset `(0,65,20)`.
+- Fab fence segment blueprint exists at `/Game/Fab/Blueprints/BP_Fab_FenceSegment`, assembled from `Baluster`, `Handrail`, and `NewelPost` to match current level `NewFolder1`: origin is the left post, segment runs along +Y to 460cm, has 10 balusters and 8 native handrail pieces.
 
 ## Open Tasks
 
