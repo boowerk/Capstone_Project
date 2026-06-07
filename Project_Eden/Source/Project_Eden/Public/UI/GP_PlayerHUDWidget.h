@@ -113,7 +113,7 @@ private:
 
 	// 화살표 이미지의 기본 방향이 프로젝트 기준과 다를 때 에디터에서 보정할 수 있는 각도입니다.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EldenRing HUD|Minimap", meta = (AllowPrivateAccess = "true", ClampMin = "-360.0", ClampMax = "360.0"))
-	float MinimapPlayerArrowAngleOffset = 0.0f;
+	float MinimapPlayerArrowAngleOffset = 90.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EldenRing HUD|Minimap", meta = (AllowPrivateAccess = "true"))
 	bool bInvertMinimapPlayerArrowRotation = false;
