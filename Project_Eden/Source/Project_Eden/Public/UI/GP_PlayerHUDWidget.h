@@ -9,8 +9,11 @@
 class UTextBlock;
 class UProgressBar;
 class UWidget;
+class UImage;
+class UTextureRenderTarget2D;
 class UAbilitySystemComponent;
 class UGP_AttributeSet;
+class UGP_MinimapSubsystem;
 
 struct FGPAttributeDelegateBinding
 {
@@ -56,13 +59,22 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "EldenRing HUD|Minimap")
 	void RefreshMinimapPlayerArrowRotation();
 
+	UFUNCTION(BlueprintCallable, Category = "EldenRing HUD|Minimap")
+	void SetMinimapRenderTarget(UTextureRenderTarget2D* InRenderTarget);
+
+	UFUNCTION(BlueprintCallable, Category = "EldenRing HUD|Minimap")
+	void RefreshMinimapBackgroundFromSubsystem();
+
 protected:
 	virtual void NativePreConstruct() override;
 	virtual void NativeConstruct() override;
+	virtual void NativeDestruct() override;
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
 private:
 	void RefreshPreview();
+	void BindToMinimapSubsystem();
+	UImage* ResolveMinimapBackgroundImage() const;
 	UWidget* ResolveMinimapPlayerArrowWidget() const;
 	void BindAttributeWidgetToASC(UAbilitySystemComponent* InASC, UGP_AttributeWidget* Widget, UGP_AttributeSet* AttributeSet, TArray<FGPAttributeDelegateBinding>& DelegateHandles);
 	void RemoveAttributeDelegateHandles(TWeakObjectPtr<UAbilitySystemComponent>& BoundASC, TArray<FGPAttributeDelegateBinding>& DelegateHandles);
@@ -73,6 +85,9 @@ private:
 	
 	UFUNCTION()
 	void OnASCInitializedCallback(class UAbilitySystemComponent* ASC, class UAttributeSet* AS);
+
+	UFUNCTION()
+	void HandleMinimapRenderTargetChanged(UTextureRenderTarget2D* InRenderTarget);
 	
 	UPROPERTY(BlueprintReadOnly, Category = "HUD", meta = (BindWidgetOptional, AllowPrivateAccess = "true"))
 	TObjectPtr<UGP_AttributeWidget> HealthBar;
@@ -97,6 +112,9 @@ private:
 
 	UPROPERTY(BlueprintReadOnly, Category = "HUD|Minimap", meta = (BindWidgetOptional, AllowPrivateAccess = "true"))
 	TObjectPtr<UWidget> MinimapPlayerArrow;
+
+	UPROPERTY(BlueprintReadOnly, Category = "HUD|Minimap", meta = (BindWidgetOptional, AllowPrivateAccess = "true"))
+	TObjectPtr<UImage> MinimapBackgroundImage;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EldenRing HUD|Preview", meta = (AllowPrivateAccess = "true"))
 	FText LocationText;
@@ -124,4 +142,6 @@ private:
 	TArray<FGPAttributeDelegateBinding> BossAttributeDelegateHandles;
 	bool bHasCachedMinimapPlayerArrowAngle = false;
 	float CachedMinimapPlayerArrowAngle = 0.0f;
+	TWeakObjectPtr<UGP_MinimapSubsystem> BoundMinimapSubsystem;
+	TWeakObjectPtr<UTextureRenderTarget2D> BoundMinimapRenderTarget;
 };
