@@ -10,15 +10,15 @@ tags:
   - memoc/state
 ---
 # Session Summary
-Last: 2026-06-07T20:49:00+09:00
+Last: 2026-06-07T21:07:00+09:00
 ## Status
 - Added dark fantasy minimap PNG source assets under `Project_Eden/Content/UI/HUD/Minimap/Textures`.
-- `UGP_PlayerHUDWidget` now rotates an optional `MinimapPlayerArrow`/fallback-named widget from the owning pawn yaw via `SetRenderTransformAngle`.
-- Minimap arrow rotation exposes enable, angle offset, and invert options for WBP tuning.
+- `UGP_PlayerHUDWidget` rotates an optional `MinimapPlayerArrow`/fallback-named widget from owning pawn yaw via `SetRenderTransformAngle`.
+- `AGP_PlayerController::Tick` also calls HUD minimap rotation refresh so it no longer depends on UserWidget native tick.
 
 ## Open Tasks
-- In `WBP_PlayerHUDWidget`, name the arrow image `MinimapPlayerArrow`, set Render Transform Pivot to `(0.5, 0.5)`, and tune offset/invert if the arrow points the wrong way.
-- Re-run full C++ build after closing Unreal Editor; compile passed, but link failed because `UnrealEditor-Project_Eden.dll` was locked by `UnrealEditor.exe`.
+- In `WBP_PlayerHUDWidget`, keep the arrow image named `MinimapPlayerArrow` or another name containing Arrow plus Minimap/Player/Direction, set Render Transform Pivot to `(0.5, 0.5)`, and tune offset/invert if needed.
 
 ## Resume
-- Existing editor-side changes remain: `TestMap.umap` and `WBP_PlayerHUDWidget.uasset`.
+- Full `Project_EdenEditor Win64 Development` build succeeded after Unreal Editor was closed.
+- Existing unrelated changes remain: `TestMap.umap` and `.memoc/MatadorMageBoss_ImplementationInstructions.md`.
