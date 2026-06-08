@@ -74,13 +74,13 @@ public:
 	void ServerAddXP(float Amount);
 
 	UFUNCTION(BlueprintPure, Category = "Progression")
-	float GetCurrentXP() const { return CurrentXP; }
+	float GetCurrentXP() const;
 
 	UFUNCTION(BlueprintPure, Category = "Progression")
-	int32 GetCurrentLevel() const { return CurrentLevel; }
+	int32 GetCurrentLevel() const;
 
 	UFUNCTION(BlueprintPure, Category = "Progression")
-	float GetXPToNextLevel() const { return XPToNextLevel; }
+	float GetXPToNextLevel() const;
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 

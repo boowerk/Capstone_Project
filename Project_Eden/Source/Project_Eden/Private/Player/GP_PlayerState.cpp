@@ -279,6 +279,21 @@ void AGP_PlayerState::ServerAddXP_Implementation(float Amount)
 	AddXP(Amount);
 }
 
+float AGP_PlayerState::GetCurrentXP() const
+{
+	return CurrentXP;
+}
+
+int32 AGP_PlayerState::GetCurrentLevel() const
+{
+	return CurrentLevel;
+}
+
+float AGP_PlayerState::GetXPToNextLevel() const
+{
+	return XPToNextLevel;
+}
+
 void AGP_PlayerState::MulticastShowXPDebug_Implementation(float AddedXP, int32 PreviousLevel, int32 NewLevel, float NewXP, float NewXPToNextLevel)
 {
 	if (!bDebugXPChanges)
