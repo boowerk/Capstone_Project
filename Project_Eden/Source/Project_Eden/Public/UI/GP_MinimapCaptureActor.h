@@ -94,6 +94,7 @@ protected:
 
 private:
 	FBox ResolveBounds(AActor* BoundsActor) const;
+	AActor* ResolveDefaultFollowTarget() const;
 	void ApplyTopDownTransform(const FVector& Center, float OrthoWidth, float Yaw);
 	void CaptureForCurrentMode();
 
