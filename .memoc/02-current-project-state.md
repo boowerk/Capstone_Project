@@ -11,10 +11,11 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-06-04T00:00:00+09:00
+Last synced: 2026-06-09T03:18:00+09:00
 
 ## Current Status
 
+- `WBP_CharacterStatsMenu` XP progress binding is repaired: `AGP_PlayerState::GetCurrentXP`, `GetCurrentLevel`, and `GetXPToNextLevel` are now cpp-defined BlueprintPure functions, UHT emits the exec functions, and `Project_EdenEditor Win64 Development` build succeeded.
 - Enemy death now grants XP directly: `AGP_BaseCharacter` exposes a post-damage hook, and `AGP_EnemyCharacter` awards its editable `XPReward` once when health reaches zero by resolving the instigator's `AGP_PlayerState`.
 - PlayerState XP debug can be enabled with `bDebugXPChanges`; `AddXP` multicasts a green on-screen/log message showing added XP, level transition, and current XP progress.
 - PlayerState now has replicated XP/level basics: `CurrentXP`, `CurrentLevel`, `XPToNextLevel`, `LevelXPScale`, `AddXP`, server forwarding, and `OnLevelUp` Blueprint event for opening augment selection later.
