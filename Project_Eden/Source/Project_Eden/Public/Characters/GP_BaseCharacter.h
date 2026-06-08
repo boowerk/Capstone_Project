@@ -30,7 +30,7 @@ public:
 	virtual UAttributeSet* GetAttributeSet() const { return nullptr; }
 	
 	void ShowDamageNumber(int32 DamageAmount, EWeaponElement Element);
-	void ShowSkillVisualActor(TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation);
+	void ShowSkillVisualActor(TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation, float VisualScale = 1.0f);
 
 	/** 캐릭터의 외형과 애니메이션을 결정하는 데이터 에셋 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation")
@@ -67,13 +67,13 @@ protected:
 	void MulticastShowDamageNumber(int32 DamageAmount, EWeaponElement Element);
 
 	UFUNCTION(NetMulticast, Reliable)
-	void MulticastSpawnSkillVisualActor(TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation);
+	void MulticastSpawnSkillVisualActor(TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation, float VisualScale);
 
 	UFUNCTION(NetMulticast, Unreliable)
 	void MulticastShowHealthDebug(const FString& InstigatorName, float DamageAmount, float CurrentHealth, float MaxHealth, FGameplayTag ElementTag);
 
 	void SpawnDamageNumberActor(int32 DamageAmount, EWeaponElement Element);
-	void SpawnSkillVisualActor(TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation);
+	void SpawnSkillVisualActor(TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation, float VisualScale = 1.0f);
 	void ShowHealthDebugMessage(const FString& InstigatorName, float DamageAmount, float CurrentHealth, float MaxHealth, FGameplayTag ElementTag) const;
 	
 	// ASC가 초기화되었을 때 AttributeSet의 델리게이트를 구독할 함수
@@ -83,6 +83,8 @@ protected:
 	// 데미지 델리게이트 수신용 함수
 	UFUNCTION()
 	void HandleDamageTaken(AActor* InstigatorActor, AActor* TargetActor, float DamageAmount, FGameplayTag ElementTag);
+
+	virtual void HandlePostDamageTaken(AActor* InstigatorActor, float DamageAmount, FGameplayTag ElementTag);
 	
 private:
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Abilities")

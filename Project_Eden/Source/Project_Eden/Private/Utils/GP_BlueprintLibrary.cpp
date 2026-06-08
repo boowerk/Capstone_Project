@@ -14,13 +14,13 @@
 
 namespace
 {
-FGameplayTag GetCurrentTechElementTagFromActor(const AActor* Actor)
+const AGP_PlayerState* GetGPPlayerStateFromActor(const AActor* Actor)
 {
 	if (const APawn* Pawn = Cast<APawn>(Actor))
 	{
 		if (const AGP_PlayerState* PlayerState = Pawn->GetPlayerState<AGP_PlayerState>())
 		{
-			return PlayerState->GetCurrentTechElementTag();
+			return PlayerState;
 		}
 	}
 
@@ -28,11 +28,36 @@ FGameplayTag GetCurrentTechElementTagFromActor(const AActor* Actor)
 	{
 		if (const AGP_PlayerState* PlayerState = InstigatorPawn->GetPlayerState<AGP_PlayerState>())
 		{
-			return PlayerState->GetCurrentTechElementTag();
+			return PlayerState;
 		}
 	}
 
+	return nullptr;
+}
+
+FGameplayTag GetCurrentTechElementTagFromActor(const AActor* Actor)
+{
+	if (const AGP_PlayerState* PlayerState = GetGPPlayerStateFromActor(Actor))
+	{
+		return PlayerState->GetCurrentTechElementTag();
+	}
+
 	return FGameplayTag();
+}
+
+float GetSkillAugmentDamageMultiplierFromActor(const AActor* Actor, const UGP_SkillData* SkillData)
+{
+	if (!SkillData || !SkillData->SkillIdTag.IsValid())
+	{
+		return 1.0f;
+	}
+
+	if (const AGP_PlayerState* PlayerState = GetGPPlayerStateFromActor(Actor))
+	{
+		return PlayerState->GetSkillAugmentDamageMultiplier(SkillData->SkillIdTag);
+	}
+
+	return 1.0f;
 }
 
 FGameplayTag ConvertTechElementToDamageElement(FGameplayTag TechElementTag)
@@ -347,9 +372,11 @@ void UGP_BlueprintLibrary::ApplyGameplayEffectToActors(AActor* Instigator, const
 
 				if (SkillData)
 				{
+					const float SkillDamageMultiplier = GetSkillAugmentDamageMultiplierFromActor(Instigator, SkillData);
 					SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Data::Base, SkillData->BaseDamage);
 					SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Data::BaseSpell, SkillData->BaseSpellDamage);
 					SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Data::ToughnessBase, SkillData->ToughnessDamage);
+					SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Data::Multiplier, SkillDamageMultiplier);
 					SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Coef::Atk, SkillData->AttackPowerCoefficient);
 					SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Coef::M_Atk, SkillData->MagicPowerCoefficient);
 					SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Coef::Def, SkillData->DefenseCoefficient);

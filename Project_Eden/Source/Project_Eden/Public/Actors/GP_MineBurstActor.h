@@ -19,6 +19,8 @@ public:
 	AGP_MineBurstActor();
 
 	void SetSkillData(UGP_SkillData* InSkillData) { SkillData = InSkillData; }
+	void SetImpactVisualActorClass(TSubclassOf<AActor> InImpactVisualActorClass) { ImpactVisualActorClass = InImpactVisualActorClass; }
+	void ApplyExplosionRadiusMultiplier(float RadiusMultiplier);
 
 protected:
 	virtual void BeginPlay() override;
@@ -63,7 +65,7 @@ protected:
 	void OnTriggerOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 
 	UFUNCTION(NetMulticast, Reliable)
-	void MulticastSpawnImpactVisual(const FVector& ImpactLocation);
+	void MulticastSpawnImpactVisual(const FVector& ImpactLocation, TSubclassOf<AActor> VisualActorClass, float VisualScale);
 
 	void ArmMine();
 	void Explode();
@@ -73,6 +75,9 @@ protected:
 
 	UPROPERTY(Transient)
 	bool bHasExploded = false;
+
+	UPROPERTY(Transient)
+	float VisualScaleMultiplier = 1.0f;
 
 	FTimerHandle ArmTimerHandle;
 };

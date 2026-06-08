@@ -6,6 +6,7 @@
 
 #include "GameplayEffect.h"
 #include "GameFramework/Pawn.h"
+#include "Net/UnrealNetwork.h"
 
 AGP_Projectile::AGP_Projectile()
 {
@@ -31,6 +32,10 @@ void AGP_Projectile::BeginPlay()
 	Super::BeginPlay();
 
 	SetLifeSpan(ProjectileLifeSpan);
+	if (ProjectileVisualSystem)
+	{
+		BP_OnProjectileVisualSystemChanged(ProjectileVisualSystem);
+	}
 
 	// 3. 블루프린트에서 추가한 ShapeComponent(Box, Sphere, Capsule)를 동적으로 찾아냅니다.
 	CollisionComponent = FindComponentByClass<UShapeComponent>();
@@ -57,6 +62,32 @@ void AGP_Projectile::BeginPlay()
 	{
 		// 디자이너가 블루프린트에 콜리전을 넣는 것을 깜빡했을 때를 대비한 경고
 		UE_LOG(LogTemp, Error, TEXT("[%s] Projectile has no Box, Sphere, or Capsule Component!"), *GetName());
+	}
+}
+
+void AGP_Projectile::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(AGP_Projectile, ProjectileVisualSystem);
+}
+
+void AGP_Projectile::SetProjectileVisualSystem(UNiagaraSystem* InProjectileVisualSystem)
+{
+	if (!InProjectileVisualSystem)
+	{
+		return;
+	}
+
+	ProjectileVisualSystem = InProjectileVisualSystem;
+	BP_OnProjectileVisualSystemChanged(ProjectileVisualSystem);
+}
+
+void AGP_Projectile::OnRep_ProjectileVisualSystem()
+{
+	if (ProjectileVisualSystem)
+	{
+		BP_OnProjectileVisualSystemChanged(ProjectileVisualSystem);
 	}
 }
 

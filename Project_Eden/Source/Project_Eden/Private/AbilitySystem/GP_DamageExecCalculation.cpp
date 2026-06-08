@@ -140,6 +140,11 @@ void UGP_DamageExecCalculation::Execute_Implementation(const FGameplayEffectCust
     }
 
     // 3. 나. 공격 수정치 적용 (치명타 및 피해 증가)
+    const float SkillDamageMultiplier = FMath::Max(
+        Spec.GetSetByCallerMagnitude(GPTags::Damage::Data::Multiplier, false, 1.0f),
+        0.0f);
+    BaseDamage *= SkillDamageMultiplier;
+
     bool bCritical = FMath::RandRange(0.0f, 1.0f) <= CriticalChance;
     // CritMultiplier 기본값은 1.5로 설정 (기획안)
     float FinalCritMult = bCritical ? FMath::Max(CritMultiplier, 1.5f) : 1.0f;
@@ -163,8 +168,13 @@ void UGP_DamageExecCalculation::Execute_Implementation(const FGameplayEffectCust
     float Damage_Final = Damage_Modified * ArmorMitigation * (1.0f - Resistance_Elem);
 
     // Matador guarded reduction is a final-state modifier: normal combat takes 10%, groggy takes full damage.
-    const bool bTargetGroggy = TargetTags != nullptr && TargetTags->HasTagExact(GPTags::State::Status::Enemy::Groggy);
-    const bool bTargetMatadorGuarded = TargetTags != nullptr && TargetTags->HasTagExact(GPTags::State::Status::Enemy::MatadorGuarded);
+    const UAbilitySystemComponent* TargetASC = ExecutionParams.GetTargetAbilitySystemComponent();
+    const bool bCapturedTargetGroggy = TargetTags != nullptr && TargetTags->HasTagExact(GPTags::State::Status::Enemy::Groggy);
+    const bool bCapturedTargetMatadorGuarded = TargetTags != nullptr && TargetTags->HasTagExact(GPTags::State::Status::Enemy::MatadorGuarded);
+    const bool bTargetGroggy = bCapturedTargetGroggy
+        || (TargetASC != nullptr && TargetASC->HasMatchingGameplayTag(GPTags::State::Status::Enemy::Groggy));
+    const bool bTargetMatadorGuarded = bCapturedTargetMatadorGuarded
+        || (TargetASC != nullptr && TargetASC->HasMatchingGameplayTag(GPTags::State::Status::Enemy::MatadorGuarded));
     const float BossStateDamageMultiplier = bTargetMatadorGuarded && !bTargetGroggy
         ? GPDamageExec::MatadorGuardedFinalDamageMultiplier
         : 1.0f;
@@ -172,8 +182,9 @@ void UGP_DamageExecCalculation::Execute_Implementation(const FGameplayEffectCust
 
     if (CVarGPDamageExecLog.GetValueOnAnyThread() != 0)
     {
-        UE_LOG(LogTemp, Log, TEXT("[DamageExec] Element=%s Base=%.2f Critical=%s CritMult=%.2f Modified=%.2f Armor=%.2f ArmorMitigation=%.3f Resistance=%.3f BossStateMult=%.2f Final=%.2f"),
+        UE_LOG(LogTemp, Log, TEXT("[DamageExec] Element=%s SkillMult=%.2f Base=%.2f Critical=%s CritMult=%.2f Modified=%.2f Armor=%.2f ArmorMitigation=%.3f Resistance=%.3f TargetGuarded=%d TargetGroggy=%d BossStateMult=%.2f Final=%.2f"),
             ElementName,
+            SkillDamageMultiplier,
             BaseDamage,
             bCritical ? TEXT("true") : TEXT("false"),
             FinalCritMult,
@@ -181,6 +192,8 @@ void UGP_DamageExecCalculation::Execute_Implementation(const FGameplayEffectCust
             Armor,
             ArmorMitigation,
             Resistance_Elem,
+            bTargetMatadorGuarded ? 1 : 0,
+            bTargetGroggy ? 1 : 0,
             BossStateDamageMultiplier,
             Damage_Final);
     }

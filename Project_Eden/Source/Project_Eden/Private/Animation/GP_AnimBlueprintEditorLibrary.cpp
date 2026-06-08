@@ -158,6 +158,7 @@ bool UGP_AnimBlueprintEditorLibrary::RestoreMotionMatchingOutput(UAnimBlueprint*
 				PoseHistoryNode = Node;
 			}
 
+			/*
 			if (!RuntimeDatabaseGetterNode && Node->GetClass()->GetName() == TEXT("K2Node_VariableGet"))
 			{
 				if (const FName MemberName = Node->GetFName(); MemberName != NAME_None)
@@ -174,10 +175,12 @@ bool UGP_AnimBlueprintEditorLibrary::RestoreMotionMatchingOutput(UAnimBlueprint*
 					}
 				}
 			}
+			*/
 
 			if (NodeName == TEXT("AnimGraphNode_MotionMatching_1") || NodeClassName == TEXT("AnimGraphNode_MotionMatching"))
 			{
 				bool bUsesRuntimeDatabase = false;
+				/*
 				for (UEdGraphPin* Pin : Node->Pins)
 				{
 					if (!Pin || Pin->Direction != EGPD_Input || Pin->PinName != TEXT("Database"))
@@ -194,6 +197,7 @@ bool UGP_AnimBlueprintEditorLibrary::RestoreMotionMatchingOutput(UAnimBlueprint*
 						}
 					}
 				}
+				*/
 
 				if (NodeName == TEXT("AnimGraphNode_MotionMatching_1") || bUsesRuntimeDatabase || !SelectedMotionMatchingNode)
 				{
@@ -238,6 +242,7 @@ bool UGP_AnimBlueprintEditorLibrary::RestoreMotionMatchingOutput(UAnimBlueprint*
 	}
 
 	UEdGraphPin* RuntimeDatabaseOutputPin = nullptr;
+	/*
 	if (RuntimeDatabaseGetterNode)
 	{
 		for (UEdGraphPin* Pin : RuntimeDatabaseGetterNode->Pins)
@@ -249,6 +254,7 @@ bool UGP_AnimBlueprintEditorLibrary::RestoreMotionMatchingOutput(UAnimBlueprint*
 			}
 		}
 	}
+	*/
 
 	if (!MotionMatchingPosePin || !PoseHistorySourcePin)
 	{
@@ -262,12 +268,14 @@ bool UGP_AnimBlueprintEditorLibrary::RestoreMotionMatchingOutput(UAnimBlueprint*
 	MotionMatchingPosePin->BreakAllPinLinks();
 	MotionMatchingPosePin->MakeLinkTo(PoseHistorySourcePin);
 
+	/*
 	if (MotionMatchingDatabasePin && RuntimeDatabaseOutputPin)
 	{
 		MotionMatchingDatabasePin->BreakAllPinLinks();
 		RuntimeDatabaseOutputPin->BreakAllPinLinks();
 		RuntimeDatabaseOutputPin->MakeLinkTo(MotionMatchingDatabasePin);
 	}
+	*/
 
 	if (ChooserPlayerNode)
 	{
@@ -281,6 +289,7 @@ bool UGP_AnimBlueprintEditorLibrary::RestoreMotionMatchingOutput(UAnimBlueprint*
 		}
 	}
 
+	/*
 	if (UAnimGraphNode_MotionMatching* MotionMatchingNodeObject = Cast<UAnimGraphNode_MotionMatching>(SelectedMotionMatchingNode))
 	{
 		MotionMatchingNodeObject->Modify();
@@ -293,6 +302,7 @@ bool UGP_AnimBlueprintEditorLibrary::RestoreMotionMatchingOutput(UAnimBlueprint*
 		}
 		MotionMatchingNodeObject->ReconstructNode();
 	}
+	*/
 
 	FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(AnimBlueprint);
 

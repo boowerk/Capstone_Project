@@ -12,6 +12,9 @@
 #include "AbilitySystem/GP_AbilitySystemComponent.h"
 #include "AbilitySystem/GP_AttributeSet.h"
 #include "Engine/DataTable.h"
+#include "GameFramework/Controller.h"
+#include "GameFramework/Pawn.h"
+#include "Player/GP_PlayerState.h"
 
 AGP_EnemyCharacter::AGP_EnemyCharacter()
 {
@@ -173,6 +176,69 @@ void AGP_EnemyCharacter::GiveDefaultBossPatternAbilities()
 		// Grant each default once; custom Blueprint abilities can still be added through StartupAbilities.
 		ASC->GiveAbility(FGameplayAbilitySpec(AbilityClass));
 	}
+}
+
+void AGP_EnemyCharacter::HandlePostDamageTaken(AActor* InstigatorActor, float DamageAmount, FGameplayTag ElementTag)
+{
+	Super::HandlePostDamageTaken(InstigatorActor, DamageAmount, ElementTag);
+
+	const UGP_AttributeSet* GPAttributeSet = Cast<UGP_AttributeSet>(GetAttributeSet());
+	if (!HasAuthority() || bXPRewardGranted || !IsValid(GPAttributeSet) || GPAttributeSet->GetHealth() > KINDA_SMALL_NUMBER)
+	{
+		return;
+	}
+
+	bXPRewardGranted = true;
+	GrantXPRewardToInstigator(InstigatorActor);
+}
+
+void AGP_EnemyCharacter::GrantXPRewardToInstigator(AActor* InstigatorActor)
+{
+	if (XPReward <= 0.0f)
+	{
+		return;
+	}
+
+	AGP_PlayerState* InstigatorPlayerState = ResolveInstigatorPlayerState(InstigatorActor);
+	if (!IsValid(InstigatorPlayerState))
+	{
+		return;
+	}
+
+	InstigatorPlayerState->AddXP(XPReward);
+}
+
+AGP_PlayerState* AGP_EnemyCharacter::ResolveInstigatorPlayerState(AActor* InstigatorActor) const
+{
+	if (!IsValid(InstigatorActor))
+	{
+		return nullptr;
+	}
+
+	if (AGP_PlayerState* InstigatorPlayerState = Cast<AGP_PlayerState>(InstigatorActor))
+	{
+		return InstigatorPlayerState;
+	}
+
+	if (const APawn* InstigatorPawn = Cast<APawn>(InstigatorActor))
+	{
+		if (AController* InstigatorPawnController = InstigatorPawn->GetController())
+		{
+			return InstigatorPawnController->GetPlayerState<AGP_PlayerState>();
+		}
+	}
+
+	if (const AController* InstigatorController = Cast<AController>(InstigatorActor))
+	{
+		return InstigatorController->GetPlayerState<AGP_PlayerState>();
+	}
+
+	if (AController* InstigatorController = InstigatorActor->GetInstigatorController())
+	{
+		return InstigatorController->GetPlayerState<AGP_PlayerState>();
+	}
+
+	return nullptr;
 }
 
 void AGP_EnemyCharacter::RefreshAIRangeVisualizers()

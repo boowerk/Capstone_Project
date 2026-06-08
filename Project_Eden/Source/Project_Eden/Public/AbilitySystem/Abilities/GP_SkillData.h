@@ -7,17 +7,49 @@
 #include "GP_SkillData.generated.h"
 
 class AActor;
+class UNiagaraSystem;
 
-USTRUCT(BlueprintType)
+UENUM(BlueprintType)
+enum class EGP_SkillVisualType : uint8
+{
+	Actor,
+	Niagara
+};
+
+USTRUCT(BlueprintType, meta = (DisplayName = "Skill Visual Cue"))
+struct FGP_SkillVisualCueEntry
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Visual", meta = (DisplayName = "Cue Tag", ToolTip = "Situation/context tag for this visual, such as cast, active, impact, tick, or expire. Empty can be used as the default for this visual type.", DisplayPriority = "1"))
+	FGameplayTag CueTag;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Visual", meta = (DisplayName = "Element", Categories = "GPTags.Tech.Element", ToolTip = "Optional element condition. Empty means any element.", DisplayPriority = "2"))
+	FGameplayTag ElementTag;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Visual", meta = (DisplayName = "Visual Type", DisplayPriority = "3"))
+	EGP_SkillVisualType VisualType = EGP_SkillVisualType::Niagara;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Visual", meta = (DisplayName = "Visual Actor", EditCondition = "VisualType == EGP_SkillVisualType::Actor", EditConditionHides, DisplayPriority = "4"))
+	TSubclassOf<AActor> VisualActorClass;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Visual", meta = (DisplayName = "Niagara System", EditCondition = "VisualType == EGP_SkillVisualType::Niagara", EditConditionHides, DisplayPriority = "5"))
+	TObjectPtr<UNiagaraSystem> NiagaraSystem;
+};
+
+USTRUCT(BlueprintType, meta = (DisplayName = "Element Visual Override"))
 struct FGP_ElementVisualActorEntry
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Visual", meta = (Categories = "GPTags.Tech.Element"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Visual", meta = (DisplayName = "Element", Categories = "GPTags.Tech.Element", DisplayPriority = "1"))
 	FGameplayTag ElementTag;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Visual")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Visual", meta = (DisplayName = "Impact Actor", ToolTip = "Element-specific visual actor spawned on impact, burst, or completion.", DisplayPriority = "2"))
 	TSubclassOf<AActor> VisualActorClass;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Visual", meta = (DisplayName = "Active Niagara", ToolTip = "Element-specific Niagara override used by the spawned execution actor while active. If empty, the actor keeps its default VFX.", DisplayPriority = "3"))
+	TObjectPtr<UNiagaraSystem> ProjectileVisualSystem;
 };
 
 UENUM(BlueprintType)
@@ -49,11 +81,20 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill")
 	TSubclassOf<UGameplayAbility> AbilityClass;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill", meta = (Categories = "GPTags.Ability.Skill.Id", ToolTip = "Stable skill identity tag used by augments, unlocks, stats, and other non-cooldown systems."))
+	FGameplayTag SkillIdTag;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Visual")
 	TSubclassOf<AActor> SkillVisualActorClass;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Visual")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Visual", meta = (DisplayName = "Visual Cues", TitleProperty = "CueTag", ToolTip = "Flexible skill visuals selected by situation cue, visual type, and optional element. Use this for cast/active/impact/tick/expire variations."))
+	TArray<FGP_SkillVisualCueEntry> VisualCues;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Visual", meta = (DisplayName = "Element Visual Overrides", TitleProperty = "ElementTag", ToolTip = "Element-specific visual overrides for impact visuals and active execution VFX."))
 	TArray<FGP_ElementVisualActorEntry> ElementVisualActorClasses;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Actor", meta = (DisplayName = "Execution Actor Class", ToolTip = "Actor spawned to execute this skill. Projectile, mine, field, trap, or other runtime actor. If empty, the ability fallback actor is used."))
+	TSubclassOf<AActor> SpawnActorClass;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Damage")
 	float BaseDamage = 0.f;
