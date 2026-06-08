@@ -184,6 +184,7 @@ private:
 	void OpenCharacterStatsMenu();
 	void CloseCharacterStatsMenu();
 	void ApplyCharacterStatsMenuInputMode(bool bMenuOpen);
+	FVector2D ResolveEffectiveMoveInput(const AGP_PlayerCharacter* PlayerCharacter) const;
 	void UpdateMovementSpeed(float DeltaSeconds);
 	void UpdateCharacterRotation(float DeltaSeconds);
 
