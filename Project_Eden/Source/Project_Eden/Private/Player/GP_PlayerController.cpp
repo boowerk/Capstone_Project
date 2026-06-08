@@ -148,6 +148,10 @@ void AGP_PlayerController::Input_Move(const FInputActionValue& Value)
 
 	const FVector2D MovementVector = Value.Get<FVector2D>().GetClampedToMaxSize(1.f);
 	CurrentMoveInput = MovementVector;
+	if (!HasAuthority())
+	{
+		Server_UpdateMoveInput(MovementVector);
+	}
 
 	AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetPawn());
 	const bool bFixed = PlayerCharacter &&
@@ -218,6 +222,10 @@ void AGP_PlayerController::Input_Move(const FInputActionValue& Value)
 void AGP_PlayerController::Input_MoveCompleted(const FInputActionValue& Value)
 {
 	CurrentMoveInput = FVector2D::ZeroVector;
+	if (!HasAuthority())
+	{
+		Server_ClearMoveInput();
+	}
 	ResetMoveDirectionSmoothing();
 	if (AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetPawn()))
 	{
@@ -483,6 +491,31 @@ void AGP_PlayerController::Server_SendSkillSelectionEvent_Implementation(FGamepl
 	Payload.Instigator = ControlledPawn;
 	Payload.Target = ControlledPawn;
 	UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(ControlledPawn, EventTag, Payload);
+}
+
+bool AGP_PlayerController::Server_UpdateMoveInput_Validate(FVector2D MovementVector)
+{
+	return MovementVector.SizeSquared() <= 1.21f;
+}
+
+void AGP_PlayerController::Server_UpdateMoveInput_Implementation(FVector2D MovementVector)
+{
+	CurrentMoveInput = MovementVector.GetClampedToMaxSize(1.0f);
+	if (CurrentMoveInput.IsNearlyZero())
+	{
+		ResetMoveDirectionSmoothing();
+	}
+}
+
+bool AGP_PlayerController::Server_ClearMoveInput_Validate()
+{
+	return true;
+}
+
+void AGP_PlayerController::Server_ClearMoveInput_Implementation()
+{
+	CurrentMoveInput = FVector2D::ZeroVector;
+	ResetMoveDirectionSmoothing();
 }
 
 void AGP_PlayerController::RefreshBossHUD()
