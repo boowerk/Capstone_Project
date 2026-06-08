@@ -77,11 +77,6 @@ void AGP_PlayerState::AddSkillAugment(UGP_SkillAugmentData* AugmentData)
 
 	SelectedSkillAugments.Add(AugmentData);
 
-	if (AugmentData->GrantedElementTag.IsValid())
-	{
-		CurrentTechElementTag = AugmentData->GrantedElementTag;
-	}
-
 	ForceNetUpdate();
 }
 
@@ -315,7 +310,7 @@ bool AGP_PlayerState::DoesAugmentApplyToSkill(const UGP_SkillAugmentData* Augmen
 		return false;
 	}
 
-	return !AugmentData->RequiredElementTag.IsValid() || CurrentTechElementTag.MatchesTagExact(AugmentData->RequiredElementTag);
+	return true;
 }
 
 void AGP_PlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

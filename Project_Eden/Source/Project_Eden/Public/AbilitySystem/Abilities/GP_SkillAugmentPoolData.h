@@ -23,6 +23,12 @@ public:
 	TArray<UGP_SkillAugmentData*> PickRandomAugmentsExcluding(int32 Count, const TArray<UGP_SkillAugmentData*>& ExcludedAugments) const;
 
 	UFUNCTION(BlueprintCallable, Category = "Skill|Augment|Pool")
+	TArray<UGP_SkillAugmentData*> PickRandomAugmentsExcludingForSkills(
+		int32 Count,
+		const TArray<UGP_SkillAugmentData*>& ExcludedAugments,
+		FGameplayTagContainer AvailableSkillTags) const;
+
+	UFUNCTION(BlueprintCallable, Category = "Skill|Augment|Pool")
 	TArray<UGP_SkillAugmentData*> PickRandomAugmentsExcludingForElement(
 		int32 Count,
 		const TArray<UGP_SkillAugmentData*>& ExcludedAugments,

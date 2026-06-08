@@ -49,6 +49,20 @@ namespace GPTags
                 UE_DEFINE_GAMEPLAY_TAG_COMMENT(LineShock, "GPTags.Ability.Skill.Id.LineShock", "라인 쇼크 스킬 식별 태그");
                 UE_DEFINE_GAMEPLAY_TAG_COMMENT(MineBurst, "GPTags.Ability.Skill.Id.MineBurst", "마인 버스트 스킬 식별 태그");
                 UE_DEFINE_GAMEPLAY_TAG_COMMENT(ConeSlash, "GPTags.Ability.Skill.Id.ConeSlash", "콘 슬래시 스킬 식별 태그");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(MagmaShot, "GPTags.Ability.Skill.Id.MagmaShot", "마그마 샷 스킬 식별 태그");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(GelmirFury, "GPTags.Ability.Skill.Id.GelmirFury", "겔미어 퓨리 스킬 식별 태그");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(DarkSoloProjectile, "GPTags.Ability.Skill.Id.DarkSoloProjectile", "다크 단일 투사체 스킬 식별 태그");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(DarkStone, "GPTags.Ability.Skill.Id.DarkStone", "다크 스톤 스킬 식별 태그");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(DarkMist, "GPTags.Ability.Skill.Id.DarkMist", "다크 미스트 스킬 식별 태그");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(LightningStrike, "GPTags.Ability.Skill.Id.LightningStrike", "라이트닝 스트라이크 스킬 식별 태그");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(IceMist, "GPTags.Ability.Skill.Id.IceMist", "아이스 미스트 스킬 식별 태그");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(CrystalTorrent, "GPTags.Ability.Skill.Id.CrystalTorrent", "크리스탈 토렌트 스킬 식별 태그");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(ShatteringCrystal, "GPTags.Ability.Skill.Id.ShatteringCrystal", "섀터링 크리스탈 스킬 식별 태그");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(BigHammer, "GPTags.Ability.Skill.Id.BigHammer", "빅 해머 스킬 식별 태그");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(BigSword, "GPTags.Ability.Skill.Id.BigSword", "빅 소드 스킬 식별 태그");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(MagicBigBubbles, "GPTags.Ability.Skill.Id.MagicBigBubbles", "매직 빅 버블 스킬 식별 태그");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(MagicBubbles, "GPTags.Ability.Skill.Id.MagicBubbles", "매직 버블 스킬 식별 태그");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(Potion, "GPTags.Ability.Skill.Id.Potion", "포션 스킬 식별 태그");
             }
         }
         namespace Enemy
