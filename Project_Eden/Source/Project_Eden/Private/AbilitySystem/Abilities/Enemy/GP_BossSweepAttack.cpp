@@ -4,6 +4,7 @@
 #include "AIController.h"
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 #include "AbilitySystem/Abilities/GP_GameplayAbility.h"
+#include "AbilitySystem/Abilities/GP_SkillData.h"
 #include "Animation/AnimMontage.h"
 #include "Animation/PDA_CharacterAnimationSet.h"
 #include "Characters/GP_BaseCharacter.h"
@@ -269,11 +270,13 @@ void UGP_BossSweepAttack::PerformBossSweepHit()
 
 	if (HasAuthority(&CurrentActivationInfo) && ResolvedDamageEffectClass)
 	{
+		UGP_SkillData* SkillData = GetSkillDataFromSpec(CurrentSpecHandle, CurrentActorInfo);
 		UGP_BlueprintLibrary::ApplyGameplayEffectToActors(
 			AvatarActor,
 			HitActors,
 			ResolvedDamageEffectClass,
-			GetAbilityLevel());
+			GetAbilityLevel(),
+			SkillData);
 	}
 
 	bBossSweepHitApplied = true;

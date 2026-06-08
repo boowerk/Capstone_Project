@@ -10,6 +10,7 @@ class UBehaviorTree;
 class UBlackboardData;
 class UEnemyAIRangeVisualizationComponent;
 class UEnemyArchetypeData;
+class AGP_PlayerState;
 struct FDataTableRowHandle;
 struct FEnemyArchetypeTuning;
 struct FEnemyLLMEvaluation;
@@ -125,6 +126,11 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Abilities", meta = (EditCondition = "bIsBossEnemy"))
 	bool bGrantDefaultBossPatternAbilities = true;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Progression", meta = (ClampMin = "0.0"))
+	float XPReward = 25.0f;
+
+	virtual void HandlePostDamageTaken(AActor* InstigatorActor, float DamageAmount, FGameplayTag ElementTag) override;
+
 private:
 #if WITH_EDITORONLY_DATA
 	UPROPERTY(VisibleAnywhere, Category = "AI|Debug", meta = (AllowPrivateAccess = "true"))
@@ -139,9 +145,12 @@ private:
 
 	FVector BehaviorAnchorLocation = FVector::ZeroVector;
 	bool bHasBehaviorAnchorLocation = false;
+	bool bXPRewardGranted = false;
 
 	const FEnemyArchetypeTuning* ResolveEnemyArchetypeTuning() const;
 	int32 ResolvePersonalitySeed() const;
 	void GiveDefaultBossPatternAbilities();
 	void RefreshAIRangeVisualizers();
+	void GrantXPRewardToInstigator(AActor* InstigatorActor);
+	AGP_PlayerState* ResolveInstigatorPlayerState(AActor* InstigatorActor) const;
 };

@@ -8,11 +8,14 @@
 #include "Actors/GP_ChainEffectActor.h"
 #include "Actors/GP_MatadorBossDecoyActor.h"
 #include "AIController.h"
+#include "BehaviorTree/BehaviorTree.h"
 #include "BehaviorTree/BlackboardComponent.h"
+#include "BehaviorTree/BlackboardData.h"
 #include "Characters/GP_MatadorBossStateComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/Controller.h"
+#include "Kismet/GameplayStatics.h"
 #include "NavigationSystem.h"
 #include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
@@ -29,6 +32,18 @@ AGP_MatadorMageBossCharacter::AGP_MatadorMageBossCharacter()
 	BullChargeActorClass = AGP_BullChargeActor::StaticClass();
 	MatadorBullPatternAbilityClass = UGP_MatadorBullPatternAbility::StaticClass();
 	MatadorGroggyAbilityClass = UGP_MatadorGroggyAbility::StaticClass();
+
+	static ConstructorHelpers::FObjectFinder<UBehaviorTree> BossBehaviorTreeFinder(TEXT("/Game/Characters/EnemyCharacter/BT/Boss/BT_Boss_Matador.BT_Boss_Matador"));
+	if (BossBehaviorTreeFinder.Succeeded())
+	{
+		BehaviorTreeAssetOverride = BossBehaviorTreeFinder.Object;
+	}
+
+	static ConstructorHelpers::FObjectFinder<UBlackboardData> BossBlackboardFinder(TEXT("/Game/Characters/EnemyCharacter/BT/Boss/BB_Boss_Matador.BB_Boss_Matador"));
+	if (BossBlackboardFinder.Succeeded())
+	{
+		BlackboardAssetOverride = BossBlackboardFinder.Object;
+	}
 
 	// SK_MaskMan is the requested prototype mesh for the native Matador boss and decoy.
 	static ConstructorHelpers::FObjectFinder<USkeletalMesh> MaskManMeshFinder(TEXT("/Game/Characters/MaskMan/SK_MaskMan.SK_MaskMan"));
@@ -64,6 +79,17 @@ void AGP_MatadorMageBossCharacter::BeginPlay()
 	{
 		EnsureMatadorDecoy();
 	}
+
+	if (bUseFallbackMatadorPatternLoop && FallbackPatternInterval > 0.0f)
+	{
+		GetWorldTimerManager().SetTimer(
+			FallbackPatternTimerHandle,
+			this,
+			&ThisClass::HandleMatadorFallbackPatternTick,
+			FMath::Max(0.1f, FallbackPatternInterval),
+			true,
+			FMath::Max(0.1f, FallbackPatternInterval * 0.5f));
+	}
 }
 
 void AGP_MatadorMageBossCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -71,6 +97,7 @@ void AGP_MatadorMageBossCharacter::EndPlay(const EEndPlayReason::Type EndPlayRea
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(GroggyRecoveryTimerHandle);
+		World->GetTimerManager().ClearTimer(FallbackPatternTimerHandle);
 	}
 
 	Super::EndPlay(EndPlayReason);
@@ -329,6 +356,35 @@ void AGP_MatadorMageBossCharacter::GrantMatadorPatternAbilities()
 	}
 }
 
+void AGP_MatadorMageBossCharacter::HandleMatadorFallbackPatternTick()
+{
+	if (!HasAuthority() || !IsValid(MatadorStateComponent) || MatadorStateComponent->IsGroggy() || IsBullPatternActive())
+	{
+		return;
+	}
+
+	AActor* TargetActor = ResolvePatternTarget(nullptr);
+	if (!IsValid(TargetActor))
+	{
+		return;
+	}
+
+	const float DistanceToTarget = FVector::Dist2D(GetActorLocation(), TargetActor->GetActorLocation());
+	if (DistanceToTarget < FallbackBullMinRange || DistanceToTarget > FallbackBullMaxRange)
+	{
+		return;
+	}
+
+	if (AGP_BullChargeActor* BullActor = SpawnBullPattern(TargetActor))
+	{
+		UE_LOG(LogTemp, Log, TEXT("[MatadorAI] Fallback bull pattern spawned. Boss=%s Target=%s Distance=%.1f Bull=%s"),
+			*GetNameSafe(this),
+			*GetNameSafe(TargetActor),
+			DistanceToTarget,
+			*GetNameSafe(BullActor));
+	}
+}
+
 AActor* AGP_MatadorMageBossCharacter::ResolvePatternTarget(AActor* ExplicitTargetActor) const
 {
 	if (IsValid(ExplicitTargetActor))
@@ -340,11 +396,15 @@ AActor* AGP_MatadorMageBossCharacter::ResolvePatternTarget(AActor* ExplicitTarge
 	{
 		if (const UBlackboardComponent* BlackboardComponent = AIController->GetBlackboardComponent())
 		{
-			return Cast<AActor>(BlackboardComponent->GetValueAsObject(EnemyBlackboardKeys::TargetActor));
+			if (AActor* BlackboardTarget = Cast<AActor>(BlackboardComponent->GetValueAsObject(EnemyBlackboardKeys::TargetActor)))
+			{
+				return BlackboardTarget;
+			}
 		}
 	}
 
-	return nullptr;
+	// Temporary safety net: Matador patterns must remain testable while the dedicated BT is rebuilt.
+	return UGameplayStatics::GetPlayerPawn(this, 0);
 }
 
 FVector AGP_MatadorMageBossCharacter::ResolveDecoySpawnLocation(AActor* TargetActor) const

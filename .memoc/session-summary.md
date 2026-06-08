@@ -2,23 +2,28 @@
 memoc: true
 type: state
 scope: project-memory
-created: 2026-06-01T04:41:15
-updated: 2026-06-01T04:41:15
 status: active
-tags:
-  - memoc
-  - memoc/state
+tags: [memoc, memoc/state]
+updated: 2026-06-06T00:00:00+09:00
 ---
 # Session Summary
-Last: 2026-06-07T22:00:00+09:00
+Last: 2026-06-06T00:00:00+09:00
+
 ## Status
-- Added dynamic minimap capture stack: `AGP_MinimapCaptureActor`, `UGP_MinimapSubsystem`, PCG completion notification, and HUD RenderTarget binding.
-- `WBP_PlayerHUDWidget` can bind `MinimapBackgroundImage`/fallback-named Image to the current minimap RenderTarget.
-- Full `Project_EdenEditor Win64 Development` build succeeded.
+- `origin/main` ExpBar UI update (`d1afb656`) merged into `feature/vfx-skills`.
+- Latest `origin/feature/vfx-skills-impact` merged into `feature/vfx-skills`; includes Primary VisualCues, Matador AI/BT updates, maps, and Fab assets.
+- Selected augment visual overrides now work. Latest applicable `ActiveVFXOverride` / `ImpactVisualActorOverride` wins over SkillData element/default visuals.
+- PlayerState owns override resolution; SkillBase consumes it for projectile and impact visuals.
+- Augment `DamageMultiplier` now scales the full damage formula, including AttackPower/MagicPower coefficient contributions.
+- Augment picker now excludes candidates whose `RequiredElementTag` does not match the player's current tech element.
+- Existing XP/level, enemy XP reward, augment UI, duplicate prevention, numeric modifiers, and element requirements remain.
 
-## Open Tasks
-- Place/configure `AGP_MinimapCaptureActor` in the level, set bounds/follow mode, and name the HUD background Image `MinimapBackgroundImage`.
-- If PCG graph finishes asynchronously, call `NotifyPcgGenerationFinished` from BP after the actual generation completion point.
+## Next
+- Later: evolved skill-slot UI. Selected upgrade augment should override base skill name, description, and icon.
+- Build.
+- Create Pyros projectile augment targeting NetTestProjectile with `NS_Free_Magic_Projectile1`.
+- Select augment in PIE and verify projectile VFX replacement.
+- Verify 1.5 damage augment changes 10 damage to 15.
 
-## Resume
-- Existing unrelated untracked file remains: `.memoc/MatadorMageBoss_ImplementationInstructions.md`.
+## Verify
+- `git diff --check` passed. Full build not run.

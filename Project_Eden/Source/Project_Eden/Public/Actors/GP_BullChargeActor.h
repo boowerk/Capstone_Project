@@ -46,6 +46,7 @@ private:
 	void FinishCharge(bool bHitDecoy);
 	void DrawTelegraph() const;
 	FVector ResolveDesiredDirection() const;
+	bool BeginChargeImpact();
 
 private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Matador", meta = (AllowPrivateAccess = "true"))
@@ -78,6 +79,15 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "Boss|Matador")
 	float EffectLevel = 1.0f;
 
+	UPROPERTY(EditDefaultsOnly, Category = "Boss|Matador|Damage", meta = (ClampMin = "0.0"))
+	float BullHitBaseDamage = 35.0f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Boss|Matador|Damage", meta = (ClampMin = "0.0"))
+	float BullHitAttackPowerCoefficient = 0.5f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Boss|Matador|Damage", meta = (ClampMin = "0.0"))
+	float BullHitToughnessDamage = 20.0f;
+
 	UPROPERTY(Transient)
 	TObjectPtr<AActor> TargetActor;
 
@@ -91,4 +101,5 @@ private:
 	FVector ChargeDirection = FVector::ForwardVector;
 	bool bChargeStarted = false;
 	bool bChargeFinished = false;
+	bool bImpactHandled = false;
 };

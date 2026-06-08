@@ -32,6 +32,9 @@ void UGP_Skill_GroundBurst::ActivateAbility(const FGameplayAbilitySpecHandle Han
 	{
 		UGP_SkillData* SkillData = GetSkillDataFromSpec(Handle, ActorInfo);
 		const FGameplayTag TechElementTag = GetCurrentTechElementTag(ActorInfo);
+		const float RadiusMultiplier = GetSkillAugmentRadiusMultiplier(SkillData, ActorInfo);
+		const float RangeMultiplier = GetSkillAugmentRangeMultiplier(SkillData, ActorInfo);
+		const float FinalBurstRadius = BurstRadius * RadiusMultiplier;
 
 		FRotator AimRotation = Avatar->GetActorRotation();
 		if (AController* Controller = Avatar->GetController())
@@ -42,29 +45,31 @@ void UGP_Skill_GroundBurst::ActivateAbility(const FGameplayAbilitySpecHandle Han
 		AimRotation.Pitch = 0.f;
 		AimRotation.Roll = 0.f;
 
-		const FVector TargetLocation = Avatar->GetActorLocation() + AimRotation.Vector() * TargetForwardOffset;
+		const FVector TargetLocation = Avatar->GetActorLocation() + AimRotation.Vector() * (TargetForwardOffset * RangeMultiplier);
 		const FVector TraceStart = TargetLocation + FVector::UpVector * TraceHeight;
 		const FVector TraceEnd = TargetLocation - FVector::UpVector * TraceDepth;
 
 		FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(GroundBurstTrace), false);
 		QueryParams.AddIgnoredActor(Avatar);
+		FCollisionObjectQueryParams ObjectQueryParams;
+		ObjectQueryParams.AddObjectTypesToQuery(ECC_WorldStatic);
 
 		FHitResult HitResult;
-		const bool bHitGround = Avatar->GetWorld()->LineTraceSingleByChannel(
+		const bool bHitGround = Avatar->GetWorld()->LineTraceSingleByObjectType(
 			HitResult,
 			TraceStart,
 			TraceEnd,
-			GroundTraceChannel,
+			ObjectQueryParams,
 			QueryParams
 		);
 
 		const FVector BurstLocation = bHitGround ? HitResult.Location : TargetLocation;
-		SpawnVisualActor(Avatar, GetSkillVisualActorClass(SkillData, BurstVisualActorClass, TechElementTag), BurstLocation);
+		SpawnVisualActor(Avatar, GetSkillVisualActorClass(SkillData, BurstVisualActorClass, TechElementTag), BurstLocation, FRotator::ZeroRotator, RadiusMultiplier);
 
 		const TArray<AActor*> HitActors = UGP_BlueprintLibrary::SphereOverlapActorsAtLocation(
 			Avatar,
 			BurstLocation,
-			BurstRadius,
+			FinalBurstRadius,
 			Avatar,
 			bDrawDebugs
 		);

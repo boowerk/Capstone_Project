@@ -1,6 +1,8 @@
 #include "Actors/GP_BullChargeActor.h"
 
 #include "Actors/GP_MatadorBossDecoyActor.h"
+#include "AbilitySystemBlueprintLibrary.h"
+#include "AbilitySystemComponent.h"
 #include "Characters/GP_MatadorBossStateComponent.h"
 #include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -25,7 +27,7 @@ AGP_BullChargeActor::AGP_BullChargeActor()
 	CollisionBox->SetCollisionResponseToAllChannels(ECR_Ignore);
 	CollisionBox->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
 	CollisionBox->SetCollisionResponseToChannel(ECC_WorldStatic, ECR_Block);
-	CollisionBox->SetCollisionResponseToChannel(ECC_WorldDynamic, ECR_Block);
+	CollisionBox->SetCollisionResponseToChannel(ECC_WorldDynamic, ECR_Overlap);
 	SetRootComponent(CollisionBox);
 
 	BullVisualMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BullVisualMesh"));
@@ -141,6 +143,11 @@ void AGP_BullChargeActor::OnChargeOverlap(UPrimitiveComponent* OverlappedCompone
 
 	if (OtherActor == DecoyActor.Get())
 	{
+		if (!BeginChargeImpact())
+		{
+			return;
+		}
+
 		if (IsValid(MatadorStateComponent.Get()))
 		{
 			MatadorStateComponent->RecordBullHitDecoy();
@@ -152,9 +159,36 @@ void AGP_BullChargeActor::OnChargeOverlap(UPrimitiveComponent* OverlappedCompone
 
 	if (UGP_BlueprintLibrary::CanApplyCombatEffect(GetOwner(), OtherActor))
 	{
+		if (!BeginChargeImpact())
+		{
+			return;
+		}
+
+		AActor* InstigatorActor = GetOwner();
+		UAbilitySystemComponent* SourceASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(InstigatorActor);
+		UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(OtherActor);
+		if (IsValid(SourceASC) && IsValid(TargetASC) && DamageEffectClass)
+		{
+			FGameplayEffectContextHandle ContextHandle = SourceASC->MakeEffectContext();
+			ContextHandle.AddInstigator(InstigatorActor, InstigatorActor);
+
+			FGameplayEffectSpecHandle SpecHandle = SourceASC->MakeOutgoingSpec(DamageEffectClass, EffectLevel, ContextHandle);
+			if (SpecHandle.IsValid())
+			{
+				SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Data::Base, BullHitBaseDamage);
+				SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Data::BaseSpell, 0.0f);
+				SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Data::ToughnessBase, BullHitToughnessDamage);
+				SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Coef::Atk, BullHitAttackPowerCoefficient);
+				SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Coef::M_Atk, 0.0f);
+				SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Coef::Def, 0.0f);
+				SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Coef::Hp, 0.0f);
+				SourceASC->ApplyGameplayEffectSpecToTarget(*SpecHandle.Data.Get(), TargetASC);
+			}
+		}
+
 		TArray<AActor*> HitActors;
 		HitActors.Add(OtherActor);
-		UGP_BlueprintLibrary::ApplyGameplayEffectAndEventToActors(GetOwner(), HitActors, DamageEffectClass, PlayerHitEventTag, EffectLevel);
+		UGP_BlueprintLibrary::SendGameplayEventToActors(InstigatorActor, HitActors, PlayerHitEventTag);
 		FinishCharge(false);
 	}
 }
@@ -167,6 +201,11 @@ void AGP_BullChargeActor::FinishCharge(bool bHitDecoy)
 	}
 
 	bChargeFinished = true;
+	bImpactHandled = true;
+	if (IsValid(CollisionBox))
+	{
+		CollisionBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
 	BP_OnBullChargeEnded(bHitDecoy);
 
 	if (IsValid(MatadorStateComponent.Get()) && MatadorStateComponent->GetActiveBullActor() == this)
@@ -178,6 +217,23 @@ void AGP_BullChargeActor::FinishCharge(bool bHitDecoy)
 	{
 		Destroy();
 	}
+}
+
+bool AGP_BullChargeActor::BeginChargeImpact()
+{
+	if (bImpactHandled || bChargeFinished)
+	{
+		return false;
+	}
+
+	bImpactHandled = true;
+	if (IsValid(CollisionBox))
+	{
+		// Prevent repeated overlap callbacks from applying damage every frame while Destroy is pending.
+		CollisionBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
+
+	return true;
 }
 
 void AGP_BullChargeActor::DrawTelegraph() const

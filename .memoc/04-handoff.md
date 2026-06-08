@@ -11,28 +11,31 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-06-07T22:00:00+09:00
+Last synced: 2026-06-03T19:04:50
 
-## Current Matador Mage Boss Handoff
+## Skill Augment Handoff
 
-- C++ is complete and build-verified for the first Matador pass. Use `AGP_MatadorMageBossCharacter` or a Blueprint child as the placed boss. It creates `UGP_MatadorBossStateComponent`, grants Matador bull/groggy GAS abilities, and defaults its mesh to `/Game/Characters/MaskMan/SK_MaskMan`.
-- Runtime pattern flow: boss selector can choose `GPTags.Ability.Enemy.Utility_MatadorBullPattern`; the ability spawns `AGP_BullChargeActor`; bull collision with `AGP_MatadorBossDecoyActor` calls the state component; 3 chain breaks enter Groggy and remove guarded damage reduction.
-- Editor setup still needed: add optional Blackboard keys `ChainBreakCount`, `bIsGroggy`, `bCanUseBullPattern`, `bBullPatternActive`, `DecoyActor`, `MainBossActor`, `PreferredHoverHeight`, `PreferredAirRange`, `bShouldTeleport` to the boss Blackboard asset if designers want to inspect/branch on them.
-- PIE checklist: verify guarded damage is 10% while `MatadorGuarded`, normal damage while `Groggy`, decoy damage routes to the real boss ASC, bull hit on decoy increments chain stage 0/1/2/3, and Groggy recovers after `GroggyDuration`.
-
-## Current Minimap Handoff
-
-- Dynamic minimap C++ is build-verified. Place `AGP_MinimapCaptureActor` or a BP child in the playable level.
-- For local minimap, leave `bStartFollowingPlayer=true`, `CaptureMode=FollowTarget`, tune `FollowOrthoWidth`, and keep `bRotateCaptureWithTarget=false` so the player arrow yaw remains the rotation source.
-- For a whole-map snapshot, assign `DefaultBoundsActor` to an actor covering the PCG play area and call `CaptureFullMap`.
-- `APcgControllerActor` now auto-calls `NotifyPcgGenerationFinished(AutoMinimapCaptureDelay)` after `ApplyPcgParameters`; if the actual PCG graph finishes later/asynchronously, call `NotifyPcgGenerationFinished` manually from BP at the real completion point.
-- In `WBP_PlayerHUDWidget`, name the minimap background Image `MinimapBackgroundImage` or use a name containing `Minimap`/`MiniMap` plus `Background`/`MapImage`; HUD will set its brush resource to the active RenderTarget.
+- `UGP_SkillAugmentData.TargetSkillTags` empty means global/all-skill augment; otherwise exact skill id match.
+- `UGP_SkillAugmentData.RequiredElementTag` gates modifier application by `AGP_PlayerState.CurrentTechElementTag`; empty means no element requirement.
+- `GrantedElementTag` remains the "change current tech element" field and is separate from `RequiredElementTag`.
+- `AGP_PlayerState` exposes damage, radius, range, cooldown multiplier, and projectile count bonus resolution.
+- `AGP_PlayerState` now resolves `ActiveVFXOverride` and `ImpactVisualActorOverride`; `UGP_SkillBase` applies the latest matching selected augment override before SkillData element/default visuals.
+- Next PIE test: create a Pyros-only projectile augment targeting NetTestProjectile, assign `NS_Free_Magic_Projectile1` to `ActiveVFXOverride`, select it, and verify the projectile Niagara changes.
+- `DamageMultiplier` is passed as `Damage.Multiplier` and applied once to computed base damage before crit/increase/mitigation. Verify NetTestProjectile damage changes from 10 to 15 with a 1.5 augment.
+- `UGP_SkillBase::ApplyCooldown` applies `CooldownMultiplier`; `UGP_Skill_DashSlash` also applies it to its fallback cooldown.
+- `ProjectileCountBonus` is wired for `SplitShot`, `NetTestProjectile`, and `ThrownBurst`; NetTest/ThrownBurst fan extra projectiles across a small 10-degree yaw spread.
+- PIE test still needed: cooldown DA (`CooldownMultiplier=0.5`), projectile DA (`ProjectileCountBonus=1`), and element-gated DA (`RequiredElementTag=Volt`) via augment picker.
+- `AGP_PlayerState::GetSkillAugmentRadiusMultiplier` returns multiplied radius modifiers for selected augments exact-matching `SkillData.SkillIdTag`.
+- `UGP_SkillBase` exposes `GetSkillAugmentRadiusMultiplier`, `GetSkillSpawnActorClass`, and `GetProjectileVisualSystem`.
+- PulseBurst/GroundBurst apply radius multiplier directly to overlap radius.
+- PulseBurst/GroundBurst pass the same multiplier to spawned visual actor scale.
+- MineBurst/ThrownBurst apply radius multiplier to spawned `AGP_MineBurstActor` / `AGP_AreaProjectile` via `ApplyExplosionRadiusMultiplier`; impact visual actor scale uses the same multiplier.
+- `AGP_PlayerState::GetSkillAugmentRangeMultiplier` and `UGP_SkillBase::GetSkillAugmentRangeMultiplier` are wired.
+- RangeMultiplier scales LineShock box length, ConeSlash candidate range/visual offset, GroundBurst target forward offset, and MineBurst place forward offset.
+- Verify in editor after compile: enable relevant debug radius and test matching augment DA per skill id.
 
 ## Current Tech UI Handoff
 
-- Character stats/menu tabs are now handled by `UGP_CharacterStatsMenuWidget` C++. It auto-detects existing tab labels (`MapTab`, `JournalTab`, `ItemsTab`, `AttributesTab`, `GearTab`, `AbilitiesTab`, `SystemTab`) and supports both text/border hit-testing and actual `UButton` delegates.
-- For real page switching in `/Game/UI/CharacterStatMenu/WBP_CharacterStatsMenu`, add a `WidgetSwitcher` named `TabContentSwitcher` with child order Map, Journal, Item, Attributes, Gear, Abilities, System. Alternative: use named panels (`MapPanel`, `JournalPanel`, `ItemsPanel`/`ItemPanel`, `AttributesPanel`, `GearPanel`, `AbilitiesPanel`, `SystemPanel`).
-- Optional selected bars are auto-detected if named `MapUnderline`, `JournalUnderline`, `ItemsUnderline`, `AttributesUnderline`, `GearUnderline`, `AbilitiesUnderline`, `SystemUnderline`. Without those, C++ still changes tab opacity and `TitleText`.
 - Boss HUD fix in progress: `GP_PlayerHUDWidget` now binds boss ASC via `UGP_AttributeWidget` (`BossBar`/`BossHealthBar` name lookup) and `GP_PlayerController::RefreshBossHUD()` re-calls binding for the current boss so live/widget swaps can recover.
 - User created `/Game/UI/HUD/WBP_BossBar` from `UGP_AttributeWidget`; it was configured to Health/MaxHealth and placed as `WBP_PlayerHUDWidget.BossBar`. If editor Blueprint compile reports a stale `BossBar_ProgressBar_Deprecated` GUID ensure, recreate/delete that designer widget manually rather than continuing Python mutation.
 - Tech selection UI test path exists: `GP_TechSelectWidget` C++ parent + `WBP_TestTechSelect` child.
@@ -71,6 +74,8 @@ Last synced: 2026-06-07T22:00:00+09:00
 
 ## Next Steps
 
+- Build and PIE-test the corrected latest `feature/vfx-skills-impact` merge: Primary attack VisualCues, augment VFX priority, Matador AI/BT, and map asset loads.
+- Future skill UI requirement: when an upgrade augment transforms a skill, replace the skill-slot presentation so it appears evolved. Add augment presentation overrides such as `SkillNameOverride`, `SkillDescriptionOverride`, and `SkillIconOverride`, then resolve the latest applicable selected augment before base `UGP_SkillData` display fields.
 - Point `UGP_CharacterAnimInstance` (or the active AnimBP path) at `CHT_MM_MaskMan_Root` instead of the stock relaxed chooser fallback.
 - Verify the new chooser in PIE: idle, turn-in-place, run, sprint, and in-air should all resolve to the intended PSDs.
 - Verify actual movement speed in PIE: forward `500`, side `350`, back `300`, sprint forward `700`, sprint side/back `350/300`.
@@ -89,7 +94,6 @@ _None yet._
 
 ## Verified
 
-- Full `Project_EdenEditor Win64 Development` build succeeded after the character stats menu tab-navigation C++ change.
 - `ABP_UEFNSource_Player` compiles and saves.
 - `BP_GP_PlayerCharacter` CDO shows `UEFNSourceMesh.animClass = /Game/Characters/PlayerCharacter/ABP_UEFNSource_Player.ABP_UEFNSource_Player_C`.
 - Build error about undefined `FTransformTrajectory` was fixed by including `Animation/TrajectoryTypes.h`.
@@ -117,6 +121,9 @@ _None yet._
 
 ## Not Verified
 
+- 2026-05-31 `UGP_SkillAugmentPoolData`: compile, create DataAsset, fill `Augments`, call `PickRandomAugments(3)` from BP, and pass result to `UGP_AugmentSelectWidget::SetCandidateAugments`.
+- 2026-06-01 `UGP_AugmentSelectWidget`: verify BP child binds `TextBlock_Description0..2` and `Image_Icon0..2`; candidate cards should show augment name, description, and icon when DA fields are set.
+- 2026-06-02 augment type backgrounds: full UBT/editor rebuild was not run because Unreal MCP build/query calls were rejected by automatic approval review. After rebuild, verify `AugmentTypeBackgrounds` defaults and `Image_CardBg0..2` bindings in `WBP_TestAugmentSelect_1`.
 - 2026-05-30 DashSlash skill PIE/runtime behavior: verify `GA_Skill_DashSlash` plays MaskMan target sword dash montage when present, otherwise UEFN source fallback, applies one forward box hit on `AttackHit`, and ends/clears `Fixed` on `ActionEnd` or montage completion.
 - 2026-05-29 MM debug source logging: user will verify via Live Coding; expected result is cyan/green `UEFNSource` log showing current DB, applied DB, validity, and selected animation.
 - 2026-05-29 idle-to-short-walk fix in `UGP_CharacterAnimInstance`: user will verify via Live Coding; expected result is no idle-pose foot slide before start/loop motion appears on short taps.

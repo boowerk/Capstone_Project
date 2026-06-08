@@ -1,4 +1,4 @@
-﻿#include "Characters/GP_PlayerCharacter.h"
+#include "Characters/GP_PlayerCharacter.h"
 
 // Engine / Core Headers
 #include "AbilitySystemComponent.h"
@@ -7,6 +7,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "HAL/IConsoleManager.h"
 #include "UObject/UnrealType.h"
+#include "Engine/OverlapResult.h"
 
 // Framework / Component Headers
 #include "GameFramework/PlayerController.h"
@@ -16,6 +17,7 @@
 #include "Camera/PlayerCameraManager.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Player/GP_PlayerController.h"
 
 // Animation Headers
 #include "Animation/AnimInstance.h"
@@ -32,6 +34,7 @@
 #include "Animation/PDA_CharacterAnimationSet.h"
 #include "CharacterTrajectoryComponent.h"
 #include "GameplayTags/GP_Tags.h"
+#include "Utils/GP_BlueprintLibrary.h"
 
 static int32 GGPActionInertiaDebug = 1;
 static FAutoConsoleVariableRef CVarGPActionInertiaDebug(
@@ -55,6 +58,8 @@ AGP_PlayerCharacter::AGP_PlayerCharacter()
 	GetCharacterMovement()->RotationRate = FRotator(0.0f, 540.0f, 0.0f);
 	GetCharacterMovement()->JumpZVelocity = 500.f;
 	GetCharacterMovement()->AirControl = 0.2f;
+	GetCharacterMovement()->NavAgentProps.bCanCrouch = true;
+	GetCharacterMovement()->CrouchedHalfHeight = 64.0f; // 기본값 40.0f가 너무 작아 앉은키가 극단적으로 작아지므로 64.0f로 적당하게 상향 조정
 
 	// 초기 속도 세팅
 	GetCharacterMovement()->MaxWalkSpeed = GetScaledNormalWalkSpeed();
@@ -74,16 +79,17 @@ AGP_PlayerCharacter::AGP_PlayerCharacter()
 	UEFNSourceMesh->SetRelativeRotation(FRotator::ZeroRotator);
 
 	GetMesh()->SetupAttachment(UEFNSourceMesh);
+	GetMesh()->AddTickPrerequisiteComponent(UEFNSourceMesh);
 
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>("CameraBoom");
 	CameraBoom->SetupAttachment(GetRootComponent());
-	CameraBoom->TargetArmLength = 380.0f;
+	CameraBoom->TargetArmLength = NormalCameraArmLength;
 	CameraBoom->bUsePawnControlRotation = true;
 	CameraBoom->bEnableCameraLag = true;
 	CameraBoom->CameraLagSpeed = 12.0f;
 	CameraBoom->bEnableCameraRotationLag = true;
 	CameraBoom->CameraRotationLagSpeed = 15.0f;
-	CameraBoom->SocketOffset = FVector(0.0f, 50.0f, 20.0f);
+	CameraBoom->SocketOffset = CameraSocketOffset;
 	CameraBoom->TargetOffset = FVector(0.0f, 0.0f, 0.0f);
 
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>("FollowCamera");
@@ -109,12 +115,44 @@ AGP_PlayerCharacter::~AGP_PlayerCharacter()
 void AGP_PlayerCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+
 	ApplyMovementSpeedFromAnimationSet();
 	ApplyRetargetVisualScaleFromAnimationSet();
 	if (bAutoSpawnWhiteVoidSet)
 	{
 		EnsureWhiteVoidSetExists();
 	}
+}
+
+void AGP_PlayerCharacter::PostInitializeComponents()
+{
+	Super::PostInitializeComponents();
+
+	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+	{
+		MoveComp->NavAgentProps.bCanCrouch = true;
+	}
+
+	if (UEFNSourceMesh && UEFNSourceMesh->GetAttachParent() != GetCapsuleComponent())
+	{
+		UEFNSourceMesh->AttachToComponent(GetCapsuleComponent(), FAttachmentTransformRules::KeepRelativeTransform);
+	}
+
+	if (UEFNSourceMesh && GetMesh() && GetMesh()->GetAttachParent() != UEFNSourceMesh)
+	{
+		GetMesh()->AttachToComponent(UEFNSourceMesh, FAttachmentTransformRules::KeepRelativeTransform);
+		GetMesh()->AddTickPrerequisiteComponent(UEFNSourceMesh);
+	}
+}
+
+void AGP_PlayerCharacter::OnStartCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust)
+{
+	Super::OnStartCrouch(HalfHeightAdjust, ScaledHalfHeightAdjust);
+}
+
+void AGP_PlayerCharacter::OnEndCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust)
+{
+	Super::OnEndCrouch(HalfHeightAdjust, ScaledHalfHeightAdjust);
 }
 
 void AGP_PlayerCharacter::Tick(float DeltaSeconds)
@@ -201,6 +239,129 @@ void AGP_PlayerCharacter::Tick(float DeltaSeconds)
 	UpdateConditionalMaxAcceleration(DeltaSeconds);
 	UpdateActionCarryVelocity(DeltaSeconds);
 	UpdateActionMotionTracking(DeltaSeconds);
+	UpdatePrimaryAttackAutoFacing(DeltaSeconds);
+	UpdatePrimaryAttackMovementAssist(DeltaSeconds);
+	UpdateCameraMotion(DeltaSeconds);
+}
+
+bool AGP_PlayerCharacter::AimPrimaryAttackAtBestTarget(float SearchRadius, float ForwardOffset, float Duration)
+{
+	AActor* BestTarget = FindBestPrimaryAttackTarget(SearchRadius, ForwardOffset);
+	if (!IsValid(BestTarget))
+	{
+		PrimaryAttackAutoFacingTarget = nullptr;
+		PrimaryAttackAutoFacingEndTime = 0.0f;
+		TargetActor = nullptr;
+		return false;
+	}
+
+	TargetActor = BestTarget;
+	PrimaryAttackAutoFacingTarget = BestTarget;
+	PrimaryAttackAutoFacingEndTime = GetWorld() ? GetWorld()->GetTimeSeconds() + FMath::Max(Duration, 0.0f) : 0.0f;
+	UpdatePrimaryAttackAutoFacing(0.0f);
+	return true;
+}
+
+AActor* AGP_PlayerCharacter::FindBestPrimaryAttackTarget(float SearchRadius, float ForwardOffset) const
+{
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return nullptr;
+	}
+
+	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(GP_PrimaryAttackAutoTarget), false);
+	QueryParams.AddIgnoredActor(this);
+
+	FCollisionResponseParams ResponseParams;
+	ResponseParams.CollisionResponse.SetAllChannels(ECR_Ignore);
+	ResponseParams.CollisionResponse.SetResponse(ECC_Pawn, ECR_Block);
+
+	TArray<FOverlapResult> OverlapResults;
+	const FVector SearchCenter = GetActorLocation() + GetActorForwardVector() * FMath::Max(ForwardOffset, 0.0f);
+	World->OverlapMultiByChannel(
+		OverlapResults,
+		SearchCenter,
+		FQuat::Identity,
+		ECC_Visibility,
+		FCollisionShape::MakeSphere(FMath::Max(SearchRadius, 1.0f)),
+		QueryParams,
+		ResponseParams);
+
+	AActor* BestTarget = nullptr;
+	float BestScore = TNumericLimits<float>::Max();
+	const FVector Forward2D = GetActorForwardVector().GetSafeNormal2D();
+	const FVector ActorLocation = GetActorLocation();
+
+	for (const FOverlapResult& Result : OverlapResults)
+	{
+		AActor* Candidate = Result.GetActor();
+		if (!IsValid(Candidate) || !UGP_BlueprintLibrary::CanApplyCombatEffect(const_cast<AGP_PlayerCharacter*>(this), Candidate))
+		{
+			continue;
+		}
+
+		FVector ToCandidate = Candidate->GetActorLocation() - ActorLocation;
+		ToCandidate.Z = 0.0f;
+		const float Distance = ToCandidate.Size();
+		if (Distance <= KINDA_SMALL_NUMBER)
+		{
+			continue;
+		}
+
+		const float FacingDot = FVector::DotProduct(Forward2D, ToCandidate / Distance);
+		if (FacingDot < -0.35f)
+		{
+			continue;
+		}
+
+		const float Score = Distance - FacingDot * 150.0f;
+		if (Score < BestScore)
+		{
+			BestScore = Score;
+			BestTarget = Candidate;
+		}
+	}
+
+	return BestTarget;
+}
+
+void AGP_PlayerCharacter::UpdatePrimaryAttackAutoFacing(float DeltaSeconds)
+{
+	const UWorld* World = GetWorld();
+	const float CurrentTime = World ? World->GetTimeSeconds() : 0.0f;
+	if (!IsValid(PrimaryAttackAutoFacingTarget) || (PrimaryAttackAutoFacingEndTime > 0.0f && CurrentTime > PrimaryAttackAutoFacingEndTime))
+	{
+		PrimaryAttackAutoFacingTarget = nullptr;
+		return;
+	}
+
+	FVector ToTarget = PrimaryAttackAutoFacingTarget->GetActorLocation() - GetActorLocation();
+	ToTarget.Z = 0.0f;
+	if (ToTarget.IsNearlyZero())
+	{
+		return;
+	}
+
+	const FRotator TargetYaw(0.0f, ToTarget.Rotation().Yaw, 0.0f);
+	const FRotator NewActorRotation = DeltaSeconds > KINDA_SMALL_NUMBER
+		? FMath::RInterpTo(GetActorRotation(), TargetYaw, DeltaSeconds, PrimaryAttackAutoFacingRotationInterpSpeed)
+		: TargetYaw;
+	SetActorRotation(NewActorRotation);
+
+	AController* OwningController = GetController();
+	if (!OwningController || !OwningController->IsLocalController())
+	{
+		return;
+	}
+
+	const FVector CameraFrom = FollowCamera ? FollowCamera->GetComponentLocation() : GetActorLocation();
+	const FRotator TargetCameraRotation = (PrimaryAttackAutoFacingTarget->GetActorLocation() - CameraFrom).Rotation();
+	const FRotator CurrentControlRotation = OwningController->GetControlRotation();
+	const FRotator NewControlRotation = DeltaSeconds > KINDA_SMALL_NUMBER
+		? FMath::RInterpTo(CurrentControlRotation, TargetCameraRotation, DeltaSeconds, PrimaryAttackAutoFacingCameraInterpSpeed)
+		: CurrentControlRotation;
+	OwningController->SetControlRotation(FRotator(NewControlRotation.Pitch, NewControlRotation.Yaw, 0.0f));
 }
 
 UAnimInstance* AGP_PlayerCharacter::GetUEFNSourceAnimInstance() const
@@ -208,7 +369,7 @@ UAnimInstance* AGP_PlayerCharacter::GetUEFNSourceAnimInstance() const
 	return UEFNSourceMesh ? UEFNSourceMesh->GetAnimInstance() : nullptr;
 }
 
-float AGP_PlayerCharacter::PlayUEFNSourceFallbackMontage(UAnimMontage* Montage, float PlayRate)
+float AGP_PlayerCharacter::PlayUEFNSourceFallbackMontage(UAnimMontage* Montage, float PlayRate, float PreviousMontageBlendOutTime)
 {
 	UAnimInstance* SourceAnimInstance = GetUEFNSourceAnimInstance();
 	if (!IsValid(SourceAnimInstance) || !IsValid(Montage))
@@ -218,7 +379,7 @@ float AGP_PlayerCharacter::PlayUEFNSourceFallbackMontage(UAnimMontage* Montage, 
 
 	if (IsValid(ActiveUEFNSourceFallbackMontage))
 	{
-		SourceAnimInstance->Montage_Stop(0.1f, ActiveUEFNSourceFallbackMontage);
+		SourceAnimInstance->Montage_Stop(FMath::Max(PreviousMontageBlendOutTime, 0.0f), ActiveUEFNSourceFallbackMontage);
 	}
 
 	const float PlayedDuration = SourceAnimInstance->Montage_Play(Montage, PlayRate);
@@ -291,12 +452,36 @@ void AGP_PlayerCharacter::ClearActionRootMotionCancelMovementInput()
 void AGP_PlayerCharacter::SetActionLowerBodyMotionMatchBlendEnabled(bool bEnabled)
 {
 	bBlendActionLowerBodyToMotionMatching = bEnabled;
+	if (!bBlendActionLowerBodyToMotionMatching)
+	{
+		ActionLowerBodyMotionMatchBlendTargetAlpha = 1.0f;
+	}
+}
+
+void AGP_PlayerCharacter::SetActionLowerBodyMotionMatchBlendTargetAlpha(float TargetAlpha)
+{
+	ActionLowerBodyMotionMatchBlendTargetAlpha = FMath::Clamp(TargetAlpha, 0.0f, 1.0f);
+}
+
+void AGP_PlayerCharacter::BeginPrimaryAttackMovementAssist(float SpeedRatio)
+{
+	bPrimaryAttackMovementAssistEnabled = true;
+	PrimaryAttackMovementAssistSpeedRatio = FMath::Clamp(SpeedRatio, 0.0f, 1.0f);
+	LastPrimaryAttackMovementLogTime = -1000.0f;
+}
+
+void AGP_PlayerCharacter::StopPrimaryAttackMovementAssist()
+{
+	bPrimaryAttackMovementAssistEnabled = false;
+	PrimaryAttackMovementAssistSpeedRatio = 0.0f;
+	LastPrimaryAttackMovementLogTime = -1000.0f;
 }
 
 void AGP_PlayerCharacter::BeginActionMotionTracking()
 {
 	bTrackActionMotion = true;
 	bBlendActionLowerBodyToMotionMatching = false;
+	ActionLowerBodyMotionMatchBlendTargetAlpha = 1.0f;
 	bActionRootMotionCancelledByMovementInput = false;
 	LastActionMotionSampleLocation = GetActorLocation();
 	LastActionMotionSampleTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
@@ -334,6 +519,7 @@ void AGP_PlayerCharacter::StopActionMotionTracking()
 		CurrentActionMotionVelocity.Size2D());
 	bTrackActionMotion = false;
 	bBlendActionLowerBodyToMotionMatching = false;
+	ActionLowerBodyMotionMatchBlendTargetAlpha = 1.0f;
 	bActionRootMotionCancelledByMovementInput = false;
 	ActionMotionCarryVelocity = FVector::ZeroVector;
 	LastActionCarryActualDelta = FVector::ZeroVector;
@@ -342,6 +528,85 @@ void AGP_PlayerCharacter::StopActionMotionTracking()
 	HeldPostActionAnimVelocity = FVector::ZeroVector;
 	HeldPostActionAnimVelocityUntilTime = 0.0f;
 	ActionMotionSamples.Reset();
+}
+
+void AGP_PlayerCharacter::UpdatePrimaryAttackMovementAssist(float DeltaSeconds)
+{
+	if (!bPrimaryAttackMovementAssistEnabled || DeltaSeconds <= KINDA_SMALL_NUMBER)
+	{
+		return;
+	}
+
+	UCharacterMovementComponent* MoveComp = GetCharacterMovement();
+	if (!MoveComp || !MoveComp->UpdatedComponent)
+	{
+		return;
+	}
+
+	const UWorld* World = GetWorld();
+	const float CurrentTime = World ? World->GetTimeSeconds() : 0.0f;
+	const float InputAge = World ? CurrentTime - LastActionRootMotionCancelMovementInputTime : -1.0f;
+	const bool bShouldLog = !World || CurrentTime - LastPrimaryAttackMovementLogTime >= 0.1f;
+	if (bShouldLog)
+	{
+		LastPrimaryAttackMovementLogTime = CurrentTime;
+		UE_LOG(LogTemp, Warning, TEXT("[PrimaryMove] Actor=%s Mode=%d Falling=%d WalkableFloor=%d OnGround=%d Vel=%s Speed2D=%.1f VelZ=%.1f Accel=%s Accel2D=%.1f MaxWalk=%.1f InputAge=%.3f AssistRatio=%.2f"),
+			*GetName(),
+			static_cast<int32>(MoveComp->MovementMode),
+			MoveComp->IsFalling() ? 1 : 0,
+			MoveComp->CurrentFloor.IsWalkableFloor() ? 1 : 0,
+			MoveComp->IsMovingOnGround() ? 1 : 0,
+			*GetVelocity().ToCompactString(),
+			GetVelocity().Size2D(),
+			GetVelocity().Z,
+			*MoveComp->GetCurrentAcceleration().ToCompactString(),
+			MoveComp->GetCurrentAcceleration().Size2D(),
+			MoveComp->MaxWalkSpeed,
+			InputAge,
+			PrimaryAttackMovementAssistSpeedRatio);
+	}
+
+	if (MoveComp->MovementMode != MOVE_Walking)
+	{
+		return;
+	}
+
+	if (LastActionRootMotionCancelMovementDirection.IsNearlyZero()
+		|| FMath::Abs(LastActionRootMotionCancelMovementScale) <= KINDA_SMALL_NUMBER
+		|| (World && InputAge > 0.15f))
+	{
+		return;
+	}
+
+	const FVector AssistDirection = LastActionRootMotionCancelMovementDirection.GetSafeNormal2D();
+	const float AssistSpeed = GetScaledNormalWalkSpeed() * PrimaryAttackMovementAssistSpeedRatio * FMath::Clamp(FMath::Abs(LastActionRootMotionCancelMovementScale), 0.0f, 1.0f);
+	if (AssistSpeed <= KINDA_SMALL_NUMBER)
+	{
+		return;
+	}
+
+	const float CurrentForwardSpeed = FVector::DotProduct(GetVelocity(), AssistDirection);
+	if (CurrentForwardSpeed >= AssistSpeed * 0.8f)
+	{
+		return;
+	}
+
+	FHitResult MoveHit;
+	const FVector BeforeLocation = GetActorLocation();
+	MoveComp->SafeMoveUpdatedComponent(AssistDirection * AssistSpeed * DeltaSeconds, MoveComp->UpdatedComponent->GetComponentQuat(), true, MoveHit);
+	const FVector AppliedDelta = GetActorLocation() - BeforeLocation;
+	if (bShouldLog)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[PrimaryMove][Assist] Actor=%s AssistSpeed=%.1f CurrentForward=%.1f Delta=%s DeltaSpeed=%.1f Hit=%d Blocking=%d HitNormal=%s"),
+			*GetName(),
+			AssistSpeed,
+			CurrentForwardSpeed,
+			*AppliedDelta.ToCompactString(),
+			DeltaSeconds > KINDA_SMALL_NUMBER ? AppliedDelta.Size2D() / DeltaSeconds : 0.0f,
+			MoveHit.bBlockingHit ? 1 : 0,
+			MoveHit.IsValidBlockingHit() ? 1 : 0,
+			*MoveHit.Normal.ToCompactString());
+	}
 }
 
 void AGP_PlayerCharacter::UpdateActionCarryVelocity(float DeltaSeconds)
@@ -649,10 +914,17 @@ void AGP_PlayerCharacter::StopUEFNSourceFallbackMontage(float BlendOutTime)
 		{
 			SourceAnimInstance->Montage_Stop(BlendOutTime, ActiveUEFNSourceFallbackMontage);
 		}
-		// 방어 코드: 슬롯명 미스매칭이나 몽타주 매칭 어긋남 대비하여 전체 활성 몽타주 강제 정지 처리
-		SourceAnimInstance->Montage_Stop(BlendOutTime, nullptr);
+		else
+		{
+			SourceAnimInstance->Montage_Stop(BlendOutTime, nullptr);
+		}
 	}
 
+	ClearUEFNSourceFallbackMontageState();
+}
+
+void AGP_PlayerCharacter::ClearUEFNSourceFallbackMontageState()
+{
 	bApplyUEFNSourceFallbackRootMotion = false;
 	bActionRootMotionInputCancelEnabled = false;
 	bBlendActionLowerBodyToMotionMatching = false;
@@ -753,6 +1025,10 @@ void AGP_PlayerCharacter::ToggleSprinting()
 		// 달리기 중이라면 어빌리티/태그 강제 취소
 		ASC->CancelAbilities(&SprintTag);
 	}
+	else if (bPrimaryAttackInProgress)
+	{
+		return;
+	}
 	else
 	{
 		// 걷기 중이라면 달리기 활성화 시도
@@ -763,7 +1039,7 @@ void AGP_PlayerCharacter::ToggleSprinting()
 void AGP_PlayerCharacter::StartSprinting()
 {
 	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
-	if (!ASC || IsSprinting()) return;
+	if (!ASC || IsSprinting() || bPrimaryAttackInProgress) return;
 
 	FGameplayTagContainer SprintTag;
 	SprintTag.AddTag(GPTags::State::Movement::Sprinting);
@@ -784,6 +1060,28 @@ bool AGP_PlayerCharacter::IsSprinting() const
 {
 	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
 	return ASC ? ASC->HasMatchingGameplayTag(GPTags::State::Movement::Sprinting) : false;
+}
+
+void AGP_PlayerCharacter::SetPrimaryAttackInProgress(bool bInProgress)
+{
+	if (bPrimaryAttackInProgress == bInProgress)
+	{
+		return;
+	}
+
+	bPrimaryAttackInProgress = bInProgress;
+	if (bPrimaryAttackInProgress)
+	{
+		StopSprinting();
+	}
+	else if (const AGP_PlayerController* GPController = Cast<AGP_PlayerController>(GetController()))
+	{
+		if (GPController->ShouldResumeHeldSprint())
+		{
+			StartSprinting();
+		}
+	}
+	RefreshCurrentMaxWalkSpeed();
 }
 
 bool AGP_PlayerCharacter::IsDashing() const
@@ -811,6 +1109,7 @@ float AGP_PlayerCharacter::ResolveDirectionalMoveSpeed(const FVector2D& MoveInpu
 {
 	const FGPDirectionalMovementSpeedProfile& Profile = GetActiveMovementSpeedProfile();
 	const FVector2D Input = MoveInput.GetSafeNormal();
+	const bool bEffectiveSprinting = bSprinting && !bPrimaryAttackInProgress;
 	const float ForwardAmount = Input.Y;
 	const float AbsForward = FMath::Abs(Input.Y);
 	const float AbsRight = FMath::Abs(Input.X);
@@ -818,19 +1117,19 @@ float AGP_PlayerCharacter::ResolveDirectionalMoveSpeed(const FVector2D& MoveInpu
 	float BaseSpeed = Profile.NormalForwardSpeed;
 	if (FMath::IsNearlyZero(ForwardAmount) && AbsRight > 0.f)
 	{
-		BaseSpeed = bSprinting ? Profile.SprintSideSpeed : Profile.NormalSideSpeed;
+		BaseSpeed = bEffectiveSprinting ? Profile.SprintSideSpeed : Profile.NormalSideSpeed;
 	}
 	else if (ForwardAmount > 0.f)
 	{
-		BaseSpeed = bSprinting ? Profile.SprintForwardSpeed : Profile.NormalForwardSpeed;
+		BaseSpeed = bEffectiveSprinting ? Profile.SprintForwardSpeed : Profile.NormalForwardSpeed;
 	}
 	else if (AbsRight > AbsForward)
 	{
-		BaseSpeed = bSprinting ? Profile.SprintSideSpeed : Profile.NormalSideSpeed;
+		BaseSpeed = bEffectiveSprinting ? Profile.SprintSideSpeed : Profile.NormalSideSpeed;
 	}
 	else
 	{
-		BaseSpeed = bSprinting ? Profile.SprintBackSpeed : Profile.NormalBackSpeed;
+		BaseSpeed = bEffectiveSprinting ? Profile.SprintBackSpeed : Profile.NormalBackSpeed;
 	}
 
 	return BaseSpeed * GetMovementSpeedScaleRatio() * FMath::Max(GASMovementSpeedMultiplier, 0.01f);
@@ -878,7 +1177,7 @@ void AGP_PlayerCharacter::RefreshCurrentMaxWalkSpeed()
 {
 	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
 	{
-		MoveComp->MaxWalkSpeed = IsSprinting() ? GetScaledSprintSpeed() : GetScaledNormalWalkSpeed();
+		MoveComp->MaxWalkSpeed = (IsSprinting() && !bPrimaryAttackInProgress) ? GetScaledSprintSpeed() : GetScaledNormalWalkSpeed();
 	}
 }
 
@@ -924,10 +1223,35 @@ void AGP_PlayerCharacter::ApplyRetargetVisualScaleFromAnimationSet()
 		UEFNSourceMesh->SetRelativeScale3D(FVector(UEFNSourceScale));
 	}
 
-	// CharacterMesh0 is attached under UEFNSourceMesh, so compensate the child-relative
-	// value to keep the authored PDA scale independent from the source mesh scale.
 	const float CharacterMeshScale = FMath::Max(VisualScaleProfile.CharacterMeshScale, 0.01f);
 	GetMesh()->SetRelativeScale3D(FVector(CharacterMeshScale / UEFNSourceScale));
+}
+
+void AGP_PlayerCharacter::UpdateCameraMotion(float DeltaSeconds)
+{
+	if (!CameraBoom)
+	{
+		return;
+	}
+
+	const float Speed2D = GetVelocity().Size2D();
+	const bool bShouldUseSprintCamera = IsSprinting() && !bPrimaryAttackInProgress;
+	const bool bShouldUseIdleCamera = Speed2D <= IdleCameraSpeedThreshold && !bShouldUseSprintCamera;
+
+	const float TargetArmLength = bShouldUseSprintCamera
+		? SprintCameraArmLength
+		: (bShouldUseIdleCamera ? IdleCameraArmLength : NormalCameraArmLength);
+
+	const float ClampedArmInterpSpeed = FMath::Max(CameraArmLengthInterpSpeed, 0.0f);
+	const float ClampedSocketInterpSpeed = FMath::Max(CameraSocketOffsetInterpSpeed, 0.0f);
+
+	CameraBoom->TargetArmLength = ClampedArmInterpSpeed > 0.0f
+		? FMath::FInterpTo(CameraBoom->TargetArmLength, TargetArmLength, DeltaSeconds, ClampedArmInterpSpeed)
+		: TargetArmLength;
+
+	CameraBoom->SocketOffset = ClampedSocketInterpSpeed > 0.0f
+		? FMath::VInterpTo(CameraBoom->SocketOffset, CameraSocketOffset, DeltaSeconds, ClampedSocketInterpSpeed)
+		: CameraSocketOffset;
 }
 
 bool AGP_PlayerCharacter::TryPerformDash()

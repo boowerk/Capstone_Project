@@ -171,6 +171,7 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 	const bool bBullPatternActive = IsValid(MatadorStateComponent) && IsValid(MatadorStateComponent->GetActiveBullActor());
 	const float MatadorPreferredHoverHeight = IsValid(MatadorBoss) ? MatadorBoss->GetPreferredHoverHeight() : PreferredHoverHeight;
 	const float MatadorPreferredAirRange = IsValid(MatadorBoss) ? MatadorBoss->GetPreferredAirRange() : PreferredAirRange;
+	const bool bIsMatadorBoss = IsValid(MatadorBoss);
 	const bool bBullRangeAllowed = DistanceToTarget >= BullPatternMinRange && DistanceToTarget <= BullPatternMaxRange;
 	const bool bCanUseBullPattern = IsValid(MatadorStateComponent)
 		&& bHasTarget
@@ -178,11 +179,12 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 		&& !bShouldPhaseTransition
 		&& !bMatadorGroggy
 		&& !bBullPatternActive
-		&& bHasLineOfSight
+		&& (bHasLineOfSight || bIsMatadorBoss)
 		&& bBullRangeAllowed
 		&& BTS_UpdateBossTactics_Internal::IsPatternWindowOpen(WorldTimeSeconds, BullPatternInterval, BullPatternWindow);
 	const bool bCanTriggerMatadorGroggy = IsValid(MatadorStateComponent) && ChainBreakCount >= ChainBreakTarget && !bMatadorGroggy;
 	const bool bShouldTeleport = IsValid(MatadorBoss) && bHasTarget && !bReturningHome && MatadorBoss->ShouldTeleportForMatador(DistanceToTarget);
+	bool bMatadorForceRangeReposition = false;
 
 	if (bMatadorGroggy)
 	{
@@ -192,6 +194,26 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 		bCanUseAreaAttack = false;
 		bCanUseSweepAttack = false;
 		bCanSummonAdds = false;
+	}
+
+	if (bIsMatadorBoss && !bMatadorGroggy)
+	{
+		// Matador stays mage-like at range and uses bull/decoy instead of generic melee spam.
+		bCanUseHeavyAttack = false;
+		bCanUseSweepAttack = false;
+		bCanSummonAdds = false;
+		bCanUseAreaAttack = bHasTarget
+			&& !bReturningHome
+			&& !bShouldPhaseTransition
+			&& bHasLineOfSight
+			&& DistanceToTarget >= MatadorPreferredAirRange * 0.55f
+			&& bAreaAttackCanReach
+			&& BTS_UpdateBossTactics_Internal::IsPatternWindowOpen(WorldTimeSeconds, AreaAttackInterval, AreaAttackWindow);
+
+		if (!bCanUseBullPattern && DistanceToTarget < MatadorPreferredAirRange * 0.75f)
+		{
+			bMatadorForceRangeReposition = true;
+		}
 	}
 
 	if (!bMatadorGroggy && IsValid(EnemyAIController) && EnemyAIController->IsBossRuntimeEvaluationTestCycleActive() && bHasTarget && !bReturningHome && bHasLineOfSight)
@@ -208,7 +230,14 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 
 	const bool bBossPatternRequestsAttack = bShouldPhaseTransition || bCanTriggerMatadorGroggy || bCanUseBullPattern || bCanSummonAdds || bCanUseAreaAttack || bCanUseSweepAttack || bCanUseHeavyAttack;
 
-	if (bBossPatternRequestsAttack)
+	if (bMatadorForceRangeReposition)
+	{
+		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanAttack, false);
+		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldRetreat, true);
+		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldReposition, true);
+		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldChase, false);
+	}
+	else if (bBossPatternRequestsAttack)
 	{
 		// 기존 공용 BT의 공격 분기를 그대로 타도록, 보스 특수 패턴이 준비된 순간에는 이동/후퇴 분기보다 공격 분기를 우선시한다.
 		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanAttack, true);

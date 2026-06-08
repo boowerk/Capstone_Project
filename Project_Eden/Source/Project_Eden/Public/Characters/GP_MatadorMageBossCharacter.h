@@ -64,6 +64,7 @@ private:
 	void HandleMatadorGroggyChanged(bool bNewGroggy);
 
 	void GrantMatadorPatternAbilities();
+	void HandleMatadorFallbackPatternTick();
 	AActor* ResolvePatternTarget(AActor* ExplicitTargetActor) const;
 	FVector ResolveDecoySpawnLocation(AActor* TargetActor) const;
 	FVector ResolveBullSpawnLocation(AActor* TargetActor) const;
@@ -118,5 +119,18 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Matador|Groggy", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "s"))
 	float GroggyDuration = 5.0f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Matador|AI", meta = (AllowPrivateAccess = "true"))
+	bool bUseFallbackMatadorPatternLoop = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Matador|AI", meta = (AllowPrivateAccess = "true", ClampMin = "0.1", Units = "s"))
+	float FallbackPatternInterval = 6.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Matador|AI", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "cm"))
+	float FallbackBullMinRange = 450.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Matador|AI", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "cm"))
+	float FallbackBullMaxRange = 2400.0f;
+
 	FTimerHandle GroggyRecoveryTimerHandle;
+	FTimerHandle FallbackPatternTimerHandle;
 };

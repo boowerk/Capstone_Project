@@ -11,12 +11,19 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-06-07T22:00:00+09:00
+Last synced: 2026-06-04T00:00:00+09:00
 
 ## Current Status
 
-- Dynamic minimap capture is now in C++: `AGP_MinimapCaptureActor` owns a top-down `USceneCaptureComponent2D` and generated/assigned `UTextureRenderTarget2D`; `UGP_MinimapSubsystem` registers the active capture actor and recaptures after PCG layout readiness; `APcgControllerActor::NotifyPcgGenerationFinished` broadcasts PCG readiness and requests delayed minimap recapture; `UGP_PlayerHUDWidget` binds `MinimapBackgroundImage`/fallback-named Image to the subsystem RenderTarget.
-- HUD minimap source PNG assets live under `Project_Eden/Content/UI/HUD/Minimap/Textures`. `UGP_PlayerHUDWidget` rotates an optional `MinimapPlayerArrow`/fallback-named widget from owning pawn yaw through `SetRenderTransformAngle`, with WBP-exposed enable/offset/invert tuning. `AGP_PlayerController::Tick` now also calls the HUD refresh so rotation does not depend on UUserWidget native tick; `Project_EdenEditor Win64 Development` build succeeded after the editor was closed.
+- Enemy death now grants XP directly: `AGP_BaseCharacter` exposes a post-damage hook, and `AGP_EnemyCharacter` awards its editable `XPReward` once when health reaches zero by resolving the instigator's `AGP_PlayerState`.
+- PlayerState XP debug can be enabled with `bDebugXPChanges`; `AddXP` multicasts a green on-screen/log message showing added XP, level transition, and current XP progress.
+- PlayerState now has replicated XP/level basics: `CurrentXP`, `CurrentLevel`, `XPToNextLevel`, `LevelXPScale`, `AddXP`, server forwarding, and `OnLevelUp` Blueprint event for opening augment selection later.
+- PlayerController now owns augment UI flow: `RequestOpenAugmentSelect` rolls candidates from the assigned pool, `OpenAugmentSelectWidget` displays them with Game+UI input mode, and `CloseAugmentSelectWidget` restores Game Only input. `UGP_AugmentSelectWidget` calls controller close after a selection.
+- Augment selection now prevents duplicate picks: `UGP_SkillAugmentPoolData` can exclude already selected augments when rolling candidates, and `AGP_PlayerState::AddSkillAugment` ignores duplicate DA requests.
+- Skill augment modifiers now include cooldown, projectile count, and element requirements. Empty `TargetSkillTags` applies to all skills; `RequiredElementTag` requires current tech element match. `CooldownMultiplier` is wired through `UGP_SkillBase::ApplyCooldown` and DashSlash fallback cooldown. `ProjectileCountBonus` is wired for SplitShot, NetTestProjectile, and ThrownBurst.
+- Skill augment visual overrides are now wired: the latest applicable selected augment's `ActiveVFXOverride` and `ImpactVisualActorOverride` take priority over SkillData element/default visuals.
+- `DamageMultiplier` now scales the complete skill damage formula, including attribute coefficient damage, through `Damage.Multiplier`; it no longer scales only base damage fields.
+- PlayerController augment candidate generation now filters `RequiredElementTag` against the current tech element. Element-specific augments no longer appear before that element is selected.
 - Selectable skill structure is now in C++: `UGP_TargetedSkillBase` supports `Instant`, `Projectile`, `Ray`, and `TargetActor` selection modes, preview actor/debug target updates, primary/secondary confirm, cancel, server-forwarded selection events, and aim-assist target actor selection near the aim line with range/LoS/filter checks. `UGP_Skill_NetTestProjectile` now uses projectile selection before commit/spawn; Dash/DashSlash cancel `GPTags.Ability.Skill.Selection`. `UGP_Skill_LifeDrainTarget` is a channeled target-select drain sample that continues while target distance <= selection range * 5 and LoS remains clear. Damage uses the configured/fallback damage GE; healing uses `/Game/GAS_Pattern/AbilitySystem/GameplayEffects/Healing/GE_Heal_Generic` with SetByCaller DataName `GPTags.Healing.Data.Base`.
 - memoc commands now use project-local `.memoc/runtime` first. This avoids Codex sandbox timeouts when `.memoc/bin/memoc.cmd summary/search/doctor` tries to execute the global AppData runtime outside the workspace.
 - ActionEnd lower-body handoff signal exists in C++ only for now. `Dash` and `DashSlash` request `SetActionLowerBodyMotionMatchBlendEnabled(true)` at ActionEnd/fallback ActionEnd, and `UGP_CharacterAnimInstance` exposes `ActionLowerBodyMotionMatchBlendAlpha` with interp speeds. The attempted AnimBP `LayeredBlendPerBone` graph insertion was reverted because it broke `DefaultSlot.Source` and caused non-montage animation A-pose. `ABP_UEFNSource_Player` and `ABP_MaskMan_Player` are restored to `pre-slot pose -> DefaultSlot -> Output`; a future lower-body handoff should use a cached-pose/safe single-consumer graph.
@@ -27,6 +34,50 @@ Last synced: 2026-06-07T22:00:00+09:00
 - Rare stop stutter after sprint-roll with released input was likely caused by unconditional post-action anim velocity hold from the last RM velocity. `ApplyCurrentActionInertia()` now creates `HeldPostActionAnimVelocity` only when cached move input is still recent or the action ended through movement-input cancel; released-input natural completion clears the hold.
 - `ActionEnd` is control/input unlock, not montage end. For A-pose/default-pose bugs after RM actions, do not fix by changing RM/inertia end paths. Current trace patch adds `[ActionEndTrace]` logs; `UGP_Skill_DashSlash` treats `OnBlendOut` as log-only instead of completion. Logs showed fallback roll was not stopped by input in no-input tests; source fallback montage auto blend-out/default slot began before ability timer completion. After `Always Update Source Pose`, `AM_UEFN_Roll_RM` and `AM_UEFN_Sword_Dash_RM` BlendOut time is `0.25`.
 - After enabling `Always Update Source Pose` on `ABP_UEFNSource_Player.DefaultSlot`, source fallback montage BlendOut was raised to `0.25`. `AGP_PlayerCharacter` now keeps a short post-action anim velocity (`PostActionAnimVelocityHoldTime=0.35`) from the last non-zero action motion velocity so UEFNSource MM can pick moving/stop poses after fast jump-roll instead of snapping to idle while capsule velocity/CMC velocity differ.
+- Action root-motion movement is componentized as `authored/retargeted RM + shared carry`: target montages use their authored RM, source fallback montages use runtime-retarget consumed RM multiplied by `MovementSpeedScaleRatio`, and both add the same entry-velocity carry path. `BeginActionMotionTracking()` captures entry XY velocity then zeros CMC XY to avoid fallback double-consuming old movement velocity. Handoff applies remaining carry velocity only, not sampled RM+carry.
+- UEFNSource fallback montage debug/anim speed reads `AGP_PlayerCharacter::GetCurrentActionMotionVelocity()` during fallback playback because manual `SafeMoveUpdatedComponent` root motion is not reflected in `CharacterMovement->Velocity`.
+- Current roll RM source assets differ: `/Game/Characters/MaskMan/Animations/MaskMan_Roll_RM` root distance is ~593.9, while `/Game/Characters/UEFN_Mannequin/Animations/Montage/Roll/UEFN_Roll_RM` is ~465.5. With MaskMan `MovementSpeedScaleRatio=1.22`, fallback expected distance is ~568 before carry/collision.
+- `AGP_PlayerCharacter.FallbackRootMotionDistanceCorrection` defaults to `1.18` to compensate observed runtime fallback loss: user measured target roll ~590-600 and fallback ~502 with only MovementSpeedScaleRatio; corrected expected fallback is ~592.
+- DashSlash skill now exists as `UGP_Skill_DashSlash` plus `/Game/GAS_Pattern/AbilitySystem/Abilities/PlayerAbilities/Character1/GA_Skill_DashSlash` and `/Game/GAS_Pattern/AbilitySystem/SkillData/DA_Skill_DashSlash`. It plays `PDA_CharacterAnimationSet.SwordMontages.Dash_RM`, falls back to `SourceSwordMontages.Dash_RM`, and uses `GPTags.Cooldown.Skill.DashSlash` as a C++ cooldown fallback when the DA cooldown tag is blank.
+- `UGP_CharacterAnimInstance` now treats ground acceleration input as movement intent before `Speed2D` crosses `IdleSpeedThreshold`, so short idle-to-walk taps can select start/move motion instead of dragging the idle pose while the capsule accelerates.
+- Motion matching debug can now print from the `UEFNSource` anim instance with separate screen keys from the target mesh, including runtime DB, applied DB, result validity, and selected animation.
+- `UGP_Primary::StartComboSequence` no longer rotates the player toward current movement input before starting a combo montage, so primary attacks use the character's current forward direction only.
+- GAS damage/HUD triage: enemy and boss attacks now point/fallback to `/Game/GAS_Pattern/AbilitySystem/GameplayEffects/Damage/GE_PrimaryDamage`; player AttributeSet damage broadcasts use avatar fallback for PlayerState-owned ASCs.
+- Player HUD GAS binding now resolves attribute widgets by name and binds boss health through `UGP_AttributeWidget`; `/Game/UI/HUD/WBP_PlayerHUDWidget.BossBar` is expected to be a `WBP_BossBar` child with Health/MaxHealth attributes.
+- `BP_GP_PlayerCharacter` has a visible `UEFNSourceMesh` native skeletal mesh component attached above `CharacterMesh0`.
+- `UEFNSourceMesh` now uses `/Game/Characters/PlayerCharacter/ABP_UEFNSource_Player` as its AnimBP.
+- `CharacterMesh0` still uses `/Game/Asset/CharacterAction/MaskMan/ABP_MaskMan_Player` to retarget from the parent mesh.
+- `GP_CharacterAnimInstance` now exposes chooser-facing locomotion context (`MovementMode`, `Stance`, `MovementState`, `Gait`, `MovementDirection`, landing/turn/start flags) in addition to its temporary runtime DB fallback and chooser evaluation path.
+- `BP_GP_PlayerCharacter` has a Blueprint-added `CharacterTrajectory` (`CharacterTrajectoryComponent`) and `ABP_UEFNSource_Player` caches that component in EventGraph.
+- `GP_CharacterAnimInstance` now reflects that Blueprint `CharacterTrajectoryComponent` at runtime and copies its internal `Trajectory` into `GeneratedTrajectory`, falling back to `PoseSearchGenerateTransformTrajectory(...)` if unavailable.
+- `GP_CharacterAnimInstance` tracks previous-frame locomotion context (`MovementMode_LastFrame`, `Gait_LastFrame`, `LastLocalVelocityDirection`, `LastVerticalVelocity`) so the stock UEFN chooser tables can be restored against named inputs instead of new ad-hoc branches.
+- `ABP_UEFNSource_Player` still keeps the enum-blend fallback graph, but chooser-driven DB selection is being moved into a new custom root chooser for MaskMan.
+- `/Game/Characters/UEFN_Mannequin/Animations/MotionMatchingData/ChooserTables/CHT_MM_MaskMan_Root` is being authored with embedded `Idle`, `Run`, `Sprint`, and `InAir` nested choosers. `Walk` is intentionally omitted for now because MaskMan's default locomotion speed (`500`) should already use run-family PSDs.
+- `BP_GP_PlayerCharacter` now uses semi-fixed GameAnimationSample Strafe/Aim-style rotation: `bUseControllerRotationYaw=false`, `bOrientRotationToMovement=false`, and controller desired rotation is enabled only while movement input is active and not Fixed. Idle keeps actor yaw fixed so yaw delta can drive Turn In Place.
+- `GP_PlayerController` smooths directional/sprint `MaxWalkSpeed` changes through `MaxWalkSpeedInterpSpeed` instead of snapping immediately, giving motion matching more time to select start/stop/pivot/TIP transitions.
+- `BP_GP_PlayerCharacter` air movement tuning now matches the sample baseline: `CharacterMovement.AirControl = 0.25` and `BrakingDecelerationFalling = 1500`.
+- Actual movement speed now scales by input direction in `GP_PlayerController::Input_Move`; controller defaults are forward `500`, side `350`, back `300`, sprint forward `700`, sprint side/back `350/300`.
+- Character source body-size ratio can drive movement speed through `PDA_CharacterAnimationSet.MovementSpeedProfile.MovementSpeedScaleRatio` (default `1`). This is manual authoring data relative to the mannequin at scale 1, not the runtime mesh component scale. Runtime max speeds multiply by this ratio; `UGP_CharacterAnimInstance.Speed2D` divides actual speed by the ratio so chooser thresholds stay in mannequin scale-1 space.
+- Directional movement speed data is now owned by `PDA_CharacterAnimationSet.MovementSpeedProfile` and copied into `AGP_PlayerCharacter` on begin play.
+- `PDA_CharacterAnimationSet` no longer owns legacy locomotion blendspace, sprint-stop, jump-loop, landing montage, or sprint enter/exit montage slots; runtime motion matching owns locomotion/air playback, with only a comment placeholder for a future jump animation montage.
+- `PDA_CharacterAnimationSet` now has source-skeleton fallback montage slots (`SourceDashMontage`, source primary/light/heavy arrays). Player Dash/Primary prefer authored PDA target montages, then fall back to UEFNSource montage playback when target montage slots are empty.
+- `AGP_PlayerCharacter` gates UEFNSource root-motion translation application to active fallback montages only, moves the capsule through `SafeMoveUpdatedComponent`, and exposes last fallback root-motion velocity for future inertia handoff.
+- `ABP_UEFNSource_Player` now routes `Pose History -> DefaultSlot -> Output Pose`, allowing UEFNSource fallback montages to evaluate through the source AnimGraph. `GP_Dash` also clears fallback dash via montage-duration timer if no `ActionEnd` notify/event arrives.
+- `PDA_CharacterAnimationSet.SourceRootMotionTranslationYawOffset` defaults to `-90`; `AGP_PlayerCharacter` applies it only to fallback source root-motion translation before converting to world space.
+- The attempted `UEFNSourceMeshScale` multiplier on consumed fallback root-motion translation was reverted because it made runtime movement/debug speed worse.
+- The attempted `UGP_CharacterAnimInstance` fallback-root-motion velocity override was reverted; speed/debug context is back to `Character->GetVelocity()`.
+- The attempted actor-location-delta debug speed display was reverted because it jittered while idle; on-screen speed display is back to `GroundSpeed` / `Speed2D`.
+- Player movement input smoothing now snaps immediately when desired direction opposes the current smoothed direction. MoveAction `Completed` is handled by a reset-only function instead of re-entering `Input_Move`.
+# Current Project State
+
+Last synced: 2026-05-23T00:00:00
+
+## Current Status
+
+- `UGP_SkillAugmentPoolData` is a new DataAsset for storing augment DA lists and `PickRandomAugments(Count)` returns valid non-duplicate random candidates for UI.
+- `UGP_AugmentSelectWidget` is a new C++ parent for a 3-candidate augment selection widget; BP children should bind `Button_Augment0..2` and `TextBlock_Augment0..2`.
+- Skill augment range scaling is wired for distance-style skills: `RangeMultiplier` affects LineShock length, ConeSlash hit range/visual offset, GroundBurst target distance, and MineBurst placement distance.
+- Skill augment radius scaling is wired for burst-family skills: SkillBase resolves matching `RadiusMultiplier`, PulseBurst/GroundBurst scale their overlap radius directly, and MineBurst/ThrownBurst pass the multiplier into spawned mine/area projectile actors.
 - Action root-motion movement is componentized as `authored/retargeted RM + shared carry`: target montages use their authored RM, source fallback montages use runtime-retarget consumed RM multiplied by `MovementSpeedScaleRatio`, and both add the same entry-velocity carry path. `BeginActionMotionTracking()` captures entry XY velocity then zeros CMC XY to avoid fallback double-consuming old movement velocity. Handoff applies remaining carry velocity only, not sampled RM+carry.
 - UEFNSource fallback montage debug/anim speed reads `AGP_PlayerCharacter::GetCurrentActionMotionVelocity()` during fallback playback because manual `SafeMoveUpdatedComponent` root motion is not reflected in `CharacterMovement->Velocity`.
 - Current roll RM source assets differ: `/Game/Characters/MaskMan/Animations/MaskMan_Roll_RM` root distance is ~593.9, while `/Game/Characters/UEFN_Mannequin/Animations/Montage/Roll/UEFN_Roll_RM` is ~465.5. With MaskMan `MovementSpeedScaleRatio=1.22`, fallback expected distance is ~568 before carry/collision.
@@ -122,12 +173,15 @@ Last synced: 2026-05-23T00:00:00
 - Verify runtime behavior in PIE for source motion, visible state transitions, and retarget fidelity with Blueprint trajectory preferred at runtime.
 - Connect `CHT_MM_MaskMan_Root` as the active chooser source for `UGP_CharacterAnimInstance` and validate `Idle / TurnInPlace / Run / Sprint / InAir`.
 - Keep manual enum/MM branching only as a temporary fallback until the new chooser fully replaces it.
+- Verify `UGP_AugmentSelectWidget` after editor rebuild: each augment DA's `AugmentType` should select the matching card background (`Dawn/Dusk/Midnight/Zenith` defaults).
 
 ## Completed Tasks
 
 - Created `Diagonal_Path_Curvature_Analysis.md` containing diagnostic details on the forward-to-diagonal trajectory angularity.
 - Resolved missing declaration `GetActiveMovementSpeedProfile` in `GP_PlayerCharacter.h`, fixing multiple C++ compilation errors and verified successful build.
 - Resolved missing include `#include "GameplayTags/GP_Tags.h"` in `GP_BaseCharacter.cpp`, fixing compiler errors (C2653/C2065 for GPTags element variables) and verified clean compile of Project C++.
+- Added `EGP_SkillAugmentType` (`BasicAttack`, `Skill`, `Ultimate`, `Passive`) to augment DAs and wired type-driven card backgrounds in `UGP_AugmentSelectWidget`.
+- Renamed `WBP_TestAugmentSelect_1` card background images to `Image_CardBg0/1/2` for C++ optional binding.
 - See `.memoc/worklog/` for full shared activity history.
 
 ## Commands

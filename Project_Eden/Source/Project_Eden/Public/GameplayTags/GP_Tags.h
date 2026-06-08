@@ -42,6 +42,18 @@ namespace GPTags
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Slot01);  // 스킬 1
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Slot02);  // 스킬 2
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ultimate); // 궁극기
+			namespace Id
+			{
+				UE_DECLARE_GAMEPLAY_TAG_EXTERN(WaterPuddle);
+				UE_DECLARE_GAMEPLAY_TAG_EXTERN(NetTestProjectile);
+				UE_DECLARE_GAMEPLAY_TAG_EXTERN(SplitShot);
+				UE_DECLARE_GAMEPLAY_TAG_EXTERN(GroundBurst);
+				UE_DECLARE_GAMEPLAY_TAG_EXTERN(ThrownBurst);
+				UE_DECLARE_GAMEPLAY_TAG_EXTERN(PulseBurst);
+				UE_DECLARE_GAMEPLAY_TAG_EXTERN(LineShock);
+				UE_DECLARE_GAMEPLAY_TAG_EXTERN(MineBurst);
+				UE_DECLARE_GAMEPLAY_TAG_EXTERN(ConeSlash);
+			}
 		}
 		namespace Enemy
 		{
@@ -96,6 +108,7 @@ namespace GPTags
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Base);			// 물리/공통 기본 데미지
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(BaseSpell);		// 마법 기본 데미지
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(ToughnessBase);	// 강인도 기본 데미지
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Multiplier);
 		}
 	}
 
@@ -168,6 +181,16 @@ namespace GPTags
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Lux);
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Chaos);
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Brute);
+		}
+	}
+
+	// GameplayCue tags keep the engine-required "GameplayCue." root while staying in native project tag declarations.
+	namespace GameplayCue
+	{
+		namespace Ability
+		{
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Trail_Magic);
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Burst_Magic);
 		}
 	}
 
