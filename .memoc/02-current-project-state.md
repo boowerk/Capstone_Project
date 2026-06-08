@@ -11,10 +11,13 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-06-09T03:18:00+09:00
+Last synced: 2026-06-09T04:05:00+09:00
 
 ## Current Status
 
+- Minimap terrain capture is resilient to missing level setup: `UGP_MinimapSubsystem` auto-spawns a transient `AGP_MinimapCaptureActor` when no placed capture actor exists, initializes the render target, and broadcasts it to HUD listeners.
+- `AGP_MinimapCaptureActor` now renders scene primitives from a top-down capture, lazily reacquires the player pawn follow target, and updates capture around the player so terrain can appear in the HUD minimap.
+- `UGP_PlayerHUDWidget` and `AGP_PlayerController` refresh the minimap background binding from the subsystem, covering late widget/player initialization and disabled widget tick cases.
 - `WBP_CharacterStatsMenu` XP progress binding is repaired: `AGP_PlayerState::GetCurrentXP`, `GetCurrentLevel`, and `GetXPToNextLevel` are now cpp-defined BlueprintPure functions, UHT emits the exec functions, and `Project_EdenEditor Win64 Development` build succeeded.
 - Enemy death now grants XP directly: `AGP_BaseCharacter` exposes a post-damage hook, and `AGP_EnemyCharacter` awards its editable `XPReward` once when health reaches zero by resolving the instigator's `AGP_PlayerState`.
 - PlayerState XP debug can be enabled with `bDebugXPChanges`; `AddXP` multicasts a green on-screen/log message showing added XP, level transition, and current XP progress.

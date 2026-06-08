@@ -4,18 +4,18 @@ type: state
 scope: project-memory
 status: active
 tags: [memoc, memoc/state]
-updated: 2026-06-06T00:00:00+09:00
+updated: 2026-06-09T00:00:00+09:00
 ---
 # Session Summary
-Last: 2026-06-09T03:18:00+09:00
+Last: 2026-06-09T04:05:00+09:00
 
 ## Status
-- Fixed `WBP_CharacterStatsMenu` XP binding errors by moving `AGP_PlayerState` XP getters from inline UFUNCTION bodies to cpp definitions.
-- UHT now generates `GetCurrentXP`, `GetCurrentLevel`, and `GetXPToNextLevel` Blueprint exec functions.
-- `Project_EdenEditor Win64 Development` build succeeded.
+- Fixed the minimap terrain feed when no placed capture actor or late player pawn prevented the render target from appearing.
+- `UGP_MinimapSubsystem` now auto-spawns a transient `AGP_MinimapCaptureActor`, and `UGP_PlayerHUDWidget` rebinds the minimap render target from the subsystem when needed.
+- `AGP_MinimapCaptureActor` renders scene primitives from a top-down capture and lazily reacquires the player follow target.
 
 ## Next
-- Reopen/refresh the editor if the already-open Blueprint graph still shows stale red nodes, then compile `WBP_CharacterStatsMenu`.
+- In `WBP_PlayerHUDWidget`, keep the minimap background image named `MinimapBackgroundImage` or another supported candidate name, then compile/save the widget.
 
 ## Verify
-- UHT generated code contains `execGetCurrentXP` and `execGetXPToNextLevel`.
+- `Project_EdenEditor Win64 Development` build succeeded.
