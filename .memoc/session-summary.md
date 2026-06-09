@@ -15,15 +15,19 @@ Replace, do not append. Keep <800B.
 History: worklog. Resume risks: 04-handoff.md.
 
 ## Status
-- Fixed predicted-client successful EndAbility replication that cancelled server skill execution before authoritative VFX/actors spawned.
-- Removed temporary skill/VFX network diagnostic logs after runtime verification succeeded.
+- Dark Stone complete.
+- Ice Mist is a projectile-aimed moving mist: enemy piercing, periodic damage/slow while moving, stops on static walls.
+- Enemy MoveSpeed attribute now updates CharacterMovement MaxWalkSpeed.
 
 ## Changed
-- GP_TargetedSkillBase.cpp: successful execution ends locally on client; server alone replicates completion.
-- GP_Skill_NetTestProjectile.cpp: successful montage completion follows same rule; cancellation still replicates.
+- Added GP_Skill_IceMist and replicated moving GP_IceMistArea.
+- Added IceMist cooldown tag.
+- GP_EnemyCharacter binds replicated MoveSpeed changes.
 
 ## Open Tasks
-- Rebuild server/client and test Magma, Dark, Lightning, and legacy projectile VFX.
+- Build C++.
+- Build C++ and update BP_IceMistArea with its Niagara component.
+- Test movement, wall stop, periodic damage, slow recovery, and multiplayer.
 
 ## Resume
-- Runtime fix verified. Temporary diagnostic logs removed.
+- Build not run by agent. git diff --check passed.

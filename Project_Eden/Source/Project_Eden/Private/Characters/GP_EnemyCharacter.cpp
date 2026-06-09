@@ -12,6 +12,7 @@
 #include "AbilitySystem/GP_AbilitySystemComponent.h"
 #include "AbilitySystem/GP_AttributeSet.h"
 #include "Engine/DataTable.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/Pawn.h"
 #include "Player/GP_PlayerState.h"
@@ -100,6 +101,7 @@ void AGP_EnemyCharacter::BeginPlay()
 
 	GetAbilitySystemComponent()->InitAbilityActorInfo(this, this);
 	OnASCInitialized.Broadcast(GetAbilitySystemComponent(), GetAttributeSet());
+	BindMoveSpeedAttribute();
 
 	if (!HasAuthority())
 	{
@@ -114,9 +116,64 @@ void AGP_EnemyCharacter::BeginPlay()
 	}
 	InitializeAttributes();
 
+	const float AttributeMoveSpeed = GetAbilitySystemComponent()->GetNumericAttribute(UGP_AttributeSet::GetMoveSpeedAttribute());
+	if (AttributeMoveSpeed > KINDA_SMALL_NUMBER)
+	{
+		if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
+		{
+			MovementComponent->MaxWalkSpeed = AttributeMoveSpeed;
+		}
+	}
+	else if (const UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
+	{
+		GetAbilitySystemComponent()->SetNumericAttributeBase(
+			UGP_AttributeSet::GetMoveSpeedAttribute(),
+			MovementComponent->MaxWalkSpeed);
+	}
+
 	// 기준 위치는 캐릭터가 저장하고, 실제 Blackboard/Behavior Tree 시작은 AEnemyAIController::OnPossess에서 담당한다.
 	BehaviorAnchorLocation = GetActorTransform().TransformPosition(BehaviorAnchorOffset);
 	bHasBehaviorAnchorLocation = true;
+}
+
+void AGP_EnemyCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	UnbindMoveSpeedAttribute();
+	Super::EndPlay(EndPlayReason);
+}
+
+void AGP_EnemyCharacter::BindMoveSpeedAttribute()
+{
+	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+	if (!IsValid(ASC) || MoveSpeedAttributeDelegateHandle.IsValid())
+	{
+		return;
+	}
+
+	MoveSpeedAttributeDelegateHandle = ASC
+		->GetGameplayAttributeValueChangeDelegate(UGP_AttributeSet::GetMoveSpeedAttribute())
+		.AddUObject(this, &ThisClass::HandleMoveSpeedAttributeChanged);
+}
+
+void AGP_EnemyCharacter::UnbindMoveSpeedAttribute()
+{
+	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+	if (!IsValid(ASC) || !MoveSpeedAttributeDelegateHandle.IsValid())
+	{
+		return;
+	}
+
+	ASC->GetGameplayAttributeValueChangeDelegate(UGP_AttributeSet::GetMoveSpeedAttribute())
+		.Remove(MoveSpeedAttributeDelegateHandle);
+	MoveSpeedAttributeDelegateHandle.Reset();
+}
+
+void AGP_EnemyCharacter::HandleMoveSpeedAttributeChanged(const FOnAttributeChangeData& ChangeData)
+{
+	if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
+	{
+		MovementComponent->MaxWalkSpeed = FMath::Max(ChangeData.NewValue, 0.0f);
+	}
 }
 
 const FEnemyArchetypeTuning* AGP_EnemyCharacter::ResolveEnemyArchetypeTuning() const

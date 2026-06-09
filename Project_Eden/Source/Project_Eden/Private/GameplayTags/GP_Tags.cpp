@@ -250,6 +250,7 @@ namespace GPTags
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(DarkStone, "GPTags.Cooldown.Skill.DarkStone", "다크 스톤 스킬 쿨다운");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(GroundBurst, "GPTags.Cooldown.Skill.GroundBurst", "그라운드 버스트 스킬 쿨다운");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(LightningStrike, "GPTags.Cooldown.Skill.LightningStrike", "라이트닝 스트라이크 스킬 쿨다운");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(IceMist, "GPTags.Cooldown.Skill.IceMist", "아이스 미스트 스킬 쿨다운");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(ThrownBurst, "GPTags.Cooldown.Skill.ThrownBurst", "투척 버스트 스킬 쿨다운");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(PulseBurst, "GPTags.Cooldown.Skill.PulseBurst", "펄스 버스트 스킬 쿨다운");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(LineShock, "GPTags.Cooldown.Skill.LineShock", "라인 쇼크 스킬 쿨다운");

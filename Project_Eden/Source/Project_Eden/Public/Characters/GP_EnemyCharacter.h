@@ -11,6 +11,7 @@ class UBlackboardData;
 class UEnemyAIRangeVisualizationComponent;
 class UEnemyArchetypeData;
 class AGP_PlayerState;
+struct FOnAttributeChangeData;
 struct FDataTableRowHandle;
 struct FEnemyArchetypeTuning;
 struct FEnemyLLMEvaluation;
@@ -64,6 +65,7 @@ public:
 protected:
 	virtual void OnConstruction(const FTransform& Transform) override;
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	// 향후 EQS나 복귀 로직에서 사용할 기준 위치를 월드에 배치할 수 있도록 유지한다.
 	UPROPERTY(EditInstanceOnly, Category = "AI", meta = (MakeEditWidget = "true"))
@@ -153,4 +155,9 @@ private:
 	void RefreshAIRangeVisualizers();
 	void GrantXPRewardToInstigator(AActor* InstigatorActor);
 	AGP_PlayerState* ResolveInstigatorPlayerState(AActor* InstigatorActor) const;
+	void HandleMoveSpeedAttributeChanged(const FOnAttributeChangeData& ChangeData);
+	void BindMoveSpeedAttribute();
+	void UnbindMoveSpeedAttribute();
+
+	FDelegateHandle MoveSpeedAttributeDelegateHandle;
 };
