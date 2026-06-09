@@ -22,6 +22,7 @@ public:
 
 	void SetSkillData(UGP_SkillData* InSkillData) { SkillData = InSkillData; }
 	void SetProjectileVisualSystem(UNiagaraSystem* InProjectileVisualSystem);
+	void SetImpactVisualActorClass(TSubclassOf<AActor> InImpactVisualActorClass);
 
 protected:
 	virtual void BeginPlay() override;
@@ -61,6 +62,9 @@ protected:
 	UPROPERTY(ReplicatedUsing = OnRep_ProjectileVisualSystem, BlueprintReadOnly, Category = "Eden|Projectile|Visual")
 	TObjectPtr<UNiagaraSystem> ProjectileVisualSystem;
 
+	UPROPERTY(BlueprintReadOnly, Category = "Eden|Projectile|Visual")
+	TSubclassOf<AActor> ImpactVisualActorClass;
+
 	UFUNCTION()
 	void OnRep_ProjectileVisualSystem();
 
@@ -72,7 +76,7 @@ protected:
 	virtual void OnProjectileOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 
 	UFUNCTION(NetMulticast, Reliable)
-	void MulticastPlayHitEffect(const FVector& ImpactLocation);
+	void MulticastPlayHitEffect(const FVector& ImpactLocation, const FRotator& ImpactRotation, TSubclassOf<AActor> InImpactVisualActorClass);
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "Eden|Projectile")
 	void BP_OnHitEffect(const FVector& ImpactLocation);

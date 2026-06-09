@@ -10,6 +10,7 @@ updated: 2026-06-06T00:00:00+09:00
 Last: 2026-06-06T00:00:00+09:00
 
 ## Status
+- MagmaShot uses skill-owned projectile/impact visuals: projectile Niagara comes from SkillData and projectile collision spawns the SkillData impact actor.
 - `origin/main` ExpBar UI update (`d1afb656`) merged into `feature/vfx-skills`.
 - Latest `origin/feature/vfx-skills-impact` merged into `feature/vfx-skills`; includes Primary VisualCues, Matador AI/BT updates, maps, and Fab assets.
 - Selected augment visual overrides now work. Latest applicable `ActiveVFXOverride` / `ImpactVisualActorOverride` wins over SkillData element/default visuals.

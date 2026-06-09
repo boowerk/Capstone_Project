@@ -205,6 +205,7 @@ void UGP_Skill_NetTestProjectile::SpawnProjectiles(const FGP_SkillTargetData& Ta
 			{
 				Projectile->SetSkillData(SkillData);
 				Projectile->SetProjectileVisualSystem(GetProjectileVisualSystem(SkillData, TechElementTag));
+				Projectile->SetImpactVisualActorClass(GetSkillVisualActorClass(SkillData, nullptr, TechElementTag));
 			}
 			else if (SpawnedActor)
 			{

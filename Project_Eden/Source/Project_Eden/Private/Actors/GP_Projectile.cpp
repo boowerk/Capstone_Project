@@ -83,6 +83,11 @@ void AGP_Projectile::SetProjectileVisualSystem(UNiagaraSystem* InProjectileVisua
 	BP_OnProjectileVisualSystemChanged(ProjectileVisualSystem);
 }
 
+void AGP_Projectile::SetImpactVisualActorClass(TSubclassOf<AActor> InImpactVisualActorClass)
+{
+	ImpactVisualActorClass = InImpactVisualActorClass;
+}
+
 void AGP_Projectile::OnRep_ProjectileVisualSystem()
 {
 	if (ProjectileVisualSystem)
@@ -119,7 +124,7 @@ void AGP_Projectile::OnProjectileOverlap(UPrimitiveComponent* OverlappedComponen
 		UGP_BlueprintLibrary::ApplyGameplayEffectAndEventToActors(GetInstigator(), HitActors, DamageEffectClass, HitEventTag, EffectLevel, SkillData);
 	}
 
-	MulticastPlayHitEffect(GetActorLocation());
+	MulticastPlayHitEffect(GetActorLocation(), GetActorRotation(), ImpactVisualActorClass);
 
 	if (bDestroyOnHit)
 	{
@@ -127,7 +132,20 @@ void AGP_Projectile::OnProjectileOverlap(UPrimitiveComponent* OverlappedComponen
 	}
 }
 
-void AGP_Projectile::MulticastPlayHitEffect_Implementation(const FVector& ImpactLocation)
+void AGP_Projectile::MulticastPlayHitEffect_Implementation(
+	const FVector& ImpactLocation,
+	const FRotator& ImpactRotation,
+	TSubclassOf<AActor> InImpactVisualActorClass)
 {
+	if (InImpactVisualActorClass)
+	{
+		FActorSpawnParameters SpawnParams;
+		SpawnParams.Owner = GetOwner();
+		SpawnParams.Instigator = GetInstigator();
+		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		GetWorld()->SpawnActor<AActor>(InImpactVisualActorClass, ImpactLocation, ImpactRotation, SpawnParams);
+		return;
+	}
+
 	BP_OnHitEffect(ImpactLocation);
 }
