@@ -391,3 +391,27 @@ Last: 2026-06-06T22:10:00+09:00
 
 ## Resume
 - Start with `02-current-project-state.md` and `04-handoff.md`, then verify the live AnimBP / chooser path in PIE.
+
+## [2026-06-09T06:21:41] archived summary (698B)
+
+---
+memoc: true
+type: state
+scope: project-memory
+status: active
+tags: [memoc, memoc/state]
+updated: 2026-06-09T00:00:00+09:00
+---
+# Session Summary
+Last: 2026-06-09
+
+## Status
+- Distinct-skill direction active; element gating is deprecated.
+- MagmaShot and DarkSoloProjectile use shared projectile execution with skill-owned projectile/impact visuals.
+- Optional direct/splash projectile damage exists.
+- New ground targeting: cursor preview, range clamp, ground trace, server target validation, and release-to-confirm.
+- `UGP_Skill_LightningStrike` added as a targeted area-strike base.
+
+## Next
+- User builds.
+- Create LightningStrike GA, preview actor, impact actor, DA, then PIE/network test.

@@ -160,6 +160,7 @@ namespace GPTags
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Projectile);
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ray);
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(TargetActor);
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(GroundPosition);
 		}
 		namespace Buff
 		{
@@ -252,6 +253,7 @@ namespace GPTags
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(SplitShot);
 
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(GroundBurst);
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(LightningStrike);
 
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(ThrownBurst);
 

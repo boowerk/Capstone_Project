@@ -2,6 +2,7 @@
 
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
+#include "Abilities/GameplayAbilityTargetTypes.h"
 #include "AbilitySystem/Abilities/GP_SkillAugmentData.h"
 #include "AbilitySystem/Abilities/GP_SkillAugmentPoolData.h"
 #include "AbilitySystem/Abilities/GP_TestSkillSet.h"
@@ -158,6 +159,7 @@ void AGP_PlayerController::Tick(float DeltaSeconds)
 
 	UpdateMovementSpeed(DeltaSeconds);
 	UpdateCharacterRotation(DeltaSeconds);
+	UpdateSkillSelectionInputMode();
 
 	BossRefreshAccumulator += DeltaSeconds;
 	if (BossRefreshAccumulator >= BossRefreshInterval)
@@ -210,9 +212,24 @@ void AGP_PlayerController::SetupInputComponent()
 	if (PrimaryAttackAction)  EnhancedInputComponent->BindAction(PrimaryAttackAction,  ETriggerEvent::Started,   this, &ThisClass::Input_PrimaryAttack);
 	if (SecondarySkillConfirmAction) EnhancedInputComponent->BindAction(SecondarySkillConfirmAction, ETriggerEvent::Started, this, &ThisClass::Input_SecondarySkillConfirm);
 	if (CancelSkillSelectionAction) EnhancedInputComponent->BindAction(CancelSkillSelectionAction, ETriggerEvent::Started, this, &ThisClass::Input_CancelSkillSelection);
-	if (SkillSlot1Action) EnhancedInputComponent->BindAction(SkillSlot1Action, ETriggerEvent::Started, this, &ThisClass::Input_SkillSlot1);
-	if (SkillSlot2Action) EnhancedInputComponent->BindAction(SkillSlot2Action, ETriggerEvent::Started, this, &ThisClass::Input_SkillSlot2);
-	if (UltimateAction) EnhancedInputComponent->BindAction(UltimateAction, ETriggerEvent::Started, this, &ThisClass::Input_UltimateSkill);
+	if (SkillSlot1Action)
+	{
+		EnhancedInputComponent->BindAction(SkillSlot1Action, ETriggerEvent::Started, this, &ThisClass::Input_SkillSlot1);
+		EnhancedInputComponent->BindAction(SkillSlot1Action, ETriggerEvent::Completed, this, &ThisClass::Input_SkillSlotReleased);
+		EnhancedInputComponent->BindAction(SkillSlot1Action, ETriggerEvent::Canceled, this, &ThisClass::Input_SkillSlotReleased);
+	}
+	if (SkillSlot2Action)
+	{
+		EnhancedInputComponent->BindAction(SkillSlot2Action, ETriggerEvent::Started, this, &ThisClass::Input_SkillSlot2);
+		EnhancedInputComponent->BindAction(SkillSlot2Action, ETriggerEvent::Completed, this, &ThisClass::Input_SkillSlotReleased);
+		EnhancedInputComponent->BindAction(SkillSlot2Action, ETriggerEvent::Canceled, this, &ThisClass::Input_SkillSlotReleased);
+	}
+	if (UltimateAction)
+	{
+		EnhancedInputComponent->BindAction(UltimateAction, ETriggerEvent::Started, this, &ThisClass::Input_UltimateSkill);
+		EnhancedInputComponent->BindAction(UltimateAction, ETriggerEvent::Completed, this, &ThisClass::Input_SkillSlotReleased);
+		EnhancedInputComponent->BindAction(UltimateAction, ETriggerEvent::Canceled, this, &ThisClass::Input_SkillSlotReleased);
+	}
 	if (TestToggleSkillAction) EnhancedInputComponent->BindAction(TestToggleSkillAction, ETriggerEvent::Started, this, &ThisClass::Input_TestToggleSkill);
 	// Keep both debug bindings after the PR merge so neither test preset rotation nor White Void input is dropped.
 	if (RotateTestSkillAction) EnhancedInputComponent->BindAction(RotateTestSkillAction, ETriggerEvent::Started, this, &ThisClass::Input_RotateTestSkill);
@@ -498,6 +515,14 @@ void AGP_PlayerController::Input_UltimateSkill()
 	ActivateAbilityByTag(GPTags::Ability::Skill::Ultimate);
 }
 
+void AGP_PlayerController::Input_SkillSlotReleased()
+{
+	if (IsSkillSelectionActive())
+	{
+		SendSkillSelectionEvent(GPTags::Event::Skill::ConfirmPrimary);
+	}
+}
+
 bool AGP_PlayerController::ActivateAbilityByTag(const FGameplayTag& AbilityTag) const
 {
 	UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn());
@@ -521,6 +546,12 @@ bool AGP_PlayerController::IsSkillSelectionActive() const
 	return IsValid(ASC) && ASC->HasMatchingGameplayTag(GPTags::State::Skill::Selecting);
 }
 
+bool AGP_PlayerController::IsGroundPositionSelectionActive() const
+{
+	UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn());
+	return IsValid(ASC) && ASC->HasMatchingGameplayTag(GPTags::State::Skill::GroundPosition);
+}
+
 bool AGP_PlayerController::SendSkillSelectionEvent(const FGameplayTag& EventTag) const
 {
 	APawn* ControlledPawn = GetPawn();
@@ -533,14 +564,82 @@ bool AGP_PlayerController::SendSkillSelectionEvent(const FGameplayTag& EventTag)
 	Payload.EventTag = EventTag;
 	Payload.Instigator = ControlledPawn;
 	Payload.Target = ControlledPawn;
+
+	FVector TargetLocation = FVector::ZeroVector;
+	const bool bHasTargetLocation =
+		EventTag.MatchesTagExact(GPTags::Event::Skill::ConfirmPrimary)
+		&& IsGroundPositionSelectionActive()
+		&& GetSkillSelectionCursorLocation(TargetLocation);
+	if (bHasTargetLocation)
+	{
+		FillSkillSelectionTargetData(Payload, TargetLocation);
+	}
+
 	UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(ControlledPawn, EventTag, Payload);
 
 	if (!HasAuthority())
 	{
-		const_cast<AGP_PlayerController*>(this)->Server_SendSkillSelectionEvent(EventTag);
+		const_cast<AGP_PlayerController*>(this)->Server_SendSkillSelectionEvent(EventTag, TargetLocation, bHasTargetLocation);
 	}
 
 	return true;
+}
+
+void AGP_PlayerController::FillSkillSelectionTargetData(
+	FGameplayEventData& Payload,
+	const FVector& TargetLocation) const
+{
+	FGameplayAbilityTargetData_LocationInfo* LocationData = new FGameplayAbilityTargetData_LocationInfo();
+	LocationData->TargetLocation.LocationType = EGameplayAbilityTargetingLocationType::LiteralTransform;
+	LocationData->TargetLocation.LiteralTransform = FTransform(TargetLocation);
+	Payload.TargetData.Add(LocationData);
+}
+
+bool AGP_PlayerController::GetSkillSelectionCursorLocation(FVector& OutTargetLocation) const
+{
+	FHitResult CursorHit;
+	if (!GetHitResultUnderCursor(ECC_Visibility, false, CursorHit))
+	{
+		return false;
+	}
+
+	OutTargetLocation = CursorHit.ImpactPoint;
+	return true;
+}
+
+void AGP_PlayerController::UpdateSkillSelectionInputMode()
+{
+	if (!IsLocalController())
+	{
+		return;
+	}
+
+	const bool bGroundSelectionActive = IsGroundPositionSelectionActive();
+	if (bGroundSelectionActive == bWasGroundPositionSelectionActive)
+	{
+		return;
+	}
+
+	bWasGroundPositionSelectionActive = bGroundSelectionActive;
+	if (bGroundSelectionActive)
+	{
+		bShowMouseCursor = true;
+		SetIgnoreLookInput(true);
+
+		FInputModeGameAndUI InputMode;
+		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+		InputMode.SetHideCursorDuringCapture(false);
+		SetInputMode(InputMode);
+		return;
+	}
+
+	const bool bAugmentOpen = IsValid(AugmentSelectWidget) && AugmentSelectWidget->IsInViewport();
+	if (!bAugmentOpen && !bIsCharacterStatsMenuOpen)
+	{
+		bShowMouseCursor = false;
+		SetIgnoreLookInput(false);
+		SetInputMode(FInputModeGameOnly());
+	}
 }
 
 void AGP_PlayerController::CancelSkillSelectionIfActive() const
@@ -551,14 +650,25 @@ void AGP_PlayerController::CancelSkillSelectionIfActive() const
 	}
 }
 
-bool AGP_PlayerController::Server_SendSkillSelectionEvent_Validate(FGameplayTag EventTag)
+bool AGP_PlayerController::Server_SendSkillSelectionEvent_Validate(
+	FGameplayTag EventTag,
+	FVector_NetQuantize TargetLocation,
+	bool bHasTargetLocation)
 {
-	return EventTag.MatchesTagExact(GPTags::Event::Skill::ConfirmPrimary)
+	const bool bValidEvent = EventTag.MatchesTagExact(GPTags::Event::Skill::ConfirmPrimary)
 		|| EventTag.MatchesTagExact(GPTags::Event::Skill::ConfirmSecondary)
 		|| EventTag.MatchesTagExact(GPTags::Event::Skill::Cancel);
+	const bool bValidLocation = !bHasTargetLocation
+		|| (FMath::IsFinite(TargetLocation.X)
+			&& FMath::IsFinite(TargetLocation.Y)
+			&& FMath::IsFinite(TargetLocation.Z));
+	return bValidEvent && bValidLocation;
 }
 
-void AGP_PlayerController::Server_SendSkillSelectionEvent_Implementation(FGameplayTag EventTag)
+void AGP_PlayerController::Server_SendSkillSelectionEvent_Implementation(
+	FGameplayTag EventTag,
+	FVector_NetQuantize TargetLocation,
+	bool bHasTargetLocation)
 {
 	APawn* ControlledPawn = GetPawn();
 	if (!IsValid(ControlledPawn) || !EventTag.IsValid())
@@ -570,6 +680,10 @@ void AGP_PlayerController::Server_SendSkillSelectionEvent_Implementation(FGamepl
 	Payload.EventTag = EventTag;
 	Payload.Instigator = ControlledPawn;
 	Payload.Target = ControlledPawn;
+	if (bHasTargetLocation)
+	{
+		FillSkillSelectionTargetData(Payload, TargetLocation);
+	}
 	UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(ControlledPawn, EventTag, Payload);
 }
 

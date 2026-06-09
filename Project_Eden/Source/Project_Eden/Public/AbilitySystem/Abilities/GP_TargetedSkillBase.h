@@ -13,7 +13,8 @@ enum class EGP_SkillSelectionMode : uint8
 	Instant,
 	Projectile,
 	Ray,
-	TargetActor
+	TargetActor,
+	GroundPosition
 };
 
 UENUM(BlueprintType)
@@ -113,6 +114,12 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS|Skill|Selection", meta = (ClampMin = "1.0"))
 	float TargetAimAssistRadius = 180.0f;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS|Skill|Selection", meta = (ClampMin = "0.0"))
+	float GroundTraceHeight = 1000.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS|Skill|Selection", meta = (ClampMin = "0.0"))
+	float GroundTraceDepth = 2000.0f;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS|Skill|Preview")
 	TSubclassOf<AActor> PreviewActorClass;
 
@@ -133,7 +140,10 @@ private:
 	void RemoveSelectionLooseTags();
 	void UpdatePreview();
 	void ConfirmSelection(EGP_SkillConfirmType ConfirmType);
+	void ConfirmSelectionFromPayload(const FGameplayEventData& Payload, EGP_SkillConfirmType ConfirmType);
 	bool TryCommitAndExecute(const FGP_SkillTargetData& TargetData);
+	bool ResolveGroundLocation(const AActor* AvatarActor, const FVector& CandidateLocation, FVector& OutGroundLocation) const;
+	FGP_SkillTargetData ValidateReceivedTargetData(const FGP_SkillTargetData& TargetData) const;
 	AActor* FindBestTargetActor(const AActor* AvatarActor, const FVector& TraceStart, const FVector& AimDirection) const;
 
 	UFUNCTION()

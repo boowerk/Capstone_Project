@@ -18,6 +18,7 @@ class UInputAction;
 class UInputMappingContext;
 class UUserWidget;
 struct FGameplayTag;
+struct FGameplayEventData;
 struct FInputActionValue;
 
 UCLASS()
@@ -176,6 +177,7 @@ private:
 	void Input_SkillSlot1();
 	void Input_SkillSlot2();
 	void Input_UltimateSkill();
+	void Input_SkillSlotReleased();
 	void Input_TestToggleSkill();
 	void Input_RotateTestSkill();
 	void Input_ToggleWhiteVoid();
@@ -188,11 +190,15 @@ private:
 	void Server_RotateTestSkill();
 
 	UFUNCTION(Server, Reliable, WithValidation)
-	void Server_SendSkillSelectionEvent(FGameplayTag EventTag);
+	void Server_SendSkillSelectionEvent(FGameplayTag EventTag, FVector_NetQuantize TargetLocation, bool bHasTargetLocation);
 
 	bool ActivateAbilityByTag(const FGameplayTag& AbilityTag) const;
 	bool IsSkillSelectionActive() const;
+	bool IsGroundPositionSelectionActive() const;
 	bool SendSkillSelectionEvent(const FGameplayTag& EventTag) const;
+	void FillSkillSelectionTargetData(FGameplayEventData& Payload, const FVector& TargetLocation) const;
+	bool GetSkillSelectionCursorLocation(FVector& OutTargetLocation) const;
+	void UpdateSkillSelectionInputMode();
 	void CancelSkillSelectionIfActive() const;
 	void ClearTestSkillSlots(UAbilitySystemComponent* ASC);
 	int32 GetTestSkillPresetCount() const;
@@ -208,6 +214,7 @@ private:
 	bool bSkillsEquipped = false;
 	int32 TestSkillPresetIndex = 0;
 	bool bIsCharacterStatsMenuOpen = false;
+	bool bWasGroundPositionSelectionActive = false;
 
 	// --- Movement Input Smoothing ---
 	FVector SmoothedMoveWorldDirection = FVector::ZeroVector;

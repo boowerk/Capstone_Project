@@ -157,6 +157,7 @@ namespace GPTags
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Projectile, "GPTags.State.Skill.Projectile", "투사체 스킬 조준 상태");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ray, "GPTags.State.Skill.Ray", "레이/라인 스킬 조준 상태");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(TargetActor, "GPTags.State.Skill.TargetActor", "대상 선택 스킬 조준 상태");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(GroundPosition, "GPTags.State.Skill.GroundPosition", "지면 위치 선택 스킬 조준 상태");
         }
         namespace Buff
         {
@@ -244,6 +245,7 @@ namespace GPTags
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(NetTestProjectile, "GPTags.Cooldown.Skill.NetTestProjectile", "테스트 프로젝타일 스킬 쿨다운");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(SplitShot, "GPTags.Cooldown.Skill.SplitShot", "스플릿샷 스킬 쿨다운");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(GroundBurst, "GPTags.Cooldown.Skill.GroundBurst", "그라운드 버스트 스킬 쿨다운");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(LightningStrike, "GPTags.Cooldown.Skill.LightningStrike", "라이트닝 스트라이크 스킬 쿨다운");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(ThrownBurst, "GPTags.Cooldown.Skill.ThrownBurst", "투척 버스트 스킬 쿨다운");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(PulseBurst, "GPTags.Cooldown.Skill.PulseBurst", "펄스 버스트 스킬 쿨다운");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(LineShock, "GPTags.Cooldown.Skill.LineShock", "라인 쇼크 스킬 쿨다운");
