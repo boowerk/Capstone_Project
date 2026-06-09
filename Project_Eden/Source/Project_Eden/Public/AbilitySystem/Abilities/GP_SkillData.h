@@ -115,6 +115,15 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Projectile|Debug", meta = (EditCondition = "ProjectileImpactDamageMode == EGP_ProjectileImpactDamageMode::DirectAndSplash", EditConditionHides))
 	bool bDrawSplashDebug = false;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Projectile|Multi Hit", meta = (DisplayName = "Projectile Max Total Hits", ClampMin = "1", ToolTip = "Maximum total number of damage hits applied by one multi-hit projectile across all targets."))
+	int32 ProjectileMaxHitsPerTarget = 3;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Projectile|Multi Hit", meta = (ClampMin = "0.01", Units = "s", ToolTip = "Delay between reserved hits after a multi-hit projectile touches a target."))
+	float ProjectileHitInterval = 0.1f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Projectile|Multi Hit", meta = (ClampMin = "0.0", ToolTip = "Damage scale applied to each hit of a multi-hit projectile."))
+	float ProjectileDamagePerHitMultiplier = 0.4f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Damage")
 	float BaseDamage = 0.f;
 
