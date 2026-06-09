@@ -13,14 +13,12 @@ tags:
 Last: 2026-06-08T00:00:00+09:00
 
 ## Status
-- Updated `/Game/Fab/Blueprints/BP_Fab_FenceSegment` to match level `NewFolder1` fence.
+- Attempted Slash distortion material graph edit, but Unreal MCP session was expired.
 
 ## Changed
-- Static SCS: `NewelPost_L` root, `NewelPost_R` Y=460, 10 balusters Y=50..410, 8 native handrails Y=50..470.
-- Preview bounds verified; preview deleted.
-
-## Open Tasks
-- Optional: convert fence BP to procedural construction-script version if designer needs editable length/count.
+- MCP calls to inspect/search/material edit all failed with `Invalid or expired session ID`.
+- Disk assets under `Project_Eden/Content/Niagara/Slash` include candidate texture assets `T_NoiseNormal_B`, `bigfire_single`, and `BezierCurve`.
+- No material graph was changed this turn.
 
 ## Resume
-- Fence BP origin is left post, not center; segment runs along +Y.
+- Reconnect/restart Unreal MCP before retrying material graph work. Likely NormalTexture=`T_NoiseNormal_B`; MaskTexture must be chosen from `bigfire_single` or `BezierCurve` by inspecting in editor.
