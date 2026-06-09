@@ -344,6 +344,7 @@ private:
 	void UpdateActionMotionTracking(float DeltaSeconds);
 	void UpdateActionCarryVelocity(float DeltaSeconds);
 	void UpdatePrimaryAttackMovementAssist(float DeltaSeconds);
+	bool ShouldApplyActionInertiaDirectMovement() const;
 	void FlushActionMotionTracking();
 	FVector GetCurrentActionInertiaVelocity() const;
 

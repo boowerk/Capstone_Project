@@ -17,6 +17,7 @@ Last synced: 2026-06-08T00:00:00+09:00
 
 - Do not run UBT/build while the editor is open. User prefers Live Coding for C++ changes.
 - Multiplayer player movement fix in progress: `AGP_PlayerController` sends local `CurrentMoveInput` to the server, clears it reliably, and now resolves server-side effective move input from `CharacterMovement->GetCurrentAcceleration()` first. Directional target speed recalculates every tick; multiplayer assigns `MaxWalkSpeed` directly while standalone keeps speed interpolation. This targets client correction jitter and wrong remote facing.
+- Action inertia is now standalone-only for direct movement: `AGP_PlayerCharacter` skips/clears `UpdateActionCarryVelocity`, `UpdatePrimaryAttackMovementAssist`, and `ApplyCurrentActionInertia` in multiplayer because their Tick-time `SafeMoveUpdatedComponent` / sampled velocity handoff can bypass CharacterMovement prediction and cause correction jitter.
 - `UEFNSourceMesh` is the source animation mesh. `CharacterMesh0`/MaskMan should stay parented under `UEFNSourceMesh`; avoid reintroducing mesh Z hacks or detached retarget experiments.
 - `ABP_UEFNSource_Player` uses motion matching with chooser-selected pose-search DBs, and `UGP_CharacterAnimInstance` owns locomotion context (`MovementMode`, `Stance`, `MovementState`, `Gait`, start/pivot/stop/TIP flags, graph DB state).
 - Primary melee currently embeds recovery inside attack montages, blocks sprint while active, forces crouch during the combo, and restores uncrouch only if crouch input is no longer held.

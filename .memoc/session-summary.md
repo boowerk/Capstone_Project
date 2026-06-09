@@ -3,22 +3,22 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-06-06T06:43:32
-updated: 2026-06-08T00:00:00+09:00
+updated: 2026-06-10T00:00:00+09:00
 status: active
 tags:
   - memoc
   - memoc/state
 ---
 # Session Summary
-Last: 2026-06-08T00:00:00+09:00
+Last: 2026-06-10T00:00:00+09:00
 
 ## Status
-- Attempted Slash distortion material graph edit, but Unreal MCP session was expired.
+- Suspected added action inertia as source of multiplayer movement jitter.
 
 ## Changed
-- MCP calls to inspect/search/material edit all failed with `Invalid or expired session ID`.
-- Disk assets under `Project_Eden/Content/Niagara/Slash` include candidate texture assets `T_NoiseNormal_B`, `bigfire_single`, and `BezierCurve`.
-- No material graph was changed this turn.
+- `AGP_PlayerCharacter` disables direct action-inertia movement outside standalone.
+- `UpdateActionCarryVelocity`, `UpdatePrimaryAttackMovementAssist`, and `ApplyCurrentActionInertia` skip/clear inertia in multiplayer.
+- `gp.ActionInertia.Debug` default is now off.
 
 ## Resume
-- Reconnect/restart Unreal MCP before retrying material graph work. Likely NormalTexture=`T_NoiseNormal_B`; MaskTexture must be chosen from `bigfire_single` or `BezierCurve` by inspecting in editor.
+- Compile with Live Coding/editor and PIE net-test. If smooth, reimplement action inertia as predicted/replicated movement instead of Tick `SafeMoveUpdatedComponent`.
