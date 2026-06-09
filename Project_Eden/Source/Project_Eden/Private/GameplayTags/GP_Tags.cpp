@@ -64,6 +64,12 @@ namespace GPTags
                 UE_DEFINE_GAMEPLAY_TAG_COMMENT(MagicBubbles, "GPTags.Ability.Skill.Id.MagicBubbles", "매직 버블 스킬 식별 태그");
                 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Potion, "GPTags.Ability.Skill.Id.Potion", "포션 스킬 식별 태그");
             }
+            namespace Visual
+            {
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(Projectile, "GPTags.Ability.Skill.Visual.Projectile", "투사체 비행 연출");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(Impact, "GPTags.Ability.Skill.Visual.Impact", "충돌 연출");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(Cast, "GPTags.Ability.Skill.Visual.Cast", "시전 연출");
+            }
         }
         namespace Enemy
         {

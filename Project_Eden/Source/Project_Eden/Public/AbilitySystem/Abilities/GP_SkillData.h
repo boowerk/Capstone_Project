@@ -60,6 +60,13 @@ enum class EGP_CooldownPolicy : uint8
 	Custom
 };
 
+UENUM(BlueprintType)
+enum class EGP_ProjectileImpactDamageMode : uint8
+{
+	DirectOnly,
+	DirectAndSplash
+};
+
 /**
  * 개별 스킬의 정보를 담는 데이터 에셋
  */
@@ -95,6 +102,18 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Actor", meta = (DisplayName = "Execution Actor Class", ToolTip = "Actor spawned to execute this skill. Projectile, mine, field, trap, or other runtime actor. If empty, the ability fallback actor is used."))
 	TSubclassOf<AActor> SpawnActorClass;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Projectile")
+	EGP_ProjectileImpactDamageMode ProjectileImpactDamageMode = EGP_ProjectileImpactDamageMode::DirectOnly;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Projectile", meta = (ClampMin = "0.0", EditCondition = "ProjectileImpactDamageMode == EGP_ProjectileImpactDamageMode::DirectAndSplash", EditConditionHides))
+	float SplashRadius = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Projectile", meta = (ClampMin = "0.0", EditCondition = "ProjectileImpactDamageMode == EGP_ProjectileImpactDamageMode::DirectAndSplash", EditConditionHides))
+	float SplashDamageMultiplier = 1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Projectile|Debug", meta = (EditCondition = "ProjectileImpactDamageMode == EGP_ProjectileImpactDamageMode::DirectAndSplash", EditConditionHides))
+	bool bDrawSplashDebug = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Damage")
 	float BaseDamage = 0.f;

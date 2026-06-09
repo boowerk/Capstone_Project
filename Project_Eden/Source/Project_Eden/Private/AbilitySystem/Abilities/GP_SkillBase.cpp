@@ -408,7 +408,7 @@ UNiagaraSystem* UGP_SkillBase::GetProjectileVisualSystem(const UGP_SkillData* Sk
 		return AugmentOverride;
 	}
 
-	if (UNiagaraSystem* NiagaraSystem = GetSkillNiagaraSystem(SkillData, ElementTag))
+	if (UNiagaraSystem* NiagaraSystem = GetSkillNiagaraSystem(SkillData, ElementTag, GPTags::Ability::Skill::Visual::Projectile))
 	{
 		return NiagaraSystem;
 	}

@@ -1,4 +1,5 @@
 ﻿#include "Actors/GP_Projectile.h"
+#include "AbilitySystem/Abilities/GP_SkillData.h"
 #include "Components/ShapeComponent.h" 
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "GameplayTags/GP_Tags.h"
@@ -122,6 +123,28 @@ void AGP_Projectile::OnProjectileOverlap(UPrimitiveComponent* OverlappedComponen
 		HitActors.Add(OtherActor);
 
 		UGP_BlueprintLibrary::ApplyGameplayEffectAndEventToActors(GetInstigator(), HitActors, DamageEffectClass, HitEventTag, EffectLevel, SkillData);
+
+		if (SkillData
+			&& SkillData->ProjectileImpactDamageMode == EGP_ProjectileImpactDamageMode::DirectAndSplash
+			&& SkillData->SplashRadius > 0.0f)
+		{
+			TArray<AActor*> SplashActors = UGP_BlueprintLibrary::SphereOverlapActorsAtLocation(
+				this,
+				GetActorLocation(),
+				SkillData->SplashRadius,
+				GetInstigator(),
+				SkillData->bDrawSplashDebug);
+			SplashActors.Remove(OtherActor);
+
+			UGP_BlueprintLibrary::ApplyGameplayEffectAndEventToActors(
+				GetInstigator(),
+				SplashActors,
+				DamageEffectClass,
+				HitEventTag,
+				EffectLevel,
+				SkillData,
+				SkillData->SplashDamageMultiplier);
+		}
 	}
 
 	MulticastPlayHitEffect(GetActorLocation(), GetActorRotation(), ImpactVisualActorClass);

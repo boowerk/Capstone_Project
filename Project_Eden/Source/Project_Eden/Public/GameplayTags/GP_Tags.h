@@ -68,6 +68,12 @@ namespace GPTags
 				UE_DECLARE_GAMEPLAY_TAG_EXTERN(MagicBubbles);
 				UE_DECLARE_GAMEPLAY_TAG_EXTERN(Potion);
 			}
+			namespace Visual
+			{
+				UE_DECLARE_GAMEPLAY_TAG_EXTERN(Projectile);
+				UE_DECLARE_GAMEPLAY_TAG_EXTERN(Impact);
+				UE_DECLARE_GAMEPLAY_TAG_EXTERN(Cast);
+			}
 		}
 		namespace Enemy
 		{
