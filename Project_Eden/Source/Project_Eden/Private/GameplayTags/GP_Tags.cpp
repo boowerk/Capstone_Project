@@ -244,6 +244,8 @@ namespace GPTags
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(WaterPuddle, "GPTags.Cooldown.Skill.WaterPuddle", "물웅덩이 스킬 쿨다운");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(NetTestProjectile, "GPTags.Cooldown.Skill.NetTestProjectile", "테스트 프로젝타일 스킬 쿨다운");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(SplitShot, "GPTags.Cooldown.Skill.SplitShot", "스플릿샷 스킬 쿨다운");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(MagmaShot, "GPTags.Cooldown.Skill.MagmaShot", "마그마 샷 스킬 쿨다운");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(DarkSoloProjectile, "GPTags.Cooldown.Skill.DarkSoloProjectile", "다크 단일 투사체 스킬 쿨다운");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(GroundBurst, "GPTags.Cooldown.Skill.GroundBurst", "그라운드 버스트 스킬 쿨다운");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(LightningStrike, "GPTags.Cooldown.Skill.LightningStrike", "라이트닝 스트라이크 스킬 쿨다운");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(ThrownBurst, "GPTags.Cooldown.Skill.ThrownBurst", "투척 버스트 스킬 쿨다운");
