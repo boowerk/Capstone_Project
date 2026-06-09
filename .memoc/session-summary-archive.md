@@ -415,3 +415,66 @@ Last: 2026-06-09
 ## Next
 - User builds.
 - Create LightningStrike GA, preview actor, impact actor, DA, then PIE/network test.
+
+## [2026-06-09T08:25:05] archived summary (942B)
+
+---
+memoc: true
+type: state
+scope: project-memory
+created: 2026-06-09T08:13:24
+updated: 2026-06-09T08:13:24
+status: active
+tags:
+  - memoc
+  - memoc/state
+---
+# Session Summary
+Last: 2026-06-09T17:25:00
+Replace, do not append. Keep <800B.
+History: worklog. Resume risks: 04-handoff.md.
+
+## Status
+- Analyzed game logs: found that skill data resolves correctly (e.g. `DA_Skill_MagmaShot` not null), but projectile spawning is bypassed.
+- Added logs to narrow down early return in `SpawnProjectiles`.
+
+## Changed
+- `GP_Skill_NetTestProjectile.cpp`: Added logs to track `SpawnProjectiles` early return variables.
+- `GP_SkillBase.cpp`: Added logs inside `GetSkillSpawnActorClass` and `GetSkillVisualActorClass`.
+
+## Open Tasks
+- User recompiles C++, runs Dedicated Server + Game Client, tests skills, and shares logs.
+
+## Resume
+- Check logs to see which parameter (e.g. `SpawnActorClass`) is null causing the early return in `SpawnProjectiles`.
+
+## [2026-06-09T08:33:26] archived summary (802B)
+
+---
+memoc: true
+type: state
+scope: project-memory
+created: 2026-06-09T08:25:05
+updated: 2026-06-09T17:34:00
+status: active
+tags:
+  - memoc
+  - memoc/state
+---
+# Session Summary
+Last: 2026-06-09T17:34:00
+Replace, do not append. Keep <800B.
+History: worklog. Resume risks: 04-handoff.md.
+
+## Status
+- Added logs to track Client-Server RPC communication during skill confirmation.
+
+## Changed
+- GP_PlayerController.cpp: Added logs to SendSkillSelectionEvent and Server RPC.
+- GP_TargetedSkillBase.cpp: Added logs to ActivateAbility, ConfirmSelectionFromPayload, and TryCommitAndExecute.
+
+## Open Tasks
+- User rebuilds and runs Dedicated Server + Client to gather logs of skill casting confirm flow.
+
+## Resume
+- Analyze logs to see if Confirm RPC reaches server and if server processes Confirm Selection.

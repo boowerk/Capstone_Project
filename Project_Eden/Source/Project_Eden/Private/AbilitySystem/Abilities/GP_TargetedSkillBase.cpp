@@ -595,7 +595,8 @@ bool UGP_TargetedSkillBase::TryCommitAndExecute(const FGP_SkillTargetData& Targe
 
 	if (bEndAbilityAfterConfirmedExecute)
 	{
-		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+		const bool bReplicateEndAbility = HasAuthority(&CurrentActivationInfo);
+		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, bReplicateEndAbility, false);
 	}
 
 	return true;
