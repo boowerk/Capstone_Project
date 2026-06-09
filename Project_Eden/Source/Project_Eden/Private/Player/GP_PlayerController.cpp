@@ -517,10 +517,6 @@ void AGP_PlayerController::Input_UltimateSkill()
 
 void AGP_PlayerController::Input_SkillSlotReleased()
 {
-	if (IsSkillSelectionActive())
-	{
-		SendSkillSelectionEvent(GPTags::Event::Skill::ConfirmPrimary);
-	}
 }
 
 bool AGP_PlayerController::ActivateAbilityByTag(const FGameplayTag& AbilityTag) const
