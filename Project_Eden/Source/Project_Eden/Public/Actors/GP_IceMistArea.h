@@ -38,6 +38,7 @@ public:
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Eden|Ice Mist")
 	TObjectPtr<USphereComponent> MovementCollision;
@@ -52,7 +53,11 @@ private:
 	UFUNCTION()
 	void HandleProjectileStopped(const FHitResult& ImpactResult);
 
+	UFUNCTION()
+	void OnRep_MovementStopped();
+
 	void StopMistMovement();
+	void ApplyStoppedMovementState();
 
 	UFUNCTION()
 	void HandleAreaBeginOverlap(
@@ -96,6 +101,9 @@ private:
 	float LaunchSpeed = 600.0f;
 	float MoveDuration = 0.5f;
 	bool bDrawDebug = false;
+
+	UPROPERTY(ReplicatedUsing = OnRep_MovementStopped)
+	bool bMovementStopped = false;
 
 	TMap<TWeakObjectPtr<AActor>, FActiveGameplayEffectHandle> SlowEffectHandles;
 	FTimerHandle DamageTimerHandle;

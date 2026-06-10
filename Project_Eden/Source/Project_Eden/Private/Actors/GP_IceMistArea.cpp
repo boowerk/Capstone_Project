@@ -6,6 +6,7 @@
 #include "Components/SphereComponent.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "GameplayEffect.h"
+#include "Net/UnrealNetwork.h"
 #include "Utils/GP_BlueprintLibrary.h"
 
 AGP_IceMistArea::AGP_IceMistArea()
@@ -128,6 +129,12 @@ void AGP_IceMistArea::BeginPlay()
 	SetLifeSpan(AreaDuration);
 }
 
+void AGP_IceMistArea::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(AGP_IceMistArea, bMovementStopped);
+}
+
 void AGP_IceMistArea::HandleProjectileStopped(const FHitResult& ImpactResult)
 {
 	StopMistMovement();
@@ -135,7 +142,27 @@ void AGP_IceMistArea::HandleProjectileStopped(const FHitResult& ImpactResult)
 
 void AGP_IceMistArea::StopMistMovement()
 {
+	if (bMovementStopped)
+	{
+		return;
+	}
+
 	GetWorldTimerManager().ClearTimer(MovementTimerHandle);
+	bMovementStopped = true;
+	ApplyStoppedMovementState();
+	ForceNetUpdate();
+}
+
+void AGP_IceMistArea::OnRep_MovementStopped()
+{
+	if (bMovementStopped)
+	{
+		ApplyStoppedMovementState();
+	}
+}
+
+void AGP_IceMistArea::ApplyStoppedMovementState()
+{
 	ProjectileMovement->StopMovementImmediately();
 	ProjectileMovement->Deactivate();
 	MovementCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
