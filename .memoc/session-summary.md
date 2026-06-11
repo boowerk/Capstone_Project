@@ -3,31 +3,27 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-06-09T08:33:26
-updated: 2026-06-09T08:33:26
+updated: 2026-06-11T00:00:00
 status: active
 tags:
   - memoc
   - memoc/state
 ---
 # Session Summary
-Last: 2026-06-09T08:33:26
+Last: 2026-06-11
 Replace, do not append. Keep <800B.
 History: worklog. Resume risks: 04-handoff.md.
 
 ## Status
-- Dark Stone complete.
-- Ice Mist is a projectile-aimed moving mist: enemy piercing, periodic damage/slow while moving, stops on static walls.
-- Enemy MoveSpeed attribute now updates CharacterMovement MaxWalkSpeed.
-
-## Changed
-- Added GP_Skill_IceMist and replicated moving GP_IceMistArea.
-- Added IceMist cooldown tag.
-- GP_EnemyCharacter binds replicated MoveSpeed changes.
+- Dark Stone and Ice Mist complete.
+- Augment DAs can define arbitrary typed Niagara `User.*` overrides.
+- Matching overrides merge by skill; later duplicate names win.
+- Lightning Strike consumes overrides; radius no longer maps to `LargeRadius`.
 
 ## Open Tasks
 - Build C++.
-- Build C++ and update BP_IceMistArea with its Niagara component.
-- Test movement, wall stop, periodic damage, slow recovery, and multiplayer.
+- Create Lightning augment DA parameter entries.
+- Verify Niagara overrides on server plus client.
 
 ## Resume
 - Build not run by agent. git diff --check passed.

@@ -231,6 +231,42 @@ UNiagaraSystem* AGP_PlayerState::GetSkillAugmentActiveVFXOverride(FGameplayTag S
 	return nullptr;
 }
 
+TArray<FGP_NiagaraParameterOverride> AGP_PlayerState::GetSkillAugmentNiagaraParameterOverrides(FGameplayTag SkillIdTag) const
+{
+	TArray<FGP_NiagaraParameterOverride> Overrides;
+	if (!SkillIdTag.IsValid())
+	{
+		return Overrides;
+	}
+
+	TMap<FName, int32> OverrideIndices;
+	for (const UGP_SkillAugmentData* Augment : SelectedSkillAugments)
+	{
+		if (!DoesAugmentApplyToSkill(Augment, SkillIdTag))
+		{
+			continue;
+		}
+
+		for (const FGP_NiagaraParameterOverride& Override : Augment->NiagaraParameterOverrides)
+		{
+			if (Override.ParameterName.IsNone())
+			{
+				continue;
+			}
+
+			if (const int32* ExistingIndex = OverrideIndices.Find(Override.ParameterName))
+			{
+				Overrides[*ExistingIndex] = Override;
+				continue;
+			}
+
+			OverrideIndices.Add(Override.ParameterName, Overrides.Add(Override));
+		}
+	}
+
+	return Overrides;
+}
+
 void AGP_PlayerState::AddXP(float Amount)
 {
 	if (Amount <= 0.0f)

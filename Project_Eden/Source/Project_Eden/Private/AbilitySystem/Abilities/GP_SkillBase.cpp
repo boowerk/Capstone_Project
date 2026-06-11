@@ -8,6 +8,7 @@
 #include "GameFramework/Pawn.h"
 #include "Player/GP_PlayerState.h"
 #include "Utils/GP_BlueprintLibrary.h"
+#include "VFX/GP_NiagaraParameterOverride.h"
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 
 UGP_SkillBase::UGP_SkillBase()
@@ -276,6 +277,26 @@ UNiagaraSystem* UGP_SkillBase::GetSkillAugmentActiveVFXOverride(const UGP_SkillD
 		: nullptr;
 }
 
+TArray<FGP_NiagaraParameterOverride> UGP_SkillBase::GetSkillAugmentNiagaraParameterOverrides(const UGP_SkillData* SkillData) const
+{
+	if (!SkillData || !SkillData->SkillIdTag.IsValid())
+	{
+		return {};
+	}
+
+	const FGameplayAbilityActorInfo* ActorInfo = GetCurrentActorInfo();
+	const AActor* OwnerActor = ActorInfo ? ActorInfo->OwnerActor.Get() : nullptr;
+	if (const AGP_PlayerState* GPPlayerState = Cast<AGP_PlayerState>(OwnerActor))
+	{
+		return GPPlayerState->GetSkillAugmentNiagaraParameterOverrides(SkillData->SkillIdTag);
+	}
+
+	const APawn* AvatarPawn = ActorInfo ? Cast<APawn>(ActorInfo->AvatarActor.Get()) : nullptr;
+	return AvatarPawn && AvatarPawn->GetPlayerState<AGP_PlayerState>()
+		? AvatarPawn->GetPlayerState<AGP_PlayerState>()->GetSkillAugmentNiagaraParameterOverrides(SkillData->SkillIdTag)
+		: TArray<FGP_NiagaraParameterOverride>();
+}
+
 TSubclassOf<AActor> UGP_SkillBase::GetSkillVisualActorClass(const UGP_SkillData* SkillData, TSubclassOf<AActor> FallbackVisualActorClass, FGameplayTag ElementTag, FGameplayTag CueTag) const
 {
 	if (const TSubclassOf<AActor> AugmentOverride = GetSkillAugmentImpactVisualActorOverride(SkillData))
@@ -435,7 +456,13 @@ UNiagaraSystem* UGP_SkillBase::GetProjectileVisualSystem(const UGP_SkillData* Sk
 	return nullptr;
 }
 
-void UGP_SkillBase::SpawnVisualActor(AActor* InstigatorActor, TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation, float VisualScale) const
+void UGP_SkillBase::SpawnVisualActor(
+	AActor* InstigatorActor,
+	TSubclassOf<AActor> VisualActorClass,
+	const FVector& Location,
+	const FRotator& Rotation,
+	float VisualScale,
+	const TArray<FGP_NiagaraParameterOverride>& NiagaraParameterOverrides) const
 {
 	if (!IsValid(InstigatorActor) || !VisualActorClass || !InstigatorActor->GetWorld())
 	{
@@ -444,7 +471,12 @@ void UGP_SkillBase::SpawnVisualActor(AActor* InstigatorActor, TSubclassOf<AActor
 
 	if (AGP_BaseCharacter* BaseCharacter = Cast<AGP_BaseCharacter>(InstigatorActor))
 	{
-		BaseCharacter->ShowSkillVisualActor(VisualActorClass, Location, Rotation, VisualScale);
+		BaseCharacter->ShowSkillVisualActor(
+			VisualActorClass,
+			Location,
+			Rotation,
+			VisualScale,
+			NiagaraParameterOverrides);
 		return;
 	}
 

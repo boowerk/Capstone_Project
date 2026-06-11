@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
 #include "GameplayTagContainer.h"
+#include "VFX/GP_NiagaraParameterOverride.h"
 #include "GP_SkillAugmentData.generated.h"
 
 class AActor;
@@ -77,4 +78,7 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Augment|Visual", meta = (DisplayName = "Active VFX Override", ToolTip = "Optional active Niagara override supplied by this augment."))
 	TObjectPtr<UNiagaraSystem> ActiveVFXOverride;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Augment|Visual", meta = (ToolTip = "Niagara User Parameters applied when this augment's target skill spawns a visual actor. Enter the exact parameter name, for example User.SpawnCount."))
+	TArray<FGP_NiagaraParameterOverride> NiagaraParameterOverrides;
 };

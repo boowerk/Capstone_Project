@@ -29,6 +29,8 @@ void UGP_Skill_LightningStrike::ExecuteConfirmedSkill_Implementation(
 	UGP_SkillData* SkillData = GetSkillDataFromSpec(CurrentSpecHandle, CurrentActorInfo);
 	const float RadiusMultiplier = GetSkillAugmentRadiusMultiplier(SkillData, CurrentActorInfo);
 	const float FinalRadius = StrikeRadius * RadiusMultiplier;
+	const TArray<FGP_NiagaraParameterOverride> NiagaraParameterOverrides =
+		GetSkillAugmentNiagaraParameterOverrides(SkillData);
 
 	SpawnVisualActor(
 		AvatarActor,
@@ -39,7 +41,8 @@ void UGP_Skill_LightningStrike::ExecuteConfirmedSkill_Implementation(
 			GPTags::Ability::Skill::Visual::Impact),
 		TargetData.TargetLocation,
 		FRotator::ZeroRotator,
-		RadiusMultiplier);
+		1.0f,
+		NiagaraParameterOverrides);
 
 	const TArray<AActor*> HitActors = UGP_BlueprintLibrary::SphereOverlapActorsAtLocation(
 		AvatarActor,

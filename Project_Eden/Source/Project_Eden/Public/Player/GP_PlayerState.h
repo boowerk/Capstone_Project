@@ -5,6 +5,7 @@
 #include "AbilitySystemInterface.h"
 #include "GameplayTagContainer.h"
 #include "Items/WeaponItemTypes.h"
+#include "VFX/GP_NiagaraParameterOverride.h"
 
 #include "GP_PlayerState.generated.h"
 
@@ -66,6 +67,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Tech|Augment")
 	UNiagaraSystem* GetSkillAugmentActiveVFXOverride(FGameplayTag SkillIdTag) const;
+
+	UFUNCTION(BlueprintPure, Category = "Tech|Augment")
+	TArray<FGP_NiagaraParameterOverride> GetSkillAugmentNiagaraParameterOverrides(FGameplayTag SkillIdTag) const;
 
 	UFUNCTION(BlueprintCallable, Category = "Progression")
 	void AddXP(float Amount);

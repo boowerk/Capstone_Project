@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "AbilitySystem/Abilities/GP_GameplayAbility.h"
 #include "GameplayTagContainer.h"
+#include "VFX/GP_NiagaraParameterOverride.h"
 #include "GP_SkillBase.generated.h"
 
 class AActor;
@@ -43,11 +44,18 @@ protected:
 	int32 GetSkillAugmentProjectileCountBonus(const UGP_SkillData* SkillData, const FGameplayAbilityActorInfo* ActorInfo) const;
 	TSubclassOf<AActor> GetSkillAugmentImpactVisualActorOverride(const UGP_SkillData* SkillData) const;
 	UNiagaraSystem* GetSkillAugmentActiveVFXOverride(const UGP_SkillData* SkillData) const;
+	TArray<FGP_NiagaraParameterOverride> GetSkillAugmentNiagaraParameterOverrides(const UGP_SkillData* SkillData) const;
 	TSubclassOf<AActor> GetSkillVisualActorClass(const UGP_SkillData* SkillData, TSubclassOf<AActor> FallbackVisualActorClass, FGameplayTag ElementTag = FGameplayTag(), FGameplayTag CueTag = FGameplayTag()) const;
 	TSubclassOf<AActor> GetSkillSpawnActorClass(const UGP_SkillData* SkillData, TSubclassOf<AActor> FallbackActorClass) const;
 	UNiagaraSystem* GetSkillNiagaraSystem(const UGP_SkillData* SkillData, FGameplayTag ElementTag = FGameplayTag(), FGameplayTag CueTag = FGameplayTag()) const;
 	UNiagaraSystem* GetProjectileVisualSystem(const UGP_SkillData* SkillData, FGameplayTag ElementTag = FGameplayTag()) const;
-	void SpawnVisualActor(AActor* InstigatorActor, TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation = FRotator::ZeroRotator, float VisualScale = 1.0f) const;
+	void SpawnVisualActor(
+		AActor* InstigatorActor,
+		TSubclassOf<AActor> VisualActorClass,
+		const FVector& Location,
+		const FRotator& Rotation = FRotator::ZeroRotator,
+		float VisualScale = 1.0f,
+		const TArray<FGP_NiagaraParameterOverride>& NiagaraParameterOverrides = {}) const;
 	UGP_SkillData* GetSkillDataFromSpec(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo) const;
 
 	// =========================================================================

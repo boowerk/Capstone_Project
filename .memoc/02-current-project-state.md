@@ -15,6 +15,7 @@ Last synced: 2026-06-04T00:00:00+09:00
 
 ## Current Status
 
+- Skill visual actors accept replicated Niagara user-parameter overrides (`Float`, `Integer`, `Boolean`, `Vector2D`, `Vector3`, `Color`). Augment DAs now store arbitrary exact `User.*` parameter names and typed values; matching selected augments are merged by skill, with later selections overriding duplicate names. Lightning Strike consumes this array. The incorrect automatic `RadiusMultiplier -> User.LargeRadius` mapping was removed because that Niagara parameter controls strike distribution, not damage radius.
 - Ground-targeted skill foundation added: `UGP_TargetedSkillBase` now supports `GroundPosition`, local cursor preview, range clamping, ground trace, and server-side target revalidation. Skill-slot release confirms selection. `UGP_Skill_LightningStrike` performs an impact-cue area strike at the confirmed ground point.
 - Enemy death now grants XP directly: `AGP_BaseCharacter` exposes a post-damage hook, and `AGP_EnemyCharacter` awards its editable `XPReward` once when health reaches zero by resolving the instigator's `AGP_PlayerState`.
 - PlayerState XP debug can be enabled with `bDebugXPChanges`; `AddXP` multicasts a green on-screen/log message showing added XP, level transition, and current XP progress.
