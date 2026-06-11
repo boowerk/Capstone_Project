@@ -297,6 +297,26 @@ TArray<FGP_NiagaraParameterOverride> UGP_SkillBase::GetSkillAugmentNiagaraParame
 		: TArray<FGP_NiagaraParameterOverride>();
 }
 
+FGP_SkillAugmentPeriodicAreaDamage UGP_SkillBase::GetSkillAugmentPeriodicAreaDamage(const UGP_SkillData* SkillData) const
+{
+	if (!SkillData || !SkillData->SkillIdTag.IsValid())
+	{
+		return {};
+	}
+
+	const FGameplayAbilityActorInfo* ActorInfo = GetCurrentActorInfo();
+	const AActor* OwnerActor = ActorInfo ? ActorInfo->OwnerActor.Get() : nullptr;
+	if (const AGP_PlayerState* GPPlayerState = Cast<AGP_PlayerState>(OwnerActor))
+	{
+		return GPPlayerState->GetSkillAugmentPeriodicAreaDamage(SkillData->SkillIdTag);
+	}
+
+	const APawn* AvatarPawn = ActorInfo ? Cast<APawn>(ActorInfo->AvatarActor.Get()) : nullptr;
+	return AvatarPawn && AvatarPawn->GetPlayerState<AGP_PlayerState>()
+		? AvatarPawn->GetPlayerState<AGP_PlayerState>()->GetSkillAugmentPeriodicAreaDamage(SkillData->SkillIdTag)
+		: FGP_SkillAugmentPeriodicAreaDamage();
+}
+
 TSubclassOf<AActor> UGP_SkillBase::GetSkillVisualActorClass(const UGP_SkillData* SkillData, TSubclassOf<AActor> FallbackVisualActorClass, FGameplayTag ElementTag, FGameplayTag CueTag) const
 {
 	if (const TSubclassOf<AActor> AugmentOverride = GetSkillAugmentImpactVisualActorOverride(SkillData))

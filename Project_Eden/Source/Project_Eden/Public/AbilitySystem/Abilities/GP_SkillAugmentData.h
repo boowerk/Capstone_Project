@@ -40,6 +40,27 @@ struct FGP_SkillAugmentNumericModifiers
 	int32 ProjectileCountBonus = 0;
 };
 
+USTRUCT(BlueprintType)
+struct FGP_SkillAugmentPeriodicAreaDamage
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Augment|Gameplay")
+	bool bEnabled = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Augment|Gameplay", meta = (EditCondition = "bEnabled", EditConditionHides, ClampMin = "0.0", Units = "cm"))
+	float Radius = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Augment|Gameplay", meta = (EditCondition = "bEnabled", EditConditionHides, ClampMin = "0.0", Units = "s"))
+	float Duration = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Augment|Gameplay", meta = (EditCondition = "bEnabled", EditConditionHides, ClampMin = "0.01", Units = "s"))
+	float Interval = 0.5f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Augment|Gameplay", meta = (EditCondition = "bEnabled", EditConditionHides, ClampMin = "0.0", ToolTip = "Damage multiplier applied on each periodic tick."))
+	float DamagePerTickMultiplier = 0.25f;
+};
+
 UCLASS(BlueprintType)
 class PROJECT_EDEN_API UGP_SkillAugmentData : public UPrimaryDataAsset
 {
@@ -72,6 +93,9 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Augment|Modifier")
 	FGP_SkillAugmentNumericModifiers Modifiers;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Augment|Gameplay")
+	FGP_SkillAugmentPeriodicAreaDamage PeriodicAreaDamage;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Augment|Visual", meta = (DisplayName = "Impact Visual Actor Override", ToolTip = "Optional impact/burst/completion visual override supplied by this augment."))
 	TSubclassOf<AActor> ImpactVisualActorOverride;

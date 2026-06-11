@@ -267,6 +267,20 @@ TArray<FGP_NiagaraParameterOverride> AGP_PlayerState::GetSkillAugmentNiagaraPara
 	return Overrides;
 }
 
+FGP_SkillAugmentPeriodicAreaDamage AGP_PlayerState::GetSkillAugmentPeriodicAreaDamage(FGameplayTag SkillIdTag) const
+{
+	FGP_SkillAugmentPeriodicAreaDamage Settings;
+	for (const UGP_SkillAugmentData* Augment : SelectedSkillAugments)
+	{
+		if (DoesAugmentApplyToSkill(Augment, SkillIdTag) && Augment->PeriodicAreaDamage.bEnabled)
+		{
+			Settings = Augment->PeriodicAreaDamage;
+		}
+	}
+
+	return Settings;
+}
+
 void AGP_PlayerState::AddXP(float Amount)
 {
 	if (Amount <= 0.0f)

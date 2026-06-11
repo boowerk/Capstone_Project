@@ -20,6 +20,9 @@ public:
 
 protected:
 	virtual void ExecuteConfirmedSkill_Implementation(const FGP_SkillTargetData& TargetData) override;
+	virtual float GetPreviewActorRadius() const override;
+
+	float GetFinalStrikeRadius(const UGP_SkillData* SkillData) const;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS|Skill|LightningStrike|Visuals")
 	TSubclassOf<AActor> StrikeVisualActorClass;

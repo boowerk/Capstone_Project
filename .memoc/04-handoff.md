@@ -74,7 +74,8 @@ Last synced: 2026-06-03T19:04:50
 
 ## Next Steps
 
-- Build and PIE-test augment Niagara parameter forwarding. Create a Lightning Strike augment with exact parameter names such as `User.SpawnCount`, `User.SpawnRate`, `User.LargeRadius`, and `User.LoopDuration`; verify server and client receive the DA values. `RadiusMultiplier` no longer writes `User.LargeRadius`.
+- Build the Lightning Storm periodic-area changes. In `DA_Skill_LightningStrike.PeriodicAreaNiagaraBindings`, set radius=`User.Large Radius`, duration=`User.Loop Duration`, spawn rate=`User.SpawnRate`. Configure `DA_Augment_LightningStrike_Storm.PeriodicAreaDamage` as desired and keep Niagara override `User.Spawn Count` for visual density. PIE verify preview diameter, initial hit, periodic ticks, selected-position overlap, and server/client agreement.
+- Build and PIE-test augment Niagara parameter forwarding. Exact Lightning names include spaces: `User.Spawn Count`, `User.SpawnRate`, `User.Large Radius`, and `User.Loop Duration`. `RadiusMultiplier` does not directly write Niagara radius.
 - Build, then create `GA_Skill_LightningStrike` from `UGP_Skill_LightningStrike`, a collision-free preview-circle actor, an impact actor, and `DA_Skill_LightningStrike`. Verify hold shows cursor/preview, release strikes the selected ground point, max range clamps, and multiplayer clients damage at the server-validated point.
 - Build and PIE-test the corrected latest `feature/vfx-skills-impact` merge: Primary attack VisualCues, augment VFX priority, Matador AI/BT, and map asset loads.
 - Future skill UI requirement: when an upgrade augment transforms a skill, replace the skill-slot presentation so it appears evolved. Add augment presentation overrides such as `SkillNameOverride`, `SkillDescriptionOverride`, and `SkillIconOverride`, then resolve the latest applicable selected augment before base `UGP_SkillData` display fields.

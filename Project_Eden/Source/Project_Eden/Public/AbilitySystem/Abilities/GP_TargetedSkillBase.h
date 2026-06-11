@@ -84,6 +84,8 @@ protected:
 	UFUNCTION(BlueprintPure, Category = "GAS|Skill|Target")
 	FGP_SkillTargetData GetCurrentTargetData(EGP_SkillConfirmType ConfirmType = EGP_SkillConfirmType::Primary) const;
 
+	virtual float GetPreviewActorRadius() const;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS|Skill|Selection")
 	EGP_SkillSelectionMode SelectionMode = EGP_SkillSelectionMode::Instant;
 
@@ -167,6 +169,8 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<AActor> PreviewActor;
 
+	FVector PreviewActorBaseScale = FVector::OneVector;
+	float PreviewActorBaseRadius = 0.0f;
 	FTimerHandle PreviewTimerHandle;
 	FGameplayTagContainer AddedLooseTags;
 	bool bSelectionActive = false;

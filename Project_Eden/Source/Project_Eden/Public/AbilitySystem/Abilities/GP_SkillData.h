@@ -52,6 +52,21 @@ struct FGP_ElementVisualActorEntry
 	TObjectPtr<UNiagaraSystem> ProjectileVisualSystem;
 };
 
+USTRUCT(BlueprintType, meta = (DisplayName = "Periodic Area Niagara Bindings"))
+struct FGP_PeriodicAreaNiagaraBindings
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Visual|Niagara", meta = (DisplayName = "Radius Parameter Name", ToolTip = "Optional Niagara float parameter that receives the periodic area's radius. Use the exact User parameter name."))
+	FName RadiusParameterName;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Visual|Niagara", meta = (DisplayName = "Duration Parameter Name", ToolTip = "Optional Niagara float parameter that receives the periodic area's duration. Use the exact User parameter name."))
+	FName DurationParameterName;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Visual|Niagara", meta = (DisplayName = "Spawn Rate Parameter Name", ToolTip = "Optional Niagara float parameter that receives 1 / damage interval. Use the exact User parameter name."))
+	FName SpawnRateParameterName;
+};
+
 UENUM(BlueprintType)
 enum class EGP_CooldownPolicy : uint8
 {
@@ -99,6 +114,9 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Visual", meta = (DisplayName = "Element Visual Overrides", TitleProperty = "ElementTag", ToolTip = "Element-specific visual overrides for impact visuals and active execution VFX."))
 	TArray<FGP_ElementVisualActorEntry> ElementVisualActorClasses;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Visual|Niagara", meta = (DisplayName = "Periodic Area Parameter Bindings", ToolTip = "Maps periodic area gameplay values to this skill's Niagara User parameters. Empty names are ignored."))
+	FGP_PeriodicAreaNiagaraBindings PeriodicAreaNiagaraBindings;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Actor", meta = (DisplayName = "Execution Actor Class", ToolTip = "Actor spawned to execute this skill. Projectile, mine, field, trap, or other runtime actor. If empty, the ability fallback actor is used."))
 	TSubclassOf<AActor> SpawnActorClass;

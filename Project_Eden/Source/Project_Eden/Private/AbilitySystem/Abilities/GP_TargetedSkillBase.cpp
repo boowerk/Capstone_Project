@@ -406,6 +406,17 @@ void UGP_TargetedSkillBase::BeginSelection()
 				AvatarActor->GetActorLocation(),
 				AvatarActor->GetActorRotation(),
 				SpawnParams);
+
+			if (IsValid(PreviewActor))
+			{
+				PreviewActorBaseScale = PreviewActor->GetActorScale3D();
+				const FBox PreviewBounds = PreviewActor->GetComponentsBoundingBox(true);
+				if (PreviewBounds.IsValid)
+				{
+					const FVector BoundsExtent = PreviewBounds.GetExtent();
+					PreviewActorBaseRadius = FMath::Max(BoundsExtent.X, BoundsExtent.Y);
+				}
+			}
 		}
 	}
 
@@ -428,6 +439,8 @@ void UGP_TargetedSkillBase::CleanupSelection()
 	}
 
 	PreviewActor = nullptr;
+	PreviewActorBaseScale = FVector::OneVector;
+	PreviewActorBaseRadius = 0.0f;
 	PrimaryConfirmTask = nullptr;
 	SecondaryConfirmTask = nullptr;
 	CancelTask = nullptr;
@@ -516,6 +529,12 @@ void UGP_TargetedSkillBase::UpdatePreview()
 	if (IsValid(PreviewActor))
 	{
 		PreviewActor->SetActorLocationAndRotation(TargetData.TargetLocation, PreviewRotation);
+		const float DesiredRadius = GetPreviewActorRadius();
+		if (DesiredRadius > 0.0f && PreviewActorBaseRadius > KINDA_SMALL_NUMBER)
+		{
+			const float RadiusScale = DesiredRadius / PreviewActorBaseRadius;
+			PreviewActor->SetActorScale3D(PreviewActorBaseScale * RadiusScale);
+		}
 	}
 
 	if (!bDrawSelectionDebug && !bDrawDebugs)
@@ -532,6 +551,11 @@ void UGP_TargetedSkillBase::UpdatePreview()
 	const FColor DebugColor = TargetData.bBlockingHit ? FColor::Green : FColor::Yellow;
 	DrawDebugLine(World, TargetData.Origin, TargetData.TargetLocation, DebugColor, false, PreviewUpdateInterval, 0, 2.0f);
 	DrawDebugSphere(World, TargetData.TargetLocation, 20.0f, 12, DebugColor, false, PreviewUpdateInterval);
+}
+
+float UGP_TargetedSkillBase::GetPreviewActorRadius() const
+{
+	return 0.0f;
 }
 
 void UGP_TargetedSkillBase::ConfirmSelection(EGP_SkillConfirmType ConfirmType)

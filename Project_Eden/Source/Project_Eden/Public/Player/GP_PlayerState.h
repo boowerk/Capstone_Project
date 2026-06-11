@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerState.h"
 #include "AbilitySystemInterface.h"
+#include "AbilitySystem/Abilities/GP_SkillAugmentData.h"
 #include "GameplayTagContainer.h"
 #include "Items/WeaponItemTypes.h"
 #include "VFX/GP_NiagaraParameterOverride.h"
@@ -13,7 +14,6 @@ class UAttributeSet;
 class UAbilitySystemComponent;
 class UGP_WeaponAttributeSet;
 class UPDA_WeaponItemCollection;
-class UGP_SkillAugmentData;
 class UNiagaraSystem;
 
 UCLASS()
@@ -70,6 +70,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Tech|Augment")
 	TArray<FGP_NiagaraParameterOverride> GetSkillAugmentNiagaraParameterOverrides(FGameplayTag SkillIdTag) const;
+
+	UFUNCTION(BlueprintPure, Category = "Tech|Augment")
+	FGP_SkillAugmentPeriodicAreaDamage GetSkillAugmentPeriodicAreaDamage(FGameplayTag SkillIdTag) const;
 
 	UFUNCTION(BlueprintCallable, Category = "Progression")
 	void AddXP(float Amount);
