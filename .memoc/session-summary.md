@@ -19,10 +19,11 @@ History: worklog. Resume risks: 04-handoff.md.
 - Big Hammer C++ added: ground targeting, replicated upside-down hammer drop, configurable height/duration/visual Z offset, ground impact VFX/damage, radius/preview/visual augment support.
 - `GPTags.Cooldown.Skill.BigHammer` added.
 - Projectile radius augments scale gameplay splash radius and multiply the Impact BP's authored Niagara Vector2D baseline.
+- Multi-projectile spread angle is configurable per SkillData; default 10 degrees preserves existing skills.
 
 ## Open Tasks
 - Build C++.
-- Set Magma Shot `Impact Radius Scale Parameter Name` to `User.SpriteAllSize`; create/test its radius augment.
+- Set Dark Solo `Projectile Spread Angle` around 25-30 degrees and test its 3-shot augment.
 
 ## Resume
 - Gelmir Fury experiment removed because random Niagara blasts could not reliably match gameplay hit positions.

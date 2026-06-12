@@ -124,6 +124,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Projectile")
 	EGP_ProjectileImpactDamageMode ProjectileImpactDamageMode = EGP_ProjectileImpactDamageMode::DirectOnly;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Projectile", meta = (DisplayName = "Projectile Spread Angle", ClampMin = "0.0", ClampMax = "180.0", Units = "deg", ToolTip = "Total horizontal angle covered when projectile count augments spawn multiple projectiles."))
+	float ProjectileSpreadAngle = 10.0f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Projectile", meta = (ClampMin = "0.0", EditCondition = "ProjectileImpactDamageMode == EGP_ProjectileImpactDamageMode::DirectAndSplash", EditConditionHides))
 	float SplashRadius = 0.0f;
 

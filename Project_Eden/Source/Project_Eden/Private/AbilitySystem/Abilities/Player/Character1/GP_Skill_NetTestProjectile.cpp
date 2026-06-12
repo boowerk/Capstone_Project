@@ -175,7 +175,7 @@ void UGP_Skill_NetTestProjectile::SpawnProjectiles(const FGP_SkillTargetData& Ta
 			ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
 		const int32 SafeProjectileCount = FMath::Max(1, 1 + GetSkillAugmentProjectileCountBonus(SkillData, CurrentActorInfo));
-		constexpr float BonusSpreadAngle = 10.0f;
+		const float BonusSpreadAngle = FMath::Max(SkillData->ProjectileSpreadAngle, 0.0f);
 		const float StepAngle = SafeProjectileCount > 1
 			? BonusSpreadAngle / static_cast<float>(SafeProjectileCount - 1)
 			: 0.0f;
