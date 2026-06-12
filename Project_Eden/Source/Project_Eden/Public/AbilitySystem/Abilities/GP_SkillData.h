@@ -130,6 +130,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Projectile", meta = (ClampMin = "0.0", EditCondition = "ProjectileImpactDamageMode == EGP_ProjectileImpactDamageMode::DirectAndSplash", EditConditionHides))
 	float SplashDamageMultiplier = 1.0f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Projectile|Visual", meta = (DisplayName = "Impact Radius Scale Parameter Name", ToolTip = "Optional Niagara Vector2D User parameter whose authored BP value is multiplied by the final splash radius multiplier. Example: User.SpriteAllSize.", EditCondition = "ProjectileImpactDamageMode == EGP_ProjectileImpactDamageMode::DirectAndSplash", EditConditionHides))
+	FName ImpactRadiusScaleParameterName;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Projectile|Debug", meta = (EditCondition = "ProjectileImpactDamageMode == EGP_ProjectileImpactDamageMode::DirectAndSplash", EditConditionHides))
 	bool bDrawSplashDebug = false;
 

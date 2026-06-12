@@ -18,12 +18,11 @@ History: worklog. Resume risks: 04-handoff.md.
 - Dark Stone, Ice Mist, Lightning Storm complete.
 - Big Hammer C++ added: ground targeting, replicated upside-down hammer drop, configurable height/duration/visual Z offset, ground impact VFX/damage, radius/preview/visual augment support.
 - `GPTags.Cooldown.Skill.BigHammer` added.
-- Shattering Crystal implementation dropped; its Niagara asset remains user-modified.
+- Projectile radius augments scale gameplay splash radius and multiply the Impact BP's authored Niagara Vector2D baseline.
 
 ## Open Tasks
 - Build C++.
-- Build, reparent/create hammer drop BP from `GP_BigHammerDropActor`, set DA Execution Actor, then PIE test.
-- PIE verify targeting, visual, damage radius, cooldown, server/client.
+- Set Magma Shot `Impact Radius Scale Parameter Name` to `User.SpriteAllSize`; create/test its radius augment.
 
 ## Resume
-- Build not run by agent. source diff check passed.
+- Gelmir Fury experiment removed because random Niagara blasts could not reliably match gameplay hit positions.

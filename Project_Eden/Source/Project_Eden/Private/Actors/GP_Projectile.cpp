@@ -8,6 +8,7 @@
 #include "GameplayEffect.h"
 #include "GameFramework/Pawn.h"
 #include "Net/UnrealNetwork.h"
+#include "NiagaraComponent.h"
 
 AGP_Projectile::AGP_Projectile()
 {
@@ -89,6 +90,11 @@ void AGP_Projectile::SetImpactVisualActorClass(TSubclassOf<AActor> InImpactVisua
 	ImpactVisualActorClass = InImpactVisualActorClass;
 }
 
+void AGP_Projectile::ApplySplashRadiusMultiplier(float RadiusMultiplier)
+{
+	SplashRadiusMultiplier = FMath::Max(RadiusMultiplier, 0.0f);
+}
+
 void AGP_Projectile::OnRep_ProjectileVisualSystem()
 {
 	if (ProjectileVisualSystem)
@@ -131,7 +137,7 @@ void AGP_Projectile::OnProjectileOverlap(UPrimitiveComponent* OverlappedComponen
 			TArray<AActor*> SplashActors = UGP_BlueprintLibrary::SphereOverlapActorsAtLocation(
 				this,
 				GetActorLocation(),
-				SkillData->SplashRadius,
+				SkillData->SplashRadius * SplashRadiusMultiplier,
 				GetInstigator(),
 				SkillData->bDrawSplashDebug);
 			SplashActors.Remove(OtherActor);
@@ -147,7 +153,12 @@ void AGP_Projectile::OnProjectileOverlap(UPrimitiveComponent* OverlappedComponen
 		}
 	}
 
-	MulticastPlayHitEffect(GetActorLocation(), GetActorRotation(), ImpactVisualActorClass);
+	MulticastPlayHitEffect(
+		GetActorLocation(),
+		GetActorRotation(),
+		ImpactVisualActorClass,
+		SkillData ? SkillData->ImpactRadiusScaleParameterName : NAME_None,
+		SplashRadiusMultiplier);
 
 	if (bDestroyOnHit)
 	{
@@ -158,7 +169,9 @@ void AGP_Projectile::OnProjectileOverlap(UPrimitiveComponent* OverlappedComponen
 void AGP_Projectile::MulticastPlayHitEffect_Implementation(
 	const FVector& ImpactLocation,
 	const FRotator& ImpactRotation,
-	TSubclassOf<AActor> InImpactVisualActorClass)
+	TSubclassOf<AActor> InImpactVisualActorClass,
+	FName RadiusScaleParameterName,
+	float RadiusScaleMultiplier)
 {
 	if (InImpactVisualActorClass)
 	{
@@ -166,7 +179,37 @@ void AGP_Projectile::MulticastPlayHitEffect_Implementation(
 		SpawnParams.Owner = GetOwner();
 		SpawnParams.Instigator = GetInstigator();
 		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-		GetWorld()->SpawnActor<AActor>(InImpactVisualActorClass, ImpactLocation, ImpactRotation, SpawnParams);
+		AActor* VisualActor = GetWorld()->SpawnActor<AActor>(
+			InImpactVisualActorClass,
+			ImpactLocation,
+			ImpactRotation,
+			SpawnParams);
+
+		if (IsValid(VisualActor) && !RadiusScaleParameterName.IsNone())
+		{
+			TArray<UNiagaraComponent*> NiagaraComponents;
+			VisualActor->GetComponents(NiagaraComponents);
+
+			for (UNiagaraComponent* NiagaraComponent : NiagaraComponents)
+			{
+				if (!IsValid(NiagaraComponent))
+				{
+					continue;
+				}
+
+				bool bHasBaseScale = false;
+				const FVector2D AuthoredBaseScale =
+					NiagaraComponent->GetVariableVec2(RadiusScaleParameterName, bHasBaseScale);
+				const FVector2D BaseScale =
+					bHasBaseScale ? AuthoredBaseScale : FVector2D(1.0f, 1.0f);
+				NiagaraComponent->DestroyInstanceNotComponent();
+				const float SafeMultiplier = FMath::Max(RadiusScaleMultiplier, 0.0f);
+				NiagaraComponent->SetVariableVec2(
+					RadiusScaleParameterName,
+					BaseScale * SafeMultiplier);
+				NiagaraComponent->Activate(true);
+			}
+		}
 		return;
 	}
 

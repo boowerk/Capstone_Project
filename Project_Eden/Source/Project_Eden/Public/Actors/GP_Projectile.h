@@ -23,6 +23,7 @@ public:
 	void SetSkillData(UGP_SkillData* InSkillData) { SkillData = InSkillData; }
 	void SetProjectileVisualSystem(UNiagaraSystem* InProjectileVisualSystem);
 	void SetImpactVisualActorClass(TSubclassOf<AActor> InImpactVisualActorClass);
+	void ApplySplashRadiusMultiplier(float RadiusMultiplier);
 
 protected:
 	virtual void BeginPlay() override;
@@ -76,11 +77,19 @@ protected:
 	virtual void OnProjectileOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 
 	UFUNCTION(NetMulticast, Reliable)
-	void MulticastPlayHitEffect(const FVector& ImpactLocation, const FRotator& ImpactRotation, TSubclassOf<AActor> InImpactVisualActorClass);
+	void MulticastPlayHitEffect(
+		const FVector& ImpactLocation,
+		const FRotator& ImpactRotation,
+		TSubclassOf<AActor> InImpactVisualActorClass,
+		FName RadiusScaleParameterName,
+		float RadiusScaleMultiplier);
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "Eden|Projectile")
 	void BP_OnHitEffect(const FVector& ImpactLocation);
 
 	UPROPERTY(Transient)
 	bool bHasHit = false;
+
+	UPROPERTY(Transient)
+	float SplashRadiusMultiplier = 1.0f;
 };

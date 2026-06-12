@@ -86,7 +86,12 @@ void AGP_MultiHitProjectile::OnMultiHitProjectileHit(
 		ImpactLocation = FVector(Hit.ImpactPoint);
 	}
 
-	MulticastPlayHitEffect(ImpactLocation, GetActorRotation(), ImpactVisualActorClass);
+	MulticastPlayHitEffect(
+		ImpactLocation,
+		GetActorRotation(),
+		ImpactVisualActorClass,
+		NAME_None,
+		1.0f);
 	Destroy();
 }
 
@@ -136,7 +141,12 @@ void AGP_MultiHitProjectile::ApplyNextHit()
 	++TotalAppliedHits;
 	if (TotalAppliedHits >= MaxHits)
 	{
-		MulticastPlayHitEffect(Target->GetActorLocation(), GetActorRotation(), ImpactVisualActorClass);
+		MulticastPlayHitEffect(
+			Target->GetActorLocation(),
+			GetActorRotation(),
+			ImpactVisualActorClass,
+			NAME_None,
+			1.0f);
 		StopHitTimer();
 	}
 }
