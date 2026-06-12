@@ -15,16 +15,15 @@ Replace, do not append. Keep <800B.
 History: worklog. Resume risks: 04-handoff.md.
 
 ## Status
-- Dark Stone and Ice Mist complete.
-- Augment DAs can define arbitrary typed Niagara `User.*` overrides.
-- Lightning Storm augment gameplay added: immediate strike plus server periodic area ticks.
-- Preview reads its spawned actor XY bounds and scales to the final damage radius.
-- SkillData maps storm radius/duration/interval to exact Niagara parameter names.
-- Periodic damage actor now has a scene root, preserving the selected strike location.
+- Dark Stone, Ice Mist, Lightning Storm complete.
+- Big Hammer C++ added: ground targeting, replicated upside-down hammer drop, configurable height/duration/visual Z offset, ground impact VFX/damage, radius/preview/visual augment support.
+- `GPTags.Cooldown.Skill.BigHammer` added.
+- Shattering Crystal implementation dropped; its Niagara asset remains user-modified.
 
 ## Open Tasks
 - Build C++.
-- PIE verify preview size, tick count/damage, server/client.
+- Build, reparent/create hammer drop BP from `GP_BigHammerDropActor`, set DA Execution Actor, then PIE test.
+- PIE verify targeting, visual, damage radius, cooldown, server/client.
 
 ## Resume
-- Build not run by agent. git diff --check passed.
+- Build not run by agent. source diff check passed.
