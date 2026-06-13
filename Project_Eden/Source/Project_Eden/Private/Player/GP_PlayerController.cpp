@@ -253,6 +253,10 @@ void AGP_PlayerController::Input_Move(const FInputActionValue& Value)
 
 	const FVector2D MovementVector = Value.Get<FVector2D>().GetClampedToMaxSize(1.f);
 	CurrentMoveInput = MovementVector;
+	if (!HasAuthority())
+	{
+		Server_UpdateMoveInput(MovementVector);
+	}
 
 	AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetPawn());
 	const bool bFixed = PlayerCharacter &&
@@ -323,6 +327,10 @@ void AGP_PlayerController::Input_Move(const FInputActionValue& Value)
 void AGP_PlayerController::Input_MoveCompleted(const FInputActionValue& Value)
 {
 	CurrentMoveInput = FVector2D::ZeroVector;
+	if (!HasAuthority())
+	{
+		Server_ClearMoveInput();
+	}
 	ResetMoveDirectionSmoothing();
 	if (AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetPawn()))
 	{
@@ -683,6 +691,31 @@ void AGP_PlayerController::Server_SendSkillSelectionEvent_Implementation(
 	UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(ControlledPawn, EventTag, Payload);
 }
 
+bool AGP_PlayerController::Server_UpdateMoveInput_Validate(FVector2D MovementVector)
+{
+	return MovementVector.SizeSquared() <= 1.21f;
+}
+
+void AGP_PlayerController::Server_UpdateMoveInput_Implementation(FVector2D MovementVector)
+{
+	CurrentMoveInput = MovementVector.GetClampedToMaxSize(1.0f);
+	if (CurrentMoveInput.IsNearlyZero())
+	{
+		ResetMoveDirectionSmoothing();
+	}
+}
+
+bool AGP_PlayerController::Server_ClearMoveInput_Validate()
+{
+	return true;
+}
+
+void AGP_PlayerController::Server_ClearMoveInput_Implementation()
+{
+	CurrentMoveInput = FVector2D::ZeroVector;
+	ResetMoveDirectionSmoothing();
+}
+
 void AGP_PlayerController::RefreshBossHUD()
 {
 	if (!HUDWidget || !GetPawn())
@@ -798,6 +831,31 @@ void AGP_PlayerController::ApplyCharacterStatsMenuInputMode(bool bMenuOpen)
 	}
 }
 
+FVector2D AGP_PlayerController::ResolveEffectiveMoveInput(const AGP_PlayerCharacter* PlayerCharacter) const
+{
+	if (!PlayerCharacter)
+	{
+		return FVector2D::ZeroVector;
+	}
+
+	const UCharacterMovementComponent* MoveComp = PlayerCharacter->GetCharacterMovement();
+	if (HasAuthority() && MoveComp)
+	{
+		const FVector AccelerationDirection = MoveComp->GetCurrentAcceleration().GetSafeNormal2D();
+		if (!AccelerationDirection.IsNearlyZero())
+		{
+			const FRotator YawRotation(0.0f, GetControlRotation().Yaw, 0.0f);
+			const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
+			const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
+			return FVector2D(
+				FVector::DotProduct(AccelerationDirection, RightDirection),
+				FVector::DotProduct(AccelerationDirection, ForwardDirection)).GetClampedToMaxSize(1.0f);
+		}
+	}
+
+	return CurrentMoveInput;
+}
+
 void AGP_PlayerController::UpdateMovementSpeed(float DeltaSeconds)
 {
 	AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetPawn());
@@ -808,24 +866,32 @@ void AGP_PlayerController::UpdateMovementSpeed(float DeltaSeconds)
 	}
 
 	const bool bSprinting = PlayerCharacter->IsSprinting() && !PlayerCharacter->IsPrimaryAttackInProgress();
-	if (CurrentMoveInput.IsNearlyZero())
+	const FVector2D EffectiveMoveInput = ResolveEffectiveMoveInput(PlayerCharacter);
+	if (EffectiveMoveInput.IsNearlyZero())
 	{
 		TargetMaxWalkSpeed = bSprinting ? PlayerCharacter->GetScaledSprintSpeed() : PlayerCharacter->GetScaledNormalWalkSpeed();
 		bHasTargetMaxWalkSpeed = true;
 	}
-	else if (!bHasTargetMaxWalkSpeed)
+	else
 	{
-		TargetMaxWalkSpeed = PlayerCharacter->ResolveDirectionalMoveSpeed(CurrentMoveInput, bSprinting);
+		TargetMaxWalkSpeed = PlayerCharacter->ResolveDirectionalMoveSpeed(EffectiveMoveInput, bSprinting);
 		bHasTargetMaxWalkSpeed = true;
 	}
 
 	if (UCharacterMovementComponent* MoveComp = PlayerCharacter->GetCharacterMovement())
 	{
-		MoveComp->MaxWalkSpeed = FMath::FInterpConstantTo(
-			MoveComp->MaxWalkSpeed,
-			TargetMaxWalkSpeed,
-			DeltaSeconds,
-			MaxWalkSpeedInterpSpeed);
+		if (GetNetMode() == NM_Standalone)
+		{
+			MoveComp->MaxWalkSpeed = FMath::FInterpConstantTo(
+				MoveComp->MaxWalkSpeed,
+				TargetMaxWalkSpeed,
+				DeltaSeconds,
+				MaxWalkSpeedInterpSpeed);
+		}
+		else
+		{
+			MoveComp->MaxWalkSpeed = TargetMaxWalkSpeed;
+		}
 	}
 }
 
@@ -1028,8 +1094,10 @@ void AGP_PlayerController::UpdateCharacterRotation(float DeltaSeconds)
 		return;
 	}
 
+	const FVector2D EffectiveMoveInput = ResolveEffectiveMoveInput(PlayerCharacter);
+
 	// 1. 이동 중일 때 (컨트롤러 원하는 각도 즉시 추종)
-	if (!CurrentMoveInput.IsNearlyZero())
+	if (!EffectiveMoveInput.IsNearlyZero())
 	{
 		MoveComp->bUseControllerDesiredRotation = true;
 		return;

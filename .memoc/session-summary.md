@@ -16,11 +16,12 @@ Replace, do not append. Keep <800B.
 ## Status
 - Big Hammer Giant Impact augment created and registered once in the skill test pool.
 - Dark Stone, Ice Mist, Lightning Storm, Big Hammer complete.
-- Projectile radius augments sync gameplay splash and authored Impact Niagara baseline.
+- Projectile radius augments sync gameplay splash and Niagara baseline.
 - Projectile spread angle configurable per SkillData.
-- Projectile augment supports infinite pierce: each unique enemy hit once, unlimited enemies crossed.
+- Projectile augment supports infinite pierce: hit once per enemy, cross unlimited targets.
+- Merged vfx-skills-impact (plaza arena, dusk lighting, matador AI, movement fixes).
 
 ## Open Tasks
-- Rebuild C++.
+- Verify merging results.
 - Set Dark Solo Void Pierce `Projectile Infinite Pierce=true`; test aligned enemies and wall collision.
 - Continue skill-specific augments.
