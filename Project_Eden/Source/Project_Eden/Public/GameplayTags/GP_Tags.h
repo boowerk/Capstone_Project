@@ -76,6 +76,18 @@ namespace GPTags
             
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Death);          // 뒤져요
 		}
+		namespace Boss
+		{
+			namespace CrystalSeraph
+			{
+				// Native ability tags keep Crystal Seraph pattern activation in the shared GAS/BT path.
+				UE_DECLARE_GAMEPLAY_TAG_EXTERN(Basic);
+				UE_DECLARE_GAMEPLAY_TAG_EXTERN(Laser);
+				UE_DECLARE_GAMEPLAY_TAG_EXTERN(Prism);
+				UE_DECLARE_GAMEPLAY_TAG_EXTERN(Area);
+				UE_DECLARE_GAMEPLAY_TAG_EXTERN(Groggy);
+			}
+		}
 	}
 	
 	// [2] Damage : 데미지 타입 및 원소 속성 (RPG 필수)
@@ -125,6 +137,8 @@ namespace GPTags
 				UE_DECLARE_GAMEPLAY_TAG_EXTERN(Aggroed);    // 어그로
 				UE_DECLARE_GAMEPLAY_TAG_EXTERN(Enraged);    // 광폭화
 				UE_DECLARE_GAMEPLAY_TAG_EXTERN(MatadorGuarded); // Matador guarded damage reduction state
+				UE_DECLARE_GAMEPLAY_TAG_EXTERN(CrystalGuarded); // Crystal Seraph guarded damage reduction state
+				UE_DECLARE_GAMEPLAY_TAG_EXTERN(WingCoreExposed); // Crystal Seraph partial vulnerability window
 				UE_DECLARE_GAMEPLAY_TAG_EXTERN(Groggy);         // Groggy removes guarded damage reduction
 			}
 		}
