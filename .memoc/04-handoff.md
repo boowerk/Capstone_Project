@@ -11,7 +11,7 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-06-13T20:07:00
+Last synced: 2026-06-14T01:59:32+09:00
 
 ## Crystal Seraph Boss Handoff
 
@@ -19,6 +19,7 @@ Last synced: 2026-06-13T20:07:00
 - Add these optional Blackboard keys to the Crystal Seraph BB asset if using BT scoring: `WingCoreBreakCount` int, `bCanExposeWingCore` bool, `bWingCoreExposed` bool, `CrystalPrismActor` object, `bCanUseLaserPattern` bool, and `bCanUsePrismPattern` bool. Existing shared keys `bIsGroggy`, `PreferredHoverHeight`, `PreferredAirRange`, and `bShouldTeleport` are reused.
 - Prototype visuals use engine basic shapes. Create BP children for `GP_CrystalPrismActor`, `GP_SeraphLaserActor`, `GP_WingCoreHitActor`, `GP_CrystalShardProjectile`, and `GP_CrystalSanctuaryMarkerActor` to assign final meshes/materials/Niagara.
 - Damage rules are tag-driven in `GP_DamageExecCalculation`: `CrystalGuarded` = 15% final damage, `WingCoreExposed` = 50%, `Groggy` = full damage. PIE verify with `gp.DamageExec.Log 1`.
+- `UBTT_ExecuteBossAttack` treats failed GAS activation as a real failure now: if a granted pattern cannot activate because of cooldown/block tags/state, it logs the failure, tries the next scored candidate, and returns Failed when no candidate activates. If Attack still loops without a pattern, inspect those `[BossAI] Pattern activation failed...` logs for the exact blocked tag/candidate.
 - Build verification succeeded, but PIE validation still needs editor setup: BP child, BT/BB asset wiring, arena placement, and pattern VFX tuning.
 
 ## Skill Augment Handoff
@@ -129,6 +130,7 @@ _None yet._
 
 ## Not Verified
 
+- 2026-06-14 boss attack activation fix: full editor target relink was blocked because the running editor held `UnrealEditor-Project_Eden.dll`; game target is separately blocked by missing `PCGExtendedToolkit/PCGExCore` precompiled manifest. Rebuild after closing the editor.
 - 2026-05-31 `UGP_SkillAugmentPoolData`: compile, create DataAsset, fill `Augments`, call `PickRandomAugments(3)` from BP, and pass result to `UGP_AugmentSelectWidget::SetCandidateAugments`.
 - 2026-06-01 `UGP_AugmentSelectWidget`: verify BP child binds `TextBlock_Description0..2` and `Image_Icon0..2`; candidate cards should show augment name, description, and icon when DA fields are set.
 - 2026-06-02 augment type backgrounds: full UBT/editor rebuild was not run because Unreal MCP build/query calls were rejected by automatic approval review. After rebuild, verify `AugmentTypeBackgrounds` defaults and `Image_CardBg0..2` bindings in `WBP_TestAugmentSelect_1`.
