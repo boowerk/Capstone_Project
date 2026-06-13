@@ -210,25 +210,36 @@ EBTNodeResult::Type UBTT_ExecuteBossAttack::ExecuteTask(UBehaviorTreeComponent& 
 		}
 
 		const bool bActivated = BossAttackTask::TryActivateAbilityByTag(ASC, Candidate.AbilityTag);
+		if (bActivated)
+		{
+			UE_LOG(
+				LogEnemyAI,
+				Log,
+				TEXT("[BossAI] Pattern selected from evaluation: %s Score=%.2f Tag=%s Activated=1 Target=%s Candidates=%s"),
+				*Candidate.DebugName.ToString(),
+				Candidate.Score,
+				*Candidate.AbilityTag.ToString(),
+				*EnemyAIDebugUtils::DescribeActor(TargetActor),
+				*FGPBossAttackPatternSelector::DescribeCandidates(Candidates));
+			return EBTNodeResult::Succeeded;
+		}
+
+		// Activation can fail because of cooldowns, blocked tags, or ability state; try the next scored pattern before failing the task.
 		UE_LOG(
 			LogEnemyAI,
-			Log,
-			TEXT("[BossAI] Pattern selected from evaluation: %s Score=%.2f Tag=%s Activated=%d Target=%s Candidates=%s"),
+			Warning,
+			TEXT("[BossAI] Pattern activation failed, trying next candidate: %s Score=%.2f Tag=%s Target=%s Candidates=%s"),
 			*Candidate.DebugName.ToString(),
 			Candidate.Score,
 			*Candidate.AbilityTag.ToString(),
-			bActivated ? 1 : 0,
 			*EnemyAIDebugUtils::DescribeActor(TargetActor),
 			*FGPBossAttackPatternSelector::DescribeCandidates(Candidates));
-
-		// If the selected pattern is on cooldown or blocked, do not fall through into sweep; let the BT wait/retry next tick.
-		return EBTNodeResult::Succeeded;
 	}
 
 	UE_LOG(
 		LogEnemyAI,
 		Warning,
-		TEXT("[BossAI] No granted ability matched selected boss patterns: %s Candidates=%s"),
+		TEXT("[BossAI] No activatable ability matched selected boss patterns: %s Candidates=%s"),
 		*GetNameSafe(ControlledPawn),
 		*FGPBossAttackPatternSelector::DescribeCandidates(Candidates));
 	return EBTNodeResult::Failed;
