@@ -14,6 +14,8 @@ static TAutoConsoleVariable<int32> CVarGPDamageExecLog(
 namespace GPDamageExec
 {
     constexpr float MatadorGuardedFinalDamageMultiplier = 0.1f;
+    constexpr float CrystalGuardedFinalDamageMultiplier = 0.15f;
+    constexpr float CrystalWingCoreExposedFinalDamageMultiplier = 0.5f;
 }
 
 struct FGP_DamageStatics
@@ -167,22 +169,41 @@ void UGP_DamageExecCalculation::Execute_Implementation(const FGameplayEffectCust
     
     float Damage_Final = Damage_Modified * ArmorMitigation * (1.0f - Resistance_Elem);
 
-    // Matador guarded reduction is a final-state modifier: normal combat takes 10%, groggy takes full damage.
+    // Boss guarded reductions are final-state modifiers: normal combat is reduced, groggy takes full damage.
     const UAbilitySystemComponent* TargetASC = ExecutionParams.GetTargetAbilitySystemComponent();
     const bool bCapturedTargetGroggy = TargetTags != nullptr && TargetTags->HasTagExact(GPTags::State::Status::Enemy::Groggy);
     const bool bCapturedTargetMatadorGuarded = TargetTags != nullptr && TargetTags->HasTagExact(GPTags::State::Status::Enemy::MatadorGuarded);
+    const bool bCapturedTargetCrystalGuarded = TargetTags != nullptr && TargetTags->HasTagExact(GPTags::State::Status::Enemy::CrystalGuarded);
+    const bool bCapturedTargetWingCoreExposed = TargetTags != nullptr && TargetTags->HasTagExact(GPTags::State::Status::Enemy::WingCoreExposed);
     const bool bTargetGroggy = bCapturedTargetGroggy
         || (TargetASC != nullptr && TargetASC->HasMatchingGameplayTag(GPTags::State::Status::Enemy::Groggy));
     const bool bTargetMatadorGuarded = bCapturedTargetMatadorGuarded
         || (TargetASC != nullptr && TargetASC->HasMatchingGameplayTag(GPTags::State::Status::Enemy::MatadorGuarded));
-    const float BossStateDamageMultiplier = bTargetMatadorGuarded && !bTargetGroggy
-        ? GPDamageExec::MatadorGuardedFinalDamageMultiplier
-        : 1.0f;
+    const bool bTargetCrystalGuarded = bCapturedTargetCrystalGuarded
+        || (TargetASC != nullptr && TargetASC->HasMatchingGameplayTag(GPTags::State::Status::Enemy::CrystalGuarded));
+    const bool bTargetWingCoreExposed = bCapturedTargetWingCoreExposed
+        || (TargetASC != nullptr && TargetASC->HasMatchingGameplayTag(GPTags::State::Status::Enemy::WingCoreExposed));
+    float BossStateDamageMultiplier = 1.0f;
+    if (!bTargetGroggy)
+    {
+        if (bTargetWingCoreExposed)
+        {
+            BossStateDamageMultiplier = GPDamageExec::CrystalWingCoreExposedFinalDamageMultiplier;
+        }
+        else if (bTargetCrystalGuarded)
+        {
+            BossStateDamageMultiplier = GPDamageExec::CrystalGuardedFinalDamageMultiplier;
+        }
+        else if (bTargetMatadorGuarded)
+        {
+            BossStateDamageMultiplier = GPDamageExec::MatadorGuardedFinalDamageMultiplier;
+        }
+    }
     Damage_Final *= BossStateDamageMultiplier;
 
     if (CVarGPDamageExecLog.GetValueOnAnyThread() != 0)
     {
-        UE_LOG(LogTemp, Log, TEXT("[DamageExec] Element=%s SkillMult=%.2f Base=%.2f Critical=%s CritMult=%.2f Modified=%.2f Armor=%.2f ArmorMitigation=%.3f Resistance=%.3f TargetGuarded=%d TargetGroggy=%d BossStateMult=%.2f Final=%.2f"),
+        UE_LOG(LogTemp, Log, TEXT("[DamageExec] Element=%s SkillMult=%.2f Base=%.2f Critical=%s CritMult=%.2f Modified=%.2f Armor=%.2f ArmorMitigation=%.3f Resistance=%.3f MatadorGuarded=%d CrystalGuarded=%d WingCoreExposed=%d TargetGroggy=%d BossStateMult=%.2f Final=%.2f"),
             ElementName,
             SkillDamageMultiplier,
             BaseDamage,
@@ -193,6 +214,8 @@ void UGP_DamageExecCalculation::Execute_Implementation(const FGameplayEffectCust
             ArmorMitigation,
             Resistance_Elem,
             bTargetMatadorGuarded ? 1 : 0,
+            bTargetCrystalGuarded ? 1 : 0,
+            bTargetWingCoreExposed ? 1 : 0,
             bTargetGroggy ? 1 : 0,
             BossStateDamageMultiplier,
             Damage_Final);

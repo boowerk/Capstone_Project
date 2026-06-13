@@ -10,6 +10,7 @@
 #include "AI/Tasks/EnemyBTTaskCommon.h"
 #include "Abilities/GameplayAbility.h"
 #include "BehaviorTree/BlackboardComponent.h"
+#include "Characters/GP_CrystalSeraphStateComponent.h"
 #include "Characters/GP_MatadorBossStateComponent.h"
 #include "GameplayTags/GP_Tags.h"
 
@@ -76,6 +77,13 @@ namespace BossAttackTask
 		Context.bShouldTeleport = GetBool(BlackboardComponent, EnemyBlackboardKeys::bShouldTeleport);
 		Context.PreferredHoverHeight = GetFloat(BlackboardComponent, EnemyBlackboardKeys::PreferredHoverHeight, Context.PreferredHoverHeight);
 		Context.PreferredAirRange = GetFloat(BlackboardComponent, EnemyBlackboardKeys::PreferredAirRange, Context.PreferredAirRange);
+		Context.WingCoreBreakCount = GetInt(BlackboardComponent, EnemyBlackboardKeys::WingCoreBreakCount, Context.WingCoreBreakCount);
+		Context.bCanExposeWingCore = GetBool(BlackboardComponent, EnemyBlackboardKeys::bCanExposeWingCore);
+		Context.bWingCoreExposed = GetBool(BlackboardComponent, EnemyBlackboardKeys::bWingCoreExposed);
+		Context.bCanUseLaserPattern = GetBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseLaserPattern);
+		Context.bCanUsePrismPattern = GetBool(BlackboardComponent, EnemyBlackboardKeys::bCanUsePrismPattern);
+		Context.bCrystalPrismActive = HasBlackboardKey(BlackboardComponent, EnemyBlackboardKeys::CrystalPrismActor)
+			&& IsValid(BlackboardComponent->GetValueAsObject(EnemyBlackboardKeys::CrystalPrismActor));
 
 		if (const UGP_MatadorBossStateComponent* MatadorStateComponent = IsValid(ControlledPawn) ? ControlledPawn->FindComponentByClass<UGP_MatadorBossStateComponent>() : nullptr)
 		{
@@ -84,6 +92,17 @@ namespace BossAttackTask
 			Context.ChainBreakTarget = MatadorStateComponent->GetChainBreakTarget();
 			Context.bIsGroggy = MatadorStateComponent->IsGroggy();
 			Context.bBullPatternActive = IsValid(MatadorStateComponent->GetActiveBullActor());
+		}
+
+		if (const UGP_CrystalSeraphStateComponent* CrystalStateComponent = IsValid(ControlledPawn) ? ControlledPawn->FindComponentByClass<UGP_CrystalSeraphStateComponent>() : nullptr)
+		{
+			// The component owns the real mechanic state; Blackboard values remain optional BT-readable mirrors.
+			Context.bIsCrystalSeraph = true;
+			Context.WingCoreBreakCount = CrystalStateComponent->GetWingCoreBreakCount();
+			Context.WingCoreBreakTarget = CrystalStateComponent->GetWingCoreBreakTarget();
+			Context.bIsGroggy = CrystalStateComponent->IsGroggy();
+			Context.bWingCoreExposed = CrystalStateComponent->IsWingCoreExposed();
+			Context.bCrystalPrismActive = IsValid(CrystalStateComponent->GetCrystalPrismActor());
 		}
 
 		return Context;

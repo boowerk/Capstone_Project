@@ -75,6 +75,31 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "AI|Boss|Matador", meta = (ClampMin = "0.0", Units = "cm"))
 	float TeleportDistanceThreshold = 1800.0f;
 
+	// Crystal Seraph prism windows are mirrored to Blackboard and then scored by the shared selector.
+	UPROPERTY(EditAnywhere, Category = "AI|Boss|Crystal Seraph", meta = (ClampMin = "0.1", Units = "s"))
+	float CrystalPrismPatternInterval = 16.0f;
+
+	UPROPERTY(EditAnywhere, Category = "AI|Boss|Crystal Seraph", meta = (ClampMin = "0.0", Units = "s"))
+	float CrystalPrismPatternWindow = 3.0f;
+
+	UPROPERTY(EditAnywhere, Category = "AI|Boss|Crystal Seraph", meta = (ClampMin = "0.1", Units = "s"))
+	float CrystalLaserPatternInterval = 10.0f;
+
+	UPROPERTY(EditAnywhere, Category = "AI|Boss|Crystal Seraph", meta = (ClampMin = "0.0", Units = "s"))
+	float CrystalLaserPatternWindow = 3.0f;
+
+	UPROPERTY(EditAnywhere, Category = "AI|Boss|Crystal Seraph", meta = (ClampMin = "0.0", Units = "cm"))
+	float CrystalLaserMinRange = 450.0f;
+
+	UPROPERTY(EditAnywhere, Category = "AI|Boss|Crystal Seraph", meta = (ClampMin = "0.0", Units = "cm"))
+	float CrystalLaserMaxRange = 2200.0f;
+
+	UPROPERTY(EditAnywhere, Category = "AI|Boss|Crystal Seraph", meta = (ClampMin = "0.0", Units = "cm"))
+	float CrystalPrismMinRange = 500.0f;
+
+	UPROPERTY(EditAnywhere, Category = "AI|Boss|Crystal Seraph", meta = (ClampMin = "0.0", Units = "cm"))
+	float CrystalPrismMaxRange = 1800.0f;
+
 private:
 	void UpdateBossTactics(UBehaviorTreeComponent& OwnerComp) const;
 };
