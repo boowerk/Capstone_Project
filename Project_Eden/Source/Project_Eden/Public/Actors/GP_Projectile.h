@@ -24,6 +24,7 @@ public:
 	void SetProjectileVisualSystem(UNiagaraSystem* InProjectileVisualSystem);
 	void SetImpactVisualActorClass(TSubclassOf<AActor> InImpactVisualActorClass);
 	void ApplySplashRadiusMultiplier(float RadiusMultiplier);
+	void SetInfinitePierce(bool bInInfinitePierce);
 
 protected:
 	virtual void BeginPlay() override;
@@ -92,4 +93,9 @@ protected:
 
 	UPROPERTY(Transient)
 	float SplashRadiusMultiplier = 1.0f;
+
+	UPROPERTY(Transient)
+	bool bInfinitePierce = false;
+
+	TArray<TWeakObjectPtr<AActor>> PiercedActors;
 };

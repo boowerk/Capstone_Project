@@ -3,27 +3,23 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-06-09T08:33:26
-updated: 2026-06-12T00:00:00
+updated: 2026-06-13T00:00:00
 status: active
 tags:
   - memoc
   - memoc/state
 ---
 # Session Summary
-Last: 2026-06-12
+Last: 2026-06-13
 Replace, do not append. Keep <800B.
-History: worklog. Resume risks: 04-handoff.md.
 
 ## Status
-- Dark Stone, Ice Mist, Lightning Storm complete.
-- Big Hammer C++ added: ground targeting, replicated upside-down hammer drop, configurable height/duration/visual Z offset, ground impact VFX/damage, radius/preview/visual augment support.
-- `GPTags.Cooldown.Skill.BigHammer` added.
-- Projectile radius augments scale gameplay splash radius and multiply the Impact BP's authored Niagara Vector2D baseline.
-- Multi-projectile spread angle is configurable per SkillData; default 10 degrees preserves existing skills.
+- Dark Stone, Ice Mist, Lightning Storm, Big Hammer complete.
+- Projectile radius augments sync gameplay splash and authored Impact Niagara baseline.
+- Projectile spread angle configurable per SkillData.
+- Projectile augment supports infinite pierce: each unique enemy hit once, unlimited enemies crossed.
 
 ## Open Tasks
-- Build C++.
-- Set Dark Solo `Projectile Spread Angle` around 25-30 degrees and test its 3-shot augment.
-
-## Resume
-- Gelmir Fury experiment removed because random Niagara blasts could not reliably match gameplay hit positions.
+- Rebuild C++.
+- Set Dark Solo Void Pierce `Projectile Infinite Pierce=true`; test aligned enemies and wall collision.
+- Continue skill-specific augments.

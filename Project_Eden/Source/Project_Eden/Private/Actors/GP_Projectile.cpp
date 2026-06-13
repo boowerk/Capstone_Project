@@ -95,6 +95,11 @@ void AGP_Projectile::ApplySplashRadiusMultiplier(float RadiusMultiplier)
 	SplashRadiusMultiplier = FMath::Max(RadiusMultiplier, 0.0f);
 }
 
+void AGP_Projectile::SetInfinitePierce(bool bInInfinitePierce)
+{
+	bInfinitePierce = bInInfinitePierce;
+}
+
 void AGP_Projectile::OnRep_ProjectileVisualSystem()
 {
 	if (ProjectileVisualSystem)
@@ -120,7 +125,12 @@ void AGP_Projectile::OnProjectileOverlap(UPrimitiveComponent* OverlappedComponen
 		return;
 	}
 
-	bHasHit = true;
+	const TWeakObjectPtr<AActor> HitActor(OtherActor);
+	if (PiercedActors.Contains(HitActor))
+	{
+		return;
+	}
+	PiercedActors.Add(HitActor);
 
 
 	if (GetInstigator())
@@ -160,6 +170,12 @@ void AGP_Projectile::OnProjectileOverlap(UPrimitiveComponent* OverlappedComponen
 		SkillData ? SkillData->ImpactRadiusScaleParameterName : NAME_None,
 		SplashRadiusMultiplier);
 
+	if (bInfinitePierce)
+	{
+		return;
+	}
+
+	bHasHit = true;
 	if (bDestroyOnHit)
 	{
 		Destroy();

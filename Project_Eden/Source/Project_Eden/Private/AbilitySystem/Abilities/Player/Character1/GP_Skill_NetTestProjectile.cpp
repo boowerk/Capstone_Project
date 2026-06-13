@@ -207,6 +207,8 @@ void UGP_Skill_NetTestProjectile::SpawnProjectiles(const FGP_SkillTargetData& Ta
 				Projectile->SetProjectileVisualSystem(GetProjectileVisualSystem(SkillData, TechElementTag));
 				Projectile->ApplySplashRadiusMultiplier(
 					GetSkillAugmentRadiusMultiplier(SkillData, CurrentActorInfo));
+				Projectile->SetInfinitePierce(
+					HasSkillAugmentInfiniteProjectilePierce(SkillData, CurrentActorInfo));
 				Projectile->SetImpactVisualActorClass(GetSkillVisualActorClass(
 					SkillData,
 					nullptr,

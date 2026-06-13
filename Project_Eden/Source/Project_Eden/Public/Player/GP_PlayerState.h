@@ -63,6 +63,9 @@ public:
 	int32 GetSkillAugmentProjectileCountBonus(FGameplayTag SkillIdTag) const;
 
 	UFUNCTION(BlueprintPure, Category = "Tech|Augment")
+	bool HasSkillAugmentInfiniteProjectilePierce(FGameplayTag SkillIdTag) const;
+
+	UFUNCTION(BlueprintPure, Category = "Tech|Augment")
 	TSubclassOf<AActor> GetSkillAugmentImpactVisualActorOverride(FGameplayTag SkillIdTag) const;
 
 	UFUNCTION(BlueprintPure, Category = "Tech|Augment")

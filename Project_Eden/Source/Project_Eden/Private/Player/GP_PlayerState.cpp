@@ -203,6 +203,29 @@ int32 AGP_PlayerState::GetSkillAugmentProjectileCountBonus(FGameplayTag SkillIdT
 	return ProjectileCountBonus;
 }
 
+bool AGP_PlayerState::HasSkillAugmentInfiniteProjectilePierce(FGameplayTag SkillIdTag) const
+{
+	if (!SkillIdTag.IsValid())
+	{
+		return false;
+	}
+
+	for (const UGP_SkillAugmentData* Augment : SelectedSkillAugments)
+	{
+		if (!DoesAugmentApplyToSkill(Augment, SkillIdTag))
+		{
+			continue;
+		}
+
+		if (Augment->Modifiers.bProjectileInfinitePierce)
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
 TSubclassOf<AActor> AGP_PlayerState::GetSkillAugmentImpactVisualActorOverride(FGameplayTag SkillIdTag) const
 {
 	for (int32 Index = SelectedSkillAugments.Num() - 1; Index >= 0; --Index)

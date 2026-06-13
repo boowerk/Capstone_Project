@@ -38,6 +38,9 @@ struct FGP_SkillAugmentNumericModifiers
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Augment|Modifier", meta = (ClampMin = "0", ToolTip = "Extra projectile count granted by this augment. 0 keeps base count."))
 	int32 ProjectileCountBonus = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Augment|Modifier", meta = (ToolTip = "Allows the projectile to pass through any number of unique enemy targets."))
+	bool bProjectileInfinitePierce = false;
 };
 
 USTRUCT(BlueprintType)

@@ -237,6 +237,33 @@ int32 UGP_SkillBase::GetSkillAugmentProjectileCountBonus(const UGP_SkillData* Sk
 	return 0;
 }
 
+bool UGP_SkillBase::HasSkillAugmentInfiniteProjectilePierce(
+	const UGP_SkillData* SkillData,
+	const FGameplayAbilityActorInfo* ActorInfo) const
+{
+	if (!SkillData || !SkillData->SkillIdTag.IsValid())
+	{
+		return false;
+	}
+
+	const AActor* OwnerActor = ActorInfo ? ActorInfo->OwnerActor.Get() : nullptr;
+	if (const AGP_PlayerState* PlayerState = Cast<AGP_PlayerState>(OwnerActor))
+	{
+		return PlayerState->HasSkillAugmentInfiniteProjectilePierce(SkillData->SkillIdTag);
+	}
+
+	const APawn* AvatarPawn = ActorInfo ? Cast<APawn>(ActorInfo->AvatarActor.Get()) : nullptr;
+	if (AvatarPawn)
+	{
+		if (const AGP_PlayerState* PlayerState = AvatarPawn->GetPlayerState<AGP_PlayerState>())
+		{
+			return PlayerState->HasSkillAugmentInfiniteProjectilePierce(SkillData->SkillIdTag);
+		}
+	}
+
+	return false;
+}
+
 TSubclassOf<AActor> UGP_SkillBase::GetSkillAugmentImpactVisualActorOverride(const UGP_SkillData* SkillData) const
 {
 	if (!SkillData || !SkillData->SkillIdTag.IsValid())

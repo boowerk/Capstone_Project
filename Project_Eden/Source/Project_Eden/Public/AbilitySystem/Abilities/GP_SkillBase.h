@@ -43,6 +43,7 @@ protected:
 	float GetSkillAugmentRangeMultiplier(const UGP_SkillData* SkillData, const FGameplayAbilityActorInfo* ActorInfo) const;
 	float GetSkillAugmentCooldownMultiplier(const UGP_SkillData* SkillData, const FGameplayAbilityActorInfo* ActorInfo) const;
 	int32 GetSkillAugmentProjectileCountBonus(const UGP_SkillData* SkillData, const FGameplayAbilityActorInfo* ActorInfo) const;
+	bool HasSkillAugmentInfiniteProjectilePierce(const UGP_SkillData* SkillData, const FGameplayAbilityActorInfo* ActorInfo) const;
 	TSubclassOf<AActor> GetSkillAugmentImpactVisualActorOverride(const UGP_SkillData* SkillData) const;
 	UNiagaraSystem* GetSkillAugmentActiveVFXOverride(const UGP_SkillData* SkillData) const;
 	TArray<FGP_NiagaraParameterOverride> GetSkillAugmentNiagaraParameterOverrides(const UGP_SkillData* SkillData) const;
