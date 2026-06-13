@@ -11,10 +11,13 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-06-09T04:05:00+09:00
+Last synced: 2026-06-13T20:07:00+09:00
 
 ## Current Status
 
+- Crystal Seraph native boss prototype is implemented from `CrystalSeraphBoss_Plan.md`: `AGP_CrystalSeraphBossCharacter` uses requested `/Game/Characters/MaskMan/SK_MaskMan` as the prototype skeletal mesh, owns `UGP_CrystalSeraphStateComponent`, grants native Crystal Seraph pattern abilities, and exposes BlueprintCallable requests for prism, laser, shard, sanctuary, wing-core exposure, groggy, and recover.
+- Crystal Seraph pattern actors exist in C++: `AGP_CrystalPrismActor`, `AGP_SeraphLaserActor`, `AGP_WingCoreHitActor`, `AGP_CrystalShardProjectile`, and `AGP_CrystalSanctuaryMarkerActor`. They use basic engine shapes as prototype visuals and expose BP events for polished VFX.
+- Boss AI/GAS integration now has Crystal Seraph native tags, optional Blackboard keys, selector scoring, BT service/task mirroring, and damage-state multipliers: guarded `0.15`, wing-core exposed `0.5`, groggy `1.0`.
 - Minimap terrain capture is resilient to missing level setup: `UGP_MinimapSubsystem` auto-spawns a transient `AGP_MinimapCaptureActor` when no placed capture actor exists, initializes the render target, and broadcasts it to HUD listeners.
 - `AGP_MinimapCaptureActor` now renders scene primitives from a top-down capture, lazily reacquires the player pawn follow target, and updates capture around the player so terrain can appear in the HUD minimap.
 - `UGP_PlayerHUDWidget` and `AGP_PlayerController` refresh the minimap background binding from the subsystem, covering late widget/player initialization and disabled widget tick cases.

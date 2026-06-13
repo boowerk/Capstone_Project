@@ -4,18 +4,19 @@ type: state
 scope: project-memory
 status: active
 tags: [memoc, memoc/state]
-updated: 2026-06-09T00:00:00+09:00
+updated: 2026-06-13T00:00:00+09:00
 ---
 # Session Summary
-Last: 2026-06-09T04:05:00+09:00
+Last: 2026-06-13T20:07:00+09:00
 
 ## Status
-- Fixed the minimap terrain feed when no placed capture actor or late player pawn prevented the render target from appearing.
-- `UGP_MinimapSubsystem` now auto-spawns a transient `AGP_MinimapCaptureActor`, and `UGP_PlayerHUDWidget` rebinds the minimap render target from the subsystem when needed.
-- `AGP_MinimapCaptureActor` renders scene primitives from a top-down capture and lazily reacquires the player follow target.
+- Implemented the native Crystal Seraph boss prototype from `CrystalSeraphBoss_Plan.md`.
+- Added Crystal Seraph tags, optional Blackboard keys, selector scoring, state component, boss character, prism/laser/core/shard/sanctuary actors, and thin GAS pattern abilities.
+- `GP_DamageExecCalculation` now applies Crystal Seraph final damage multipliers: guarded 0.15, wing-core exposed 0.5, groggy 1.0.
 
 ## Next
-- In `WBP_PlayerHUDWidget`, keep the minimap background image named `MinimapBackgroundImage` or another supported candidate name, then compile/save the widget.
+- Create a Blueprint child of `AGP_CrystalSeraphBossCharacter`, then add the new Crystal Seraph Blackboard keys to its BB asset if the shared boss BB does not already contain them.
+- Replace prototype basic-shape meshes/materials/VFX on prism, laser, core, shard, and sanctuary marker BPs.
 
 ## Verify
 - `Project_EdenEditor Win64 Development` build succeeded.
