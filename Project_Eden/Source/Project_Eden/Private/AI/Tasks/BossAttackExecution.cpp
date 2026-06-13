@@ -92,9 +92,7 @@ namespace BossAttackExecution
 
 		// Boss state components are authoritative even if a Blueprint forgot to mirror the boss flag.
 		return IsValid(ControlledPawn->FindComponentByClass<UGP_MatadorBossStateComponent>())
-			|| IsValid(ControlledPawn->FindComponentByClass<UGP_CrystalSeraphStateComponent>())
-			|| (HasBlackboardKey(BlackboardComponent, EnemyBlackboardKeys::BossPhase)
-				&& HasBlackboardKey(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossSweepAttack));
+			|| IsValid(ControlledPawn->FindComponentByClass<UGP_CrystalSeraphStateComponent>());
 	}
 
 	FGPBossAttackPatternContext BuildPatternContext(
