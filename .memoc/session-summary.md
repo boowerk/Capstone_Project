@@ -14,6 +14,7 @@ Last: 2026-06-13
 Replace, do not append. Keep <800B.
 
 ## Status
+- Big Hammer Giant Impact augment created and registered once in the skill test pool.
 - Dark Stone, Ice Mist, Lightning Storm, Big Hammer complete.
 - Projectile radius augments sync gameplay splash and authored Impact Niagara baseline.
 - Projectile spread angle configurable per SkillData.

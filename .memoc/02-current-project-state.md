@@ -11,10 +11,11 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-06-04T00:00:00+09:00
+Last synced: 2026-06-13T00:00:00+09:00
 
 ## Current Status
 
+- Big Hammer `DA_Augment_BigHammer_GiantImpact` is authored with 1.35 damage and 1.3 radius multipliers and is registered exactly once in `DA_AugmentPool_SkillTest`.
 - Big Hammer C++ skill added as a ground-targeted falling strike. A replicated drop actor moves the upside-down hammer from configurable height to a visually offset endpoint, then spawns SkillData's Impact cue and applies one area hit at the actual ground target. Radius/Niagara augment overrides and preview scaling are supported.
 - Projectile splash radius augments now scale both gameplay `SplashRadius` and an optional Impact Niagara Vector2D parameter configured by `UGP_SkillData.ImpactRadiusScaleParameterName`. The Niagara value authored in the impact BP is the baseline and is multiplied by the final augment radius multiplier (Magma Shot uses `User.SpriteAllSize`).
 - Multi-projectile horizontal spread is configured per SkillData through `ProjectileSpreadAngle`; the default remains 10 degrees.
