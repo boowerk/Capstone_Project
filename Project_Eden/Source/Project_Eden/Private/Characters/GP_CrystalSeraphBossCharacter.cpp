@@ -1,10 +1,16 @@
 #include "Characters/GP_CrystalSeraphBossCharacter.h"
 
 #include "AbilitySystem/GP_AttributeSet.h"
+#include "AbilitySystem/Abilities/Enemy/GP_CrystalSeraphPatternAbility.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/GameplayAbility.h"
 #include "AIController.h"
 #include "AI/Data/EnemyBlackboardKeys.h"
+#include "Actors/GP_CrystalPrismActor.h"
+#include "Actors/GP_CrystalSanctuaryMarkerActor.h"
+#include "Actors/GP_CrystalShardProjectile.h"
+#include "Actors/GP_SeraphLaserActor.h"
+#include "Actors/GP_WingCoreHitActor.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "Characters/GP_CrystalSeraphStateComponent.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -21,6 +27,16 @@ AGP_CrystalSeraphBossCharacter::AGP_CrystalSeraphBossCharacter()
 	BossDisplayName = NSLOCTEXT("GPCrystalSeraphBoss", "BossDisplayName", "Crystal Seraph");
 
 	CrystalSeraphStateComponent = CreateDefaultSubobject<UGP_CrystalSeraphStateComponent>(TEXT("CrystalSeraphStateComponent"));
+	CrystalPrismActorClass = AGP_CrystalPrismActor::StaticClass();
+	SeraphLaserActorClass = AGP_SeraphLaserActor::StaticClass();
+	WingCoreHitActorClass = AGP_WingCoreHitActor::StaticClass();
+	CrystalShardProjectileClass = AGP_CrystalShardProjectile::StaticClass();
+	AreaMarkerActorClass = AGP_CrystalSanctuaryMarkerActor::StaticClass();
+	CrystalShardAbilityClass = UGP_CrystalSeraphShardAbility::StaticClass();
+	CrystalLaserAbilityClass = UGP_CrystalSeraphLaserAbility::StaticClass();
+	CrystalPrismAbilityClass = UGP_CrystalSeraphPrismAbility::StaticClass();
+	CrystalAreaAbilityClass = UGP_CrystalSeraphAreaAbility::StaticClass();
+	CrystalGroggyAbilityClass = UGP_CrystalSeraphGroggyAbility::StaticClass();
 
 	if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
 	{
@@ -91,6 +107,10 @@ AActor* AGP_CrystalSeraphBossCharacter::RequestSpawnCrystalPrism(AActor* Pattern
 	const FVector SpawnLocation = ResolvePrismSpawnLocation(TargetActor);
 	const FRotator SpawnRotation = FRotator::ZeroRotator;
 	AActor* PrismActor = SpawnConfiguredActor(CrystalPrismActorClass, SpawnLocation, SpawnRotation, TEXT("CrystalPrism"));
+	if (AGP_CrystalPrismActor* CrystalPrismActor = Cast<AGP_CrystalPrismActor>(PrismActor))
+	{
+		CrystalPrismActor->InitializePrism(this);
+	}
 	CrystalSeraphStateComponent->RegisterCrystalPrismActor(PrismActor);
 	LastPrismPatternTime = GetWorld() ? GetWorld()->GetTimeSeconds() : LastPrismPatternTime;
 	return PrismActor;
@@ -114,6 +134,10 @@ bool AGP_CrystalSeraphBossCharacter::RequestStartLaserPattern(AActor* PatternTar
 
 	const FVector SpawnLocation = GetActorLocation() + AimDirection * 120.0f;
 	AActor* LaserActor = SpawnConfiguredActor(SeraphLaserActorClass, SpawnLocation, AimDirection.Rotation(), TEXT("SeraphLaser"));
+	if (AGP_SeraphLaserActor* SeraphLaserActor = Cast<AGP_SeraphLaserActor>(LaserActor))
+	{
+		SeraphLaserActor->InitializeLaser(this, TargetActor, AimDirection, 1);
+	}
 	LastLaserPatternTime = GetWorld() ? GetWorld()->GetTimeSeconds() : LastLaserPatternTime;
 	return IsValid(LaserActor);
 }
@@ -162,7 +186,11 @@ bool AGP_CrystalSeraphBossCharacter::RequestStartAreaPattern(AActor* PatternTarg
 	{
 		const float Angle = 360.0f * static_cast<float>(Index) / static_cast<float>(MarkerCount);
 		const FVector Offset = FRotator(0.0f, Angle, 0.0f).RotateVector(FVector(320.0f, 0.0f, 0.0f));
-		SpawnConfiguredActor(AreaMarkerActorClass, BaseLocation + Offset, FRotator::ZeroRotator, TEXT("CrystalAreaMarker"));
+		AActor* MarkerActor = SpawnConfiguredActor(AreaMarkerActorClass, BaseLocation + Offset, FRotator::ZeroRotator, TEXT("CrystalAreaMarker"));
+		if (AGP_CrystalSanctuaryMarkerActor* SanctuaryMarkerActor = Cast<AGP_CrystalSanctuaryMarkerActor>(MarkerActor))
+		{
+			SanctuaryMarkerActor->InitializeSanctuaryMarker(this);
+		}
 	}
 
 	return true;
@@ -191,6 +219,11 @@ void AGP_CrystalSeraphBossCharacter::RequestExposeWingCore(float ExposureDuratio
 		if (IsValid(CoreActor))
 		{
 			CoreActor->AttachToActor(this, FAttachmentTransformRules::KeepWorldTransform);
+			if (AGP_WingCoreHitActor* WingCoreHitActor = Cast<AGP_WingCoreHitActor>(CoreActor))
+			{
+				WingCoreHitActor->InitializeWingCore(this, CrystalSeraphStateComponent);
+				WingCoreHitActor->SetCoreActive(true);
+			}
 			CrystalSeraphStateComponent->RegisterWingCoreActor(CoreActor);
 		}
 	}
@@ -302,6 +335,12 @@ void AGP_CrystalSeraphBossCharacter::HandleCrystalSeraphWingCoreExposedChanged(b
 
 	if (AActor* WingCoreActor = IsValid(CrystalSeraphStateComponent) ? CrystalSeraphStateComponent->GetWingCoreActor() : nullptr)
 	{
+		if (AGP_WingCoreHitActor* WingCoreHitActor = Cast<AGP_WingCoreHitActor>(WingCoreActor))
+		{
+			WingCoreHitActor->SetCoreActive(bNewExposed);
+			return;
+		}
+
 		WingCoreActor->SetActorHiddenInGame(!bNewExposed);
 		WingCoreActor->SetActorEnableCollision(bNewExposed);
 	}

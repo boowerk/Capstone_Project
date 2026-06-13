@@ -1,0 +1,94 @@
+#include "Actors/GP_CrystalSanctuaryMarkerActor.h"
+
+#include "Actors/GP_CrystalSeraphCombatUtils.h"
+#include "Components/SphereComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "GameFramework/Pawn.h"
+#include "GameplayEffect.h"
+#include "GameplayTags/GP_Tags.h"
+#include "TimerManager.h"
+#include "UObject/ConstructorHelpers.h"
+
+AGP_CrystalSanctuaryMarkerActor::AGP_CrystalSanctuaryMarkerActor()
+{
+	PrimaryActorTick.bCanEverTick = false;
+	bReplicates = true;
+
+	SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("SceneRoot"));
+	SetRootComponent(SceneRoot);
+
+	DamageArea = CreateDefaultSubobject<USphereComponent>(TEXT("DamageArea"));
+	DamageArea->SetupAttachment(SceneRoot);
+	DamageArea->SetSphereRadius(MarkerRadius);
+	DamageArea->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	DamageArea->SetCollisionResponseToAllChannels(ECR_Ignore);
+	DamageArea->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
+
+	MarkerMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MarkerMesh"));
+	MarkerMesh->SetupAttachment(SceneRoot);
+	MarkerMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	MarkerMesh->SetRelativeScale3D(FVector(4.4f, 4.4f, 0.05f));
+
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> CylinderMeshFinder(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
+	if (CylinderMeshFinder.Succeeded())
+	{
+		MarkerMesh->SetStaticMesh(CylinderMeshFinder.Object);
+	}
+
+	static ConstructorHelpers::FClassFinder<UGameplayEffect> DamageEffectFinder(TEXT("/Game/GAS_Pattern/AbilitySystem/GameplayEffects/Damage/GE_PrimaryDamage"));
+	if (DamageEffectFinder.Succeeded())
+	{
+		DamageEffectClass = DamageEffectFinder.Class;
+	}
+}
+
+void AGP_CrystalSanctuaryMarkerActor::BeginPlay()
+{
+	Super::BeginPlay();
+
+	DamageArea->SetSphereRadius(FMath::Max(0.0f, MarkerRadius));
+	BP_OnTelegraphStarted();
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().SetTimer(ExplosionTimerHandle, this, &ThisClass::Explode, FMath::Max(0.0f, TelegraphDuration), false);
+	}
+}
+
+void AGP_CrystalSanctuaryMarkerActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(ExplosionTimerHandle);
+	}
+
+	Super::EndPlay(EndPlayReason);
+}
+
+void AGP_CrystalSanctuaryMarkerActor::InitializeSanctuaryMarker(AActor* InBossOwner)
+{
+	BossOwner = InBossOwner;
+	SetOwner(InBossOwner);
+	SetInstigator(Cast<APawn>(InBossOwner));
+}
+
+void AGP_CrystalSanctuaryMarkerActor::Explode()
+{
+	if (HasAuthority())
+	{
+		TArray<AActor*> OverlappingActors;
+		DamageArea->GetOverlappingActors(OverlappingActors);
+		GPCrystalSeraphCombatUtils::ApplySetByCallerDamage(
+			GetInstigator(),
+			OverlappingActors,
+			DamageEffectClass,
+			GPTags::Event::Player::HitReact,
+			AttackPowerDamageCoefficient,
+			0.0f,
+			0.0f,
+			true);
+	}
+
+	BP_OnExploded();
+	Destroy();
+}
