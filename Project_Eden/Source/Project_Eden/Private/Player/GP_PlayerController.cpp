@@ -160,6 +160,11 @@ void AGP_PlayerController::Tick(float DeltaSeconds)
 	UpdateMovementSpeed(DeltaSeconds);
 	UpdateCharacterRotation(DeltaSeconds);
 	UpdateSkillSelectionInputMode();
+	if (HUDWidget)
+	{
+		// HUD 위젯 자체 tick이 비활성인 경우에도 미니맵 플레이어 방향은 컨트롤러 tick에서 보장합니다.
+		HUDWidget->RefreshMinimapPlayerArrowRotation();
+	}
 
 	BossRefreshAccumulator += DeltaSeconds;
 	if (BossRefreshAccumulator >= BossRefreshInterval)

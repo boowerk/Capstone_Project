@@ -1,4 +1,5 @@
 ﻿#include "UI/GP_PlayerHUDWidget.h"
+#include "Components/Image.h"
 #include "Components/ProgressBar.h"
 #include "Components/TextBlock.h"
 #include "Components/Widget.h"
@@ -6,6 +7,10 @@
 #include "AbilitySystem/GP_AttributeSet.h"
 #include "Blueprint/WidgetTree.h"
 #include "Characters/GP_BaseCharacter.h"
+#include "Engine/TextureRenderTarget2D.h"
+#include "Engine/World.h"
+#include "GameFramework/Pawn.h"
+#include "UI/GP_MinimapSubsystem.h"
 
 UGP_PlayerHUDWidget::UGP_PlayerHUDWidget(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -24,6 +29,9 @@ void UGP_PlayerHUDWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 	RefreshPreview();
+	RefreshMinimapPlayerArrowRotation();
+	BindToMinimapSubsystem();
+	RefreshMinimapBackgroundFromSubsystem();
 
 	// 1. 즉시 시도
 	APawn* OwningPawn = GetOwningPlayerPawn();
@@ -43,6 +51,220 @@ void UGP_PlayerHUDWidget::NativeConstruct()
 			NativeConstruct();
 		});
 	}
+}
+
+void UGP_PlayerHUDWidget::NativeDestruct()
+{
+	if (BoundMinimapSubsystem.IsValid())
+	{
+		BoundMinimapSubsystem->OnRenderTargetChanged.RemoveDynamic(this, &ThisClass::HandleMinimapRenderTargetChanged);
+	}
+
+	BoundMinimapSubsystem.Reset();
+	Super::NativeDestruct();
+}
+
+void UGP_PlayerHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
+{
+	Super::NativeTick(MyGeometry, InDeltaTime);
+	RefreshMinimapPlayerArrowRotation();
+}
+
+void UGP_PlayerHUDWidget::SetMinimapRenderTarget(UTextureRenderTarget2D* InRenderTarget)
+{
+	UImage* BackgroundImage = ResolveMinimapBackgroundImage();
+	if (!IsValid(BackgroundImage) || !IsValid(InRenderTarget))
+	{
+		return;
+	}
+
+	FSlateBrush Brush = BackgroundImage->GetBrush();
+	Brush.SetResourceObject(InRenderTarget);
+	Brush.ImageSize = FVector2D(InRenderTarget->SizeX, InRenderTarget->SizeY);
+	BackgroundImage->SetBrush(Brush);
+
+	BoundMinimapRenderTarget = InRenderTarget;
+}
+
+void UGP_PlayerHUDWidget::RefreshMinimapBackgroundFromSubsystem()
+{
+	BindToMinimapSubsystem();
+
+	if (BoundMinimapSubsystem.IsValid())
+	{
+		SetMinimapRenderTarget(BoundMinimapSubsystem->GetMinimapRenderTarget());
+	}
+}
+
+void UGP_PlayerHUDWidget::BindToMinimapSubsystem()
+{
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	UGP_MinimapSubsystem* MinimapSubsystem = World->GetSubsystem<UGP_MinimapSubsystem>();
+	if (!IsValid(MinimapSubsystem) || BoundMinimapSubsystem.Get() == MinimapSubsystem)
+	{
+		return;
+	}
+
+	if (BoundMinimapSubsystem.IsValid())
+	{
+		BoundMinimapSubsystem->OnRenderTargetChanged.RemoveDynamic(this, &ThisClass::HandleMinimapRenderTargetChanged);
+	}
+
+	BoundMinimapSubsystem = MinimapSubsystem;
+	MinimapSubsystem->OnRenderTargetChanged.AddUniqueDynamic(this, &ThisClass::HandleMinimapRenderTargetChanged);
+}
+
+UImage* UGP_PlayerHUDWidget::ResolveMinimapBackgroundImage() const
+{
+	if (IsValid(MinimapBackgroundImage))
+	{
+		return MinimapBackgroundImage.Get();
+	}
+
+	static const FName CandidateNames[] =
+	{
+		TEXT("MinimapBackgroundImage"),
+		TEXT("MiniMapBackgroundImage"),
+		TEXT("MinimapBackground"),
+		TEXT("MiniMapBackground"),
+		TEXT("MinimapImage"),
+		TEXT("MiniMapImage"),
+		TEXT("MinimapMapImage"),
+		TEXT("MiniMapMapImage")
+	};
+
+	for (const FName& CandidateName : CandidateNames)
+	{
+		if (UImage* CandidateImage = Cast<UImage>(GetWidgetFromName(CandidateName)))
+		{
+			return CandidateImage;
+		}
+	}
+
+	if (!WidgetTree)
+	{
+		return nullptr;
+	}
+
+	UImage* FoundImage = nullptr;
+	WidgetTree->ForEachWidget([&FoundImage](UWidget* ChildWidget)
+	{
+		if (FoundImage || !ChildWidget)
+		{
+			return;
+		}
+
+		const FString WidgetName = ChildWidget->GetName();
+		const bool bLooksLikeMinimap = WidgetName.Contains(TEXT("Minimap")) || WidgetName.Contains(TEXT("MiniMap"));
+		const bool bLooksLikeBackground = WidgetName.Contains(TEXT("Background")) || WidgetName.Contains(TEXT("MapImage"));
+
+		// WBP 이름이 조금 달라도 미니맵 배경 Image를 자동으로 찾기 위한 보수적 fallback입니다.
+		if (bLooksLikeMinimap && bLooksLikeBackground)
+		{
+			FoundImage = Cast<UImage>(ChildWidget);
+		}
+	});
+
+	return FoundImage;
+}
+
+void UGP_PlayerHUDWidget::RefreshMinimapPlayerArrowRotation()
+{
+	if (!bRotateMinimapPlayerArrow)
+	{
+		return;
+	}
+
+	APawn* OwningPawn = GetOwningPlayerPawn();
+	UWidget* ArrowWidget = ResolveMinimapPlayerArrowWidget();
+	if (!IsValid(OwningPawn) || !IsValid(ArrowWidget))
+	{
+		bHasCachedMinimapPlayerArrowAngle = false;
+		return;
+	}
+
+	const float RotationSign = bInvertMinimapPlayerArrowRotation ? -1.0f : 1.0f;
+	const float DesiredAngle = FRotator::NormalizeAxis((OwningPawn->GetActorRotation().Yaw * RotationSign) + MinimapPlayerArrowAngleOffset);
+
+	// 같은 각도를 반복해서 쓰지 않도록 캐시해 Slate transform 갱신 비용을 줄입니다.
+	if (bHasCachedMinimapPlayerArrowAngle && FMath::IsNearlyEqual(CachedMinimapPlayerArrowAngle, DesiredAngle, 0.1f))
+	{
+		return;
+	}
+
+	ArrowWidget->SetRenderTransformAngle(DesiredAngle);
+	CachedMinimapPlayerArrowAngle = DesiredAngle;
+	bHasCachedMinimapPlayerArrowAngle = true;
+}
+
+UWidget* UGP_PlayerHUDWidget::ResolveMinimapPlayerArrowWidget() const
+{
+	if (IsValid(MinimapPlayerArrow))
+	{
+		return MinimapPlayerArrow.Get();
+	}
+
+	static const FName CandidateNames[] =
+	{
+		TEXT("MinimapPlayerArrow"),
+		TEXT("MiniMapPlayerArrow"),
+		TEXT("MinimapPlayerArrowImage"),
+		TEXT("MiniMapPlayerArrowImage"),
+		TEXT("MinimapArrow"),
+		TEXT("MiniMapArrow"),
+		TEXT("PlayerArrow"),
+		TEXT("PlayerArrowImage"),
+		TEXT("PlayerDirectionArrow"),
+		TEXT("MapPlayerArrow")
+	};
+
+	for (const FName& CandidateName : CandidateNames)
+	{
+		if (UWidget* CandidateWidget = GetWidgetFromName(CandidateName))
+		{
+			return CandidateWidget;
+		}
+	}
+
+	if (!WidgetTree)
+	{
+		return nullptr;
+	}
+
+	UWidget* FoundArrowWidget = nullptr;
+	WidgetTree->ForEachWidget([&FoundArrowWidget](UWidget* ChildWidget)
+	{
+		if (FoundArrowWidget || !ChildWidget)
+		{
+			return;
+		}
+
+		const FString WidgetName = ChildWidget->GetName();
+		const bool bLooksLikeArrow = WidgetName.Contains(TEXT("Arrow"));
+		const bool bLooksLikeMinimapPlayer =
+			WidgetName.Contains(TEXT("Minimap")) ||
+			WidgetName.Contains(TEXT("MiniMap")) ||
+			WidgetName.Contains(TEXT("Player")) ||
+			WidgetName.Contains(TEXT("Direction"));
+
+		// 에디터에서 이름이 약간 달라도 미니맵 플레이어 방향 위젯을 최대한 안전하게 찾습니다.
+		if (bLooksLikeArrow && bLooksLikeMinimapPlayer)
+		{
+			FoundArrowWidget = ChildWidget;
+		}
+	});
+
+	if (FoundArrowWidget)
+	{
+		return FoundArrowWidget;
+	}
+
+	return nullptr;
 }
 
 void UGP_PlayerHUDWidget::BindToASC(UAbilitySystemComponent* InASC)
@@ -301,4 +523,9 @@ void UGP_PlayerHUDWidget::RefreshPreview()
 void UGP_PlayerHUDWidget::OnASCInitializedCallback(UAbilitySystemComponent* ASC, UAttributeSet* AS)
 {
 	BindToASC(ASC);
+}
+
+void UGP_PlayerHUDWidget::HandleMinimapRenderTargetChanged(UTextureRenderTarget2D* InRenderTarget)
+{
+	SetMinimapRenderTarget(InRenderTarget);
 }
