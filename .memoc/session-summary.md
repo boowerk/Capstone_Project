@@ -4,20 +4,19 @@ type: state
 scope: project-memory
 status: active
 tags: [memoc, memoc/state]
-updated: 2026-06-14T01:59:32+09:00
+updated: 2026-06-14T02:34:09+09:00
 ---
 # Session Summary
-Last: 2026-06-14T01:59:32+09:00
+Last: 2026-06-14T02:34:09+09:00
 
 ## Status
-- Fixed `UBTT_ExecuteBossAttack`: boss Attack BT task now succeeds only after a GAS pattern ability actually activates.
-- If a selected boss pattern is granted but blocked/cooldowned, the task logs it, tries the next scored candidate, and fails only when none activate.
+- Found `BT_BossCommon.uasset` still references `BTT_ExecuteEnemyAttack` in its Attack branch, so boss pattern selection could be bypassed after merges.
+- Added shared `BossAttackExecution` helper and routed boss pawns from both `BTT_ExecuteBossAttack` and legacy/generic `BTT_ExecuteEnemyAttack` into the same GAS pattern selector.
 - Existing editor asset/map changes were left untouched.
 
 ## Next
-- Re-run full `Project_EdenEditor Win64 Development` after closing the running editor so the DLL can relink.
-- In PIE, check `[BossAI] Pattern activation failed...` logs if a boss still enters Attack without playing a pattern.
+- In PIE, Attack branch should log `[BossAI] Generic attack task routed through boss pattern selector...` if the BT still uses the generic task.
+- If no `[BossAI]` logs appear, inspect `bCanAttack`, `DistanceToTarget`, and LOS because the BT is not reaching the Attack task.
 
 ## Verify
-- Editor target compiled `BTT_ExecuteBossAttack.cpp`; final link was blocked because `UnrealEditor.exe` held `UnrealEditor-Project_Eden.dll`.
-- Game target is blocked independently by missing `PCGExtendedToolkit/PCGExCore` precompiled manifest.
+- `Project_EdenEditor Win64 Development` build succeeded.
