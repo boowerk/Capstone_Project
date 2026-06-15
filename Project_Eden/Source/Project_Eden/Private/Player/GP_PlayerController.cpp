@@ -5,6 +5,8 @@
 #include "Abilities/GameplayAbilityTargetTypes.h"
 #include "AbilitySystem/Abilities/GP_SkillAugmentData.h"
 #include "AbilitySystem/Abilities/GP_SkillAugmentPoolData.h"
+#include "AbilitySystem/Abilities/GP_SkillData.h"
+#include "AbilitySystem/Abilities/GP_SkillPoolData.h"
 #include "AbilitySystem/Abilities/GP_TestSkillSet.h"
 #include "Blueprint/UserWidget.h"
 #include "Characters/GP_EnemyCharacter.h"
@@ -96,6 +98,48 @@ bool AGP_PlayerController::RequestOpenAugmentSelect()
 		ExcludedAugments,
 		CurrentElementTag);
 	return OpenAugmentSelectWidget(CandidateAugments);
+}
+
+bool AGP_PlayerController::RequestEquipSkill(UGP_SkillData* SkillData, FGameplayTag SlotTag)
+{
+	if (!CanEquipSkill(SkillData, SlotTag))
+	{
+		return false;
+	}
+
+	Server_EquipSkill(SkillData, SlotTag);
+	return true;
+}
+
+void AGP_PlayerController::Server_EquipSkill_Implementation(UGP_SkillData* SkillData, FGameplayTag SlotTag)
+{
+	if (!CanEquipSkill(SkillData, SlotTag))
+	{
+		return;
+	}
+
+	if (AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetPawn()))
+	{
+		PlayerCharacter->EquipSkill(SkillData, SlotTag);
+	}
+}
+
+bool AGP_PlayerController::CanEquipSkill(UGP_SkillData* SkillData, FGameplayTag SlotTag) const
+{
+	if (!IsValid(SkillPoolData) || !IsValid(SkillData) || !SkillData->AbilityClass)
+	{
+		return false;
+	}
+
+	const bool bValidSlot =
+		SlotTag.MatchesTagExact(GPTags::Ability::Skill::Slot01) ||
+		SlotTag.MatchesTagExact(GPTags::Ability::Skill::Slot02);
+	if (!bValidSlot || !SkillPoolData->ContainsSkill(SkillData))
+	{
+		return false;
+	}
+
+	return SkillData->SupportedSlotTags.IsEmpty() || SkillData->SupportedSlotTags.HasTagExact(SlotTag);
 }
 
 bool AGP_PlayerController::OpenAugmentSelectWidget(const TArray<UGP_SkillAugmentData*>& Candidates)

@@ -1609,6 +1609,10 @@ void AGP_PlayerCharacter::EquipSkill(UGP_SkillData* NewSkillData, FGameplayTag S
 	}
 
 	if (!GiveAbilityToSlot(SlotTag, NewSkillData->AbilityClass, NewSkillData)) return;
+	if (AGP_PlayerState* GPPlayerState = GetPlayerState<AGP_PlayerState>())
+	{
+		GPPlayerState->SetEquippedSkillData(SlotTag, NewSkillData);
+	}
 	// 교환 성공 알림 방송 (UI 연동용)
 	if (OnSkillEquipped.IsBound())
 	{

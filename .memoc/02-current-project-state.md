@@ -23,6 +23,7 @@ Last synced: 2026-06-13T00:00:00+09:00
 - **Ground-Targeted Foundation**: `UGP_TargetedSkillBase` supports ground position cursor preview, range clamping, trace, server revalidation, and selection modes (Instant, Projectile, Ray, TargetActor).
 - **XP & Leveling**: Replicated progression (`CurrentXP`, `CurrentLevel`, etc.) with XP granted on enemy death. Added debugging output and a Blueprint event for level-up.
 - **Augment Selection UI**: `UGP_AugmentSelectWidget` (C++ parent) rolls candidates from `UGP_SkillAugmentPoolData` without duplicate picks, using Game+UI input mode. Card backgrounds match type (Dawn/Dusk/Midnight/Zenith).
+- **Skill Selection Foundation**: `UGP_SkillPoolData` provides selectable skills. Slot01/Slot02 equipped SkillData replicates through PlayerState, and PlayerController validates pool/slot compatibility before server equip.
 - **Multiplayer Movement & Inertia Fixes**: `AGP_PlayerController` sends local movement input to the server, resolving effective move input from acceleration to fix jitter and remote facing. Action inertia is restricted to standalone mode to prevent prediction correction jitter in multiplayer.
 - **Boss Matador AI**: Boss Matador mage boss character (`AGP_MatadorMageBossCharacter`) and state component implemented, including decoy, chain, bull actors, and bull/groggy abilities. Bias toward range-keeping tactics.
 - **Procedural Fence & Arena Layout**: Instanced-mesh procedural fence actor (`BP_Fab_FenceSegment`) and 48 generated arena fences placed symmetrically outside the EventMap2 boundary.
@@ -49,6 +50,7 @@ Last synced: 2026-06-13T00:00:00+09:00
 - Test Dark Solo Void Pierce against aligned enemies and wall collision.
 - Connect `CHT_MM_MaskMan_Root` as the active chooser source and validate all locomotion states.
 - Verify `UGP_AugmentSelectWidget` type-driven card background bindings after rebuild.
+- Create the skill pool Data Asset and the skill selection Widget Blueprint.
 
 ## Completed Tasks
 

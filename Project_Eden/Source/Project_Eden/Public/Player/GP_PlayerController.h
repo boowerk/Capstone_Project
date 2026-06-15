@@ -12,6 +12,8 @@ class UGP_AugmentSelectWidget;
 class UGP_CharacterStatsMenuWidget;
 class UGP_SkillAugmentData;
 class UGP_SkillAugmentPoolData;
+class UGP_SkillData;
+class UGP_SkillPoolData;
 class UGP_TestSkillSet;
 class UGP_PlayerHUDWidget;
 class UInputAction;
@@ -40,6 +42,12 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "UI|Augment")
 	void CloseAugmentSelectWidget();
+
+	UFUNCTION(BlueprintCallable, Category = "UI|Skill")
+	bool RequestEquipSkill(UGP_SkillData* SkillData, FGameplayTag SlotTag);
+
+	UFUNCTION(BlueprintPure, Category = "UI|Skill")
+	UGP_SkillPoolData* GetSkillPoolData() const { return SkillPoolData; }
 
 protected:
 	virtual void BeginPlay() override;
@@ -139,6 +147,9 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UGP_AugmentSelectWidget> AugmentSelectWidget;
 
+	UPROPERTY(EditDefaultsOnly, Category = "UI|Skill")
+	TObjectPtr<UGP_SkillPoolData> SkillPoolData;
+
 	UPROPERTY(Transient)
 	TObjectPtr<AGP_EnemyCharacter> CurrentBossEnemy;
 
@@ -198,6 +209,10 @@ private:
 	UFUNCTION(Server, Reliable, WithValidation)
 	void Server_ClearMoveInput();
 
+	UFUNCTION(Server, Reliable)
+	void Server_EquipSkill(UGP_SkillData* SkillData, FGameplayTag SlotTag);
+
+	bool CanEquipSkill(UGP_SkillData* SkillData, FGameplayTag SlotTag) const;
 	bool ActivateAbilityByTag(const FGameplayTag& AbilityTag) const;
 	bool IsSkillSelectionActive() const;
 	bool IsGroundPositionSelectionActive() const;

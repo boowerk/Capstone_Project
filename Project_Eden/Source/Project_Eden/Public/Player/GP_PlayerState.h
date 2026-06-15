@@ -15,6 +15,12 @@ class UAbilitySystemComponent;
 class UGP_WeaponAttributeSet;
 class UPDA_WeaponItemCollection;
 class UNiagaraSystem;
+class UGP_SkillData;
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
+	FOnEquippedSkillChanged,
+	FGameplayTag, SlotTag,
+	UGP_SkillData*, SkillData);
 
 UCLASS()
 class PROJECT_EDEN_API AGP_PlayerState : public APlayerState, public IAbilitySystemInterface
@@ -92,6 +98,15 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Progression")
 	float GetXPToNextLevel() const { return XPToNextLevel; }
 
+	UFUNCTION(BlueprintCallable, Category = "Skill|Equipment")
+	void SetEquippedSkillData(FGameplayTag SlotTag, UGP_SkillData* SkillData);
+
+	UFUNCTION(BlueprintPure, Category = "Skill|Equipment")
+	UGP_SkillData* GetEquippedSkillData(FGameplayTag SlotTag) const;
+
+	UPROPERTY(BlueprintAssignable, Category = "Skill|Equipment")
+	FOnEquippedSkillChanged OnEquippedSkillChanged;
+
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 protected:
@@ -132,6 +147,12 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Debug|Progression", meta = (AllowPrivateAccess = "true", EditCondition = "bDebugXPChanges", ClampMin = "0.1", Units = "s"))
 	float DebugXPMessageDuration = 2.0f;
 
+	UPROPERTY(ReplicatedUsing = OnRep_Slot01SkillData, BlueprintReadOnly, Category = "Skill|Equipment", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UGP_SkillData> Slot01SkillData;
+
+	UPROPERTY(ReplicatedUsing = OnRep_Slot02SkillData, BlueprintReadOnly, Category = "Skill|Equipment", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UGP_SkillData> Slot02SkillData;
+
 	UFUNCTION()
 	void OnRep_EquippedWeaponData();
 
@@ -149,6 +170,12 @@ private:
 
 	UFUNCTION()
 	void OnRep_XPToNextLevel();
+
+	UFUNCTION()
+	void OnRep_Slot01SkillData();
+
+	UFUNCTION()
+	void OnRep_Slot02SkillData();
 
 	UFUNCTION(NetMulticast, Unreliable)
 	void MulticastShowXPDebug(float AddedXP, int32 PreviousLevel, int32 NewLevel, float NewXP, float NewXPToNextLevel);

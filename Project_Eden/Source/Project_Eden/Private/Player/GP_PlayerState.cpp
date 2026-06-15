@@ -5,6 +5,8 @@
 #include "Engine/Engine.h"
 #include "Net/UnrealNetwork.h"
 #include "AbilitySystem/GP_AttributeSet.h"
+#include "AbilitySystem/Abilities/GP_SkillData.h"
+#include "GameplayTags/GP_Tags.h"
 
 
 AGP_PlayerState::AGP_PlayerState()
@@ -347,6 +349,46 @@ void AGP_PlayerState::ServerAddXP_Implementation(float Amount)
 	AddXP(Amount);
 }
 
+void AGP_PlayerState::SetEquippedSkillData(FGameplayTag SlotTag, UGP_SkillData* SkillData)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	if (SlotTag.MatchesTagExact(GPTags::Ability::Skill::Slot01))
+	{
+		Slot01SkillData = SkillData;
+		OnEquippedSkillChanged.Broadcast(SlotTag, SkillData);
+	}
+	else if (SlotTag.MatchesTagExact(GPTags::Ability::Skill::Slot02))
+	{
+		Slot02SkillData = SkillData;
+		OnEquippedSkillChanged.Broadcast(SlotTag, SkillData);
+	}
+	else
+	{
+		return;
+	}
+
+	ForceNetUpdate();
+}
+
+UGP_SkillData* AGP_PlayerState::GetEquippedSkillData(FGameplayTag SlotTag) const
+{
+	if (SlotTag.MatchesTagExact(GPTags::Ability::Skill::Slot01))
+	{
+		return Slot01SkillData;
+	}
+
+	if (SlotTag.MatchesTagExact(GPTags::Ability::Skill::Slot02))
+	{
+		return Slot02SkillData;
+	}
+
+	return nullptr;
+}
+
 void AGP_PlayerState::MulticastShowXPDebug_Implementation(float AddedXP, int32 PreviousLevel, int32 NewLevel, float NewXP, float NewXPToNextLevel)
 {
 	if (!bDebugXPChanges)
@@ -395,6 +437,8 @@ void AGP_PlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
 	DOREPLIFETIME(AGP_PlayerState, CurrentXP);
 	DOREPLIFETIME(AGP_PlayerState, CurrentLevel);
 	DOREPLIFETIME(AGP_PlayerState, XPToNextLevel);
+	DOREPLIFETIME(AGP_PlayerState, Slot01SkillData);
+	DOREPLIFETIME(AGP_PlayerState, Slot02SkillData);
 }
 
 void AGP_PlayerState::OnRep_EquippedWeaponData()
@@ -423,4 +467,14 @@ void AGP_PlayerState::OnRep_CurrentLevel(int32 PreviousLevel)
 
 void AGP_PlayerState::OnRep_XPToNextLevel()
 {
+}
+
+void AGP_PlayerState::OnRep_Slot01SkillData()
+{
+	OnEquippedSkillChanged.Broadcast(GPTags::Ability::Skill::Slot01, Slot01SkillData);
+}
+
+void AGP_PlayerState::OnRep_Slot02SkillData()
+{
+	OnEquippedSkillChanged.Broadcast(GPTags::Ability::Skill::Slot02, Slot02SkillData);
 }
