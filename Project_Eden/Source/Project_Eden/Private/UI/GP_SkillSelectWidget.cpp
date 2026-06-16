@@ -2,6 +2,7 @@
 
 #include "AbilitySystem/Abilities/GP_SkillData.h"
 #include "AbilitySystem/Abilities/GP_SkillPoolData.h"
+#include "Blueprint/WidgetBlueprintLibrary.h"
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
@@ -34,6 +35,22 @@ void UGP_SkillSelectWidget::NativeConstruct()
 		Button_Slot02->OnClicked.AddDynamic(this, &ThisClass::HandleSlot02Clicked);
 	}
 
+	if (Button_Close)
+	{
+		Button_Close->OnClicked.RemoveDynamic(this, &ThisClass::HandleCloseClicked);
+		Button_Close->OnClicked.AddDynamic(this, &ThisClass::HandleCloseClicked);
+	}
+
+	if (APlayerController* PlayerController = GetOwningPlayer())
+	{
+		PlayerController->SetShowMouseCursor(true);
+
+		FInputModeUIOnly InputMode;
+		InputMode.SetWidgetToFocus(TakeWidget());
+		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+		PlayerController->SetInputMode(InputMode);
+	}
+
 	RefreshSkillSelection();
 }
 
@@ -42,6 +59,11 @@ void UGP_SkillSelectWidget::NativeDestruct()
 	if (AGP_PlayerState* PlayerState = GetGPPlayerState())
 	{
 		PlayerState->OnEquippedSkillChanged.RemoveDynamic(this, &ThisClass::HandleEquippedSkillChanged);
+	}
+
+	if (Button_Close)
+	{
+		Button_Close->OnClicked.RemoveDynamic(this, &ThisClass::HandleCloseClicked);
 	}
 
 	Super::NativeDestruct();
@@ -96,6 +118,17 @@ bool UGP_SkillSelectWidget::EquipSkillToSlot(UGP_SkillData* SkillData, FGameplay
 	return bEquipped;
 }
 
+void UGP_SkillSelectWidget::CloseSkillSelection()
+{
+	if (APlayerController* PlayerController = GetOwningPlayer())
+	{
+		PlayerController->SetShowMouseCursor(false);
+		UWidgetBlueprintLibrary::SetInputMode_GameOnly(PlayerController);
+	}
+
+	RemoveFromParent();
+}
+
 UGP_SkillData* UGP_SkillSelectWidget::GetEquippedSkill(FGameplayTag SlotTag) const
 {
 	const AGP_PlayerState* PlayerState = GetGPPlayerState();
@@ -130,6 +163,11 @@ void UGP_SkillSelectWidget::HandleSlot01Clicked()
 void UGP_SkillSelectWidget::HandleSlot02Clicked()
 {
 	SelectSlot02();
+}
+
+void UGP_SkillSelectWidget::HandleCloseClicked()
+{
+	CloseSkillSelection();
 }
 
 AGP_PlayerController* UGP_SkillSelectWidget::GetGPPlayerController() const

@@ -38,6 +38,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Skill Selection")
 	bool EquipSkillToSlot(UGP_SkillData* SkillData, FGameplayTag SlotTag);
 
+	UFUNCTION(BlueprintCallable, Category = "Skill Selection")
+	void CloseSkillSelection();
+
 	UFUNCTION(BlueprintPure, Category = "Skill Selection")
 	UGP_SkillData* GetEquippedSkill(FGameplayTag SlotTag) const;
 
@@ -67,6 +70,9 @@ protected:
 	TObjectPtr<UButton> Button_Slot02;
 
 	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UButton> Button_Close;
+
+	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> Text_Slot01;
 
 	UPROPERTY(meta = (BindWidgetOptional))
@@ -91,6 +97,9 @@ private:
 
 	UFUNCTION()
 	void HandleSlot02Clicked();
+
+	UFUNCTION()
+	void HandleCloseClicked();
 
 	AGP_PlayerController* GetGPPlayerController() const;
 	AGP_PlayerState* GetGPPlayerState() const;
