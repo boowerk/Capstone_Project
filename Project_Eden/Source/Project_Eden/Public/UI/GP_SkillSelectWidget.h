@@ -9,6 +9,10 @@
 class AGP_PlayerController;
 class AGP_PlayerState;
 class UGP_SkillData;
+class UGP_SkillEntryWidget;
+class UButton;
+class UTextBlock;
+class UVerticalBox;
 
 UCLASS(Abstract, Blueprintable)
 class PROJECT_EDEN_API UGP_SkillSelectWidget : public UUserWidget
@@ -50,6 +54,24 @@ protected:
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill Selection|Entries")
+	TSubclassOf<UGP_SkillEntryWidget> SkillEntryWidgetClass;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UVerticalBox> VerticalBox_SkillList;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UButton> Button_Slot01;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UButton> Button_Slot02;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> Text_Slot01;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> Text_Slot02;
+
 	UFUNCTION(BlueprintImplementableEvent, Category = "Skill Selection", meta = (DisplayName = "On Skill Selection Refreshed"))
 	void BP_OnSkillSelectionRefreshed(
 		const TArray<UGP_SkillData*>& AvailableSkills,
@@ -61,10 +83,25 @@ private:
 	UFUNCTION()
 	void HandleEquippedSkillChanged(FGameplayTag SlotTag, UGP_SkillData* SkillData);
 
+	UFUNCTION()
+	void HandleSkillEntryClicked(UGP_SkillData* SkillData);
+
+	UFUNCTION()
+	void HandleSlot01Clicked();
+
+	UFUNCTION()
+	void HandleSlot02Clicked();
+
 	AGP_PlayerController* GetGPPlayerController() const;
 	AGP_PlayerState* GetGPPlayerState() const;
 	void SetSelectedSlot(FGameplayTag SlotTag);
+	void RebuildSkillEntries(const TArray<UGP_SkillData*>& AvailableSkills, UGP_SkillData* Slot01Skill, UGP_SkillData* Slot02Skill);
+	void RefreshSlotTexts(UGP_SkillData* Slot01Skill, UGP_SkillData* Slot02Skill) const;
+	FText GetSlotDisplayText(const TCHAR* SlotLabel, const UGP_SkillData* SkillData) const;
 
 	UPROPERTY(Transient)
 	FGameplayTag SelectedSlotTag;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UGP_SkillEntryWidget>> SkillEntryWidgets;
 };
