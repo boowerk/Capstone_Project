@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-06-14T02:34:09+09:00
+updated: 2026-06-17T03:59:58+09:00
 status: active
 tags:
   - memoc
@@ -11,10 +11,13 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-06-14T02:34:09+09:00
+Last synced: 2026-06-17T03:59:58+09:00
 
 ## Current Status
 
+- Basic enemy Blueprint inheritance path now exists. `AGP_MeleeEnemyCharacter`, `AGP_RangedEnemyCharacter`, and `AGP_FlyingEnemyCharacter` are Blueprintable C++ parents with archetype-specific sight/lose-sight/patrol/home ranges, built-in AI tuning, movement defaults, common `BT_EnemyCommon`/`BB_EnemyCommon`, and `/Game/Characters/MaskMan/SK_MaskMan` assigned as the prototype mesh.
+- Enemy default GAS attacks are archetype-aware. `UGP_EnemyRangedAttack` provides a first ranged prototype hit ability, `AGP_EnemyCharacter` can grant a default enemy attack ability, and shared `BTT_ExecuteEnemyAttack` now resolves the controlled enemy's default attack tag so ranged/flying parents do not need a separate BT.
+- Basic enemy BP templates were created at `/Game/Characters/EnemyCharacter/Basic/BP_BasicEnemy_Melee`, `/Game/Characters/EnemyCharacter/Basic/BP_BasicEnemy_Ranged`, and `/Game/Characters/EnemyCharacter/Basic/BP_BasicEnemy_Flying`.
 - Boss pattern execution is centralized in `BossAttackExecution`. `BTT_ExecuteBossAttack` and boss pawns accidentally routed through generic `BTT_ExecuteEnemyAttack` now use the same GAS pattern selector and activation/failure logging.
 - `UBTT_ExecuteBossAttack` no longer reports success when GAS pattern activation fails. Granted-but-blocked/cooldowned boss pattern candidates are logged, the next scored candidate is attempted, and the BT task fails only when no candidate can activate.
 - Crystal Seraph native boss prototype is implemented from `CrystalSeraphBoss_Plan.md`: `AGP_CrystalSeraphBossCharacter` uses requested `/Game/Characters/MaskMan/SK_MaskMan` as the prototype skeletal mesh, owns `UGP_CrystalSeraphStateComponent`, grants native Crystal Seraph pattern abilities, and exposes BlueprintCallable requests for prism, laser, shard, sanctuary, wing-core exposure, groggy, and recover.
