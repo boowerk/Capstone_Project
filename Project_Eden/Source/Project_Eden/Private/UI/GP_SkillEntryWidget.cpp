@@ -58,7 +58,7 @@ void UGP_SkillEntryWidget::RefreshView()
 	if (Image_Icon)
 	{
 		UTexture2D* IconTexture = bHasSkill ? SkillData->SkillIcon.LoadSynchronous() : nullptr;
-		Image_Icon->SetVisibility(IsValid(IconTexture) ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+		Image_Icon->SetVisibility(IsValid(IconTexture) ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Hidden);
 		if (IsValid(IconTexture))
 		{
 			Image_Icon->SetBrushFromTexture(IconTexture, true);
