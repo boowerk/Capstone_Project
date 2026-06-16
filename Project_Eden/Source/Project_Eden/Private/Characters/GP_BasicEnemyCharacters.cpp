@@ -5,11 +5,54 @@
 #include "AI/Data/EnemyArchetypeData.h"
 #include "AbilitySystem/Abilities/Enemy/GP_EnemyAttack.h"
 #include "AbilitySystem/Abilities/Enemy/GP_EnemyRangedAttack.h"
+#include "BehaviorTree/BehaviorTree.h"
+#include "BehaviorTree/BlackboardData.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Engine/SkeletalMesh.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameplayTags/GP_Tags.h"
+#include "UObject/ConstructorHelpers.h"
 
 namespace GPBasicEnemyDefaults
 {
+	struct FSharedTemplateAssets
+	{
+		TObjectPtr<UBehaviorTree> CommonBehaviorTree = nullptr;
+		TObjectPtr<UBlackboardData> CommonBlackboard = nullptr;
+		TObjectPtr<USkeletalMesh> MaskManMesh = nullptr;
+	};
+
+	const FSharedTemplateAssets& GetSharedTemplateAssets()
+	{
+		static FSharedTemplateAssets SharedAssets;
+		static bool bLoadedAssets = false;
+		if (!bLoadedAssets)
+		{
+			// Basic Blueprint children should be usable immediately after creation, without hand-wiring common AI assets.
+			static ConstructorHelpers::FObjectFinder<UBehaviorTree> CommonBehaviorTreeFinder(TEXT("/Game/Characters/EnemyCharacter/BT/Common/BT_EnemyCommon.BT_EnemyCommon"));
+			if (CommonBehaviorTreeFinder.Succeeded())
+			{
+				SharedAssets.CommonBehaviorTree = CommonBehaviorTreeFinder.Object;
+			}
+
+			static ConstructorHelpers::FObjectFinder<UBlackboardData> CommonBlackboardFinder(TEXT("/Game/Characters/EnemyCharacter/BT/Common/BB_EnemyCommon.BB_EnemyCommon"));
+			if (CommonBlackboardFinder.Succeeded())
+			{
+				SharedAssets.CommonBlackboard = CommonBlackboardFinder.Object;
+			}
+
+			static ConstructorHelpers::FObjectFinder<USkeletalMesh> MaskManMeshFinder(TEXT("/Game/Characters/MaskMan/SK_MaskMan.SK_MaskMan"));
+			if (MaskManMeshFinder.Succeeded())
+			{
+				SharedAssets.MaskManMesh = MaskManMeshFinder.Object;
+			}
+
+			bLoadedAssets = true;
+		}
+
+		return SharedAssets;
+	}
+
 	FEnemyArchetypeTuning MakeTuning(
 		EEnemyMode Mode,
 		float Aggression,
@@ -34,6 +77,14 @@ namespace GPBasicEnemyDefaults
 
 AGP_MeleeEnemyCharacter::AGP_MeleeEnemyCharacter()
 {
+	const GPBasicEnemyDefaults::FSharedTemplateAssets& SharedAssets = GPBasicEnemyDefaults::GetSharedTemplateAssets();
+	BehaviorTreeAssetOverride = SharedAssets.CommonBehaviorTree;
+	BlackboardAssetOverride = SharedAssets.CommonBlackboard;
+	if (GetMesh() != nullptr && SharedAssets.MaskManMesh != nullptr)
+	{
+		GetMesh()->SetSkeletalMesh(SharedAssets.MaskManMesh);
+	}
+
 	CombatArchetype = EGPEnemyCombatArchetype::Melee;
 	ReturnHomeDistance = 2200.0f;
 	ReturnHomeAcceptanceRadius = 150.0f;
@@ -64,6 +115,14 @@ AGP_MeleeEnemyCharacter::AGP_MeleeEnemyCharacter()
 
 AGP_RangedEnemyCharacter::AGP_RangedEnemyCharacter()
 {
+	const GPBasicEnemyDefaults::FSharedTemplateAssets& SharedAssets = GPBasicEnemyDefaults::GetSharedTemplateAssets();
+	BehaviorTreeAssetOverride = SharedAssets.CommonBehaviorTree;
+	BlackboardAssetOverride = SharedAssets.CommonBlackboard;
+	if (GetMesh() != nullptr && SharedAssets.MaskManMesh != nullptr)
+	{
+		GetMesh()->SetSkeletalMesh(SharedAssets.MaskManMesh);
+	}
+
 	CombatArchetype = EGPEnemyCombatArchetype::Ranged;
 	ReturnHomeDistance = 3000.0f;
 	ReturnHomeAcceptanceRadius = 180.0f;
@@ -94,6 +153,14 @@ AGP_RangedEnemyCharacter::AGP_RangedEnemyCharacter()
 
 AGP_FlyingEnemyCharacter::AGP_FlyingEnemyCharacter()
 {
+	const GPBasicEnemyDefaults::FSharedTemplateAssets& SharedAssets = GPBasicEnemyDefaults::GetSharedTemplateAssets();
+	BehaviorTreeAssetOverride = SharedAssets.CommonBehaviorTree;
+	BlackboardAssetOverride = SharedAssets.CommonBlackboard;
+	if (GetMesh() != nullptr && SharedAssets.MaskManMesh != nullptr)
+	{
+		GetMesh()->SetSkeletalMesh(SharedAssets.MaskManMesh);
+	}
+
 	CombatArchetype = EGPEnemyCombatArchetype::Flying;
 	ReturnHomeDistance = 3400.0f;
 	ReturnHomeAcceptanceRadius = 220.0f;
