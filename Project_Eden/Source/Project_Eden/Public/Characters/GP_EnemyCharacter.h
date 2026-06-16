@@ -1,7 +1,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "AI/Data/EnemyArchetypeData.h"
 #include "Characters/GP_BaseCharacter.h"
+#include "GameplayTagContainer.h"
 #include "GP_EnemyCharacter.generated.h"
 
 class UAbilitySystemComponent;
@@ -14,6 +16,14 @@ class AGP_PlayerState;
 struct FDataTableRowHandle;
 struct FEnemyArchetypeTuning;
 struct FEnemyLLMEvaluation;
+
+UENUM(BlueprintType)
+enum class EGPEnemyCombatArchetype : uint8
+{
+	Melee UMETA(DisplayName = "Melee"),
+	Ranged UMETA(DisplayName = "Ranged"),
+	Flying UMETA(DisplayName = "Flying")
+};
 
 UCLASS()
 class PROJECT_EDEN_API AGP_EnemyCharacter : public AGP_BaseCharacter
@@ -52,6 +62,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "AI|Perception")
 	float GetPeripheralVisionAngleDegrees() const { return FMath::Clamp(PeripheralVisionAngleDegrees, 0.0f, 180.0f); }
 
+	UFUNCTION(BlueprintPure, Category = "AI|Archetype")
+	EGPEnemyCombatArchetype GetCombatArchetype() const { return CombatArchetype; }
+
+	UFUNCTION(BlueprintPure, Category = "AI|Combat")
+	FGameplayTag GetDefaultAttackAbilityTag() const { return DefaultAttackAbilityTag; }
+
 	UFUNCTION(BlueprintPure, Category = "AI")
 	UBehaviorTree* GetBehaviorTreeAssetOverride() const { return BehaviorTreeAssetOverride; }
 
@@ -88,6 +104,9 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AI|Perception", meta = (ClampMin = "0.0", ClampMax = "180.0", Units = "deg"))
 	float PeripheralVisionAngleDegrees = 70.0f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AI|Archetype")
+	EGPEnemyCombatArchetype CombatArchetype = EGPEnemyCombatArchetype::Melee;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AI|Debug")
 	bool bShowAIRangesInEditor = true;
 
@@ -109,6 +128,13 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AI|Config", meta = (RowType = "/Script/Project_Eden.EnemyArchetypeTableRow"))
 	FDataTableRowHandle EnemyArchetypeRow;
 
+	// Built-in presets make inherited C++ enemy parents usable before a designer creates a dedicated DataAsset.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AI|Config")
+	bool bUseBuiltInArchetypeTuning = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AI|Config", meta = (EditCondition = "bUseBuiltInArchetypeTuning"))
+	FEnemyArchetypeTuning BuiltInArchetypeTuning;
+
 	// 디버깅이나 고정 개성 연출이 필요할 때 랜덤 시드를 수동 고정한다.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AI|Config")
 	bool bOverridePersonalitySeed = false;
@@ -125,6 +151,15 @@ protected:
 	// Boss 플래그만 켜도 기본 강공격/광역/휩쓸기 어빌리티를 받을 수 있게 합니다.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Abilities", meta = (EditCondition = "bIsBossEnemy"))
 	bool bGrantDefaultBossPatternAbilities = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|Abilities")
+	bool bGrantDefaultEnemyAttackAbility = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|Abilities", meta = (EditCondition = "bGrantDefaultEnemyAttackAbility"))
+	TSubclassOf<UGameplayAbility> DefaultEnemyAttackAbilityClass;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|Abilities", meta = (EditCondition = "bGrantDefaultEnemyAttackAbility"))
+	FGameplayTag DefaultAttackAbilityTag;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Progression", meta = (ClampMin = "0.0"))
 	float XPReward = 25.0f;
@@ -149,6 +184,7 @@ private:
 
 	const FEnemyArchetypeTuning* ResolveEnemyArchetypeTuning() const;
 	int32 ResolvePersonalitySeed() const;
+	void GiveDefaultEnemyAttackAbility();
 	void GiveDefaultBossPatternAbilities();
 	void RefreshAIRangeVisualizers();
 	void GrantXPRewardToInstigator(AActor* InstigatorActor);
