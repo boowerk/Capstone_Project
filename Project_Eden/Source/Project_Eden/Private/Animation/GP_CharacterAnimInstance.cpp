@@ -510,5 +510,3 @@ void UGP_CharacterAnimInstance::SuppressMotionMatchingUpdate(float Duration)
 {
 	MotionMatchingSuppressTimeRemaining = FMath::Max(MotionMatchingSuppressTimeRemaining, Duration);
 }
-
-

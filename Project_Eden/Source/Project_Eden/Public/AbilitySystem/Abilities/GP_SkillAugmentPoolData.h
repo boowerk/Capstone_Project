@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
+#include "GameplayTagContainer.h"
 #include "GP_SkillAugmentPoolData.generated.h"
 
 class UGP_SkillAugmentData;
@@ -17,4 +18,13 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Skill|Augment|Pool")
 	TArray<UGP_SkillAugmentData*> PickRandomAugments(int32 Count) const;
+
+	UFUNCTION(BlueprintCallable, Category = "Skill|Augment|Pool")
+	TArray<UGP_SkillAugmentData*> PickRandomAugmentsExcluding(int32 Count, const TArray<UGP_SkillAugmentData*>& ExcludedAugments) const;
+
+	UFUNCTION(BlueprintCallable, Category = "Skill|Augment|Pool")
+	TArray<UGP_SkillAugmentData*> PickRandomAugmentsExcludingForElement(
+		int32 Count,
+		const TArray<UGP_SkillAugmentData*>& ExcludedAugments,
+		FGameplayTag CurrentElementTag) const;
 };

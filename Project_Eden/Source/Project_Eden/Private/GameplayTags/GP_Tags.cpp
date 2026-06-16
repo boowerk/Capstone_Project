@@ -72,6 +72,17 @@ namespace GPTags
             
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Death, "GPTags.Ability.Enemy.Death", "적 사망 처리");
         }
+        namespace Boss
+        {
+            namespace CrystalSeraph
+            {
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(Basic, "GPTags.Ability.Boss.CrystalSeraph.Basic", "크리스탈 세라프 크리스탈 샤드 패턴");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(Laser, "GPTags.Ability.Boss.CrystalSeraph.Laser", "크리스탈 세라프 굴절 레이저 패턴");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(Prism, "GPTags.Ability.Boss.CrystalSeraph.Prism", "크리스탈 세라프 프리즘 소환 패턴");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(Area, "GPTags.Ability.Boss.CrystalSeraph.Area", "크리스탈 세라프 유리 성역 패턴");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(Groggy, "GPTags.Ability.Boss.CrystalSeraph.Groggy", "크리스탈 세라프 그로기 진입 패턴");
+            }
+        }
     }
     
     // [2] Damage : 데미지 타입 및 원소 속성
@@ -104,6 +115,7 @@ namespace GPTags
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Base, "Damage.Base", "SetByCaller 물리/공통 기본 데미지");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(BaseSpell, "Damage.BaseSpell", "SetByCaller 마법 기본 데미지");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(ToughnessBase, "Damage.ToughnessBase", "SetByCaller 강인도 기본 데미지");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Multiplier, "Damage.Multiplier", "SetByCaller 최종 스킬 피해 배율");
         }
     }
 
@@ -121,6 +133,8 @@ namespace GPTags
                 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Aggroed, "GPTags.State.Status.Enemy.Aggroed", "어그로 끌린 상태");
                 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Enraged, "GPTags.State.Status.Enemy.Enraged", "광폭화 상태");
                 UE_DEFINE_GAMEPLAY_TAG_COMMENT(MatadorGuarded, "GPTags.State.Status.Enemy.MatadorGuarded", "마타도르 보스 기본 피해 감쇠 상태");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(CrystalGuarded, "GPTags.State.Status.Enemy.CrystalGuarded", "크리스탈 세라프 기본 피해 감쇠 상태");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(WingCoreExposed, "GPTags.State.Status.Enemy.WingCoreExposed", "크리스탈 세라프 날개 코어 노출 상태");
                 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Groggy, "GPTags.State.Status.Enemy.Groggy", "적 그로기 상태");
             }
         }

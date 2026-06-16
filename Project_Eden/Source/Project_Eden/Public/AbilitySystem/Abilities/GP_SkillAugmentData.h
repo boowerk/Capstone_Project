@@ -9,6 +9,15 @@ class AActor;
 class UNiagaraSystem;
 class UTexture2D;
 
+UENUM(BlueprintType)
+enum class EGP_SkillAugmentType : uint8
+{
+	BasicAttack UMETA(DisplayName = "Basic Attack"),
+	Skill UMETA(DisplayName = "Skill"),
+	Ultimate UMETA(DisplayName = "Ultimate"),
+	Passive UMETA(DisplayName = "Passive")
+};
+
 USTRUCT(BlueprintType)
 struct FGP_SkillAugmentNumericModifiers
 {
@@ -48,8 +57,14 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Augment|Info")
 	TSoftObjectPtr<UTexture2D> AugmentIcon;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Augment|Target", meta = (Categories = "GPTags.Ability.Skill.Id", ToolTip = "Skill identity tags this augment can affect. Empty means the selection system must decide validity another way."))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Augment|Info")
+	EGP_SkillAugmentType AugmentType = EGP_SkillAugmentType::Skill;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Augment|Target", meta = (Categories = "GPTags.Ability.Skill.Id", ToolTip = "Skill identity tags this augment can affect. Empty means every skill can use this augment."))
 	FGameplayTagContainer TargetSkillTags;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Augment|Element", meta = (Categories = "GPTags.Tech.Element", ToolTip = "Optional element required for this augment's modifiers to apply. Empty means no element requirement."))
+	FGameplayTag RequiredElementTag;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Augment|Element", meta = (Categories = "GPTags.Tech.Element", ToolTip = "Element this augment grants or prefers. Empty means no element change."))
 	FGameplayTag GrantedElementTag;

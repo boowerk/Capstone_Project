@@ -29,4 +29,5 @@ Durable user and project preferences live here. Update when the user gives a rul
 
 ## Project-Specific Rules
 
-_None yet._
+- When Codex performs implementation work, split commits by functional unit.
+- Follow the repository's commit title style from history: `type(scope): short summary`, such as `feat(ui): add native tab navigation for character stats menu`.

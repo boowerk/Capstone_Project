@@ -317,4 +317,10 @@ void AGP_BaseCharacter::HandleDamageTaken(AActor* InstigatorActor, AActor* Targe
 				ElementTag);
 		}
 	}
+
+	HandlePostDamageTaken(InstigatorActor, DamageAmount, ElementTag);
+}
+
+void AGP_BaseCharacter::HandlePostDamageTaken(AActor* InstigatorActor, float DamageAmount, FGameplayTag ElementTag)
+{
 }

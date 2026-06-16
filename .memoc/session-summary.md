@@ -2,24 +2,21 @@
 memoc: true
 type: state
 scope: project-memory
-created: 2026-06-06T06:43:32
-updated: 2026-06-16T00:00:00+09:00
 status: active
-tags:
-  - memoc
-  - memoc/state
+tags: [memoc, memoc/state]
+updated: 2026-06-14T02:34:09+09:00
 ---
 # Session Summary
-Last: 2026-06-16T21:20:00+09:00
+Last: 2026-06-14T02:34:09+09:00
 
 ## Status
-- Shrank `/Game/Fab/Lava_Material/Textures/T_Lava_01` source texture data for Git/LFS size reduction.
-- Result: total `.uasset` size dropped from about 259.64MB to 55.12MB.
+- Found `BT_BossCommon.uasset` still references `BTT_ExecuteEnemyAttack` in its Attack branch, so boss pattern selection could be bypassed after merges.
+- Added shared `BossAttackExecution` helper and routed boss pawns from both `BTT_ExecuteBossAttack` and legacy/generic `BTT_ExecuteEnemyAttack` into the same GAS pattern selector.
+- Existing editor asset/map changes were left untouched.
 
-## Changed
-- `Project_Eden.Build.cs` editor deps now include `TargetPlatform` and `TextureUtilitiesCommon`.
-- Added commandlet source/header under `Source/Project_Eden/*/Commandlets`.
+## Next
+- In PIE, Attack branch should log `[BossAI] Generic attack task routed through boss pattern selector...` if the BT still uses the generic task.
+- If no `[BossAI]` logs appear, inspect `bCanAttack`, `DistanceToTarget`, and LOS because the BT is not reaching the Attack task.
 
-## Resume
-- `GP_DownsizeLavaTexturesCommandlet` saved all 6 Lava textures successfully. Process exit code was 1 only because unrelated project load errors remain (`MI_WaterfallCaustics2` invalid package and missing Fab fence meshes).
-- References are preserved because the same asset paths were overwritten in place.
+## Verify
+- `Project_EdenEditor Win64 Development` build succeeded.

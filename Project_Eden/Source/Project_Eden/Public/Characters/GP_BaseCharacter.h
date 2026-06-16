@@ -83,6 +83,8 @@ protected:
 	// 데미지 델리게이트 수신용 함수
 	UFUNCTION()
 	void HandleDamageTaken(AActor* InstigatorActor, AActor* TargetActor, float DamageAmount, FGameplayTag ElementTag);
+
+	virtual void HandlePostDamageTaken(AActor* InstigatorActor, float DamageAmount, FGameplayTag ElementTag);
 	
 private:
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Abilities")

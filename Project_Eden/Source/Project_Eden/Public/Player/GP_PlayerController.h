@@ -8,7 +8,10 @@
 class AGP_PlayerCharacter;
 class UAbilitySystemComponent;
 class AGP_EnemyCharacter;
+class UGP_AugmentSelectWidget;
 class UGP_CharacterStatsMenuWidget;
+class UGP_SkillAugmentData;
+class UGP_SkillAugmentPoolData;
 class UGP_TestSkillSet;
 class UGP_PlayerHUDWidget;
 class UInputAction;
@@ -27,6 +30,15 @@ public:
 	FVector2D GetCurrentMoveInput() const { return CurrentMoveInput; }
 	bool ShouldResumeHeldSprint() const { return !bIsSprintToggle && bSprintInputHeld; }
 	bool IsCrouchInputHeld() const { return bCrouchInputHeld; }
+
+	UFUNCTION(BlueprintCallable, Category = "UI|Augment")
+	bool RequestOpenAugmentSelect();
+
+	UFUNCTION(BlueprintCallable, Category = "UI|Augment")
+	bool OpenAugmentSelectWidget(const TArray<UGP_SkillAugmentData*>& Candidates);
+
+	UFUNCTION(BlueprintCallable, Category = "UI|Augment")
+	void CloseAugmentSelectWidget();
 
 protected:
 	virtual void BeginPlay() override;
@@ -113,6 +125,18 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UGP_CharacterStatsMenuWidget> CharacterStatsMenuWidget;
+
+	UPROPERTY(EditDefaultsOnly, Category = "UI|Augment")
+	TSubclassOf<UGP_AugmentSelectWidget> AugmentSelectWidgetClass;
+
+	UPROPERTY(EditDefaultsOnly, Category = "UI|Augment")
+	TObjectPtr<UGP_SkillAugmentPoolData> AugmentPoolData;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UI|Augment", meta = (AllowPrivateAccess = "true", ClampMin = "1"))
+	int32 AugmentCandidateCount = 3;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UGP_AugmentSelectWidget> AugmentSelectWidget;
 
 	UPROPERTY(Transient)
 	TObjectPtr<AGP_EnemyCharacter> CurrentBossEnemy;

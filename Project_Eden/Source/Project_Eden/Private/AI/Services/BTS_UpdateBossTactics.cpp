@@ -8,6 +8,8 @@
 #include "BehaviorTree/BehaviorTreeComponent.h"
 #include "BehaviorTree/BehaviorTreeTypes.h"
 #include "BehaviorTree/BlackboardComponent.h"
+#include "Characters/GP_CrystalSeraphBossCharacter.h"
+#include "Characters/GP_CrystalSeraphStateComponent.h"
 #include "Characters/GP_MatadorBossStateComponent.h"
 #include "Characters/GP_MatadorMageBossCharacter.h"
 #include "GameFramework/Actor.h"
@@ -70,6 +72,12 @@ namespace BTS_UpdateBossTactics_Internal
 		}
 
 		return FMath::Fmod(FMath::Max(0.0f, WorldTimeSeconds), Interval) <= FMath::Max(0.0f, Window);
+	}
+
+	bool IsDistanceInRange(float Distance, float MinRange, float MaxRange)
+	{
+		const float SafeDistance = FMath::Max(0.0f, Distance);
+		return SafeDistance >= FMath::Max(0.0f, MinRange) && SafeDistance <= FMath::Max(MinRange, MaxRange);
 	}
 }
 
@@ -186,6 +194,43 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 	const bool bShouldTeleport = IsValid(MatadorBoss) && bHasTarget && !bReturningHome && MatadorBoss->ShouldTeleportForMatador(DistanceToTarget);
 	bool bMatadorForceRangeReposition = false;
 
+	const UGP_CrystalSeraphStateComponent* CrystalSeraphStateComponent = IsValid(ControlledPawn)
+		? ControlledPawn->FindComponentByClass<UGP_CrystalSeraphStateComponent>()
+		: nullptr;
+	const AGP_CrystalSeraphBossCharacter* CrystalSeraphBoss = Cast<AGP_CrystalSeraphBossCharacter>(ControlledPawn);
+	const bool bIsCrystalSeraphBoss = IsValid(CrystalSeraphBoss);
+	const int32 WingCoreBreakCount = IsValid(CrystalSeraphStateComponent) ? CrystalSeraphStateComponent->GetWingCoreBreakCount() : 0;
+	const int32 WingCoreBreakTarget = IsValid(CrystalSeraphStateComponent) ? CrystalSeraphStateComponent->GetWingCoreBreakTarget() : 3;
+	const bool bCrystalSeraphGroggy = IsValid(CrystalSeraphStateComponent) && CrystalSeraphStateComponent->IsGroggy();
+	const bool bWingCoreExposed = IsValid(CrystalSeraphStateComponent) && CrystalSeraphStateComponent->IsWingCoreExposed();
+	const bool bCrystalPrismActive = IsValid(CrystalSeraphStateComponent) && IsValid(CrystalSeraphStateComponent->GetCrystalPrismActor());
+	const bool bCanTriggerCrystalSeraphGroggy = IsValid(CrystalSeraphStateComponent) && WingCoreBreakCount >= WingCoreBreakTarget && !bCrystalSeraphGroggy;
+	const float CrystalPreferredHoverHeight = IsValid(CrystalSeraphBoss) ? CrystalSeraphBoss->GetPreferredHoverHeight() : PreferredHoverHeight;
+	const float CrystalPreferredAirRange = IsValid(CrystalSeraphBoss) ? CrystalSeraphBoss->GetPreferredAirRange() : PreferredAirRange;
+	const bool bCrystalLaserRangeAllowed = BTS_UpdateBossTactics_Internal::IsDistanceInRange(DistanceToTarget, CrystalLaserMinRange, CrystalLaserMaxRange);
+	const bool bCrystalPrismRangeAllowed = BTS_UpdateBossTactics_Internal::IsDistanceInRange(DistanceToTarget, CrystalPrismMinRange, CrystalPrismMaxRange);
+	bool bCanUseCrystalLaserPattern = IsValid(CrystalSeraphStateComponent)
+		&& bHasTarget
+		&& !bReturningHome
+		&& !bShouldPhaseTransition
+		&& !bCrystalSeraphGroggy
+		&& !bWingCoreExposed
+		&& bCrystalPrismActive
+		&& bHasLineOfSight
+		&& bCrystalLaserRangeAllowed
+		&& BTS_UpdateBossTactics_Internal::IsPatternWindowOpen(WorldTimeSeconds, CrystalLaserPatternInterval, CrystalLaserPatternWindow);
+	bool bCanUseCrystalPrismPattern = IsValid(CrystalSeraphStateComponent)
+		&& bHasTarget
+		&& !bReturningHome
+		&& !bShouldPhaseTransition
+		&& !bCrystalSeraphGroggy
+		&& !bWingCoreExposed
+		&& !bCrystalPrismActive
+		&& bCrystalPrismRangeAllowed
+		&& BTS_UpdateBossTactics_Internal::IsPatternWindowOpen(WorldTimeSeconds, CrystalPrismPatternInterval, CrystalPrismPatternWindow);
+	bool bCrystalForceRangeReposition = false;
+	bool bCrystalShouldTeleport = IsValid(CrystalSeraphBoss) && bHasTarget && !bReturningHome && CrystalSeraphBoss->ShouldTeleportForCrystalSeraph(DistanceToTarget);
+
 	if (bMatadorGroggy)
 	{
 		// Groggy makes the boss vulnerable; suppress normal attack requests until the state component recovers it.
@@ -216,7 +261,40 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 		}
 	}
 
-	if (!bMatadorGroggy && IsValid(EnemyAIController) && EnemyAIController->IsBossRuntimeEvaluationTestCycleActive() && bHasTarget && !bReturningHome && bHasLineOfSight)
+	if (bCrystalSeraphGroggy)
+	{
+		// Groggy makes Crystal Seraph a reward window; suppress every attack selector input.
+		bShouldPhaseTransition = false;
+		bCanUseHeavyAttack = false;
+		bCanUseAreaAttack = false;
+		bCanUseSweepAttack = false;
+		bCanSummonAdds = false;
+		bCanUseCrystalLaserPattern = false;
+		bCanUseCrystalPrismPattern = false;
+	}
+
+	if (bIsCrystalSeraphBoss && !bCrystalSeraphGroggy)
+	{
+		// Crystal Seraph prefers air-range shard, prism, laser, and sanctuary patterns over generic melee/summon pressure.
+		bCanUseHeavyAttack = false;
+		bCanUseSweepAttack = false;
+		bCanSummonAdds = false;
+		bCanUseAreaAttack = bHasTarget
+			&& !bReturningHome
+			&& !bShouldPhaseTransition
+			&& !bWingCoreExposed
+			&& BossPhase >= 2
+			&& bHasLineOfSight
+			&& BTS_UpdateBossTactics_Internal::IsDistanceInRange(DistanceToTarget, CrystalPreferredAirRange * 0.5f, AreaAttackRange)
+			&& BTS_UpdateBossTactics_Internal::IsPatternWindowOpen(WorldTimeSeconds, AreaAttackInterval, AreaAttackWindow);
+
+		if (!bCanUseCrystalLaserPattern && !bCanUseCrystalPrismPattern && (DistanceToTarget < CrystalPreferredAirRange * 0.65f || bCrystalShouldTeleport))
+		{
+			bCrystalForceRangeReposition = true;
+		}
+	}
+
+	if (!bMatadorGroggy && !bCrystalSeraphGroggy && IsValid(EnemyAIController) && EnemyAIController->IsBossRuntimeEvaluationTestCycleActive() && bHasTarget && !bReturningHome && bHasLineOfSight)
 	{
 		const bool bModePrefersHold = EnemyMode == FEnemyLLMEvaluationParser::ToBlackboardName(EEnemyMode::Hold);
 		const bool bTestAreaWindow = bModePrefersHold && PreferredRange <= 250.0f;
@@ -228,9 +306,18 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 		bCanSummonAdds = EnemyMode == FEnemyLLMEvaluationParser::ToBlackboardName(EEnemyMode::Retreat) && (bBasicAttackCanReach || bSweepAttackCanReach || bAreaAttackCanReach);
 	}
 
-	const bool bBossPatternRequestsAttack = bShouldPhaseTransition || bCanTriggerMatadorGroggy || bCanUseBullPattern || bCanSummonAdds || bCanUseAreaAttack || bCanUseSweepAttack || bCanUseHeavyAttack;
+	const bool bBossPatternRequestsAttack = bShouldPhaseTransition
+		|| bCanTriggerMatadorGroggy
+		|| bCanTriggerCrystalSeraphGroggy
+		|| bCanUseBullPattern
+		|| bCanUseCrystalLaserPattern
+		|| bCanUseCrystalPrismPattern
+		|| bCanSummonAdds
+		|| bCanUseAreaAttack
+		|| bCanUseSweepAttack
+		|| bCanUseHeavyAttack;
 
-	if (bMatadorForceRangeReposition)
+	if (bMatadorForceRangeReposition || bCrystalForceRangeReposition)
 	{
 		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanAttack, false);
 		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldRetreat, true);
@@ -259,12 +346,19 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossSweepAttack, bCanUseSweepAttack);
 	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanSummonAdds, bCanSummonAdds);
 	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardInt(BlackboardComponent, EnemyBlackboardKeys::ChainBreakCount, ChainBreakCount);
-	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bIsGroggy, bMatadorGroggy);
+	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bIsGroggy, bMatadorGroggy || bCrystalSeraphGroggy);
 	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBullPattern, bCanUseBullPattern);
 	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bBullPatternActive, bBullPatternActive);
 	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardObject(BlackboardComponent, EnemyBlackboardKeys::DecoyActor, IsValid(MatadorStateComponent) ? MatadorStateComponent->GetDecoyActor() : nullptr);
-	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardObject(BlackboardComponent, EnemyBlackboardKeys::MainBossActor, IsValid(MatadorStateComponent) ? MatadorStateComponent->GetMainBossActor() : ControlledPawn);
-	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardFloat(BlackboardComponent, EnemyBlackboardKeys::PreferredHoverHeight, MatadorPreferredHoverHeight);
-	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardFloat(BlackboardComponent, EnemyBlackboardKeys::PreferredAirRange, MatadorPreferredAirRange);
-	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldTeleport, bShouldTeleport);
+	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardObject(BlackboardComponent, EnemyBlackboardKeys::MainBossActor,
+		IsValid(CrystalSeraphStateComponent) ? CrystalSeraphStateComponent->GetMainBossActor() : (IsValid(MatadorStateComponent) ? MatadorStateComponent->GetMainBossActor() : ControlledPawn));
+	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardFloat(BlackboardComponent, EnemyBlackboardKeys::PreferredHoverHeight, bIsCrystalSeraphBoss ? CrystalPreferredHoverHeight : MatadorPreferredHoverHeight);
+	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardFloat(BlackboardComponent, EnemyBlackboardKeys::PreferredAirRange, bIsCrystalSeraphBoss ? CrystalPreferredAirRange : MatadorPreferredAirRange);
+	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldTeleport, bIsCrystalSeraphBoss ? bCrystalShouldTeleport : bShouldTeleport);
+	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardInt(BlackboardComponent, EnemyBlackboardKeys::WingCoreBreakCount, WingCoreBreakCount);
+	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanExposeWingCore, IsValid(CrystalSeraphStateComponent) && !bWingCoreExposed && !bCrystalSeraphGroggy);
+	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bWingCoreExposed, bWingCoreExposed);
+	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardObject(BlackboardComponent, EnemyBlackboardKeys::CrystalPrismActor, IsValid(CrystalSeraphStateComponent) ? CrystalSeraphStateComponent->GetCrystalPrismActor() : nullptr);
+	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseLaserPattern, bCanUseCrystalLaserPattern);
+	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUsePrismPattern, bCanUseCrystalPrismPattern);
 }

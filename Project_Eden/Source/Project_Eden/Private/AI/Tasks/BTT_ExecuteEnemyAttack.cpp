@@ -4,6 +4,8 @@
 #include "AbilitySystem/GP_AbilitySystemComponent.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
+#include "AI/Debug/EnemyAIDebugUtils.h"
+#include "AI/Tasks/BossAttackExecution.h"
 #include "AIController.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "GameplayTags/GP_Tags.h"
@@ -69,6 +71,18 @@ EBTNodeResult::Type UBTT_ExecuteEnemyAttack::ExecuteTask(UBehaviorTreeComponent&
 	{
 		UE_LOG(LogTemp, Warning, TEXT("[EnemyAI] Cannot execute attack ability because ASC is missing: %s"), *GetNameSafe(ControlledPawn));
 		return EBTNodeResult::Failed;
+	}
+
+	if (BossAttackExecution::ShouldUseBossPatternSelector(ControlledPawn, BlackboardComponent))
+	{
+		// Some merged boss BT assets still reference this generic task; route boss pawns through the shared pattern selector.
+		UE_LOG(
+			LogEnemyAI,
+			Log,
+			TEXT("[BossAI] Generic attack task routed through boss pattern selector: Pawn=%s Target=%s"),
+			*GetNameSafe(ControlledPawn),
+			*EnemyAIDebugUtils::DescribeActor(TargetActor));
+		return BossAttackExecution::ExecuteBestPattern(ASC, ControlledPawn, BlackboardComponent, EffectiveAttackAbilityTag, TargetActor);
 	}
 
 	bool bActivated = false;
