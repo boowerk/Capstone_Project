@@ -2,24 +2,19 @@
 memoc: true
 type: state
 scope: project-memory
+updated: 2026-06-17T07:55:00+09:00
 status: active
-tags: [memoc, memoc/state]
-updated: 2026-06-17T03:59:58+09:00
+tags:
+  - memoc
+  - memoc/state
+created: 2026-06-17T07:48:57
 ---
 # Session Summary
-Last: 2026-06-17T03:59:58+09:00
+Last: 2026-06-17T07:55:00+09:00
 
 ## Status
-- Added Blueprintable basic enemy parents: `AGP_MeleeEnemyCharacter`, `AGP_RangedEnemyCharacter`, and `AGP_FlyingEnemyCharacter`.
-- Parents set editable ranges/perception, built-in AI tuning, common `BT_EnemyCommon`/`BB_EnemyCommon`, `/Game/Characters/MaskMan/SK_MaskMan`, movement defaults, and melee/ranged GAS attack tags.
-- Added `UGP_EnemyRangedAttack` and made `BTT_ExecuteEnemyAttack` use each enemy parent's default attack tag when the shared task is still on melee.
-- Created BP templates under `/Game/Characters/EnemyCharacter/Basic`: `BP_BasicEnemy_Melee`, `BP_BasicEnemy_Ranged`, `BP_BasicEnemy_Flying`.
-- Existing editor asset/map changes were left untouched.
+- memoc memory cleanup completed: startup summary was trimmed, large state/handoff files were compacted, and `memoc doctor` reports no issues.
+- Current project focus: basic enemy BP inheritance, boss attack routing, Crystal Seraph prototype, skill augment/VFX flow, and motion-matching/root-motion follow-up validation.
 
-## Next
-- In editor, duplicate or subclass the three Basic BP templates to make concrete enemies, then override `AI|Perception`, `AI|Config`, movement speed, and `Enemy|Abilities` per enemy type.
-- PIE-check common BT behavior, ranged hit reach, and flying movement height/pathing.
-
-## Verify
-- `Project_EdenEditor Win64 Development` build succeeded.
-- UE Python BP creation script ran successfully, but commandlet returned failure because existing `Content/Maps/DemoMap/TestMap.umap` is unloadable.
+## Resume
+- Use `memoc search "<topic>" --limit 5` first; load `02-current-project-state.md` or `04-handoff.md` only when needed.
