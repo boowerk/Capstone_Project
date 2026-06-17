@@ -273,6 +273,9 @@ void AGP_EnemyCharacter::HandlePostDamageTaken(AActor* InstigatorActor, float Da
 
 	bXPRewardGranted = true;
 	GrantXPRewardToInstigator(InstigatorActor);
+
+	// Same first-death gate as XP: let the GameMode count this enemy toward the current zone clear.
+	OnEnemyDied.Broadcast(this);
 }
 
 void AGP_EnemyCharacter::GrantXPRewardToInstigator(AActor* InstigatorActor)

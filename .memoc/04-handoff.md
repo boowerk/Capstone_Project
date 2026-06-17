@@ -21,6 +21,7 @@ Last synced: 2026-06-17T07:55:00+09:00
 
 ## Immediate Resume Items
 
+- Run-progression slice (new, NOT yet built): spawn-volume design implemented in C++ — `AGP_EnemySpawnVolume` (new), `AGP_GameMode` (rewritten to auto-spawn from volumes), `AGP_GameState`, `AGP_EnemyCharacter::OnEnemyDied`. Next: build `Project_EdenEditor`; reparent `BP_ProjectEden_Gamemode` to `AGP_GameMode`; place `AGP_EnemySpawnVolume` actors (city zones with ZoneOrder + Spawns composition; boss room volume with bIsBossZone + boss in Spawns); cover combat areas with `NavMeshBoundsVolume`. Then PIE-test city->boss->city loop, watch GameState EnemiesRemaining, and bind HUD. Spawn skips off-navmesh points (logs a warning) — fix by extending NavMeshBoundsVolume. If first spawn fires before navmesh is ready, raise `StartDelaySeconds` or call `StartRun()` from BP. Design rationale in [[pcg-region-system-and-gameplay-flow]].
 - Basic enemies: C++ build succeeded and BP templates were created, but PIE behavior still needs validation. Check common BT chase/attack transitions, ranged hit distance, and flying movement/pathing.
 - Boss routing: C++ guard routes boss pawns through `BossAttackExecution` even if the shared BT still calls `BTT_ExecuteEnemyAttack`. In editor, replace stale boss Attack nodes with `BTT_ExecuteBossAttack` when convenient.
 - Crystal Seraph: native prototype builds. Make a BP child from `AGP_CrystalSeraphBossCharacter`, wire BT/BB/arena placement, then create BP visual children for prism, laser, wing core, shard projectile, and sanctuary marker actors.

@@ -26,6 +26,9 @@ enum class EGPEnemyCombatArchetype : uint8
 	Flying UMETA(DisplayName = "Flying")
 };
 
+// Broadcast on the server the first time this enemy's health reaches zero, so the GameMode can track zone clears.
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FGPOnEnemyDied, AGP_EnemyCharacter*, DeadEnemy);
+
 UCLASS()
 class PROJECT_EDEN_API AGP_EnemyCharacter : public AGP_BaseCharacter
 {
@@ -38,6 +41,10 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Boss")
 	bool IsBossEnemy() const { return bIsBossEnemy; }
+
+	// Fires once (server authority) when this enemy dies. The GameMode subscribes to count down zone clears.
+	UPROPERTY(BlueprintAssignable, Category = "Enemy|Lifecycle")
+	FGPOnEnemyDied OnEnemyDied;
 
 	UFUNCTION(BlueprintPure, Category = "Boss")
 	FText GetBossDisplayName() const;

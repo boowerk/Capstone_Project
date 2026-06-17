@@ -33,6 +33,12 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 - For crouch/uncrouch, do not patch visible dipping by stacking mesh component Z corrections. Leave mesh components alone first, then identify whether movement comes from capsule/root, attachment hierarchy, Retarget Pose From Mesh, or animation/root offsets.
 - Prefer `Capsule -> UEFNSourceMesh` and `Capsule -> CharacterMesh0` sibling hierarchy over `Capsule -> UEFNSourceMesh -> CharacterMesh0`; preserve retargeting by connecting `ABP_MaskMan_Player` Retarget Pose From Mesh `SourceMeshComponent` to `RetargetSourceMesh`, filling it from C++, and ticking `UEFNSourceMesh` before `CharacterMesh0`.
 
+### 2026-06-17
+- Gameplay direction confirmed: **linear city progression** (`[city] clear designated enemies -> [boss room] -> next city`). Element system dropped; shrinking-zone idea dropped. Region State is cosmetic feedback only (cleared-city vegetation change). See [[pcg-region-system-and-gameplay-flow]].
+- Vertical slice is the priority: wire existing systems into one playable run, not new features.
+- Progression owned in C++ (`AGP_GameMode`/`AGP_GameState`), zone *content* owned in Blueprint (OnZoneStarted spawns + RegisterZoneEnemy each enemy; OnZoneCompleted wires vegetation change + boss teleport/gate). Enemies report death via new `AGP_EnemyCharacter::OnEnemyDied` (server, first-death gate shared with XP grant).
+- Enemy spawning only inside designated cities (not around-player/continuous); spawn points must project onto navmesh; do not reuse raw PCG vegetation points. City combat zones can use Static navmesh + a `NavMeshBoundsVolume` per city.
+
 ### 2026-06-11
 - Lightning Storm uses full-area periodic ticks, not random per-bolt hit locations.
 - Lightning final gameplay/preview radius is `max(base strike radius, storm distribution radius)`.

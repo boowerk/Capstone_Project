@@ -13,8 +13,8 @@ created: 2026-06-17T07:48:57
 Last: 2026-06-17T07:55:00+09:00
 
 ## Status
-- memoc memory cleanup completed: startup summary was trimmed, large state/handoff files were compacted, and `memoc doctor` reports no issues.
-- Current project focus: basic enemy BP inheritance, boss attack routing, Crystal Seraph prototype, skill augment/VFX flow, and motion-matching/root-motion follow-up validation.
+- Gameplay direction confirmed: linear city progression (city clear -> boss room -> next city); element & shrinking-zone ideas dropped. Priority = playable vertical slice.
+- Added run-progression C++ skeleton: `AGP_GameMode` + `AGP_GameState` + `AGP_EnemyCharacter::OnEnemyDied`. Needs build + `BP_ProjectEden_Gamemode` reparent + BP zone wiring + PIE.
 
 ## Resume
 - Use `memoc search "<topic>" --limit 5` first; load `02-current-project-state.md` or `04-handoff.md` only when needed.

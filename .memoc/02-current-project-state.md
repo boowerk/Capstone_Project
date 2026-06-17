@@ -25,6 +25,7 @@ Last synced: 2026-06-17T07:55:00+09:00
 - XP/level basics exist on `AGP_PlayerState`; enemy death grants editable `XPReward`; augment UI flow is owned by `AGP_PlayerController`.
 - Minimap capture now auto-spawns/follows when no placed capture actor exists, initializes its render target, and refreshes HUD binding through subsystem/controller/widget paths.
 - Motion matching and root-motion work is mostly C++/asset integration state: UEFN source mesh drives animation, MaskMan retargets, chooser context variables exist, directional movement speed lives in the animation set profile, source fallback montages can drive capsule movement, and post-action velocity handoff logic exists.
+- Run-progression system added (C++): spawn-volume-driven linear city progression. `AGP_EnemySpawnVolume` (placed-in-level box; holds ZoneOrder/DisplayName/bIsBossZone/Spawns and projects spawn points onto navmesh) defines each zone self-contained. `AGP_GameMode` (server) gathers all volumes, sorts by ZoneOrder, auto-spawns each zone's composition (reuses `GP_BossSummonAdds` SpawnActor+ProjectPointToNavigation+SpawnDefaultController pattern), tracks deaths via `AGP_EnemyCharacter::OnEnemyDied`, advances on clear. `AGP_GameState` replicates phase/zone/enemies-remaining for co-op HUD. BP hooks: OnZoneStarted (post-spawn setup), OnZoneCompleted (vegetation change + boss teleport), OnRunFinished (win/lose UI). Auto-starts after `StartDelaySeconds` (navmesh readiness) or via `StartRun()`. Not yet built/PIE-tested; `BP_ProjectEden_Gamemode` still needs reparenting to `AGP_GameMode`.
 - memoc uses project-local `.memoc/runtime` first to avoid sandbox timeouts from global AppData runtime calls.
 
 ## Current Risks
@@ -36,6 +37,7 @@ Last synced: 2026-06-17T07:55:00+09:00
 
 ## Open Tasks
 
+- Vertical slice (priority): build the module, reparent `BP_ProjectEden_Gamemode` to `AGP_GameMode`, place `AGP_EnemySpawnVolume` actors (one per city + boss room, set ZoneOrder/Spawns; boss volume bIsBossZone), cover combat areas with `NavMeshBoundsVolume`, then PIE-test the city->boss->city loop + GameState HUD binding. Optionally wire `OnZoneCompleted` (vegetation + boss teleport)/`OnRunFinished`.
 - Duplicate/subclass the three Basic enemy BP templates into concrete enemies; override perception/config, movement speed, and `Enemy|Abilities`.
 - PIE-check common enemy BT chase/attack transitions, ranged hit distance, flying movement height/pathing, and boss generic-task routing logs.
 - Create/verify Crystal Seraph BP child, BT/BB wiring, arena placement, and final meshes/materials/Niagara for prototype actors.
