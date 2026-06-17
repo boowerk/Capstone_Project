@@ -1,32 +1,20 @@
 #include "Game/GP_LobbyGameMode.h"
 
 #include "Blueprint/UserWidget.h"
+#include "Game/GP_LobbyPlayerController.h"
 #include "Game/GP_LobbyPlayerState.h"
 #include "GameFramework/PlayerController.h"
 #include "UI/GP_LobbyWidget.h"
 
 AGP_LobbyGameMode::AGP_LobbyGameMode()
 {
+	PlayerControllerClass = AGP_LobbyPlayerController::StaticClass();
 	PlayerStateClass = AGP_LobbyPlayerState::StaticClass();
 }
 
 void AGP_LobbyGameMode::BeginPlay()
 {
 	Super::BeginPlay();
-
-	APlayerController* PC = GetWorld()->GetFirstPlayerController();
-	if (!PC || !LobbyWidgetClass)
-	{
-		return;
-	}
-
-	LobbyWidget = CreateWidget<UGP_LobbyWidget>(PC, LobbyWidgetClass);
-	if (LobbyWidget)
-	{
-		LobbyWidget->AddToViewport();
-		PC->SetInputMode(FInputModeUIOnly());
-		PC->SetShowMouseCursor(true);
-	}
 }
 
 void AGP_LobbyGameMode::PostLogin(APlayerController* NewPlayer)
@@ -39,21 +27,30 @@ void AGP_LobbyGameMode::PostLogin(APlayerController* NewPlayer)
 	}
 
 	OnPlayerCountChanged(GetNumPlayers());
-
-	if (IsValid(LobbyWidget))
-	{
-		LobbyWidget->NotifyPlayerListChanged();
-	}
+	BroadcastRefreshPlayerList();
 }
 
 void AGP_LobbyGameMode::Logout(AController* Exiting)
 {
 	Super::Logout(Exiting);
 	OnPlayerCountChanged(GetNumPlayers() - 1);
+	BroadcastRefreshPlayerList();
+}
+
+void AGP_LobbyGameMode::BroadcastRefreshPlayerList()
+{
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		if (AGP_LobbyPlayerController* LPC = Cast<AGP_LobbyPlayerController>(It->Get()))
+		{
+			LPC->ClientRefreshPlayerList();
+		}
+	}
 }
 
 void AGP_LobbyGameMode::OnPlayerReadyChanged(AGP_LobbyPlayerState* PlayerState, bool bIsReady)
 {
+	BroadcastRefreshPlayerList();
 	CheckAllReady();
 }
 

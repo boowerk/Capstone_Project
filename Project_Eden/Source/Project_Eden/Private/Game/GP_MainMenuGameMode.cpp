@@ -8,6 +8,11 @@ void AGP_MainMenuGameMode::BeginPlay()
 {
 	Super::BeginPlay();
 
+	if (GetNetMode() == NM_DedicatedServer)
+	{
+		return;
+	}
+
 	APlayerController* PC = GetWorld()->GetFirstPlayerController();
 	if (!PC || !MainMenuWidgetClass)
 	{

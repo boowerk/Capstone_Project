@@ -31,7 +31,7 @@ void UGP_MainMenuWidget::OnHostClicked()
 
 void UGP_MainMenuWidget::OnJoinClicked()
 {
-	FString IP = TEXT("127.0.0.1");
+	FString IP = TEXT("127.0.0.1:7778");
 	if (TextBox_IP && !TextBox_IP->GetText().IsEmpty())
 	{
 		IP = TextBox_IP->GetText().ToString();
