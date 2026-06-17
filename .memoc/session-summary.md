@@ -14,6 +14,7 @@ Replace, do not append. Keep <800B.
 ## Status
 - Matador design: body floats/does nothing; decoy owns melee, bull lure/redirect, and bull counter loop.
 - `BP_Boss_Matador` parent is `GP_MatadorMageBossCharacter`; `BP_MatadorDecoy` parent is `GP_MatadorBossDecoyActor`.
+- Basic enemy parents/templates added: melee, ranged, flying.
 
 ## Changed
 - Created/assigned `BP_MatadorDecoy` as `BP_Boss_Matador.DecoyActorClass`.
@@ -21,6 +22,8 @@ Replace, do not append. Keep <800B.
 - Body stops AI movement while non-groggy; active decoy follows player when bull inactive.
 - Decoy layout now matches Character baseline: capsule 34/100, mesh Z -100, actor Z uses NavMesh + 100.
 - Decoy movement replication enabled; layout reapplied in Construction/BeginPlay to beat stale BP native defaults.
+- Added `UGP_EnemyRangedAttack`; shared enemy attack task can use each enemy parent's default attack tag.
 
 ## Resume
 - Compile in editor. Then verify placed boss instance does not override `DecoyActorClass` back to native class.
+- Also PIE-check basic enemy templates/common BT, ranged reach, flying movement height/pathing.
