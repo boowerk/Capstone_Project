@@ -11,7 +11,9 @@
 #include "Actors/GP_CrystalShardProjectile.h"
 #include "Actors/GP_SeraphLaserActor.h"
 #include "Actors/GP_WingCoreHitActor.h"
+#include "BehaviorTree/BehaviorTree.h"
 #include "BehaviorTree/BlackboardComponent.h"
+#include "BehaviorTree/BlackboardData.h"
 #include "Characters/GP_CrystalSeraphStateComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/World.h"
@@ -38,6 +40,20 @@ AGP_CrystalSeraphBossCharacter::AGP_CrystalSeraphBossCharacter()
 	CrystalAreaAbilityClass = UGP_CrystalSeraphAreaAbility::StaticClass();
 	CrystalGroggyAbilityClass = UGP_CrystalSeraphGroggyAbility::StaticClass();
 	CrystalTeleportAbilityClass = UGP_CrystalSeraphTeleportAbility::StaticClass();
+
+	// Crystal Seraph uses a minimal attack/idle tree so flying combat never enters ground EQS movement branches.
+	static ConstructorHelpers::FObjectFinder<UBehaviorTree> CrystalBehaviorTreeFinder(TEXT("/Game/Characters/EnemyCharacter/BT/Boss/BT_CrystalSeraph.BT_CrystalSeraph"));
+	if (CrystalBehaviorTreeFinder.Succeeded())
+	{
+		BehaviorTreeAssetOverride = CrystalBehaviorTreeFinder.Object;
+	}
+
+	// Keep the dedicated tree on the shared enemy Blackboard schema consumed by the common boss tasks and services.
+	static ConstructorHelpers::FObjectFinder<UBlackboardData> CrystalBlackboardFinder(TEXT("/Game/Characters/EnemyCharacter/BT/Common/BB_EnemyCommon.BB_EnemyCommon"));
+	if (CrystalBlackboardFinder.Succeeded())
+	{
+		BlackboardAssetOverride = CrystalBlackboardFinder.Object;
+	}
 
 	if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
 	{
