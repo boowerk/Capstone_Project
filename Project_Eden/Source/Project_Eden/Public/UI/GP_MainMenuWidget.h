@@ -26,7 +26,7 @@ protected:
 
 	// Map name for the lobby (must match the actual asset name under /Game/Maps/).
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Menu")
-	FString LobbyMapName = TEXT("LobbyMap");
+	FString LobbyMapName = TEXT("MainMap/LobbyMap");
 
 private:
 	UPROPERTY(meta = (BindWidget))
