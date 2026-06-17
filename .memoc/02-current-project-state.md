@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-06-14T02:34:09+09:00
+updated: 2026-06-17T14:08:34+09:00
 status: active
 tags:
   - memoc
@@ -11,10 +11,13 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-06-14T02:34:09+09:00
+Last synced: 2026-06-17T14:35:00+09:00
 
 ## Current Status
 
+- Matador bull/decoy loop now has explicit bull states, proximity-based decoy redirect/return-hit radii, prototype player-overlap redirect via `TryRedirectTowardDecoy()`, decoy-hit success gated to `RedirectedByPlayer`, delayed groggy teleport to the decoy location, and a BP hook `BP_OnDecoyVanishRequested(VanishDelay)` for smoke vanish VFX. `GP_BullChargeActor` owns a native `BullActorVisual` child actor component using `/Game/Meshes/Bull/SK/Bull`, and `BP_Boss_Matador.BullChargeActorClass` points to native `/Script/Project_Eden.GP_BullChargeActor`. Redirect success is limited by charging state, one-time use, max distance, and facing angle; `UGP_MatadorBossStateComponent::TryRedirectActiveBullTowardDecoy(PlayerActor)` is the player parry/deflect call site. Decoy vanish spawns a temporary Niagara default `NS_Free_Magic_Hit2`, hides mesh, and disables collision. Matador state suppresses generic boss selector candidates (`Basic`, `Sweep`, `Area`, `Summon`), and `BTS_UpdateBossTactics` keeps Matador area disabled so bull/decoy remains primary pressure. Matador melee specials are native GAS abilities: `UGP_MatadorRapierThrustAbility` has 5s target tracking, rapier glow scalar, direction lock, 0.5s commit delay, 7500cm line-box thrust damage, and no C++ forward step so root-motion montages can own movement; `UGP_MatadorCapeGustAbility` has 1s prepare, direction lock, 30deg cone damage/knockback, optional slow GE, and low-health multi-burst. Bull and Cape/Rapier activation now mutually block through active bull checks and `MatadorMeleeActive`. `AGP_MatadorMageBossCharacter` grants them natively, and `BP_Boss_Matador` points to `/Game/GAS_Pattern/AbilitySystem/Abilities/EnemyAbilities/Matador/BP_GA_MatadorRapierThrust` and `BP_GA_MatadorCapeGust`. `BossAttackPatternSelector` scores Bull > Cape/Rapier, and `BTS_UpdateBossTactics` counts Matador melee range as an attack request to avoid chase/reposition stutter. External UBT remains blocked by active Live Coding, and MCP `LiveCoding.Compile` was issued after the bull proximity redirect + mutual exclusion patch.
+- `BP_Boss_Matador` uses correct `BT_Boss_Matador` and `BB_Boss_Matador` overrides. The shared `EnemyAIController` boss runtime evaluation test cycle default is now disabled, preventing old Sans/common boss Basic/Sweep/Area/Summon sample cycling from driving Matador behavior unless explicitly re-enabled for testing.
+- Matador bull pattern is now structured as a staged matador loop instead of a simple projectile: bull spawns away with a VFX hook/default Niagara, starts toward the decoy, first decoy contact triggers `BP_OnDecoyRedirectedBull` and redirects toward the player, player overlap/prototype redirect returns it to the decoy, and only that return hit records chain success. Non-final return calls `BP_OnDecoyBullReturned`; 3rd/groggy return calls decoy vanish/break and boss teleport flow.
 - Boss pattern execution is centralized in `BossAttackExecution`. `BTT_ExecuteBossAttack` and boss pawns accidentally routed through generic `BTT_ExecuteEnemyAttack` now use the same GAS pattern selector and activation/failure logging.
 - `UBTT_ExecuteBossAttack` no longer reports success when GAS pattern activation fails. Granted-but-blocked/cooldowned boss pattern candidates are logged, the next scored candidate is attempted, and the BT task fails only when no candidate can activate.
 - Crystal Seraph native boss prototype is implemented from `CrystalSeraphBoss_Plan.md`: `AGP_CrystalSeraphBossCharacter` uses requested `/Game/Characters/MaskMan/SK_MaskMan` as the prototype skeletal mesh, owns `UGP_CrystalSeraphStateComponent`, grants native Crystal Seraph pattern abilities, and exposes BlueprintCallable requests for prism, laser, shard, sanctuary, wing-core exposure, groggy, and recover.
@@ -165,7 +168,7 @@ Last synced: 2026-05-23T00:00:00
 ## Project Snapshot
 
 <!-- memoc:snapshot:start -->
-- Last synced: 2026-06-01T10:10:30
+- Last synced: 2026-06-17T04:47:15
 - Detected stack: Not detected
 
 ### Source Directories

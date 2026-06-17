@@ -59,7 +59,7 @@ AGP_PlayerCharacter::AGP_PlayerCharacter()
 	GetCharacterMovement()->JumpZVelocity = 500.f;
 	GetCharacterMovement()->AirControl = 0.2f;
 	GetCharacterMovement()->NavAgentProps.bCanCrouch = true;
-	GetCharacterMovement()->CrouchedHalfHeight = 64.0f; // 기본값 40.0f가 너무 작아 앉은키가 극단적으로 작아지므로 64.0f로 적당하게 상향 조정
+	GetCharacterMovement()->SetCrouchedHalfHeight(64.0f); // 기본값 40.0f가 너무 작아 앉은키가 극단적으로 작아지므로 64.0f로 적당하게 상향 조정
 
 	// 초기 속도 세팅
 	GetCharacterMovement()->MaxWalkSpeed = GetScaledNormalWalkSpeed();

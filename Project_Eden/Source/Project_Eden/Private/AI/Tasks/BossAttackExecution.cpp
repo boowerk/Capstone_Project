@@ -146,6 +146,7 @@ namespace BossAttackExecution
 			Context.ChainBreakTarget = MatadorStateComponent->GetChainBreakTarget();
 			Context.bIsGroggy = MatadorStateComponent->IsGroggy();
 			Context.bBullPatternActive = IsValid(MatadorStateComponent->GetActiveBullActor());
+			Context.bSuppressGenericBossAttacks = true;
 		}
 
 		if (const UGP_CrystalSeraphStateComponent* CrystalStateComponent = IsValid(ControlledPawn) ? ControlledPawn->FindComponentByClass<UGP_CrystalSeraphStateComponent>() : nullptr)
