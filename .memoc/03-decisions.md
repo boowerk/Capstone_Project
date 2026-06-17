@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-06-04T03:45:00+09:00
+updated: 2026-06-18T05:59:00+09:00
 status: active
 tags:
   - memoc
@@ -32,3 +32,7 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 - Hold crouch uses `IA_Crouch` on `C`, controller `Crouch()`/`UnCrouch()`, and character `bCanCrouch`.
 - For crouch/uncrouch, do not patch visible dipping by stacking mesh component Z corrections. Leave mesh components alone first, then identify whether movement comes from capsule/root, attachment hierarchy, Retarget Pose From Mesh, or animation/root offsets.
 - Prefer `Capsule -> UEFNSourceMesh` and `Capsule -> CharacterMesh0` sibling hierarchy over `Capsule -> UEFNSourceMesh -> CharacterMesh0`; preserve retargeting by connecting `ABP_MaskMan_Player` Retarget Pose From Mesh `SourceMeshComponent` to `RetargetSourceMesh`, filling it from C++, and ticking `UEFNSourceMesh` before `CharacterMesh0`.
+
+### 2026-06-18
+- Run Crystal Seraph through a dedicated attack/idle Behavior Tree; model aerial repositioning as the scored Teleport GAS pattern instead of shared ground Chase/Reposition/EQS branches.
+- Reapply Crystal Seraph BT/Blackboard assets in `OnConstruction` so legacy Blueprint and placed-instance serialization cannot silently restore the common ground boss tree.
