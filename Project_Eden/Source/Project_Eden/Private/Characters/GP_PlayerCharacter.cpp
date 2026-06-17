@@ -36,7 +36,7 @@
 #include "GameplayTags/GP_Tags.h"
 #include "Utils/GP_BlueprintLibrary.h"
 
-static int32 GGPActionInertiaDebug = 1;
+static int32 GGPActionInertiaDebug = 0;
 static FAutoConsoleVariableRef CVarGPActionInertiaDebug(
 	TEXT("gp.ActionInertia.Debug"),
 	GGPActionInertiaDebug,
@@ -59,7 +59,7 @@ AGP_PlayerCharacter::AGP_PlayerCharacter()
 	GetCharacterMovement()->JumpZVelocity = 500.f;
 	GetCharacterMovement()->AirControl = 0.2f;
 	GetCharacterMovement()->NavAgentProps.bCanCrouch = true;
-	GetCharacterMovement()->CrouchedHalfHeight = 64.0f; // 기본값 40.0f가 너무 작아 앉은키가 극단적으로 작아지므로 64.0f로 적당하게 상향 조정
+	GetCharacterMovement()->SetCrouchedHalfHeight(64.0f); // 기본값 40.0f가 너무 작아 앉은키가 극단적으로 작아지므로 64.0f로 적당하게 상향 조정
 
 	// 초기 속도 세팅
 	GetCharacterMovement()->MaxWalkSpeed = GetScaledNormalWalkSpeed();
@@ -532,7 +532,7 @@ void AGP_PlayerCharacter::StopActionMotionTracking()
 
 void AGP_PlayerCharacter::UpdatePrimaryAttackMovementAssist(float DeltaSeconds)
 {
-	if (!bPrimaryAttackMovementAssistEnabled || DeltaSeconds <= KINDA_SMALL_NUMBER)
+	if (!bPrimaryAttackMovementAssistEnabled || DeltaSeconds <= KINDA_SMALL_NUMBER || !ShouldApplyActionInertiaDirectMovement())
 	{
 		return;
 	}
@@ -613,7 +613,7 @@ void AGP_PlayerCharacter::UpdateActionCarryVelocity(float DeltaSeconds)
 {
 	LastActionCarryActualDelta = FVector::ZeroVector;
 
-	if (!bTrackActionMotion || !bCarryEntryVelocityDuringActionRootMotion || DeltaSeconds < (1.0f / 240.0f))
+	if (!bTrackActionMotion || !bCarryEntryVelocityDuringActionRootMotion || DeltaSeconds < (1.0f / 240.0f) || !ShouldApplyActionInertiaDirectMovement())
 	{
 		return;
 	}
@@ -650,6 +650,11 @@ void AGP_PlayerCharacter::UpdateActionCarryVelocity(float DeltaSeconds)
 			CarryDelta.Size2D(),
 			LastActionCarryActualDelta.Size2D());
 	}
+}
+
+bool AGP_PlayerCharacter::ShouldApplyActionInertiaDirectMovement() const
+{
+	return GetNetMode() == NM_Standalone;
 }
 
 void AGP_PlayerCharacter::UpdateActionMotionTracking(float DeltaSeconds)
@@ -774,6 +779,19 @@ void AGP_PlayerCharacter::ApplyCurrentActionInertia()
 {
 	FlushActionMotionTracking();
 	bTrackActionMotion = false;
+	if (!ShouldApplyActionInertiaDirectMovement())
+	{
+		ActionMotionCarryVelocity = FVector::ZeroVector;
+		LastActionCarryActualDelta = FVector::ZeroVector;
+		CurrentActionMotionVelocity = FVector::ZeroVector;
+		LastNonZeroActionMotionVelocity = FVector::ZeroVector;
+		HeldPostActionAnimVelocity = FVector::ZeroVector;
+		HeldPostActionAnimVelocityUntilTime = 0.0f;
+		bActionRootMotionCancelledByMovementInput = false;
+		ActionMotionSamples.Reset();
+		return;
+	}
+
 	const UWorld* World = GetWorld();
 	const float CurrentTime = World ? World->GetTimeSeconds() : 0.0f;
 	const bool bHasRecentMoveInput =

@@ -391,3 +391,32 @@ Last: 2026-06-06T22:10:00+09:00
 
 ## Resume
 - Start with `02-current-project-state.md` and `04-handoff.md`, then verify the live AnimBP / chooser path in PIE.
+
+## [2026-06-17T04:47:15] archived summary (1776B)
+
+---
+memoc: true
+type: state
+scope: project-memory
+status: active
+tags: [memoc, memoc/state]
+updated: 2026-06-17T13:01:55+09:00
+---
+# Session Summary
+Last: 2026-06-17T13:01:55+09:00
+
+## Status
+- Matador bull loop is staged: bull spawns away, charges decoy, decoy redirects to player, player redirect back to decoy records success, 3 successes trigger decoy vanish + boss teleport.
+- `GP_BullChargeActor` owns native `BullActorVisual` using `/Game/Meshes/Bull/SK/Bull`; `BP_Boss_Matador.BullChargeActorClass` points to native `/Script/Project_Eden.GP_BullChargeActor`.
+- `BT_Boss_Matador`/`BB_Boss_Matador` are assigned, and `EnemyAIController` runtime boss test cycle default is disabled so old Sans/common cycling does not drive Matador.
+- Matador state now suppresses generic boss attack selector candidates (`Basic`, `Sweep`, `Area`, `Summon`), and `BTS_UpdateBossTactics` keeps Matador area disabled. Bull/decoy should be primary pressure.
+
+## Next
+- Replace prototype overlap redirect with real parry/deflect input by calling `TryRedirectActiveBullTowardDecoy(PlayerActor)`.
+- Replace temporary decoy vanish Niagara with a real smoke/poof Niagara asset when available.
+- Add/assign real decoy matador-deflect animation in BP via `BP_OnDecoyRedirectedBull`; add player parry animation/input instead of current overlap prototype.
+- Remove unused temporary `/Game/Characters/EnemyCharacter/Boss/BP_Boss_Matador/BP_MatadorBullChargeActor` after user confirms cleanup.
+- If Matador becomes too passive, add a dedicated Matador-only ranged poke/cooldown instead of reusing common boss area spam.
+
+## Verify
+- User reported editor Live Coding compile succeeded after the generic attack suppression patch. Full external UBT still needs Live Coding disabled/closed editor.

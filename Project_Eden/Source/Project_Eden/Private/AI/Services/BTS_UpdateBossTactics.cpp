@@ -192,6 +192,7 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 		&& BTS_UpdateBossTactics_Internal::IsPatternWindowOpen(WorldTimeSeconds, BullPatternInterval, BullPatternWindow);
 	const bool bCanTriggerMatadorGroggy = IsValid(MatadorStateComponent) && ChainBreakCount >= ChainBreakTarget && !bMatadorGroggy;
 	const bool bShouldTeleport = IsValid(MatadorBoss) && bHasTarget && !bReturningHome && MatadorBoss->ShouldTeleportForMatador(DistanceToTarget);
+	bool bCanUseMatadorMeleePattern = false;
 	bool bMatadorForceRangeReposition = false;
 
 	const UGP_CrystalSeraphStateComponent* CrystalSeraphStateComponent = IsValid(ControlledPawn)
@@ -247,15 +248,18 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 		bCanUseHeavyAttack = false;
 		bCanUseSweepAttack = false;
 		bCanSummonAdds = false;
-		bCanUseAreaAttack = bHasTarget
+		bCanUseAreaAttack = false;
+
+		const bool bInMatadorCapeGustRange = FGPBossAttackPatternRanges::IsWithinReach(DistanceToTarget, FGPBossAttackPatternRanges::MatadorCapeGustReach);
+		const bool bInMatadorRapierRange = FGPBossAttackPatternRanges::IsWithinMatadorRapierRange(DistanceToTarget);
+		bCanUseMatadorMeleePattern = bHasTarget
 			&& !bReturningHome
 			&& !bShouldPhaseTransition
-			&& bHasLineOfSight
-			&& DistanceToTarget >= MatadorPreferredAirRange * 0.55f
-			&& bAreaAttackCanReach
-			&& BTS_UpdateBossTactics_Internal::IsPatternWindowOpen(WorldTimeSeconds, AreaAttackInterval, AreaAttackWindow);
+			&& !bCanUseBullPattern
+			&& !bBullPatternActive
+			&& (bInMatadorCapeGustRange || bInMatadorRapierRange);
 
-		if (!bCanUseBullPattern && DistanceToTarget < MatadorPreferredAirRange * 0.75f)
+		if (!bCanUseBullPattern && !bCanUseMatadorMeleePattern && DistanceToTarget < MatadorPreferredAirRange * 0.75f)
 		{
 			bMatadorForceRangeReposition = true;
 		}
@@ -310,6 +314,7 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 		|| bCanTriggerMatadorGroggy
 		|| bCanTriggerCrystalSeraphGroggy
 		|| bCanUseBullPattern
+		|| bCanUseMatadorMeleePattern
 		|| bCanUseCrystalLaserPattern
 		|| bCanUseCrystalPrismPattern
 		|| bCanSummonAdds

@@ -74,6 +74,11 @@ namespace GPTags
         }
         namespace Boss
         {
+            namespace Matador
+            {
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(RapierThrust, "GPTags.Ability.Boss.Matador.RapierThrust", "마타도르 레이피어 찌르기 패턴");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(CapeGust, "GPTags.Ability.Boss.Matador.CapeGust", "마타도르 붉은 천 풍압 패턴");
+            }
             namespace CrystalSeraph
             {
                 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Basic, "GPTags.Ability.Boss.CrystalSeraph.Basic", "크리스탈 세라프 크리스탈 샤드 패턴");
@@ -133,6 +138,7 @@ namespace GPTags
                 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Aggroed, "GPTags.State.Status.Enemy.Aggroed", "어그로 끌린 상태");
                 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Enraged, "GPTags.State.Status.Enemy.Enraged", "광폭화 상태");
                 UE_DEFINE_GAMEPLAY_TAG_COMMENT(MatadorGuarded, "GPTags.State.Status.Enemy.MatadorGuarded", "마타도르 보스 기본 피해 감쇠 상태");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(MatadorMeleeActive, "GPTags.State.Status.Enemy.MatadorMeleeActive", "마타도르 전용 근접 패턴 진행 중");
                 UE_DEFINE_GAMEPLAY_TAG_COMMENT(CrystalGuarded, "GPTags.State.Status.Enemy.CrystalGuarded", "크리스탈 세라프 기본 피해 감쇠 상태");
                 UE_DEFINE_GAMEPLAY_TAG_COMMENT(WingCoreExposed, "GPTags.State.Status.Enemy.WingCoreExposed", "크리스탈 세라프 날개 코어 노출 상태");
                 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Groggy, "GPTags.State.Status.Enemy.Groggy", "적 그로기 상태");
@@ -231,6 +237,14 @@ namespace GPTags
     // [7] Cooldown : 쿨다운
     namespace Cooldown
     {
+        namespace Enemy
+        {
+            namespace Matador
+            {
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(RapierThrust, "GPTags.Cooldown.Enemy.Matador.RapierThrust", "마타도르 레이피어 찌르기 쿨다운");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(CapeGust, "GPTags.Cooldown.Enemy.Matador.CapeGust", "마타도르 붉은 천 풍압 쿨다운");
+            }
+        }
         namespace Skill
         {
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(WaterPuddle, "GPTags.Cooldown.Skill.WaterPuddle", "물웅덩이 스킬 쿨다운");

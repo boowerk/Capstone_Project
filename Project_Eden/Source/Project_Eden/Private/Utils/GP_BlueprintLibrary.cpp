@@ -1,4 +1,4 @@
-﻿#include "Utils/GP_BlueprintLibrary.h"
+#include "Utils/GP_BlueprintLibrary.h"
 
 #include "Engine/World.h"
 #include "DrawDebugHelpers.h"
@@ -367,7 +367,7 @@ void UGP_BlueprintLibrary::ApplyGameplayEffectToActors(AActor* Instigator, const
 				const FGameplayTag DamageElementTag = ConvertTechElementToDamageElement(GetCurrentTechElementTagFromActor(Instigator));
 				if (DamageElementTag.IsValid())
 				{
-					SpecHandle.Data->DynamicAssetTags.AddTag(DamageElementTag);
+					SpecHandle.Data->AddDynamicAssetTag(DamageElementTag);
 				}
 
 				if (SkillData)

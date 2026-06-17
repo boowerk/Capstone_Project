@@ -2,24 +2,28 @@
 memoc: true
 type: state
 scope: project-memory
+created: 2026-06-17T04:47:15
+updated: 2026-06-17T16:24:00+09:00
 status: active
 tags: [memoc, memoc/state]
-updated: 2026-06-17T03:59:58+09:00
 ---
 # Session Summary
-Last: 2026-06-17T03:59:58+09:00
+Last: 2026-06-17T16:24:00+09:00
+Replace, do not append. Keep <800B.
 
 ## Status
-- Added Blueprintable basic enemy parents: `AGP_MeleeEnemyCharacter`, `AGP_RangedEnemyCharacter`, and `AGP_FlyingEnemyCharacter`.
-- Parents set editable ranges/perception, built-in AI tuning, common `BT_EnemyCommon`/`BB_EnemyCommon`, `/Game/Characters/MaskMan/SK_MaskMan`, movement defaults, and melee/ranged GAS attack tags.
-- Added `UGP_EnemyRangedAttack` and made `BTT_ExecuteEnemyAttack` use each enemy parent's default attack tag when the shared task is still on melee.
-- Created BP templates under `/Game/Characters/EnemyCharacter/Basic`: `BP_BasicEnemy_Melee`, `BP_BasicEnemy_Ranged`, `BP_BasicEnemy_Flying`.
-- Existing editor asset/map changes were left untouched.
+- Matador design: body floats/does nothing; decoy owns melee, bull lure/redirect, and bull counter loop.
+- `BP_Boss_Matador` parent is `GP_MatadorMageBossCharacter`; `BP_MatadorDecoy` parent is `GP_MatadorBossDecoyActor`.
+- Basic enemy parents/templates added: melee, ranged, flying.
 
-## Next
-- In editor, duplicate or subclass the three Basic BP templates to make concrete enemies, then override `AI|Perception`, `AI|Config`, movement speed, and `Enemy|Abilities` per enemy type.
-- PIE-check common BT behavior, ranged hit reach, and flying movement height/pathing.
+## Changed
+- Created/assigned `BP_MatadorDecoy` as `BP_Boss_Matador.DecoyActorClass`.
+- Bull spawns toward active decoy, no longer repositions decoy at bull start.
+- Body stops AI movement while non-groggy; active decoy follows player when bull inactive.
+- Decoy layout now matches Character baseline: capsule 34/100, mesh Z -100, actor Z uses NavMesh + 100.
+- Decoy movement replication enabled; layout reapplied in Construction/BeginPlay to beat stale BP native defaults.
+- Added `UGP_EnemyRangedAttack`; shared enemy attack task can use each enemy parent's default attack tag.
 
-## Verify
-- `Project_EdenEditor Win64 Development` build succeeded.
-- UE Python BP creation script ran successfully, but commandlet returned failure because existing `Content/Maps/DemoMap/TestMap.umap` is unloadable.
+## Resume
+- Compile in editor. Then verify placed boss instance does not override `DecoyActorClass` back to native class.
+- Also PIE-check basic enemy templates/common BT, ranged reach, flying movement height/pathing.

@@ -34,6 +34,9 @@ public:
 	void RegisterActiveBullActor(AActor* InBullActor);
 
 	UFUNCTION(BlueprintCallable, Category = "Boss|Matador")
+	bool TryRedirectActiveBullTowardDecoy(AActor* RedirectingActor);
+
+	UFUNCTION(BlueprintCallable, Category = "Boss|Matador")
 	void RecordBullHitDecoy();
 
 	UFUNCTION(BlueprintCallable, Category = "Boss|Matador")
@@ -65,6 +68,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Boss|Matador")
 	AActor* GetDecoyActor() const { return DecoyActor.Get(); }
+
+	UFUNCTION(BlueprintPure, Category = "Boss|Matador")
+	AActor* GetActiveDecoyActor() const { return DecoyActor.Get(); }
 
 	UFUNCTION(BlueprintPure, Category = "Boss|Matador")
 	AActor* GetChainEffectActor() const { return ChainEffectActor.Get(); }

@@ -2,6 +2,7 @@
 
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
+#include "Actors/GP_BullChargeActor.h"
 #include "GameplayTags/GP_Tags.h"
 #include "Net/UnrealNetwork.h"
 
@@ -82,8 +83,36 @@ void UGP_MatadorBossStateComponent::RegisterActiveBullActor(AActor* InBullActor)
 {
 	if (GetOwnerRole() == ROLE_Authority)
 	{
+		if (UAbilitySystemComponent* ASC = ResolveOwnerASC())
+		{
+			if (InBullActor)
+			{
+				ASC->AddLooseGameplayTag(GPTags::State::Status::Enemy::MatadorMeleeActive);
+			}
+			else
+			{
+				ASC->RemoveLooseGameplayTag(GPTags::State::Status::Enemy::MatadorMeleeActive);
+			}
+		}
+
 		ActiveBullActor = InBullActor;
 	}
+}
+
+bool UGP_MatadorBossStateComponent::TryRedirectActiveBullTowardDecoy(AActor* RedirectingActor)
+{
+	if (GetOwnerRole() != ROLE_Authority || bIsGroggy)
+	{
+		return false;
+	}
+
+	AGP_BullChargeActor* BullActor = Cast<AGP_BullChargeActor>(ActiveBullActor.Get());
+	if (!IsValid(BullActor))
+	{
+		return false;
+	}
+
+	return BullActor->TryRedirectTowardDecoy(RedirectingActor);
 }
 
 void UGP_MatadorBossStateComponent::RecordBullHitDecoy()

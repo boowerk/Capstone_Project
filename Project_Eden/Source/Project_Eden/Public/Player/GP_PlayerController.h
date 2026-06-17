@@ -190,6 +190,12 @@ private:
 	UFUNCTION(Server, Reliable, WithValidation)
 	void Server_SendSkillSelectionEvent(FGameplayTag EventTag);
 
+	UFUNCTION(Server, Unreliable, WithValidation)
+	void Server_UpdateMoveInput(FVector2D MovementVector);
+
+	UFUNCTION(Server, Reliable, WithValidation)
+	void Server_ClearMoveInput();
+
 	bool ActivateAbilityByTag(const FGameplayTag& AbilityTag) const;
 	bool IsSkillSelectionActive() const;
 	bool SendSkillSelectionEvent(const FGameplayTag& EventTag) const;
@@ -202,6 +208,7 @@ private:
 	void OpenCharacterStatsMenu();
 	void CloseCharacterStatsMenu();
 	void ApplyCharacterStatsMenuInputMode(bool bMenuOpen);
+	FVector2D ResolveEffectiveMoveInput(const AGP_PlayerCharacter* PlayerCharacter) const;
 	void UpdateMovementSpeed(float DeltaSeconds);
 	void UpdateCharacterRotation(float DeltaSeconds);
 

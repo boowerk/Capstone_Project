@@ -16,6 +16,12 @@ bool FGPBossAttackPatternRanges::IsWithinBullPatternRange(float DistanceToTarget
 	return SafeDistance >= BullPatternMinRange && SafeDistance <= BullPatternMaxRange;
 }
 
+bool FGPBossAttackPatternRanges::IsWithinMatadorRapierRange(float DistanceToTarget)
+{
+	const float SafeDistance = FMath::Max(0.0f, DistanceToTarget);
+	return SafeDistance >= MatadorRapierMinRange && SafeDistance <= MatadorRapierMaxRange;
+}
+
 bool FGPBossAttackPatternRanges::IsWithinCrystalLaserRange(float DistanceToTarget)
 {
 	const float SafeDistance = FMath::Max(0.0f, DistanceToTarget);
@@ -151,7 +157,29 @@ TArray<FGPBossAttackPatternCandidate> FGPBossAttackPatternSelector::BuildCandida
 		AddCandidate(Candidates, GPTags::Ability::Enemy::Utility_MatadorBullPattern, BullScore, TEXT("MatadorBull"));
 	}
 
-	if (FGPBossAttackPatternRanges::IsWithinReach(DistanceToTarget, FGPBossAttackPatternRanges::BasicAttackReach))
+	if (Context.bSuppressGenericBossAttacks && !Context.bBullPatternActive)
+	{
+		if (FGPBossAttackPatternRanges::IsWithinReach(DistanceToTarget, FGPBossAttackPatternRanges::MatadorCapeGustReach))
+		{
+			const float CapeScore = 0.72f
+				+ ClosePressure * 0.25f
+				+ PhaseBonus
+				+ (HealthRatio <= 0.35f ? 0.25f : 0.0f);
+			AddCandidate(Candidates, GPTags::Ability::Boss::Matador::CapeGust, CapeScore, TEXT("MatadorCapeGust"));
+		}
+
+		if (FGPBossAttackPatternRanges::IsWithinMatadorRapierRange(DistanceToTarget))
+		{
+			const float RapierRangeFit = 1.0f - FMath::Clamp(FMath::Abs(DistanceToTarget - 700.0f) / 700.0f, 0.0f, 1.0f);
+			const float RapierScore = 0.68f
+				+ RapierRangeFit * 0.28f
+				+ PhaseBonus
+				+ (bPressureMode ? 0.08f : 0.0f);
+			AddCandidate(Candidates, GPTags::Ability::Boss::Matador::RapierThrust, RapierScore, TEXT("MatadorRapier"));
+		}
+	}
+
+	if (!Context.bSuppressGenericBossAttacks && FGPBossAttackPatternRanges::IsWithinReach(DistanceToTarget, FGPBossAttackPatternRanges::BasicAttackReach))
 	{
 		const float BasicScore = 0.35f
 			+ (1.0f - Aggression) * 0.25f
@@ -164,7 +192,7 @@ TArray<FGPBossAttackPatternCandidate> FGPBossAttackPatternSelector::BuildCandida
 		AddCandidate(Candidates, Context.DefaultAttackAbilityTag, BasicScore, TEXT("Basic"));
 	}
 
-	if (Context.bCanSummonAdds)
+	if (!Context.bSuppressGenericBossAttacks && Context.bCanSummonAdds)
 	{
 		const float SummonScore = 0.65f
 			+ PhaseBonus
@@ -175,7 +203,7 @@ TArray<FGPBossAttackPatternCandidate> FGPBossAttackPatternSelector::BuildCandida
 		AddCandidate(Candidates, GPTags::Ability::Enemy::Utility_BossSummon, SummonScore, TEXT("Summon"));
 	}
 
-	if (Context.bCanUseBossSweepAttack && FGPBossAttackPatternRanges::IsWithinReach(DistanceToTarget, FGPBossAttackPatternRanges::SweepAttackReach))
+	if (!Context.bSuppressGenericBossAttacks && Context.bCanUseBossSweepAttack && FGPBossAttackPatternRanges::IsWithinReach(DistanceToTarget, FGPBossAttackPatternRanges::SweepAttackReach))
 	{
 		const float SweepScore = 0.2f
 			+ Aggression * 0.25f
@@ -185,7 +213,7 @@ TArray<FGPBossAttackPatternCandidate> FGPBossAttackPatternSelector::BuildCandida
 		AddCandidate(Candidates, GPTags::Ability::Enemy::Attack_BossSweep, SweepScore, TEXT("Sweep"));
 	}
 
-	if (Context.bCanUseBossAreaAttack && FGPBossAttackPatternRanges::IsWithinReach(DistanceToTarget, FGPBossAttackPatternRanges::AreaAttackReach))
+	if (!Context.bSuppressGenericBossAttacks && Context.bCanUseBossAreaAttack && FGPBossAttackPatternRanges::IsWithinReach(DistanceToTarget, FGPBossAttackPatternRanges::AreaAttackReach))
 	{
 		const float AreaScore = 0.18f
 			+ PhaseBonus

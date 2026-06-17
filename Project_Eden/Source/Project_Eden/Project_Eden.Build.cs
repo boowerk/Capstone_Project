@@ -50,6 +50,8 @@ public class Project_Eden : ModuleRules
 				"KismetCompiler",
 				"InputEditor",
 				"PoseSearchEditor",
+				"TargetPlatform",
+				"TextureUtilitiesCommon",
 			});
 		}
 

@@ -94,6 +94,31 @@ bool FBossAttackPatternSelectorScoresTest::RunTest(const FString& Parameters)
 	ExpectTopPattern(*this, TEXT("Far hold evaluation prefers area"), Context, GPTags::Ability::Enemy::Attack_BossArea);
 
 	Context = MakeBaseContext();
+	Context.bSuppressGenericBossAttacks = true;
+	Context.bCanUseBossHeavyAttack = true;
+	Context.bCanUseBossSweepAttack = true;
+	Context.bCanUseBossAreaAttack = true;
+	Context.bCanSummonAdds = true;
+	Context.DistanceToTarget = 1300.0f;
+	ExpectNoDamagePattern(*this, TEXT("Matador suppresses common boss melee and area patterns outside special range"), Context);
+
+	Context = MakeBaseContext();
+	Context.bSuppressGenericBossAttacks = true;
+	Context.DistanceToTarget = 520.0f;
+	ExpectTopPattern(*this, TEXT("Matador close range uses cape gust"), Context, GPTags::Ability::Boss::Matador::CapeGust);
+
+	Context = MakeBaseContext();
+	Context.bSuppressGenericBossAttacks = true;
+	Context.DistanceToTarget = 900.0f;
+	ExpectTopPattern(*this, TEXT("Matador mid range uses rapier thrust"), Context, GPTags::Ability::Boss::Matador::RapierThrust);
+
+	Context = MakeBaseContext();
+	Context.bSuppressGenericBossAttacks = true;
+	Context.bCanUseBullPattern = true;
+	Context.DistanceToTarget = 900.0f;
+	ExpectTopPattern(*this, TEXT("Matador bull pattern outranks melee specials"), Context, GPTags::Ability::Enemy::Utility_MatadorBullPattern);
+
+	Context = MakeBaseContext();
 	Context.bCanUseBossSweepAttack = true;
 	Context.bCanUseBossAreaAttack = true;
 	Context.bCanUseBossHeavyAttack = true;
