@@ -6,6 +6,7 @@
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystem/Abilities/GP_SkillData.h"
+#include "Actors/GP_BullChargeActor.h"
 #include "Characters/GP_EnemyCharacter.h"
 #include "GameplayEffect.h"
 #include "GameplayTags/GP_Tags.h"
@@ -71,6 +72,31 @@ FGameplayTag ConvertTechElementToDamageElement(FGameplayTag TechElementTag)
 	if (TechElementTag.MatchesTagExact(GPTags::Tech::Element::Brute)) { return GPTags::Damage::Element::Brute; }
 
 	return FGameplayTag();
+}
+
+bool IsMatadorBullCounterTarget(AActor* Instigator, AActor* TargetActor)
+{
+	return IsValid(Instigator)
+		&& IsValid(TargetActor)
+		&& TargetActor->IsA<AGP_BullChargeActor>()
+		&& !Instigator->IsA<AGP_EnemyCharacter>();
+}
+
+bool TryHandleMatadorBullCounter(AActor* Instigator, AActor* TargetActor)
+{
+	AGP_BullChargeActor* BullActor = Cast<AGP_BullChargeActor>(TargetActor);
+	if (!IsMatadorBullCounterTarget(Instigator, BullActor))
+	{
+		return false;
+	}
+
+	const bool bRedirected = BullActor->TryRedirectTowardDecoy(Instigator);
+	UE_LOG(LogTemp, Log, TEXT("[MatadorBull] Player counter %s. Instigator=%s Bull=%s State=%d"),
+		bRedirected ? TEXT("succeeded") : TEXT("rejected"),
+		*GetNameSafe(Instigator),
+		*GetNameSafe(BullActor),
+		static_cast<int32>(BullActor->GetChargeState()));
+	return true;
 }
 }
 
@@ -149,6 +175,7 @@ TArray<AActor*> UGP_BlueprintLibrary::SphereOverlapActorsAtLocation(UObject* Wor
 	FCollisionResponseParams CollisionResponseParams;
 	CollisionResponseParams.CollisionResponse.SetAllChannels(ECR_Ignore);
 	CollisionResponseParams.CollisionResponse.SetResponse(ECC_Pawn, ECR_Block);
+	CollisionResponseParams.CollisionResponse.SetResponse(ECC_WorldDynamic, ECR_Block);
 
 	TArray<FOverlapResult> OverlapResults;
 	FCollisionShape CollisionShapeSphere = FCollisionShape::MakeSphere(Radius);
@@ -205,6 +232,7 @@ TArray<AActor*> UGP_BlueprintLibrary::BoxOverlapActorsAtLocation(UObject* WorldC
 	FCollisionResponseParams CollisionResponseParams;
 	CollisionResponseParams.CollisionResponse.SetAllChannels(ECR_Ignore);
 	CollisionResponseParams.CollisionResponse.SetResponse(ECC_Pawn, ECR_Block);
+	CollisionResponseParams.CollisionResponse.SetResponse(ECC_WorldDynamic, ECR_Block);
 
 	TArray<FOverlapResult> OverlapResults;
 	const FCollisionShape CollisionShapeBox = FCollisionShape::MakeBox(BoxExtent);
@@ -253,6 +281,7 @@ TArray<AActor*> UGP_BlueprintLibrary::ForwardArcMeleeHitBoxOverlap(AActor* Avata
 	FCollisionResponseParams CollisionResponseParams;
 	CollisionResponseParams.CollisionResponse.SetAllChannels(ECR_Ignore);
 	CollisionResponseParams.CollisionResponse.SetResponse(ECC_Pawn, ECR_Block);
+	CollisionResponseParams.CollisionResponse.SetResponse(ECC_WorldDynamic, ECR_Block);
 
 	TArray<FOverlapResult> OverlapResults;
 	const FVector ForwardVector = AvatarActor->GetActorForwardVector().GetSafeNormal2D();
@@ -319,6 +348,11 @@ void UGP_BlueprintLibrary::SendGameplayEventToActors(AActor* Instigator, const T
 
 	for (AActor* HitActor : TargetActors)
 	{
+		if (TryHandleMatadorBullCounter(Instigator, HitActor))
+		{
+			continue;
+		}
+
 		if (!CanApplyCombatEffect(Instigator, HitActor))
 		{
 			continue;
@@ -337,20 +371,38 @@ bool UGP_BlueprintLibrary::CanApplyCombatEffect(AActor* Instigator, AActor* Targ
 		return false;
 	}
 
+	if (IsMatadorBullCounterTarget(Instigator, TargetActor))
+	{
+		return true;
+	}
+
 	// Enemy-vs-enemy friendly fire is disabled so bosses, summons, and regular enemies cannot damage each other.
 	return !(Instigator->IsA<AGP_EnemyCharacter>() && TargetActor->IsA<AGP_EnemyCharacter>());
 }
 
 void UGP_BlueprintLibrary::ApplyGameplayEffectToActors(AActor* Instigator, const TArray<AActor*>& TargetActors, TSubclassOf<UGameplayEffect> EffectClass, float EffectLevel, UGP_SkillData* SkillData)
 {
-	if (!IsValid(Instigator) || !IsValid(EffectClass)) return;
-
-	UAbilitySystemComponent* InstigatorASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Instigator);
-	if (!IsValid(InstigatorASC)) return;
+	if (!IsValid(Instigator)) return;
 
 	for (AActor* TargetActor : TargetActors)
 	{
+		if (TryHandleMatadorBullCounter(Instigator, TargetActor))
+		{
+			continue;
+		}
+
 		if (!CanApplyCombatEffect(Instigator, TargetActor))
+		{
+			continue;
+		}
+
+		if (!IsValid(EffectClass))
+		{
+			continue;
+		}
+
+		UAbilitySystemComponent* InstigatorASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Instigator);
+		if (!IsValid(InstigatorASC))
 		{
 			continue;
 		}

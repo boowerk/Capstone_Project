@@ -80,8 +80,13 @@ private:
 	AActor* ResolvePlayerTargetActor();
 	bool StartDecoyCircleRedirect();
 	void TickDecoyCircleRedirect(float DeltaSeconds);
+	FVector EvaluateDecoyRedirectCurve(float Alpha) const;
+	FVector EvaluateDecoyRedirectCurveTangent(float Alpha) const;
 	bool TryRedirectTowardPlayerFromDecoy();
 	bool CanRecordDecoyHit() const;
+	bool IsActorRelatedToDecoy(AActor* Actor) const;
+	bool IsBlockingHitSafeNearDecoy(const FHitResult& Hit) const;
+	void ApplyBullImpactToActor(AActor* HitActor);
 	void FinishCharge(bool bHitDecoy);
 	void DrawTelegraph() const;
 	FVector ResolveDesiredDirection() const;
@@ -130,8 +135,14 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "Boss|Matador|Damage", meta = (ClampMin = "0.0"))
 	float BullHitToughnessDamage = 20.0f;
 
+	UPROPERTY(EditDefaultsOnly, Category = "Boss|Matador|Damage", meta = (ClampMin = "0.0", Units = "cm/s"))
+	float BullHitKnockbackHorizontalSpeed = 2200.0f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Boss|Matador|Damage", meta = (ClampMin = "0.0", Units = "cm/s"))
+	float BullHitKnockbackVerticalSpeed = 260.0f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Matador|Counterplay", meta = (AllowPrivateAccess = "true"))
-	bool bRedirectTowardDecoyOnPlayerOverlap = true;
+	bool bRedirectTowardDecoyOnPlayerOverlap = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Matador|Counterplay", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "cm"))
 	float RedirectMaxDistance = 450.0f;
@@ -153,6 +164,33 @@ private:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Matador|Counterplay", meta = (AllowPrivateAccess = "true", ClampMin = "1.0", Units = "deg/s"))
 	float DecoyRedirectArcSpeedDegrees = 260.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Matador|Counterplay", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float DecoyRedirectTurnInterpSpeed = 10.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Matador|Counterplay", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float PlayerRedirectTurnInterpSpeed = 14.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Matador|Counterplay", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", ClampMax = "1.0"))
+	float DecoyRedirectLookAheadAlpha = 0.08f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Matador|Counterplay", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", ClampMax = "1.0"))
+	float DecoyRedirectTangentWeight = 0.75f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Matador|Counterplay", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", ClampMax = "1.0"))
+	float DecoyRedirectOuterSideStrengthP1 = 0.32f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Matador|Counterplay", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", ClampMax = "1.0"))
+	float DecoyRedirectOuterSideStrengthP2 = 0.16f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Matador|Counterplay", meta = (AllowPrivateAccess = "true", ClampMin = "0.1", Units = "s"))
+	float DecoyRedirectLifeExtensionSeconds = 4.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Matador|Counterplay", meta = (AllowPrivateAccess = "true", ClampMin = "0.1", Units = "s"))
+	float PlayerCounterLifeExtensionSeconds = 4.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Matador|Counterplay", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "cm"))
+	float DecoyRedirectCollisionGraceRadius = 1200.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Matador|VFX", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UNiagaraSystem> BullSpawnEffect;
@@ -181,12 +219,20 @@ private:
 	FTimerHandle ChargeStartTimerHandle;
 	FVector ChargeDirection = FVector::ForwardVector;
 	FVector DecoyCircleStartOffset = FVector::ForwardVector;
+	FVector DecoyRedirectCurveP0 = FVector::ZeroVector;
+	FVector DecoyRedirectCurveP1 = FVector::ZeroVector;
+	FVector DecoyRedirectCurveP2 = FVector::ZeroVector;
+	FVector DecoyRedirectCurveP3 = FVector::ZeroVector;
+	FVector LockedRedirectDirection = FVector::ForwardVector;
 	float DecoyCircleRadius = 560.0f;
 	float DecoyCircleProgressDegrees = 0.0f;
 	float DecoyCircleDirectionSign = 1.0f;
+	float DecoyRedirectCurveAlpha = 0.0f;
+	float DecoyRedirectCurveLength = 1000.0f;
 	bool bChargeStarted = false;
 	bool bChargeFinished = false;
 	bool bImpactHandled = false;
 	bool bRedirectedByPlayer = false;
 	bool bRedirectedByDecoy = false;
+	TArray<TWeakObjectPtr<AActor>> BullImpactHitActors;
 };

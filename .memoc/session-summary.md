@@ -3,27 +3,26 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-06-17T04:47:15
-updated: 2026-06-17T16:24:00+09:00
+updated: 2026-06-18T00:27:00+09:00
 status: active
 tags: [memoc, memoc/state]
 ---
 # Session Summary
-Last: 2026-06-17T16:24:00+09:00
+Last: 2026-06-18T00:27:00+09:00
 Replace, do not append. Keep <800B.
 
 ## Status
-- Matador design: body floats/does nothing; decoy owns melee, bull lure/redirect, and bull counter loop.
-- `BP_Boss_Matador` parent is `GP_MatadorMageBossCharacter`; `BP_MatadorDecoy` parent is `GP_MatadorBossDecoyActor`.
-- Basic enemy parents/templates added: melee, ranged, flying.
+- Matador body floats/does nothing; active decoy owns melee, bull lure/redirect/counter loop.
+- `BP_Boss_Matador` uses `BP_MatadorDecoy`.
 
 ## Changed
-- Created/assigned `BP_MatadorDecoy` as `BP_Boss_Matador.DecoyActorClass`.
-- Bull spawns toward active decoy, no longer repositions decoy at bull start.
-- Body stops AI movement while non-groggy; active decoy follows player when bull inactive.
-- Decoy layout now matches Character baseline: capsule 34/100, mesh Z -100, actor Z uses NavMesh + 100.
-- Decoy movement replication enabled; layout reapplied in Construction/BeginPlay to beat stale BP native defaults.
-- Added `UGP_EnemyRangedAttack`; shared enemy attack task can use each enemy parent's default attack tag.
+- Bull decoy pass now moves by cubic curve delta (`EvaluateCurve(next)-EvaluateCurve(prev)`) instead of free-steering, so the path actually reaches the player-facing exit.
+- Decoy-to-player redirect stores `LockedRedirectDirection`, then turns toward it via `PlayerRedirectTurnInterpSpeed` instead of snapping; yellow debug line marks the fixed direction.
+- Decoy/near-decoy blocking now treats decoy-owned/attached/nearby hits as redirect-safe via `IsBlockingHitSafeNearDecoy`, reducing bull deletion during lure/pass.
+- Bull spawn now uses decoy-player axis with side offset 450cm; curve side strengths tuned to P1=0.32/P2=0.16 for slight decoy pass without large miss.
+- Bull player impact no longer destroys/finishes bull. It applies damage once per hit actor, launches player along charge direction, sends hit-react event, and bull keeps charging.
+- Player attack counter no longer depends on valid GE/ASC; if hit detects bull it calls `TryRedirectTowardDecoy`, logs success/reject reason, and locks bull direction to decoy.
+- Body collision remains damage/knockback only.
 
 ## Resume
-- Compile in editor. Then verify placed boss instance does not override `DecoyActorClass` back to native class.
-- Also PIE-check basic enemy templates/common BT, ranged reach, flying movement height/pathing.
+- Compile in editor. Test bull body collision, primary counter, and decoy orbit feel.

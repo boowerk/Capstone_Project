@@ -13,6 +13,7 @@
 #include "Engine/World.h"
 #include "GameplayEffect.h"
 #include "GameplayTags/GP_Tags.h"
+#include "GameFramework/Character.h"
 #include "Kismet/GameplayStatics.h"
 #include "Materials/MaterialInterface.h"
 #include "Net/UnrealNetwork.h"
@@ -34,6 +35,7 @@ AGP_BullChargeActor::AGP_BullChargeActor()
 	CollisionBox->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	CollisionBox->SetCollisionResponseToAllChannels(ECR_Ignore);
 	CollisionBox->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
+	CollisionBox->SetCollisionResponseToChannel(ECC_Visibility, ECR_Overlap);
 	CollisionBox->SetCollisionResponseToChannel(ECC_WorldStatic, ECR_Block);
 	CollisionBox->SetCollisionResponseToChannel(ECC_WorldDynamic, ECR_Overlap);
 	SetRootComponent(CollisionBox);
@@ -150,7 +152,10 @@ void AGP_BullChargeActor::Tick(float DeltaSeconds)
 
 	const FVector DesiredDirection = ResolveDesiredDirection();
 	const float MaxTurnRadians = FMath::DegreesToRadians(HomingTurnSpeedDegrees) * DeltaSeconds;
-	ChargeDirection = FMath::VInterpNormalRotationTo(ChargeDirection, DesiredDirection, DeltaSeconds, FMath::Max(0.0f, HomingTurnSpeedDegrees / 90.0f));
+	const float TurnInterpSpeed = ChargeState == EGPMatadorBullChargeState::RedirectedByDecoyToPlayer
+		? FMath::Max(0.0f, PlayerRedirectTurnInterpSpeed)
+		: FMath::Max(0.0f, HomingTurnSpeedDegrees / 90.0f);
+	ChargeDirection = FMath::VInterpNormalRotationTo(ChargeDirection, DesiredDirection, DeltaSeconds, TurnInterpSpeed);
 	if (FMath::Acos(FMath::Clamp(FVector::DotProduct(ChargeDirection, DesiredDirection), -1.0f, 1.0f)) <= MaxTurnRadians)
 	{
 		ChargeDirection = DesiredDirection;
@@ -161,9 +166,24 @@ void AGP_BullChargeActor::Tick(float DeltaSeconds)
 	AddActorWorldOffset(ChargeDirection * ChargeSpeed * DeltaSeconds, true, &MoveHit);
 	if (MoveHit.bBlockingHit)
 	{
+		if (ChargeState == EGPMatadorBullChargeState::ChargingToDecoy && IsBlockingHitSafeNearDecoy(MoveHit))
+		{
+			const float DistanceToDecoy = FVector::Dist2D(GetActorLocation(), DecoyActor->GetActorLocation());
+			UE_LOG(LogTemp, Warning, TEXT("[MatadorBull] Blocking hit near decoy; trying redirect instead of finishing. Bull=%s Hit=%s Distance=%.1f"),
+				*GetNameSafe(this),
+				*GetNameSafe(MoveHit.GetActor()),
+				DistanceToDecoy);
+			if (!StartDecoyCircleRedirect())
+			{
+				TryHandleDecoyProximity(&PreviousLocation);
+			}
+			return;
+		}
+
 		FinishCharge(false);
 		return;
 	}
+	SetActorRotation(ChargeDirection.Rotation());
 
 	TryHandleDecoyProximity(&PreviousLocation);
 }
@@ -216,11 +236,29 @@ bool AGP_BullChargeActor::TryRedirectTowardDecoy(AActor* RedirectingActor)
 {
 	if (!HasAuthority() || !CanRedirectTowardDecoy(RedirectingActor))
 	{
+		UE_LOG(LogTemp, Log, TEXT("[MatadorBull] Redirect toward decoy rejected. Bull=%s Redirector=%s HasAuthority=%d State=%d ChargeStarted=%d Finished=%d AlreadyRedirectedByPlayer=%d Decoy=%s"),
+			*GetNameSafe(this),
+			*GetNameSafe(RedirectingActor),
+			HasAuthority() ? 1 : 0,
+			static_cast<int32>(ChargeState),
+			bChargeStarted ? 1 : 0,
+			bChargeFinished ? 1 : 0,
+			bRedirectedByPlayer ? 1 : 0,
+			*GetNameSafe(DecoyActor.Get()));
 		return false;
 	}
 
 	bRedirectedByPlayer = true;
 	TargetActor = DecoyActor.Get();
+	const FVector ToDecoy = (DecoyActor->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
+	if (!ToDecoy.IsNearlyZero())
+	{
+		ChargeDirection = ToDecoy;
+		SetActorRotation(ChargeDirection.Rotation());
+	}
+	const float DistanceToDecoy = FVector::Dist2D(GetActorLocation(), DecoyActor->GetActorLocation());
+	const float PlayerCounterLifeSeconds = DistanceToDecoy / FMath::Max(1.0f, ChargeSpeed) + PlayerCounterLifeExtensionSeconds;
+	SetLifeSpan(FMath::Max(0.1f, PlayerCounterLifeSeconds));
 	SetChargeState(EGPMatadorBullChargeState::RedirectedByPlayerToDecoy);
 	BP_OnBullRedirected(RedirectingActor, DecoyActor.Get());
 
@@ -239,28 +277,15 @@ bool AGP_BullChargeActor::CanRedirectTowardDecoy(AActor* RedirectingActor) const
 		return false;
 	}
 
-	if (!bChargeStarted || ChargeState != EGPMatadorBullChargeState::RedirectedByDecoyToPlayer)
+	if (!bChargeStarted
+		|| (ChargeState != EGPMatadorBullChargeState::RedirectedByDecoyToPlayer
+			&& ChargeState != EGPMatadorBullChargeState::ChargingToPlayer
+			&& ChargeState != EGPMatadorBullChargeState::CirclingDecoyToPlayer))
 	{
 		return false;
 	}
 
-	const FVector BullLocation = GetActorLocation();
-	const FVector RedirectorLocation = RedirectingActor->GetActorLocation();
-	if (FVector::DistSquared2D(BullLocation, RedirectorLocation) > FMath::Square(FMath::Max(0.0f, RedirectMaxDistance)))
-	{
-		return false;
-	}
-
-	const FVector ToRedirector = (RedirectorLocation - BullLocation).GetSafeNormal2D();
-	const FVector CurrentDirection = ChargeDirection.GetSafeNormal2D();
-	if (ToRedirector.IsNearlyZero() || CurrentDirection.IsNearlyZero())
-	{
-		return false;
-	}
-
-	const float Dot = FVector::DotProduct(CurrentDirection, ToRedirector);
-	const float MinDot = FMath::Cos(FMath::DegreesToRadians(FMath::Clamp(RedirectMaxAngleDegrees, 0.0f, 180.0f)));
-	return Dot >= MinDot;
+	return true;
 }
 
 void AGP_BullChargeActor::StartCharge()
@@ -291,8 +316,21 @@ void AGP_BullChargeActor::OnChargeOverlap(UPrimitiveComponent* OverlappedCompone
 				return;
 			}
 
-			SetChargeState(EGPMatadorBullChargeState::Failed);
-			FinishCharge(false);
+			UE_LOG(LogTemp, Warning, TEXT("[MatadorBull] Decoy overlap could not start redirect yet; keeping bull alive for retry. Bull=%s Decoy=%s Player=%s"),
+				*GetNameSafe(this),
+				*GetNameSafe(DecoyActor.Get()),
+				*GetNameSafe(PlayerTargetActor.Get()));
+			return;
+		}
+
+		if (ChargeState == EGPMatadorBullChargeState::CirclingDecoyToPlayer
+			|| ChargeState == EGPMatadorBullChargeState::RedirectedByDecoyToPlayer
+			|| ChargeState == EGPMatadorBullChargeState::ChargingToPlayer)
+		{
+			UE_LOG(LogTemp, Verbose, TEXT("[MatadorBull] Ignored decoy overlap during redirect. Bull=%s State=%d Decoy=%s"),
+				*GetNameSafe(this),
+				static_cast<int32>(ChargeState),
+				*GetNameSafe(DecoyActor.Get()));
 			return;
 		}
 
@@ -336,38 +374,8 @@ void AGP_BullChargeActor::OnChargeOverlap(UPrimitiveComponent* OverlappedCompone
 			return;
 		}
 
-		if (!BeginChargeImpact())
-		{
-			return;
-		}
-
-		SetChargeState(EGPMatadorBullChargeState::Failed);
-		AActor* InstigatorActor = GetOwner();
-		UAbilitySystemComponent* SourceASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(InstigatorActor);
-		UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(OtherActor);
-		if (IsValid(SourceASC) && IsValid(TargetASC) && DamageEffectClass)
-		{
-			FGameplayEffectContextHandle ContextHandle = SourceASC->MakeEffectContext();
-			ContextHandle.AddInstigator(InstigatorActor, InstigatorActor);
-
-			FGameplayEffectSpecHandle SpecHandle = SourceASC->MakeOutgoingSpec(DamageEffectClass, EffectLevel, ContextHandle);
-			if (SpecHandle.IsValid())
-			{
-				SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Data::Base, BullHitBaseDamage);
-				SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Data::BaseSpell, 0.0f);
-				SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Data::ToughnessBase, BullHitToughnessDamage);
-				SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Coef::Atk, BullHitAttackPowerCoefficient);
-				SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Coef::M_Atk, 0.0f);
-				SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Coef::Def, 0.0f);
-				SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Coef::Hp, 0.0f);
-				SourceASC->ApplyGameplayEffectSpecToTarget(*SpecHandle.Data.Get(), TargetASC);
-			}
-		}
-
-		TArray<AActor*> HitActors;
-		HitActors.Add(OtherActor);
-		UGP_BlueprintLibrary::SendGameplayEventToActors(InstigatorActor, HitActors, PlayerHitEventTag);
-		FinishCharge(false);
+		ApplyBullImpactToActor(OtherActor);
+		return;
 	}
 }
 
@@ -415,8 +423,10 @@ bool AGP_BullChargeActor::TryHandleDecoyProximity(const FVector* PreviousLocatio
 			return true;
 		}
 
-		SetChargeState(EGPMatadorBullChargeState::Failed);
-		FinishCharge(false);
+		UE_LOG(LogTemp, Warning, TEXT("[MatadorBull] Decoy proximity could not start redirect yet; keeping bull alive for retry. Bull=%s Decoy=%s Player=%s"),
+			*GetNameSafe(this),
+			*GetNameSafe(DecoyActor.Get()),
+			*GetNameSafe(PlayerTargetActor.Get()));
 		return true;
 	}
 
@@ -472,23 +482,56 @@ bool AGP_BullChargeActor::StartDecoyCircleRedirect()
 	DecoyCircleRadius = FMath::Max(FMath::Max(1.0f, DecoyRedirectArcRadius), StartOffset.Size2D());
 	DecoyCircleStartOffset = StartOffset.GetSafeNormal2D() * DecoyCircleRadius;
 	DecoyCircleProgressDegrees = 0.0f;
+	DecoyRedirectCurveAlpha = 0.0f;
 
 	const FVector ToPlayer = (PlayerTarget->GetActorLocation() - DecoyActor->GetActorLocation()).GetSafeNormal2D();
 	const FVector StartDirection = DecoyCircleStartOffset.GetSafeNormal2D();
-	const float CrossZ = FVector::CrossProduct(StartDirection, ToPlayer).Z;
-	DecoyCircleDirectionSign = CrossZ >= 0.0f ? 1.0f : -1.0f;
+	const FVector SafeToPlayer = ToPlayer.IsNearlyZero() ? GetActorForwardVector().GetSafeNormal2D() : ToPlayer;
+	const FVector SafeChargeDirection = ChargeDirection.GetSafeNormal2D().IsNearlyZero() ? -StartDirection : ChargeDirection.GetSafeNormal2D();
+	const FVector LeftSideDirection = FRotator(0.0f, 90.0f, 0.0f).RotateVector(SafeToPlayer).GetSafeNormal2D();
+	const FVector RightSideDirection = FRotator(0.0f, -90.0f, 0.0f).RotateVector(SafeToPlayer).GetSafeNormal2D();
+	const bool bUseLeftOuterSide = FVector::DotProduct(LeftSideDirection, StartDirection) <= FVector::DotProduct(RightSideDirection, StartDirection);
+	DecoyCircleDirectionSign = bUseLeftOuterSide ? 1.0f : -1.0f;
+	const FVector SideDirection = bUseLeftOuterSide ? LeftSideDirection : RightSideDirection;
+
+	DecoyRedirectCurveP0 = GetActorLocation();
+	DecoyRedirectCurveP3 = DecoyActor->GetActorLocation() + SafeToPlayer * DecoyCircleRadius;
+	DecoyRedirectCurveP3.Z = DecoyRedirectCurveP0.Z;
+	DecoyRedirectCurveP1 =
+		DecoyRedirectCurveP0
+		+ SafeChargeDirection * DecoyCircleRadius * 0.65f
+		+ SideDirection * DecoyCircleRadius * DecoyRedirectOuterSideStrengthP1;
+	DecoyRedirectCurveP2 =
+		DecoyRedirectCurveP3
+		- SafeToPlayer * DecoyCircleRadius * 0.9f
+		+ SideDirection * DecoyCircleRadius * DecoyRedirectOuterSideStrengthP2;
+
+	DecoyRedirectCurveLength = 0.0f;
+	FVector PreviousCurvePoint = DecoyRedirectCurveP0;
+	for (int32 SampleIndex = 1; SampleIndex <= 16; ++SampleIndex)
+	{
+		const float SampleAlpha = static_cast<float>(SampleIndex) / 16.0f;
+		const FVector CurvePoint = EvaluateDecoyRedirectCurve(SampleAlpha);
+		DecoyRedirectCurveLength += FVector::Dist(PreviousCurvePoint, CurvePoint);
+		PreviousCurvePoint = CurvePoint;
+	}
+	DecoyRedirectCurveLength = FMath::Max(1.0f, DecoyRedirectCurveLength);
 
 	TargetActor = nullptr;
+	const float EstimatedCurveSeconds = DecoyRedirectCurveLength / FMath::Max(1.0f, ChargeSpeed);
+	const float EstimatedPlayerLegSeconds = FVector::Dist2D(DecoyRedirectCurveP3, PlayerTarget->GetActorLocation()) / FMath::Max(1.0f, ChargeSpeed);
+	SetLifeSpan(FMath::Max(0.1f, EstimatedCurveSeconds + EstimatedPlayerLegSeconds + PlayerCounterLifeExtensionSeconds));
 	SetChargeState(EGPMatadorBullChargeState::CirclingDecoyToPlayer);
 	DecoyActor->PlayBullRedirectPresentation(this, PlayerTarget);
 
-	UE_LOG(LogTemp, Log, TEXT("[MatadorBull] Decoy circle redirect started. Bull=%s Decoy=%s Player=%s Arc=%.1f Radius=%.1f Sign=%.0f"),
+	UE_LOG(LogTemp, Log, TEXT("[MatadorBull] Decoy circle redirect started. Bull=%s Decoy=%s Player=%s Arc=%.1f Radius=%.1f Sign=%.0f Life=%.2f"),
 		*GetNameSafe(this),
 		*GetNameSafe(DecoyActor.Get()),
 		*GetNameSafe(PlayerTarget),
 		DecoyRedirectArcDegrees,
 		DecoyCircleRadius,
-		DecoyCircleDirectionSign);
+		DecoyCircleDirectionSign,
+		GetLifeSpan());
 
 	return true;
 }
@@ -508,70 +551,72 @@ void AGP_BullChargeActor::TickDecoyCircleRedirect(float DeltaSeconds)
 		return;
 	}
 
-	const FVector CenterLocation = DecoyActor->GetActorLocation();
-	FVector CurrentOffset = GetActorLocation() - CenterLocation;
-	CurrentOffset.Z = 0.0f;
-	if (CurrentOffset.IsNearlyZero())
-	{
-		CurrentOffset = DecoyCircleStartOffset;
-	}
-
-	const FVector RadialDirection = CurrentOffset.GetSafeNormal2D();
-	const FVector TangentDirection = FRotator(0.0f, 90.0f * DecoyCircleDirectionSign, 0.0f).RotateVector(RadialDirection).GetSafeNormal2D();
-	const FVector ToPlayerDirection = (PlayerTarget->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
-	const float CurrentRadius = FMath::Max(1.0f, CurrentOffset.Size2D());
-	const float RadiusCorrectionAlpha = FMath::Clamp((DecoyCircleRadius - CurrentRadius) / FMath::Max(1.0f, DecoyCircleRadius), -1.0f, 1.0f);
-	const FVector RadiusCorrection = RadialDirection * RadiusCorrectionAlpha;
-	FVector DesiredDirection = TangentDirection * 0.70f + ToPlayerDirection * 0.45f + RadiusCorrection * 0.85f;
+	const float DistanceStep = FMath::Max(0.0f, ChargeSpeed) * FMath::Max(0.0f, DeltaSeconds);
+	const float AlphaStep = DistanceStep / FMath::Max(1.0f, DecoyRedirectCurveLength);
+	const float NextAlpha = FMath::Min(1.0f, DecoyRedirectCurveAlpha + AlphaStep);
+	const float LookAheadAlpha = FMath::Min(1.0f, NextAlpha + DecoyRedirectLookAheadAlpha);
+	const FVector CurveTargetDirection = (EvaluateDecoyRedirectCurve(LookAheadAlpha) - GetActorLocation()).GetSafeNormal2D();
+	const FVector CurveTangentDirection = EvaluateDecoyRedirectCurveTangent(NextAlpha).GetSafeNormal2D();
+	const float TangentWeight = FMath::Clamp(DecoyRedirectTangentWeight, 0.0f, 1.0f);
+	FVector DesiredDirection = CurveTargetDirection * (1.0f - TangentWeight) + CurveTangentDirection * TangentWeight;
 	DesiredDirection = DesiredDirection.GetSafeNormal2D();
-	if (DesiredDirection.IsNearlyZero())
+	if (!DesiredDirection.IsNearlyZero())
 	{
-		DesiredDirection = TangentDirection;
+		ChargeDirection = DecoyRedirectTurnInterpSpeed > 0.0f
+			? FMath::VInterpNormalRotationTo(ChargeDirection, DesiredDirection, DeltaSeconds, DecoyRedirectTurnInterpSpeed)
+			: DesiredDirection;
+		if (ChargeDirection.IsNearlyZero())
+		{
+			ChargeDirection = DesiredDirection;
+		}
 	}
 
-	const float SteeringSpeed = FMath::Max(HomingTurnSpeedDegrees, DecoyRedirectArcSpeedDegrees);
-	ChargeDirection = FMath::VInterpNormalRotationTo(ChargeDirection, DesiredDirection, DeltaSeconds, FMath::Max(0.0f, SteeringSpeed / 90.0f));
-	if (ChargeDirection.IsNearlyZero())
+	const FVector PreviousLocation = GetActorLocation();
+	const FVector PreviousCurveLocation = EvaluateDecoyRedirectCurve(DecoyRedirectCurveAlpha);
+	const FVector NextCurveLocation = EvaluateDecoyRedirectCurve(NextAlpha);
+	const FVector CurveMoveDelta = NextCurveLocation - PreviousCurveLocation;
+	const FVector CurveMoveDirection = CurveMoveDelta.GetSafeNormal2D();
+	if (!CurveMoveDirection.IsNearlyZero())
 	{
-		ChargeDirection = DesiredDirection;
+		ChargeDirection = CurveMoveDirection;
 	}
-
 	FHitResult MoveHit;
-	AddActorWorldOffset(ChargeDirection * ChargeSpeed * DeltaSeconds, true, &MoveHit);
+	AddActorWorldOffset(CurveMoveDelta, true, &MoveHit);
 	if (MoveHit.bBlockingHit)
 	{
-		FinishCharge(false);
+		if (IsBlockingHitSafeNearDecoy(MoveHit))
+		{
+			UE_LOG(LogTemp, Verbose, TEXT("[MatadorBull] Ignored blocking hit near decoy during curve redirect. Bull=%s Hit=%s Decoy=%s"),
+				*GetNameSafe(this),
+				*GetNameSafe(MoveHit.GetActor()),
+				*GetNameSafe(DecoyActor.Get()));
+			SetActorLocation(NextCurveLocation, false);
+			SetActorRotation(ChargeDirection.Rotation());
+			DecoyRedirectCurveAlpha = NextAlpha;
+		}
+		else
+		{
+			FinishCharge(false);
+		}
 		return;
 	}
 	SetActorRotation(ChargeDirection.Rotation());
 
-	const FVector CurrentDirectionFromDecoy = (GetActorLocation() - CenterLocation).GetSafeNormal2D();
-	const FVector StartDirectionFromDecoy = DecoyCircleStartOffset.GetSafeNormal2D();
-	const float Dot = FVector::DotProduct(StartDirectionFromDecoy, CurrentDirectionFromDecoy);
-	const float CrossZ = FVector::CrossProduct(StartDirectionFromDecoy, CurrentDirectionFromDecoy).Z;
-	float SignedProgress = FMath::RadiansToDegrees(FMath::Atan2(CrossZ, Dot)) * DecoyCircleDirectionSign;
-	if (SignedProgress < 0.0f)
+	DecoyRedirectCurveAlpha = NextAlpha;
+
+	if (TryHandleDecoyProximity(&PreviousLocation))
 	{
-		SignedProgress += 360.0f;
+		return;
 	}
-	DecoyCircleProgressDegrees = FMath::Max(DecoyCircleProgressDegrees, SignedProgress);
 
-	DrawDebugCircle(
-		GetWorld(),
-		CenterLocation + FVector(0.0f, 0.0f, 35.0f),
-		DecoyCircleRadius,
-		48,
-		FColor::Cyan,
-		false,
-		0.05f,
-		0,
-		4.0f,
-		FVector::ForwardVector,
-		FVector::RightVector,
-		false);
+	for (int32 SampleIndex = 0; SampleIndex < 12; ++SampleIndex)
+	{
+		const float AlphaA = static_cast<float>(SampleIndex) / 12.0f;
+		const float AlphaB = static_cast<float>(SampleIndex + 1) / 12.0f;
+		DrawDebugLine(GetWorld(), EvaluateDecoyRedirectCurve(AlphaA), EvaluateDecoyRedirectCurve(AlphaB), FColor::Cyan, false, 0.05f, 0, 4.0f);
+	}
 
-	const float ArcTargetDegrees = FMath::Clamp(DecoyRedirectArcDegrees, 0.0f, 360.0f);
-	if (DecoyCircleProgressDegrees >= ArcTargetDegrees - KINDA_SMALL_NUMBER)
+	if (DecoyRedirectCurveAlpha >= 1.0f - KINDA_SMALL_NUMBER)
 	{
 		if (!TryRedirectTowardPlayerFromDecoy())
 		{
@@ -582,6 +627,25 @@ void AGP_BullChargeActor::TickDecoyCircleRedirect(float DeltaSeconds)
 			FinishCharge(false);
 		}
 	}
+}
+
+FVector AGP_BullChargeActor::EvaluateDecoyRedirectCurve(float Alpha) const
+{
+	const float T = FMath::Clamp(Alpha, 0.0f, 1.0f);
+	const float OneMinusT = 1.0f - T;
+	return DecoyRedirectCurveP0 * OneMinusT * OneMinusT * OneMinusT
+		+ DecoyRedirectCurveP1 * 3.0f * OneMinusT * OneMinusT * T
+		+ DecoyRedirectCurveP2 * 3.0f * OneMinusT * T * T
+		+ DecoyRedirectCurveP3 * T * T * T;
+}
+
+FVector AGP_BullChargeActor::EvaluateDecoyRedirectCurveTangent(float Alpha) const
+{
+	const float T = FMath::Clamp(Alpha, 0.0f, 1.0f);
+	const float OneMinusT = 1.0f - T;
+	return (DecoyRedirectCurveP1 - DecoyRedirectCurveP0) * 3.0f * OneMinusT * OneMinusT
+		+ (DecoyRedirectCurveP2 - DecoyRedirectCurveP1) * 6.0f * OneMinusT * T
+		+ (DecoyRedirectCurveP3 - DecoyRedirectCurveP2) * 3.0f * T * T;
 }
 
 AActor* AGP_BullChargeActor::ResolvePlayerTargetActor()
@@ -614,18 +678,37 @@ bool AGP_BullChargeActor::TryRedirectTowardPlayerFromDecoy()
 	const FVector ToPlayer = (PlayerTarget->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
 	if (!ToPlayer.IsNearlyZero())
 	{
-		ChargeDirection = ToPlayer;
-		SetActorRotation(ChargeDirection.Rotation());
+		LockedRedirectDirection = ToPlayer;
 	}
+	else
+	{
+		LockedRedirectDirection = ChargeDirection.GetSafeNormal2D().IsNearlyZero()
+			? GetActorForwardVector().GetSafeNormal2D()
+			: ChargeDirection.GetSafeNormal2D();
+	}
+	const float DistanceToPlayer = FVector::Dist2D(GetActorLocation(), PlayerTarget->GetActorLocation());
+	const float PlayerRedirectLifeSeconds = DistanceToPlayer / FMath::Max(1.0f, ChargeSpeed) + DecoyRedirectLifeExtensionSeconds;
+	SetLifeSpan(FMath::Max(0.1f, PlayerRedirectLifeSeconds));
 	SetChargeState(EGPMatadorBullChargeState::RedirectedByDecoyToPlayer);
 	DecoyActor->PlayBullRedirectPresentation(this, PlayerTarget);
 	BP_OnBullRedirected(DecoyActor.Get(), PlayerTarget);
+	DrawDebugLine(
+		GetWorld(),
+		GetActorLocation() + FVector(0.0f, 0.0f, 80.0f),
+		GetActorLocation() + LockedRedirectDirection * 1600.0f + FVector(0.0f, 0.0f, 80.0f),
+		FColor::Yellow,
+		false,
+		2.0f,
+		0,
+		10.0f);
 
-	UE_LOG(LogTemp, Log, TEXT("[MatadorBull] Decoy redirected bull toward player. Bull=%s Decoy=%s Player=%s Direction=%s"),
+	UE_LOG(LogTemp, Log, TEXT("[MatadorBull] Decoy redirected bull toward player. Bull=%s Decoy=%s Player=%s CurrentDirection=%s LockedDirection=%s Life=%.2f"),
 		*GetNameSafe(this),
 		*GetNameSafe(DecoyActor.Get()),
 		*GetNameSafe(PlayerTarget),
-		*ChargeDirection.ToCompactString());
+		*ChargeDirection.ToCompactString(),
+		*LockedRedirectDirection.ToCompactString(),
+		GetLifeSpan());
 
 	return true;
 }
@@ -633,6 +716,101 @@ bool AGP_BullChargeActor::TryRedirectTowardPlayerFromDecoy()
 bool AGP_BullChargeActor::CanRecordDecoyHit() const
 {
 	return ChargeState == EGPMatadorBullChargeState::RedirectedByPlayerToDecoy;
+}
+
+bool AGP_BullChargeActor::IsActorRelatedToDecoy(AActor* Actor) const
+{
+	AActor* CurrentDecoyActor = DecoyActor.Get();
+	if (!IsValid(Actor) || !IsValid(CurrentDecoyActor))
+	{
+		return false;
+	}
+
+	return Actor == CurrentDecoyActor
+		|| Actor->GetOwner() == CurrentDecoyActor
+		|| Actor->GetAttachParentActor() == CurrentDecoyActor
+		|| CurrentDecoyActor->GetOwner() == Actor
+		|| CurrentDecoyActor->GetAttachParentActor() == Actor;
+}
+
+bool AGP_BullChargeActor::IsBlockingHitSafeNearDecoy(const FHitResult& Hit) const
+{
+	AActor* CurrentDecoyActor = DecoyActor.Get();
+	if (!IsValid(CurrentDecoyActor))
+	{
+		return false;
+	}
+
+	if (IsActorRelatedToDecoy(Hit.GetActor()))
+	{
+		return true;
+	}
+
+	const float DistanceToDecoy = FVector::Dist2D(GetActorLocation(), CurrentDecoyActor->GetActorLocation());
+	const float SafeRadius = FMath::Max3(DecoyRedirectRadius, DecoyRedirectArcRadius, DecoyRedirectCollisionGraceRadius);
+	return DistanceToDecoy <= SafeRadius;
+}
+
+void AGP_BullChargeActor::ApplyBullImpactToActor(AActor* HitActor)
+{
+	if (!HasAuthority() || !IsValid(HitActor))
+	{
+		return;
+	}
+
+	for (const TWeakObjectPtr<AActor>& PreviousHitActor : BullImpactHitActors)
+	{
+		if (PreviousHitActor.Get() == HitActor)
+		{
+			return;
+		}
+	}
+	BullImpactHitActors.Add(TWeakObjectPtr<AActor>(HitActor));
+
+	const FVector ImpactDirection = ChargeDirection.GetSafeNormal2D().IsNearlyZero()
+		? GetActorForwardVector().GetSafeNormal2D()
+		: ChargeDirection.GetSafeNormal2D();
+
+	AActor* InstigatorActor = GetOwner();
+	UAbilitySystemComponent* SourceASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(InstigatorActor);
+	UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(HitActor);
+	if (IsValid(SourceASC) && IsValid(TargetASC) && DamageEffectClass)
+	{
+		FGameplayEffectContextHandle ContextHandle = SourceASC->MakeEffectContext();
+		ContextHandle.AddInstigator(InstigatorActor, InstigatorActor);
+
+		FGameplayEffectSpecHandle SpecHandle = SourceASC->MakeOutgoingSpec(DamageEffectClass, EffectLevel, ContextHandle);
+		if (SpecHandle.IsValid())
+		{
+			SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Data::Base, BullHitBaseDamage);
+			SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Data::BaseSpell, 0.0f);
+			SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Data::ToughnessBase, BullHitToughnessDamage);
+			SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Coef::Atk, BullHitAttackPowerCoefficient);
+			SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Coef::M_Atk, 0.0f);
+			SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Coef::Def, 0.0f);
+			SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Coef::Hp, 0.0f);
+			SourceASC->ApplyGameplayEffectSpecToTarget(*SpecHandle.Data.Get(), TargetASC);
+		}
+	}
+
+	if (ACharacter* HitCharacter = Cast<ACharacter>(HitActor))
+	{
+		const FVector LaunchVelocity =
+			ImpactDirection * FMath::Max(0.0f, BullHitKnockbackHorizontalSpeed)
+			+ FVector::UpVector * FMath::Max(0.0f, BullHitKnockbackVerticalSpeed);
+		HitCharacter->LaunchCharacter(LaunchVelocity, true, true);
+	}
+
+	TArray<AActor*> HitActors;
+	HitActors.Add(HitActor);
+	UGP_BlueprintLibrary::SendGameplayEventToActors(InstigatorActor, HitActors, PlayerHitEventTag);
+
+	UE_LOG(LogTemp, Log, TEXT("[MatadorBull] Player impact. Bull=%s Target=%s Direction=%s Damage=%.1f Knockback=%.1f"),
+		*GetNameSafe(this),
+		*GetNameSafe(HitActor),
+		*ImpactDirection.ToCompactString(),
+		BullHitBaseDamage,
+		BullHitKnockbackHorizontalSpeed);
 }
 
 void AGP_BullChargeActor::FinishCharge(bool bHitDecoy)
@@ -701,6 +879,18 @@ void AGP_BullChargeActor::DrawTelegraph() const
 
 FVector AGP_BullChargeActor::ResolveDesiredDirection() const
 {
+	if (ChargeState == EGPMatadorBullChargeState::RedirectedByDecoyToPlayer)
+	{
+		const FVector LockedDirection = LockedRedirectDirection.GetSafeNormal2D();
+		return LockedDirection.IsNearlyZero() ? FVector::ForwardVector : LockedDirection;
+	}
+
+	if (ChargeState == EGPMatadorBullChargeState::RedirectedByPlayerToDecoy)
+	{
+		const FVector LockedDirection = ChargeDirection.GetSafeNormal2D();
+		return LockedDirection.IsNearlyZero() ? FVector::ForwardVector : LockedDirection;
+	}
+
 	if (IsValid(TargetActor))
 	{
 		const FVector ToTarget = (TargetActor->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
