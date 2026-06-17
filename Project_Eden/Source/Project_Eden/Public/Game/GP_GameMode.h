@@ -7,6 +7,7 @@
 class AGP_EnemyCharacter;
 class AGP_EnemySpawnVolume;
 class AGP_GameState;
+class AGP_RunPortal;
 
 /**
  * Server-authoritative progression manager for the linear "city -> boss room -> next city" loop.
@@ -42,6 +43,11 @@ protected:
 	UFUNCTION(BlueprintImplementableEvent, Category = "Run")
 	void OnRunFinished(bool bVictory);
 
+	// Portal actor spawned at a cleared zone to teleport players into the next zone. Set a BP child
+	// (with mesh/VFX) here. If left empty, zones simply unlock and players walk in.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run")
+	TSubclassOf<AGP_RunPortal> PortalClass;
+
 private:
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<AGP_EnemySpawnVolume>> OrderedZones;
@@ -59,6 +65,7 @@ private:
 	void RegisterZoneEnemy(AGP_EnemyCharacter* Enemy);
 	void CompleteCurrentZone();
 	void AdvanceZone();
+	void SpawnPortalToZone(int32 FromZoneIndex, int32 ToZoneIndex);
 	void FinishRun(bool bVictory);
 
 	UFUNCTION()

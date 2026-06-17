@@ -3,6 +3,7 @@
 #include "Characters/GP_EnemyCharacter.h"
 #include "Game/GP_EnemySpawnVolume.h"
 #include "Game/GP_GameState.h"
+#include "Game/GP_RunPortal.h"
 #include "Kismet/GameplayStatics.h"
 
 AGP_GameMode::AGP_GameMode()
@@ -238,6 +239,32 @@ void AGP_GameMode::AdvanceZone()
 
 	// Unlock next zone — spawn fires when player physically enters it.
 	UnlockZone(NextZoneIndex);
+
+	// Drop a portal at the cleared zone that teleports the party into the next zone's box.
+	SpawnPortalToZone(CurrentZoneIndex, NextZoneIndex);
+}
+
+void AGP_GameMode::SpawnPortalToZone(int32 FromZoneIndex, int32 ToZoneIndex)
+{
+	UWorld* World = GetWorld();
+	if (!World || !*PortalClass || !OrderedZones.IsValidIndex(FromZoneIndex) || !OrderedZones.IsValidIndex(ToZoneIndex))
+	{
+		// No portal class set (or bad index): fall back to walking into the unlocked zone.
+		return;
+	}
+
+	bool bProjected = false;
+	const FVector SpawnPos = OrderedZones[FromZoneIndex]->GetSpawnPoint(/*bRandomizeInVolume=*/false, bProjected);
+	const FVector TargetPos = OrderedZones[ToZoneIndex]->GetSpawnPoint(/*bRandomizeInVolume=*/false, bProjected);
+
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+	AGP_RunPortal* Portal = World->SpawnActor<AGP_RunPortal>(PortalClass, SpawnPos, FRotator::ZeroRotator, SpawnParameters);
+	if (IsValid(Portal))
+	{
+		Portal->SetTargetLocation(TargetPos);
+	}
 }
 
 void AGP_GameMode::NotifyAllPlayersDead()
