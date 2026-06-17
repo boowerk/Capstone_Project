@@ -2,6 +2,8 @@
 
 #include "Characters/GP_PlayerCharacter.h"
 #include "Components/BoxComponent.h"
+#include "Game/GP_EnemySpawnMarker.h"
+#include "Kismet/GameplayStatics.h"
 #include "NavigationSystem.h"
 
 AGP_EnemySpawnVolume::AGP_EnemySpawnVolume()
@@ -13,6 +15,7 @@ AGP_EnemySpawnVolume::AGP_EnemySpawnVolume()
 	SpawnBox->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 	SpawnBox->SetCollisionResponseToAllChannels(ECR_Ignore);
 	SpawnBox->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
+	SpawnBox->SetGenerateOverlapEvents(true);
 	SpawnBox->SetBoxExtent(FVector(500.0f, 500.0f, 200.0f));
 	SpawnBox->ShapeColor = FColor(80, 200, 120);
 }
@@ -20,7 +23,27 @@ AGP_EnemySpawnVolume::AGP_EnemySpawnVolume()
 void AGP_EnemySpawnVolume::BeginPlay()
 {
 	Super::BeginPlay();
-	SpawnBox->OnComponentBeginOverlap.AddDynamic(this, &AGP_EnemySpawnVolume::HandleOverlapBegin);
+
+	SpawnBox->OnComponentBeginOverlap.AddDynamic(this, &AGP_EnemySpawnVolume::HandleBoxOverlap);
+
+	// Collect AGP_EnemySpawnMarker actors whose centers fall inside this box.
+	TArray<AActor*> AllMarkers;
+	UGameplayStatics::GetAllActorsOfClass(this, AGP_EnemySpawnMarker::StaticClass(), AllMarkers);
+	for (AActor* Actor : AllMarkers)
+	{
+		if (AGP_EnemySpawnMarker* Marker = Cast<AGP_EnemySpawnMarker>(Actor))
+		{
+			// Use point-in-box check instead of overlap (overlap not ready at BeginPlay).
+			const FVector Local = SpawnBox->GetComponentTransform().InverseTransformPosition(Marker->GetActorLocation());
+			const FVector Extent = SpawnBox->GetScaledBoxExtent();
+			if (FMath::Abs(Local.X) <= Extent.X && FMath::Abs(Local.Y) <= Extent.Y && FMath::Abs(Local.Z) <= Extent.Z)
+			{
+				Markers.Add(Marker);
+				UE_LOG(LogTemp, Log, TEXT("[GP_EnemySpawnVolume] Collected marker '%s'"), *Marker->GetName());
+			}
+		}
+	}
+	UE_LOG(LogTemp, Log, TEXT("[GP_EnemySpawnVolume] Zone '%s' collected %d markers"), *GetName(), Markers.Num());
 }
 
 void AGP_EnemySpawnVolume::Unlock()
@@ -28,39 +51,37 @@ void AGP_EnemySpawnVolume::Unlock()
 	bUnlocked = true;
 }
 
-void AGP_EnemySpawnVolume::HandleOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
+void AGP_EnemySpawnVolume::ActivateMarkers()
+{
+	for (AGP_EnemySpawnMarker* Marker : Markers)
+	{
+		if (IsValid(Marker))
+		{
+			Marker->Activate(this);
+		}
+	}
+}
+
+void AGP_EnemySpawnVolume::NotifyMarkerTriggered(AGP_EnemySpawnMarker* Marker)
+{
+	OnMarkerTriggered.Broadcast(this, Marker);
+}
+
+void AGP_EnemySpawnVolume::HandleBoxOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
 	UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
-	if (bTriggered || !bUnlocked)
+	if (bEntered || !bUnlocked || !Cast<AGP_PlayerCharacter>(OtherActor))
 	{
 		return;
 	}
 
-	if (!Cast<AGP_PlayerCharacter>(OtherActor))
-	{
-		return;
-	}
-
-	bTriggered = true;
+	bEntered = true;
 	OnPlayerEnteredZone.Broadcast(this);
 }
 
-FVector AGP_EnemySpawnVolume::GetSpawnPoint(bool bRandomizeInVolume, bool& bOutProjected) const
+FVector AGP_EnemySpawnVolume::ProjectToNavmesh(const FVector& DesiredLocation, bool& bOutProjected) const
 {
 	bOutProjected = false;
-
-	const FVector Center = SpawnBox->GetComponentLocation();
-	FVector DesiredLocation = Center;
-
-	if (bRandomizeInVolume)
-	{
-		const FVector Extent = SpawnBox->GetScaledBoxExtent();
-		const FVector LocalOffset(
-			FMath::FRandRange(-Extent.X, Extent.X),
-			FMath::FRandRange(-Extent.Y, Extent.Y),
-			0.0f);
-		DesiredLocation = SpawnBox->GetComponentTransform().TransformPositionNoScale(LocalOffset);
-	}
 
 	if (const UNavigationSystemV1* NavigationSystem = UNavigationSystemV1::GetCurrent(GetWorld()))
 	{
@@ -73,4 +94,38 @@ FVector AGP_EnemySpawnVolume::GetSpawnPoint(bool bRandomizeInVolume, bool& bOutP
 	}
 
 	return DesiredLocation;
+}
+
+FVector AGP_EnemySpawnVolume::GetSpawnPoint(bool bRandomizeInVolume, bool& bOutProjected) const
+{
+	FVector DesiredLocation = SpawnBox->GetComponentLocation();
+
+	if (bRandomizeInVolume)
+	{
+		const FVector Extent = SpawnBox->GetScaledBoxExtent();
+		const FVector LocalOffset(
+			FMath::FRandRange(-Extent.X, Extent.X),
+			FMath::FRandRange(-Extent.Y, Extent.Y),
+			0.0f);
+		DesiredLocation = SpawnBox->GetComponentTransform().TransformPositionNoScale(LocalOffset);
+	}
+
+	return ProjectToNavmesh(DesiredLocation, bOutProjected);
+}
+
+FVector AGP_EnemySpawnVolume::GetSpawnPointNearMarker(const AGP_EnemySpawnMarker* Marker, bool& bOutProjected) const
+{
+	if (!Marker)
+	{
+		bOutProjected = false;
+		return GetActorLocation();
+	}
+
+	const float Scatter = Marker->GetSpawnScatterRadius();
+	const float Angle = FMath::FRandRange(0.0f, 2.0f * PI);
+	const float Dist = Scatter * FMath::Sqrt(FMath::FRand());
+	const FVector DesiredLocation = Marker->GetActorLocation()
+		+ FVector(Dist * FMath::Cos(Angle), Dist * FMath::Sin(Angle), 0.0f);
+
+	return ProjectToNavmesh(DesiredLocation, bOutProjected);
 }

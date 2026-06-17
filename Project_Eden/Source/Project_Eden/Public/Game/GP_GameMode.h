@@ -8,6 +8,7 @@ class AGP_EnemyCharacter;
 class AGP_EnemySpawnVolume;
 class AGP_GameState;
 class AGP_RunPortal;
+class AGP_EnemySpawnMarker;
 
 /**
  * Server-authoritative progression manager for the linear "city -> boss room -> next city" loop.
@@ -55,6 +56,8 @@ private:
 	int32 CurrentZoneIndex = INDEX_NONE;
 	int32 PendingZoneIndex = INDEX_NONE;
 	int32 AliveZoneEnemies = 0;
+	int32 MarkersTotal = 0;
+	int32 MarkersTriggered = 0;
 	bool bRunStarted = false;
 	bool bRunFinished = false;
 
@@ -62,7 +65,9 @@ private:
 	void UnlockZone(int32 ZoneIndex);
 	void StartZone(int32 ZoneIndex);
 	void SpawnZoneEnemies(AGP_EnemySpawnVolume* Zone);
+	void SpawnMarkerEnemies(AGP_EnemySpawnVolume* Zone, AGP_EnemySpawnMarker* Marker);
 	void RegisterZoneEnemy(AGP_EnemyCharacter* Enemy);
+	void MaybeCompleteZone();
 	void CompleteCurrentZone();
 	void AdvanceZone();
 	void SpawnPortalToZone(int32 FromZoneIndex, int32 ToZoneIndex);
@@ -70,6 +75,9 @@ private:
 
 	UFUNCTION()
 	void HandlePlayerEnteredZone(AGP_EnemySpawnVolume* Zone);
+
+	UFUNCTION()
+	void HandleMarkerTriggered(AGP_EnemySpawnVolume* Zone, AGP_EnemySpawnMarker* Marker);
 
 	UFUNCTION()
 	void HandleZoneEnemyDied(AGP_EnemyCharacter* DeadEnemy);

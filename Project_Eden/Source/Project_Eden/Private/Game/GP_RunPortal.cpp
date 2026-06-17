@@ -15,6 +15,7 @@ AGP_RunPortal::AGP_RunPortal()
 	Trigger->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 	Trigger->SetCollisionResponseToAllChannels(ECR_Ignore);
 	Trigger->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
+	Trigger->SetGenerateOverlapEvents(true);
 	Trigger->ShapeColor = FColor(120, 120, 255);
 }
 

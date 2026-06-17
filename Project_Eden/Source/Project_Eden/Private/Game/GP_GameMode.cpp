@@ -1,6 +1,7 @@
 #include "Game/GP_GameMode.h"
 
 #include "Characters/GP_EnemyCharacter.h"
+#include "Game/GP_EnemySpawnMarker.h"
 #include "Game/GP_EnemySpawnVolume.h"
 #include "Game/GP_GameState.h"
 #include "Game/GP_RunPortal.h"
@@ -21,6 +22,7 @@ void AGP_GameMode::BeginPlay()
 	for (AGP_EnemySpawnVolume* Zone : OrderedZones)
 	{
 		Zone->OnPlayerEnteredZone.AddDynamic(this, &AGP_GameMode::HandlePlayerEnteredZone);
+		Zone->OnMarkerTriggered.AddDynamic(this, &AGP_GameMode::HandleMarkerTriggered);
 	}
 
 	UnlockZone(0);
@@ -112,6 +114,9 @@ void AGP_GameMode::StartZone(int32 ZoneIndex)
 
 	AGP_EnemySpawnVolume* Zone = OrderedZones[ZoneIndex];
 
+	MarkersTotal = Zone->GetMarkerCount();
+	MarkersTriggered = 0;
+
 	if (AGP_GameState* GPGameState = GetGPGameState())
 	{
 		GPGameState->SetCurrentZoneIndex(ZoneIndex);
@@ -119,10 +124,85 @@ void AGP_GameMode::StartZone(int32 ZoneIndex)
 		GPGameState->SetMatchPhase(Zone->IsBossZone() ? EGPMatchPhase::BossFight : EGPMatchPhase::InCity);
 	}
 
+	if (MarkersTotal > 0)
+	{
+		// Progressive mode: enemies spawn marker-by-marker as the player advances into the city.
+		Zone->ActivateMarkers();
+		OnZoneStarted(ZoneIndex, Zone);
+		return;
+	}
+
+	// Box-fallback mode: spawn the whole composition at once.
 	SpawnZoneEnemies(Zone);
 	OnZoneStarted(ZoneIndex, Zone);
 
 	if (AliveZoneEnemies == 0)
+	{
+		CompleteCurrentZone();
+	}
+}
+
+void AGP_GameMode::HandleMarkerTriggered(AGP_EnemySpawnVolume* Zone, AGP_EnemySpawnMarker* Marker)
+{
+	if (bRunFinished || !IsValid(Zone) || !Marker || OrderedZones.IndexOfByKey(Zone) != CurrentZoneIndex)
+	{
+		return;
+	}
+
+	++MarkersTriggered;
+	SpawnMarkerEnemies(Zone, Marker);
+
+	// A marker with no valid enemies still counts as triggered; if that empties the zone, complete it.
+	MaybeCompleteZone();
+}
+
+void AGP_GameMode::SpawnMarkerEnemies(AGP_EnemySpawnVolume* Zone, AGP_EnemySpawnMarker* Marker)
+{
+	UWorld* World = GetWorld();
+	if (!World || !IsValid(Zone) || !Marker)
+	{
+		return;
+	}
+
+	for (const FGP_EnemySpawnEntry& Entry : Marker->GetSpawns())
+	{
+		if (!*Entry.EnemyClass)
+		{
+			continue;
+		}
+
+		for (int32 SpawnIndex = 0; SpawnIndex < Entry.Count; ++SpawnIndex)
+		{
+			bool bProjected = false;
+			const FVector SpawnLocation = Zone->GetSpawnPointNearMarker(Marker, bProjected);
+			if (!bProjected)
+			{
+				UE_LOG(LogTemp, Warning, TEXT("[GP_GameMode] Skipped marker spawn in zone '%s': no navmesh near marker. Check NavMeshBoundsVolume coverage."), *Zone->GetName());
+				continue;
+			}
+
+			FActorSpawnParameters SpawnParameters;
+			SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+
+			AGP_EnemyCharacter* SpawnedEnemy = World->SpawnActor<AGP_EnemyCharacter>(
+				Entry.EnemyClass, SpawnLocation, FRotator::ZeroRotator, SpawnParameters);
+
+			if (!IsValid(SpawnedEnemy))
+			{
+				continue;
+			}
+
+			SpawnedEnemy->SpawnDefaultController();
+			RegisterZoneEnemy(SpawnedEnemy);
+		}
+	}
+}
+
+void AGP_GameMode::MaybeCompleteZone()
+{
+	// In marker mode the zone clears only once every marker has fired and nothing is left alive.
+	const bool bAllMarkersDone = (MarkersTotal == 0) || (MarkersTriggered >= MarkersTotal);
+	if (bAllMarkersDone && AliveZoneEnemies == 0)
 	{
 		CompleteCurrentZone();
 	}
@@ -205,10 +285,7 @@ void AGP_GameMode::HandleZoneEnemyDied(AGP_EnemyCharacter* DeadEnemy)
 		GPGameState->SetEnemiesRemaining(AliveZoneEnemies);
 	}
 
-	if (AliveZoneEnemies == 0)
-	{
-		CompleteCurrentZone();
-	}
+	MaybeCompleteZone();
 }
 
 void AGP_GameMode::CompleteCurrentZone()
