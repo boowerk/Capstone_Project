@@ -71,6 +71,23 @@ AGP_CrystalSeraphBossCharacter::AGP_CrystalSeraphBossCharacter()
 	}
 }
 
+void AGP_CrystalSeraphBossCharacter::OnConstruction(const FTransform& Transform)
+{
+	Super::OnConstruction(Transform);
+
+	// Reapply Crystal Seraph AI assets after serialized Blueprint or placed-instance defaults load.
+	if (UBehaviorTree* CrystalBehaviorTree = LoadObject<UBehaviorTree>(nullptr, TEXT("/Game/Characters/EnemyCharacter/BT/Boss/BT_CrystalSeraph.BT_CrystalSeraph")))
+	{
+		BehaviorTreeAssetOverride = CrystalBehaviorTree;
+	}
+
+	// The dedicated BT uses the shared enemy Blackboard schema rather than the legacy boss Blackboard override.
+	if (UBlackboardData* CrystalBlackboard = LoadObject<UBlackboardData>(nullptr, TEXT("/Game/Characters/EnemyCharacter/BT/Common/BB_EnemyCommon.BB_EnemyCommon")))
+	{
+		BlackboardAssetOverride = CrystalBlackboard;
+	}
+}
+
 void AGP_CrystalSeraphBossCharacter::BeginPlay()
 {
 	Super::BeginPlay();
