@@ -8,6 +8,7 @@ class UButton;
 class UTextBlock;
 class UVerticalBox;
 class AGP_LobbyPlayerState;
+class UGP_LobbyPlayerRowWidget;
 
 /**
  * Lobby widget shown while waiting for all players to ready up.
@@ -22,6 +23,9 @@ class PROJECT_EDEN_API UGP_LobbyWidget : public UUserWidget
 {
 	GENERATED_BODY()
 
+public:
+	void NotifyPlayerListChanged();
+
 protected:
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
@@ -29,7 +33,7 @@ protected:
 	// Widget class used for each player row inside Box_PlayerList.
 	// Create a simple BP widget with Text_Name (UTextBlock) + Text_Status (UTextBlock).
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Lobby")
-	TSubclassOf<UUserWidget> PlayerRowWidgetClass;
+	TSubclassOf<UGP_LobbyPlayerRowWidget> PlayerRowWidgetClass;
 
 private:
 	UPROPERTY(meta = (BindWidget))

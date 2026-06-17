@@ -39,6 +39,11 @@ void AGP_LobbyGameMode::PostLogin(APlayerController* NewPlayer)
 	}
 
 	OnPlayerCountChanged(GetNumPlayers());
+
+	if (IsValid(LobbyWidget))
+	{
+		LobbyWidget->NotifyPlayerListChanged();
+	}
 }
 
 void AGP_LobbyGameMode::Logout(AController* Exiting)
@@ -75,6 +80,16 @@ void AGP_LobbyGameMode::CheckAllReady()
 
 void AGP_LobbyGameMode::TravelToGame()
 {
+	// Restore game input for all players before travelling.
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		if (APlayerController* PC = It->Get())
+		{
+			PC->SetInputMode(FInputModeGameOnly());
+			PC->SetShowMouseCursor(false);
+		}
+	}
+
 	const FString URL = FString::Printf(TEXT("/Game/Maps/%s?listen"), *GameMapName);
 	GetWorld()->ServerTravel(URL);
 }

@@ -6,6 +6,7 @@
 #include "Game/GP_LobbyPlayerState.h"
 #include "GameFramework/GameStateBase.h"
 #include "GameFramework/PlayerState.h"
+#include "UI/GP_LobbyPlayerRowWidget.h"
 
 void UGP_LobbyWidget::NativeConstruct()
 {
@@ -77,17 +78,15 @@ void UGP_LobbyWidget::RefreshPlayerList()
 
 		if (PlayerRowWidgetClass)
 		{
-			UUserWidget* Row = CreateWidget<UUserWidget>(GetOwningPlayer(), PlayerRowWidgetClass);
+			UGP_LobbyPlayerRowWidget* Row = CreateWidget<UGP_LobbyPlayerRowWidget>(GetOwningPlayer(), PlayerRowWidgetClass);
 			if (Row)
 			{
-				// BP row widget: expose Text_Name and Text_Status as BindWidget variables,
-				// then cast and set them here, or just use SetContentForSlot in BP.
+				Row->SetPlayerInfo(Name, LPS->IsReady());
 				Box_PlayerList->AddChildToVerticalBox(Row);
 			}
 		}
 		else
 		{
-			// Fallback: plain text row when no row widget class is set.
 			UTextBlock* Row = NewObject<UTextBlock>(this);
 			Row->SetText(FText::FromString(FString::Printf(TEXT("%s   %s"), *Name, *Status)));
 			Box_PlayerList->AddChildToVerticalBox(Row);
@@ -127,5 +126,11 @@ void UGP_LobbyWidget::UnbindFromPlayerStates()
 
 void UGP_LobbyWidget::OnPlayerReadyChanged(AGP_LobbyPlayerState* PlayerState, bool bReady)
 {
+	RefreshPlayerList();
+}
+
+void UGP_LobbyWidget::NotifyPlayerListChanged()
+{
+	BindToPlayerStates();
 	RefreshPlayerList();
 }
