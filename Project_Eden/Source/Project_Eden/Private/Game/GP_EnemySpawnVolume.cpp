@@ -24,7 +24,10 @@ void AGP_EnemySpawnVolume::BeginPlay()
 {
 	Super::BeginPlay();
 
-	SpawnBox->OnComponentBeginOverlap.AddDynamic(this, &AGP_EnemySpawnVolume::HandleBoxOverlap);
+	if (HasAuthority())
+	{
+		SpawnBox->OnComponentBeginOverlap.AddDynamic(this, &AGP_EnemySpawnVolume::HandleBoxOverlap);
+	}
 
 	// Collect AGP_EnemySpawnMarker actors whose centers fall inside this box.
 	TArray<AActor*> AllMarkers;

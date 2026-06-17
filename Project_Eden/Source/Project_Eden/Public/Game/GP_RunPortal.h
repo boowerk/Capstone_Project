@@ -4,6 +4,7 @@
 #include "GameFramework/Actor.h"
 #include "GP_RunPortal.generated.h"
 
+class AGP_PlayerCharacter;
 class USphereComponent;
 
 /**
@@ -26,9 +27,13 @@ public:
 protected:
 	virtual void BeginPlay() override;
 
-	// Fired on the server when the portal is triggered, before teleport. Hook VFX/sound here in BP.
+	// Fired on the server when the last player passes through (portal about to destroy).
 	UFUNCTION(BlueprintImplementableEvent, Category = "Portal")
 	void OnPortalActivated();
+
+	// Fired on the server each time a player passes through.
+	UFUNCTION(BlueprintImplementableEvent, Category = "Portal")
+	void OnPlayerPassedThrough(AGP_PlayerCharacter* Player);
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Portal")
 	TObjectPtr<USphereComponent> Trigger;
@@ -37,7 +42,8 @@ protected:
 	FVector TargetLocation = FVector::ZeroVector;
 
 private:
-	bool bTriggered = false;
+	UPROPERTY()
+	TSet<TObjectPtr<AGP_PlayerCharacter>> PlayersEntered;
 
 	UFUNCTION()
 	void HandleOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,

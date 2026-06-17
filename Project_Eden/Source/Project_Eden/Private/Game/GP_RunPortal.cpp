@@ -33,24 +33,22 @@ void AGP_RunPortal::BeginPlay()
 void AGP_RunPortal::HandleOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
 	UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
-	if (bTriggered || !Cast<AGP_PlayerCharacter>(OtherActor))
+	AGP_PlayerCharacter* Player = Cast<AGP_PlayerCharacter>(OtherActor);
+	if (!Player || PlayersEntered.Contains(Player))
 	{
 		return;
 	}
 
-	bTriggered = true;
-	OnPortalActivated();
+	PlayersEntered.Add(Player);
+	Player->TeleportTo(TargetLocation, Player->GetActorRotation());
+	OnPlayerPassedThrough(Player);
 
-	// Co-op: one player entering pulls the whole party through.
-	TArray<AActor*> Players;
-	UGameplayStatics::GetAllActorsOfClass(this, AGP_PlayerCharacter::StaticClass(), Players);
-	for (AActor* Player : Players)
+	// Count total connected players and destroy once everyone has entered.
+	TArray<AActor*> AllPlayers;
+	UGameplayStatics::GetAllActorsOfClass(this, AGP_PlayerCharacter::StaticClass(), AllPlayers);
+	if (PlayersEntered.Num() >= AllPlayers.Num())
 	{
-		if (IsValid(Player))
-		{
-			Player->TeleportTo(TargetLocation, Player->GetActorRotation());
-		}
+		OnPortalActivated();
+		Destroy();
 	}
-
-	Destroy();
 }

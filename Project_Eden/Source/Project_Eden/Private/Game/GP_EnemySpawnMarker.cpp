@@ -21,7 +21,10 @@ AGP_EnemySpawnMarker::AGP_EnemySpawnMarker()
 void AGP_EnemySpawnMarker::BeginPlay()
 {
 	Super::BeginPlay();
-	Trigger->OnComponentBeginOverlap.AddDynamic(this, &AGP_EnemySpawnMarker::HandleOverlapBegin);
+	if (HasAuthority())
+	{
+		Trigger->OnComponentBeginOverlap.AddDynamic(this, &AGP_EnemySpawnMarker::HandleOverlapBegin);
+	}
 }
 
 void AGP_EnemySpawnMarker::Activate(AGP_EnemySpawnVolume* OwningZone)
