@@ -16,16 +16,13 @@ void AGP_GameMode::BeginPlay()
 
 	GatherZones();
 
-	// Delay the first spawn so navmesh/streaming has time to be ready; StartRun can also be called from BP.
-	if (StartDelaySeconds > 0.0f)
+	// Subscribe to all volumes; unlock zone 0 so it fires when the first player steps in.
+	for (AGP_EnemySpawnVolume* Zone : OrderedZones)
 	{
-		FTimerHandle StartTimerHandle;
-		GetWorldTimerManager().SetTimer(StartTimerHandle, this, &AGP_GameMode::StartRun, StartDelaySeconds, false);
+		Zone->OnPlayerEnteredZone.AddDynamic(this, &AGP_GameMode::HandlePlayerEnteredZone);
 	}
-	else
-	{
-		StartRun();
-	}
+
+	UnlockZone(0);
 }
 
 void AGP_GameMode::GatherZones()
@@ -48,14 +45,42 @@ void AGP_GameMode::GatherZones()
 	});
 }
 
-void AGP_GameMode::StartRun()
+void AGP_GameMode::UnlockZone(int32 ZoneIndex)
 {
-	if (bRunStarted)
+	if (!OrderedZones.IsValidIndex(ZoneIndex))
 	{
 		return;
 	}
 
-	bRunStarted = true;
+	PendingZoneIndex = ZoneIndex;
+	OrderedZones[ZoneIndex]->Unlock();
+
+	UE_LOG(LogTemp, Log, TEXT("[GP_GameMode] Zone %d unlocked — waiting for player to enter."), ZoneIndex);
+}
+
+void AGP_GameMode::HandlePlayerEnteredZone(AGP_EnemySpawnVolume* Zone)
+{
+	if (bRunFinished || !IsValid(Zone))
+	{
+		return;
+	}
+
+	const int32 ZoneIndex = OrderedZones.IndexOfByKey(Zone);
+	if (ZoneIndex != PendingZoneIndex)
+	{
+		return;
+	}
+
+	StartZone(ZoneIndex);
+}
+
+void AGP_GameMode::StartRun()
+{
+	// Legacy manual trigger — unlocks and immediately starts zone 0 without waiting for overlap.
+	if (bRunStarted)
+	{
+		return;
+	}
 
 	if (OrderedZones.Num() == 0)
 	{
@@ -76,11 +101,11 @@ void AGP_GameMode::StartZone(int32 ZoneIndex)
 
 	if (!OrderedZones.IsValidIndex(ZoneIndex))
 	{
-		// Ran past the end of the sequence: that is a victory.
 		FinishRun(/*bVictory=*/true);
 		return;
 	}
 
+	bRunStarted = true;
 	CurrentZoneIndex = ZoneIndex;
 	AliveZoneEnemies = 0;
 
@@ -94,11 +119,8 @@ void AGP_GameMode::StartZone(int32 ZoneIndex)
 	}
 
 	SpawnZoneEnemies(Zone);
-
-	// Extra presentation/setup after the zone's enemies exist.
 	OnZoneStarted(ZoneIndex, Zone);
 
-	// A zone with no valid spawns would otherwise stall the run; treat it as immediately cleared.
 	if (AliveZoneEnemies == 0)
 	{
 		CompleteCurrentZone();
@@ -128,7 +150,6 @@ void AGP_GameMode::SpawnZoneEnemies(AGP_EnemySpawnVolume* Zone)
 			const FVector SpawnLocation = Zone->GetSpawnPoint(bRandomize, bProjected);
 			if (!bProjected)
 			{
-				// No navmesh under the chosen point; skip rather than drop an enemy that cannot path.
 				UE_LOG(LogTemp, Warning, TEXT("[GP_GameMode] Skipped spawn in zone '%s': no navmesh near spawn point. Check NavMeshBoundsVolume coverage."), *Zone->GetName());
 				continue;
 			}
@@ -147,7 +168,6 @@ void AGP_GameMode::SpawnZoneEnemies(AGP_EnemySpawnVolume* Zone)
 				continue;
 			}
 
-			// Runtime-spawned enemies still need their AI controller; placed enemies auto-possess on their own.
 			SpawnedEnemy->SpawnDefaultController();
 			RegisterZoneEnemy(SpawnedEnemy);
 		}
@@ -161,7 +181,6 @@ void AGP_GameMode::RegisterZoneEnemy(AGP_EnemyCharacter* Enemy)
 		return;
 	}
 
-	// Avoid double-counting if the same enemy is registered twice.
 	if (Enemy->OnEnemyDied.IsAlreadyBound(this, &AGP_GameMode::HandleZoneEnemyDied))
 	{
 		return;
@@ -198,9 +217,7 @@ void AGP_GameMode::CompleteCurrentZone()
 		return;
 	}
 
-	// Cleared-city vegetation change and the boss-room teleport/gate are wired in the Blueprint event.
 	OnZoneCompleted(CurrentZoneIndex, OrderedZones[CurrentZoneIndex]);
-
 	AdvanceZone();
 }
 
@@ -219,7 +236,8 @@ void AGP_GameMode::AdvanceZone()
 		GPGameState->SetMatchPhase(EGPMatchPhase::Transition);
 	}
 
-	StartZone(NextZoneIndex);
+	// Unlock next zone — spawn fires when player physically enters it.
+	UnlockZone(NextZoneIndex);
 }
 
 void AGP_GameMode::NotifyAllPlayersDead()

@@ -7,6 +7,8 @@
 class AGP_EnemyCharacter;
 class UBoxComponent;
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FGPOnPlayerEnteredZone, AGP_EnemySpawnVolume*, Zone);
+
 /** One enemy type and how many of it spawn in this zone. */
 USTRUCT(BlueprintType)
 struct FGP_EnemySpawnEntry
@@ -25,8 +27,7 @@ struct FGP_EnemySpawnEntry
  * whether it is the boss zone, and which enemies spawn inside it. AGP_GameMode discovers all of these,
  * orders them by ZoneOrder, and drives the linear "city -> boss room -> next city" loop.
  *
- * Design intent: a designer drops one of these per city (and per boss room), sizes the box over the
- * combat area, and fills Spawns. No Blueprint spawn wiring is needed. See the PCG/gameplay-flow topic note.
+ * Enemies spawn only when a player physically enters the box, not at game start.
  */
 UCLASS()
 class PROJECT_EDEN_API AGP_EnemySpawnVolume : public AActor
@@ -41,29 +42,41 @@ public:
 	FText GetDisplayName() const { return DisplayName; }
 	const TArray<FGP_EnemySpawnEntry>& GetSpawns() const { return Spawns; }
 
+	// Called by GameMode to allow this zone to fire OnPlayerEnteredZone when a player steps in.
+	void Unlock();
+
 	// Returns a spawn location projected onto the navmesh. Random inside the box when bRandomizeInVolume is
 	// true (city enemies); the box center otherwise (precise boss placement). bOutProjected reports whether
 	// a navmesh point was found.
 	FVector GetSpawnPoint(bool bRandomizeInVolume, bool& bOutProjected) const;
 
+	// Fired once when the first player enters this zone after Unlock() is called.
+	UPROPERTY(BlueprintAssignable, Category = "Zone")
+	FGPOnPlayerEnteredZone OnPlayerEnteredZone;
+
 protected:
-	// The combat area for this zone; enemies spawn within its bounds.
+	virtual void BeginPlay() override;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Zone")
 	TObjectPtr<UBoxComponent> SpawnBox;
 
-	// Ascending run order: 0 is the first zone, 1 the next, etc. Determines the city -> boss -> city sequence.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Zone")
 	int32 ZoneOrder = 0;
 
-	// Shown in the HUD ("City of X", "Boss: Crystal Seraph").
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Zone")
 	FText DisplayName;
 
-	// Boss zones report the BossFight phase and spawn at the box center (precise) instead of randomized.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Zone")
 	bool bIsBossZone = false;
 
-	// Enemy composition spawned when this zone starts.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Zone")
 	TArray<FGP_EnemySpawnEntry> Spawns;
+
+private:
+	bool bUnlocked = false;
+	bool bTriggered = false;
+
+	UFUNCTION()
+	void HandleOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
+		UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 };
