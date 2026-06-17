@@ -3,6 +3,8 @@
 #include "Engine/TextureRenderTarget2D.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "GameFramework/Pawn.h"
+#include "Kismet/GameplayStatics.h"
 #include "TimerManager.h"
 #include "UI/GP_MinimapCaptureActor.h"
 
@@ -106,7 +108,46 @@ AGP_MinimapCaptureActor* UGP_MinimapSubsystem::ResolveCaptureActor()
 		return *It;
 	}
 
-	return nullptr;
+	return SpawnDefaultCaptureActor();
+}
+
+AGP_MinimapCaptureActor* UGP_MinimapSubsystem::SpawnDefaultCaptureActor()
+{
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return nullptr;
+	}
+
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	SpawnParameters.ObjectFlags |= RF_Transient;
+
+	AGP_MinimapCaptureActor* CaptureActor = World->SpawnActor<AGP_MinimapCaptureActor>(
+		AGP_MinimapCaptureActor::StaticClass(),
+		FVector::ZeroVector,
+		FRotator::ZeroRotator,
+		SpawnParameters);
+
+	if (!IsValid(CaptureActor))
+	{
+		return nullptr;
+	}
+
+	// Fallback spawn keeps the minimap alive even when the level forgot to place a capture actor.
+	ActiveCaptureActor = CaptureActor;
+	CaptureActor->InitializeCapture();
+	if (APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(World, 0))
+	{
+		CaptureActor->CaptureAroundTarget(PlayerPawn);
+	}
+	else
+	{
+		CaptureActor->RequestCapture();
+	}
+
+	BroadcastCurrentRenderTarget();
+	return CaptureActor;
 }
 
 void UGP_MinimapSubsystem::BroadcastCurrentRenderTarget()

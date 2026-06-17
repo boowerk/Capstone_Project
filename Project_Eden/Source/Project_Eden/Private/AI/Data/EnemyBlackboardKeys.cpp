@@ -37,4 +37,10 @@ namespace EnemyBlackboardKeys
 	const FName PreferredHoverHeight(TEXT("PreferredHoverHeight"));
 	const FName PreferredAirRange(TEXT("PreferredAirRange"));
 	const FName bShouldTeleport(TEXT("bShouldTeleport"));
+	const FName WingCoreBreakCount(TEXT("WingCoreBreakCount"));
+	const FName bCanExposeWingCore(TEXT("bCanExposeWingCore"));
+	const FName bWingCoreExposed(TEXT("bWingCoreExposed"));
+	const FName CrystalPrismActor(TEXT("CrystalPrismActor"));
+	const FName bCanUseLaserPattern(TEXT("bCanUseLaserPattern"));
+	const FName bCanUsePrismPattern(TEXT("bCanUsePrismPattern"));
 }

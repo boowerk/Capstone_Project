@@ -19,8 +19,12 @@ AGP_MinimapCaptureActor::AGP_MinimapCaptureActor()
 	SceneCapture->SetupAttachment(SceneRoot);
 	SceneCapture->ProjectionType = ECameraProjectionMode::Orthographic;
 	SceneCapture->CaptureSource = ESceneCaptureSource::SCS_FinalColorLDR;
+	SceneCapture->PrimitiveRenderMode = ESceneCapturePrimitiveRenderMode::PRM_RenderScenePrimitives;
 	SceneCapture->bCaptureEveryFrame = false;
 	SceneCapture->bCaptureOnMovement = false;
+	SceneCapture->bAlwaysPersistRenderingState = true;
+	SceneCapture->bUseRayTracingIfEnabled = false;
+	SceneCapture->LODDistanceFactor = 2.0f;
 }
 
 void AGP_MinimapCaptureActor::BeginPlay()
@@ -39,7 +43,7 @@ void AGP_MinimapCaptureActor::BeginPlay()
 
 	if (bStartFollowingPlayer)
 	{
-		SetFollowTarget(UGameplayStatics::GetPlayerPawn(this, 0));
+		SetFollowTarget(ResolveDefaultFollowTarget());
 		CaptureAroundTarget(FollowTargetActor);
 	}
 	else
@@ -54,7 +58,11 @@ void AGP_MinimapCaptureActor::Tick(float DeltaSeconds)
 
 	if (CaptureMode != EGPMinimapCaptureMode::FollowTarget || !IsValid(FollowTargetActor))
 	{
-		return;
+		SetFollowTarget(ResolveDefaultFollowTarget());
+		if (!IsValid(FollowTargetActor))
+		{
+			return;
+		}
 	}
 
 	FollowCaptureAccumulator += DeltaSeconds;
@@ -87,8 +95,11 @@ void AGP_MinimapCaptureActor::InitializeCapture()
 	{
 		SceneCapture->TextureTarget = RenderTarget;
 		SceneCapture->ProjectionType = ECameraProjectionMode::Orthographic;
+		SceneCapture->PrimitiveRenderMode = ESceneCapturePrimitiveRenderMode::PRM_RenderScenePrimitives;
 		SceneCapture->bCaptureEveryFrame = false;
 		SceneCapture->bCaptureOnMovement = false;
+		SceneCapture->bAlwaysPersistRenderingState = true;
+		SceneCapture->MaxViewDistanceOverride = CaptureHeight * 2.0f;
 	}
 
 	bCaptureInitialized = true;
@@ -158,6 +169,12 @@ FBox AGP_MinimapCaptureActor::ResolveBounds(AActor* BoundsActor) const
 	return BoundsActor->GetComponentsBoundingBox(true);
 }
 
+AActor* AGP_MinimapCaptureActor::ResolveDefaultFollowTarget() const
+{
+	// The player pawn can appear after the HUD or capture actor, so resolve it lazily whenever capture needs it.
+	return UGameplayStatics::GetPlayerPawn(this, 0);
+}
+
 void AGP_MinimapCaptureActor::ApplyTopDownTransform(const FVector& Center, float OrthoWidth, float Yaw)
 {
 	const FVector CaptureLocation(Center.X, Center.Y, Center.Z + CaptureHeight);
@@ -180,6 +197,18 @@ void AGP_MinimapCaptureActor::CaptureForCurrentMode()
 		ApplyTopDownTransform(FollowTargetActor->GetActorLocation(), FollowOrthoWidth, CaptureYaw);
 		RequestCapture();
 		return;
+	}
+
+	if (CaptureMode == EGPMinimapCaptureMode::FollowTarget)
+	{
+		SetFollowTarget(ResolveDefaultFollowTarget());
+		if (IsValid(FollowTargetActor))
+		{
+			const float CaptureYaw = bRotateCaptureWithTarget ? FollowTargetActor->GetActorRotation().Yaw : 0.0f;
+			ApplyTopDownTransform(FollowTargetActor->GetActorLocation(), FollowOrthoWidth, CaptureYaw);
+			RequestCapture();
+			return;
+		}
 	}
 
 	CaptureFullMap(DefaultBoundsActor);

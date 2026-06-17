@@ -206,7 +206,8 @@ void AGP_PlayerController::Tick(float DeltaSeconds)
 	UpdateSkillSelectionInputMode();
 	if (HUDWidget)
 	{
-		// HUD 위젯 자체 tick이 비활성인 경우에도 미니맵 플레이어 방향은 컨트롤러 tick에서 보장합니다.
+		// Controller tick keeps minimap updates alive even if the widget native tick is disabled.
+		HUDWidget->RefreshMinimapBackgroundFromSubsystem();
 		HUDWidget->RefreshMinimapPlayerArrowRotation();
 	}
 

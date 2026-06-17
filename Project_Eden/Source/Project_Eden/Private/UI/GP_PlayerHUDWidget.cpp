@@ -68,6 +68,10 @@ void UGP_PlayerHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaT
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
 	RefreshMinimapPlayerArrowRotation();
+	if (!BoundMinimapRenderTarget.IsValid())
+	{
+		RefreshMinimapBackgroundFromSubsystem();
+	}
 }
 
 void UGP_PlayerHUDWidget::SetMinimapRenderTarget(UTextureRenderTarget2D* InRenderTarget)
@@ -135,7 +139,12 @@ UImage* UGP_PlayerHUDWidget::ResolveMinimapBackgroundImage() const
 		TEXT("MinimapImage"),
 		TEXT("MiniMapImage"),
 		TEXT("MinimapMapImage"),
-		TEXT("MiniMapMapImage")
+		TEXT("MiniMapMapImage"),
+		TEXT("MinimapRenderTargetImage"),
+		TEXT("MiniMapRenderTargetImage"),
+		TEXT("MapBackgroundImage"),
+		TEXT("MapBackground"),
+		TEXT("MapImage")
 	};
 
 	for (const FName& CandidateName : CandidateNames)

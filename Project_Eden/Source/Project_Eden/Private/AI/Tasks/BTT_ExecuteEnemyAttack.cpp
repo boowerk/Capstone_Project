@@ -4,8 +4,11 @@
 #include "AbilitySystem/GP_AbilitySystemComponent.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
+#include "AI/Debug/EnemyAIDebugUtils.h"
+#include "AI/Tasks/BossAttackExecution.h"
 #include "AIController.h"
 #include "BehaviorTree/BlackboardComponent.h"
+#include "Characters/GP_EnemyCharacter.h"
 #include "GameplayTags/GP_Tags.h"
 
 namespace BTT_ExecuteEnemyAttack_Internal
@@ -19,6 +22,17 @@ namespace BTT_ExecuteEnemyAttack_Internal
 		(void)ControlledPawn;
 		(void)BlackboardComponent;
 		(void)BossSweepAttackChance;
+
+		if (const AGP_EnemyCharacter* EnemyCharacter = Cast<AGP_EnemyCharacter>(ControlledPawn))
+		{
+			const FGameplayTag EnemyDefaultAttackTag = EnemyCharacter->GetDefaultAttackAbilityTag();
+			if (EnemyDefaultAttackTag.IsValid()
+				&& (!DefaultAttackAbilityTag.IsValid() || DefaultAttackAbilityTag.MatchesTagExact(GPTags::Ability::Enemy::Attack_Melee)))
+			{
+				// Shared enemy BT assets default to melee; enemy archetype parents can replace that with ranged or future tags.
+				return EnemyDefaultAttackTag;
+			}
+		}
 
 		// Generic attack tasks now execute their configured tag literally.
 		// Boss pattern switching belongs to UBTT_ExecuteBossAttack or explicit boss task nodes in the BT.
@@ -69,6 +83,18 @@ EBTNodeResult::Type UBTT_ExecuteEnemyAttack::ExecuteTask(UBehaviorTreeComponent&
 	{
 		UE_LOG(LogTemp, Warning, TEXT("[EnemyAI] Cannot execute attack ability because ASC is missing: %s"), *GetNameSafe(ControlledPawn));
 		return EBTNodeResult::Failed;
+	}
+
+	if (BossAttackExecution::ShouldUseBossPatternSelector(ControlledPawn, BlackboardComponent))
+	{
+		// Some merged boss BT assets still reference this generic task; route boss pawns through the shared pattern selector.
+		UE_LOG(
+			LogEnemyAI,
+			Log,
+			TEXT("[BossAI] Generic attack task routed through boss pattern selector: Pawn=%s Target=%s"),
+			*GetNameSafe(ControlledPawn),
+			*EnemyAIDebugUtils::DescribeActor(TargetActor));
+		return BossAttackExecution::ExecuteBestPattern(ASC, ControlledPawn, BlackboardComponent, EffectiveAttackAbilityTag, TargetActor);
 	}
 
 	bool bActivated = false;

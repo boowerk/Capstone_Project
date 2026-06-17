@@ -42,4 +42,11 @@ namespace EnemyBlackboardKeys
 	PROJECT_EDEN_API extern const FName PreferredHoverHeight;
 	PROJECT_EDEN_API extern const FName PreferredAirRange;
 	PROJECT_EDEN_API extern const FName bShouldTeleport;
+	// Crystal Seraph keys are optional so existing boss Blackboard assets keep working unchanged.
+	PROJECT_EDEN_API extern const FName WingCoreBreakCount;
+	PROJECT_EDEN_API extern const FName bCanExposeWingCore;
+	PROJECT_EDEN_API extern const FName bWingCoreExposed;
+	PROJECT_EDEN_API extern const FName CrystalPrismActor;
+	PROJECT_EDEN_API extern const FName bCanUseLaserPattern;
+	PROJECT_EDEN_API extern const FName bCanUsePrismPattern;
 }

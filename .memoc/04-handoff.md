@@ -11,7 +11,17 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-06-03T19:04:50
+Last synced: 2026-06-17T03:59:58+09:00
+
+## Crystal Seraph Boss Handoff
+
+- Native prototype is complete and builds: use `AGP_CrystalSeraphBossCharacter` as the C++ parent for a BP child. The constructor assigns `/Game/Characters/MaskMan/SK_MaskMan` as the requested prototype mesh.
+- Add these optional Blackboard keys to the Crystal Seraph BB asset if using BT scoring: `WingCoreBreakCount` int, `bCanExposeWingCore` bool, `bWingCoreExposed` bool, `CrystalPrismActor` object, `bCanUseLaserPattern` bool, and `bCanUsePrismPattern` bool. Existing shared keys `bIsGroggy`, `PreferredHoverHeight`, `PreferredAirRange`, and `bShouldTeleport` are reused.
+- Prototype visuals use engine basic shapes. Create BP children for `GP_CrystalPrismActor`, `GP_SeraphLaserActor`, `GP_WingCoreHitActor`, `GP_CrystalShardProjectile`, and `GP_CrystalSanctuaryMarkerActor` to assign final meshes/materials/Niagara.
+- Damage rules are tag-driven in `GP_DamageExecCalculation`: `CrystalGuarded` = 15% final damage, `WingCoreExposed` = 50%, `Groggy` = full damage. PIE verify with `gp.DamageExec.Log 1`.
+- `UBTT_ExecuteBossAttack` treats failed GAS activation as a real failure now: if a granted pattern cannot activate because of cooldown/block tags/state, it logs the failure, tries the next scored candidate, and returns Failed when no candidate activates. If Attack still loops without a pattern, inspect those `[BossAI] Pattern activation failed...` logs for the exact blocked tag/candidate.
+- `BT_BossCommon.uasset` was observed still referencing `BTT_ExecuteEnemyAttack` in the Attack branch. C++ now guards this by routing boss pawns through `BossAttackExecution` even from the generic task. The editor-side clean setup is still to replace that Attack node with `BTT_ExecuteBossAttack` when convenient.
+- Build verification succeeded, but PIE validation still needs editor setup: BP child, BT/BB asset wiring, arena placement, and pattern VFX tuning.
 
 ## Skill Augment Handoff
 
@@ -124,6 +134,9 @@ _None yet._
 
 ## Not Verified
 
+- 2026-06-17 basic enemy templates: C++ build succeeded and BP templates were created, but PIE runtime behavior still needs checking for common BT chase/attack transitions, ranged hit distance, and flying movement/pathing.
+- 2026-06-17 UE Python commandlet created the Basic enemy BP assets successfully but returned failure because existing `Content/Maps/DemoMap/TestMap.umap` is unloadable (`Invalid value for PACKAGE_FILE_TAG`).
+- 2026-06-14 generic boss Attack task routing: `Project_EdenEditor Win64 Development` build succeeded, but PIE still needs checking. Expected log from a stale generic Attack node is `[BossAI] Generic attack task routed through boss pattern selector...`.
 - 2026-05-31 `UGP_SkillAugmentPoolData`: compile, create DataAsset, fill `Augments`, call `PickRandomAugments(3)` from BP, and pass result to `UGP_AugmentSelectWidget::SetCandidateAugments`.
 - 2026-06-01 `UGP_AugmentSelectWidget`: verify BP child binds `TextBlock_Description0..2` and `Image_Icon0..2`; candidate cards should show augment name, description, and icon when DA fields are set.
 - 2026-06-02 augment type backgrounds: full UBT/editor rebuild was not run because Unreal MCP build/query calls were rejected by automatic approval review. After rebuild, verify `AugmentTypeBackgrounds` defaults and `Image_CardBg0..2` bindings in `WBP_TestAugmentSelect_1`.

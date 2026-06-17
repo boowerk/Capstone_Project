@@ -17,9 +17,15 @@ struct PROJECT_EDEN_API FGPBossAttackPatternRanges
 	static constexpr float AreaAttackReach = 850.0f;
 	static constexpr float BullPatternMinRange = 450.0f;
 	static constexpr float BullPatternMaxRange = 2400.0f;
+	static constexpr float CrystalLaserMinRange = 450.0f;
+	static constexpr float CrystalLaserMaxRange = 2200.0f;
+	static constexpr float CrystalPrismMinRange = 500.0f;
+	static constexpr float CrystalPrismMaxRange = 1800.0f;
 
 	static bool IsWithinReach(float DistanceToTarget, float AttackReach);
 	static bool IsWithinBullPatternRange(float DistanceToTarget);
+	static bool IsWithinCrystalLaserRange(float DistanceToTarget);
+	static bool IsWithinCrystalPrismRange(float DistanceToTarget);
 };
 
 // Snapshot of the blackboard/evaluation state used to score the next boss attack pattern.
@@ -45,6 +51,16 @@ struct FGPBossAttackPatternContext
 	bool bShouldTeleport = false;
 	float PreferredHoverHeight = 650.0f;
 	float PreferredAirRange = 1100.0f;
+	bool bIsCrystalSeraph = false;
+	bool bWingCoreExposed = false;
+	bool bCanExposeWingCore = false;
+	bool bCanUseLaserPattern = false;
+	bool bCanUsePrismPattern = false;
+	bool bCrystalPrismActive = false;
+	int32 WingCoreBreakCount = 0;
+	int32 WingCoreBreakTarget = 3;
+	float TimeSinceLastLaser = 999.0f;
+	float TimeSinceLastPrism = 999.0f;
 };
 
 // Shared deterministic selector used by the BT task and automation tests.

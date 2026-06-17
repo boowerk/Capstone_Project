@@ -9,12 +9,14 @@
 #include "AbilitySystem/Abilities/Enemy/GP_BossHeavyAttack.h"
 #include "AbilitySystem/Abilities/Enemy/GP_BossSummonAdds.h"
 #include "AbilitySystem/Abilities/Enemy/GP_BossSweepAttack.h"
+#include "AbilitySystem/Abilities/Enemy/GP_EnemyAttack.h"
 #include "AbilitySystem/GP_AbilitySystemComponent.h"
 #include "AbilitySystem/GP_AttributeSet.h"
 #include "Engine/DataTable.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/Pawn.h"
+#include "GameplayTags/GP_Tags.h"
 #include "Player/GP_PlayerState.h"
 
 AGP_EnemyCharacter::AGP_EnemyCharacter()
@@ -26,6 +28,9 @@ AGP_EnemyCharacter::AGP_EnemyCharacter()
 	AbilitySystemComponent->SetReplicationMode(EGameplayEffectReplicationMode::Minimal);
 
 	AttributeSet = CreateDefaultSubobject<UGP_AttributeSet>(TEXT("AttributeSet"));
+
+	DefaultEnemyAttackAbilityClass = UGP_EnemyAttack::StaticClass();
+	DefaultAttackAbilityTag = GPTags::Ability::Enemy::Attack_Melee;
 
 	// 적은 배치/스폰 시 공용 AIController를 자동 점유해 BT/Blackboard 초기화를 컨트롤러에 위임한다.
 	AIControllerClass = AEnemyAIController::StaticClass();
@@ -109,6 +114,7 @@ void AGP_EnemyCharacter::BeginPlay()
 	}
 
 	GiveStartupAbilities();
+	GiveDefaultEnemyAttackAbility();
 	if (bIsBossEnemy && bGrantDefaultBossPatternAbilities)
 	{
 		// Boss-specific defaults keep Sans prototypes playable even before designers add custom BP abilities.
@@ -189,6 +195,11 @@ const FEnemyArchetypeTuning* AGP_EnemyCharacter::ResolveEnemyArchetypeTuning() c
 		return ArchetypeRow != nullptr ? &ArchetypeRow->Tuning : nullptr;
 	}
 
+	if (bUseBuiltInArchetypeTuning)
+	{
+		return &BuiltInArchetypeTuning;
+	}
+
 	return nullptr;
 }
 
@@ -232,6 +243,21 @@ void AGP_EnemyCharacter::GiveDefaultBossPatternAbilities()
 
 		// Grant each default once; custom Blueprint abilities can still be added through StartupAbilities.
 		ASC->GiveAbility(FGameplayAbilitySpec(AbilityClass));
+	}
+}
+
+void AGP_EnemyCharacter::GiveDefaultEnemyAttackAbility()
+{
+	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+	if (!bGrantDefaultEnemyAttackAbility || !IsValid(ASC) || !*DefaultEnemyAttackAbilityClass)
+	{
+		return;
+	}
+
+	// Blueprint StartupAbilities can override this; the default grant only fills an otherwise missing basic attack.
+	if (ASC->FindAbilitySpecFromClass(DefaultEnemyAttackAbilityClass) == nullptr)
+	{
+		ASC->GiveAbility(FGameplayAbilitySpec(DefaultEnemyAttackAbilityClass));
 	}
 }
 

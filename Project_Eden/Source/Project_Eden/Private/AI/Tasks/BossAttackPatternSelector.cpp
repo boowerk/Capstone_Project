@@ -16,6 +16,18 @@ bool FGPBossAttackPatternRanges::IsWithinBullPatternRange(float DistanceToTarget
 	return SafeDistance >= BullPatternMinRange && SafeDistance <= BullPatternMaxRange;
 }
 
+bool FGPBossAttackPatternRanges::IsWithinCrystalLaserRange(float DistanceToTarget)
+{
+	const float SafeDistance = FMath::Max(0.0f, DistanceToTarget);
+	return SafeDistance >= CrystalLaserMinRange && SafeDistance <= CrystalLaserMaxRange;
+}
+
+bool FGPBossAttackPatternRanges::IsWithinCrystalPrismRange(float DistanceToTarget)
+{
+	const float SafeDistance = FMath::Max(0.0f, DistanceToTarget);
+	return SafeDistance >= CrystalPrismMinRange && SafeDistance <= CrystalPrismMaxRange;
+}
+
 void FGPBossAttackPatternSelector::AddCandidate(TArray<FGPBossAttackPatternCandidate>& Candidates, const FGameplayTag& AbilityTag, float Score, FName DebugName)
 {
 	if (!AbilityTag.IsValid() || Score <= KINDA_SMALL_NUMBER)
@@ -52,10 +64,60 @@ TArray<FGPBossAttackPatternCandidate> FGPBossAttackPatternSelector::BuildCandida
 	const int32 ChainBreakTarget = FMath::Max(1, Context.ChainBreakTarget);
 	const int32 ChainBreakCount = FMath::Clamp(Context.ChainBreakCount, 0, ChainBreakTarget);
 	const float PreferredAirRange = FMath::Max(100.0f, Context.PreferredAirRange);
+	const int32 WingCoreBreakTarget = FMath::Max(1, Context.WingCoreBreakTarget);
+	const int32 WingCoreBreakCount = FMath::Clamp(Context.WingCoreBreakCount, 0, WingCoreBreakTarget);
 
 	if (Context.bIsGroggy)
 	{
 		// During groggy the boss is intentionally open, so the selector should not start new attacks.
+		return Candidates;
+	}
+
+	if (Context.bIsCrystalSeraph)
+	{
+		if (WingCoreBreakCount >= WingCoreBreakTarget)
+		{
+			AddCandidate(Candidates, GPTags::Ability::Boss::CrystalSeraph::Groggy, 5.0f, TEXT("CrystalSeraphGroggy"));
+			return Candidates;
+		}
+
+		if (Context.bWingCoreExposed)
+		{
+			// While the core is exposed, stop normal pressure so the player clearly reads the damage window.
+			return Candidates;
+		}
+
+		const bool bCanUseCrystalLaser = Context.bCanUseLaserPattern && FGPBossAttackPatternRanges::IsWithinCrystalLaserRange(DistanceToTarget);
+		const bool bCanUseCrystalPrism = Context.bCanUsePrismPattern && FGPBossAttackPatternRanges::IsWithinCrystalPrismRange(DistanceToTarget);
+		const float CrystalPhaseBonus = FMath::Clamp(static_cast<float>(BossPhase - 1) * 0.2f, 0.0f, 0.45f);
+		const float CrystalAirFit = 1.0f - FMath::Clamp(FMath::Abs(DistanceToTarget - PreferredAirRange) / PreferredAirRange, 0.0f, 1.0f);
+		const float CorePressure = static_cast<float>(WingCoreBreakCount) / static_cast<float>(WingCoreBreakTarget);
+
+		if (!Context.bCrystalPrismActive && bCanUseCrystalPrism)
+		{
+			const float PrismScore = 1.05f + CrystalAirFit * 0.3f + CrystalPhaseBonus + CorePressure * 0.15f;
+			AddCandidate(Candidates, GPTags::Ability::Boss::CrystalSeraph::Prism, PrismScore, TEXT("CrystalPrism"));
+		}
+
+		if (Context.bCrystalPrismActive && bCanUseCrystalLaser)
+		{
+			const float LaserScore = 1.2f + CrystalPhaseBonus + CorePressure * 0.2f + (BossPhase >= 2 ? 0.2f : 0.0f);
+			AddCandidate(Candidates, GPTags::Ability::Boss::CrystalSeraph::Laser, LaserScore, TEXT("SeraphLaser"));
+		}
+
+		if (Context.bCanUseBossAreaAttack && BossPhase >= 2 && FGPBossAttackPatternRanges::IsWithinReach(DistanceToTarget, FGPBossAttackPatternRanges::AreaAttackReach))
+		{
+			const float AreaScore = 0.7f + CrystalPhaseBonus + (BossPhase >= 3 ? 0.35f : 0.0f);
+			AddCandidate(Candidates, GPTags::Ability::Boss::CrystalSeraph::Area, AreaScore, TEXT("CrystalSanctuary"));
+		}
+
+		AddCandidate(Candidates, GPTags::Ability::Boss::CrystalSeraph::Basic, 0.45f + CrystalAirFit * 0.2f, TEXT("CrystalShard"));
+
+		Candidates.Sort([](const FGPBossAttackPatternCandidate& Left, const FGPBossAttackPatternCandidate& Right)
+		{
+			return Left.Score > Right.Score;
+		});
+
 		return Candidates;
 	}
 

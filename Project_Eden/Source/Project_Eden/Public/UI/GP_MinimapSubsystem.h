@@ -37,6 +37,7 @@ public:
 
 private:
 	AGP_MinimapCaptureActor* ResolveCaptureActor();
+	AGP_MinimapCaptureActor* SpawnDefaultCaptureActor();
 	void BroadcastCurrentRenderTarget();
 
 	TWeakObjectPtr<AGP_MinimapCaptureActor> ActiveCaptureActor;
