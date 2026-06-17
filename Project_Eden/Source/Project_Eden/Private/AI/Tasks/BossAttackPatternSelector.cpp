@@ -93,6 +93,13 @@ TArray<FGPBossAttackPatternCandidate> FGPBossAttackPatternSelector::BuildCandida
 			return Candidates;
 		}
 
+		if (Context.bShouldTeleport)
+		{
+			// Crystal Seraph re-enters its authored air range before evaluating damage patterns.
+			AddCandidate(Candidates, GPTags::Ability::Boss::CrystalSeraph::Teleport, 4.0f, TEXT("CrystalTeleport"));
+			return Candidates;
+		}
+
 		const bool bCanUseCrystalLaser = Context.bCanUseLaserPattern && FGPBossAttackPatternRanges::IsWithinCrystalLaserRange(DistanceToTarget);
 		const bool bCanUseCrystalPrism = Context.bCanUsePrismPattern && FGPBossAttackPatternRanges::IsWithinCrystalPrismRange(DistanceToTarget);
 		const float CrystalPhaseBonus = FMath::Clamp(static_cast<float>(BossPhase - 1) * 0.2f, 0.0f, 0.45f);

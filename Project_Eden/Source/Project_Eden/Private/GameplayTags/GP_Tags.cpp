@@ -86,6 +86,7 @@ namespace GPTags
                 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Prism, "GPTags.Ability.Boss.CrystalSeraph.Prism", "크리스탈 세라프 프리즘 소환 패턴");
                 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Area, "GPTags.Ability.Boss.CrystalSeraph.Area", "크리스탈 세라프 유리 성역 패턴");
                 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Groggy, "GPTags.Ability.Boss.CrystalSeraph.Groggy", "크리스탈 세라프 그로기 진입 패턴");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(Teleport, "GPTags.Ability.Boss.CrystalSeraph.Teleport", "크리스탈 세라프 공중 전투 위치 재배치");
             }
         }
     }

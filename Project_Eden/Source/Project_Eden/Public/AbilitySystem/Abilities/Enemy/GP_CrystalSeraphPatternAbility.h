@@ -85,3 +85,15 @@ public:
 protected:
 	virtual bool ExecuteCrystalSeraphPattern(AGP_CrystalSeraphBossCharacter* CrystalSeraphBoss, const FGameplayEventData* TriggerEventData) override;
 };
+
+UCLASS(Blueprintable)
+class PROJECT_EDEN_API UGP_CrystalSeraphTeleportAbility : public UGP_CrystalSeraphPatternAbility
+{
+	GENERATED_BODY()
+
+public:
+	UGP_CrystalSeraphTeleportAbility();
+
+protected:
+	virtual bool ExecuteCrystalSeraphPattern(AGP_CrystalSeraphBossCharacter* CrystalSeraphBoss, const FGameplayEventData* TriggerEventData) override;
+};

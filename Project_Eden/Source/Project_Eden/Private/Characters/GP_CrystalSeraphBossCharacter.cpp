@@ -37,6 +37,7 @@ AGP_CrystalSeraphBossCharacter::AGP_CrystalSeraphBossCharacter()
 	CrystalPrismAbilityClass = UGP_CrystalSeraphPrismAbility::StaticClass();
 	CrystalAreaAbilityClass = UGP_CrystalSeraphAreaAbility::StaticClass();
 	CrystalGroggyAbilityClass = UGP_CrystalSeraphGroggyAbility::StaticClass();
+	CrystalTeleportAbilityClass = UGP_CrystalSeraphTeleportAbility::StaticClass();
 
 	if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
 	{
@@ -268,6 +269,61 @@ void AGP_CrystalSeraphBossCharacter::RequestRecoverFromGroggy()
 	MoveToHoverLocation();
 }
 
+bool AGP_CrystalSeraphBossCharacter::RequestTeleportToPreferredCombatPosition(AActor* PatternTargetActor)
+{
+	if (!HasAuthority() || !IsValid(CrystalSeraphStateComponent) || CrystalSeraphStateComponent->IsGroggy())
+	{
+		return false;
+	}
+
+	AActor* TargetActor = ResolvePatternTarget(PatternTargetActor);
+	if (!IsValid(TargetActor))
+	{
+		return false;
+	}
+
+	const float WorldTimeSeconds = GetWorld() != nullptr ? GetWorld()->GetTimeSeconds() : 0.0f;
+	if (WorldTimeSeconds - LastTacticalTeleportTime < FMath::Max(0.0f, TacticalTeleportCooldown))
+	{
+		// Repeated BT evaluations during the cooldown are already satisfied by the previous teleport.
+		return true;
+	}
+
+	FVector HorizontalAway = (GetActorLocation() - TargetActor->GetActorLocation()).GetSafeNormal2D();
+	if (HorizontalAway.IsNearlyZero())
+	{
+		HorizontalAway = -TargetActor->GetActorForwardVector().GetSafeNormal2D();
+	}
+	if (HorizontalAway.IsNearlyZero())
+	{
+		HorizontalAway = FVector::ForwardVector;
+	}
+	const float OrbitAngleDegrees = TacticalTeleportSequence % 2 == 0 ? 45.0f : -45.0f;
+	HorizontalAway = HorizontalAway.RotateAngleAxis(OrbitAngleDegrees, FVector::UpVector).GetSafeNormal2D();
+	++TacticalTeleportSequence;
+
+	const FVector TargetLocation = TargetActor->GetActorLocation();
+	const FVector Destination(
+		TargetLocation.X + HorizontalAway.X * GetPreferredAirRange(),
+		TargetLocation.Y + HorizontalAway.Y * GetPreferredAirRange(),
+		TargetLocation.Z + GetPreferredHoverHeight());
+	const FRotator FacingRotation = (TargetLocation - Destination).Rotation();
+
+	if (AAIController* AIController = Cast<AAIController>(GetController()))
+	{
+		AIController->StopMovement();
+	}
+
+	SetActorLocationAndRotation(Destination, FRotator(0.0f, FacingRotation.Yaw, 0.0f), false, nullptr, ETeleportType::TeleportPhysics);
+	LastTacticalTeleportTime = WorldTimeSeconds;
+
+	UE_LOG(LogTemp, Log, TEXT("[CrystalSeraph] Tactical teleport: Boss=%s Target=%s Destination=%s"),
+		*GetNameSafe(this),
+		*GetNameSafe(TargetActor),
+		*Destination.ToCompactString());
+	return true;
+}
+
 bool AGP_CrystalSeraphBossCharacter::ShouldTeleportForCrystalSeraph(float DistanceToTarget) const
 {
 	const float SafeDistance = FMath::Max(0.0f, DistanceToTarget);
@@ -366,6 +422,7 @@ void AGP_CrystalSeraphBossCharacter::GrantCrystalSeraphPatternAbilities()
 		CrystalPrismAbilityClass,
 		CrystalAreaAbilityClass,
 		CrystalGroggyAbilityClass,
+		CrystalTeleportAbilityClass,
 	};
 
 	for (const TSubclassOf<UGameplayAbility>& AbilityClass : CrystalAbilities)

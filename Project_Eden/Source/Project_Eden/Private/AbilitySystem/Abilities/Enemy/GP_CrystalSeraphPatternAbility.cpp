@@ -111,3 +111,15 @@ bool UGP_CrystalSeraphGroggyAbility::ExecuteCrystalSeraphPattern(AGP_CrystalSera
 	CrystalSeraphBoss->RequestEnterGroggy();
 	return true;
 }
+
+UGP_CrystalSeraphTeleportAbility::UGP_CrystalSeraphTeleportAbility()
+{
+	FGameplayTagContainer AbilityAssetTags;
+	AbilityAssetTags.AddTag(GPTags::Ability::Boss::CrystalSeraph::Teleport);
+	SetAssetTags(AbilityAssetTags);
+}
+
+bool UGP_CrystalSeraphTeleportAbility::ExecuteCrystalSeraphPattern(AGP_CrystalSeraphBossCharacter* CrystalSeraphBoss, const FGameplayEventData* TriggerEventData)
+{
+	return IsValid(CrystalSeraphBoss) && CrystalSeraphBoss->RequestTeleportToPreferredCombatPosition(ResolvePatternTarget(TriggerEventData));
+}

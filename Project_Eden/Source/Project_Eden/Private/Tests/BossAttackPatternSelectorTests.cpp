@@ -138,6 +138,30 @@ bool FBossAttackPatternSelectorScoresTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FCrystalSeraphPatternSelectorTest,
+	"ProjectEden.AI.Boss.PatternSelector.CrystalSeraph",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCrystalSeraphPatternSelectorTest::RunTest(const FString& Parameters)
+{
+	using namespace BossAttackPatternSelectorTests;
+
+	FGPBossAttackPatternContext Context = MakeBaseContext();
+	Context.bIsCrystalSeraph = true;
+	Context.bShouldTeleport = true;
+	Context.DistanceToTarget = 2300.0f;
+	ExpectTopPattern(*this, TEXT("Crystal Seraph teleports before distant attacks"), Context, GPTags::Ability::Boss::CrystalSeraph::Teleport);
+
+	Context = MakeBaseContext();
+	Context.bIsCrystalSeraph = true;
+	Context.DistanceToTarget = 1100.0f;
+	Context.PreferredAirRange = 1100.0f;
+	ExpectTopPattern(*this, TEXT("Crystal Seraph uses shard as its normal range fallback"), Context, GPTags::Ability::Boss::CrystalSeraph::Basic);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FBossAttackPatternSelectorLiveEvaluationTest,
 	"ProjectEden.AI.Boss.PatternSelector.LiveEvaluationChangesPattern",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
