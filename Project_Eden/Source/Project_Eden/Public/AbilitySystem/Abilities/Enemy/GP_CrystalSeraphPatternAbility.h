@@ -44,8 +44,6 @@ public:
 
 protected:
 	virtual bool ExecuteCrystalSeraphPattern(AGP_CrystalSeraphBossCharacter* CrystalSeraphBoss, const FGameplayEventData* TriggerEventData) override;
-	// Groggy is a state reaction and must interrupt immediately instead of waiting for the attack cadence.
-	virtual bool UsesSharedPatternCadence() const override { return false; }
 };
 
 UCLASS(Blueprintable)
@@ -94,6 +92,8 @@ public:
 
 protected:
 	virtual bool ExecuteCrystalSeraphPattern(AGP_CrystalSeraphBossCharacter* CrystalSeraphBoss, const FGameplayEventData* TriggerEventData) override;
+	// Groggy is a state reaction and must interrupt immediately instead of waiting for the attack cadence.
+	virtual bool UsesSharedPatternCadence() const override { return false; }
 };
 
 UCLASS(Blueprintable)
