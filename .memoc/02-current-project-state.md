@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-06-18T13:22:06+09:00
+updated: 2026-06-19T07:13:33+09:00
 status: active
 tags:
   - memoc
@@ -11,7 +11,7 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-06-18T13:22:06+09:00
+Last synced: 2026-06-19T07:13:33+09:00
 
 ## Current Status
 
@@ -19,7 +19,7 @@ Last synced: 2026-06-18T13:22:06+09:00
 - `BP_Boss_Matador` uses correct `BT_Boss_Matador` and `BB_Boss_Matador` overrides. The shared `EnemyAIController` boss runtime evaluation test cycle default is now disabled, preventing old Sans/common boss Basic/Sweep/Area/Summon sample cycling from driving Matador behavior unless explicitly re-enabled for testing.
 - Matador bull pattern is now structured as a staged matador loop instead of a simple projectile: bull spawns away with a VFX hook/default Niagara, starts toward the decoy, first decoy contact triggers `BP_OnDecoyRedirectedBull` and redirects toward the player, player overlap/prototype redirect returns it to the decoy, and only that return hit records chain success. Non-final return calls `BP_OnDecoyBullReturned`; 3rd/groggy return calls decoy vanish/break and boss teleport flow.
 - Basic enemy Blueprint inheritance path now exists. `AGP_MeleeEnemyCharacter`, `AGP_RangedEnemyCharacter`, and `AGP_FlyingEnemyCharacter` are Blueprintable C++ parents with archetype-specific sight/lose-sight/patrol/home ranges, built-in AI tuning, movement defaults, common `BT_EnemyCommon`/`BB_EnemyCommon`, and `/Game/Characters/MaskMan/SK_MaskMan` assigned as the prototype mesh.
-- Enemy default GAS attacks are archetype-aware. `UGP_EnemyRangedAttack` provides a first ranged prototype hit ability, `AGP_EnemyCharacter` can grant a default enemy attack ability, and shared `BTT_ExecuteEnemyAttack` now resolves the controlled enemy's default attack tag so ranged/flying parents do not need a separate BT.
+- Enemy default GAS attacks are archetype-aware. `UGP_EnemyRangedAttack` now replaces the shared overlap hit with `AGP_EnemyRangedProjectile`, aimed at Blackboard `TargetActor`; the projectile supplies native collision/movement/prototype visuals and set-by-caller damage. `AGP_EnemyCharacter` grants the default attack ability, and shared `BTT_ExecuteEnemyAttack` resolves the archetype attack tag so ranged/flying parents keep the common BT.
 - Basic enemy BP templates were created at `/Game/Characters/EnemyCharacter/Basic/BP_BasicEnemy_Melee`, `/Game/Characters/EnemyCharacter/Basic/BP_BasicEnemy_Ranged`, and `/Game/Characters/EnemyCharacter/Basic/BP_BasicEnemy_Flying`.
 - Boss pattern execution is centralized in `BossAttackExecution`. `BTT_ExecuteBossAttack` and boss pawns accidentally routed through generic `BTT_ExecuteEnemyAttack` now use the same GAS pattern selector and activation/failure logging.
 - `UBTT_ExecuteBossAttack` no longer reports success when GAS pattern activation fails. Granted-but-blocked/cooldowned boss pattern candidates are logged, the next scored candidate is attempted, and the BT task fails only when no candidate can activate.
