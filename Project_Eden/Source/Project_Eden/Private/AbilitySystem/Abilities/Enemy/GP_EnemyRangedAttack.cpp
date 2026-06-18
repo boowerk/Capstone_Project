@@ -39,19 +39,25 @@ void UGP_EnemyRangedAttack::PerformAttackHit()
 		}
 	}
 
-	// Aim at the player's torso while preserving a forward fallback if perception loses the target during the attack frame.
+	// Character actor locations already represent the capsule center, so avoid adding height that would push shots over the player.
 	const FVector TargetLocation = IsValid(TargetActor)
-		? TargetActor->GetActorLocation() + FVector(0.0f, 0.0f, 55.0f)
+		? TargetActor->GetActorLocation()
 		: AvatarPawn->GetActorLocation() + AvatarPawn->GetActorForwardVector() * 1000.0f;
-	FVector AimDirection = (TargetLocation - AvatarPawn->GetActorLocation()).GetSafeNormal();
-	if (AimDirection.IsNearlyZero())
+	FVector SpawnForwardDirection = (TargetLocation - AvatarPawn->GetActorLocation()).GetSafeNormal();
+	if (SpawnForwardDirection.IsNearlyZero())
 	{
-		AimDirection = AvatarPawn->GetActorForwardVector().GetSafeNormal();
+		SpawnForwardDirection = AvatarPawn->GetActorForwardVector().GetSafeNormal();
 	}
 
 	const FVector SpawnLocation = AvatarPawn->GetActorLocation()
-		+ AimDirection * ProjectileSpawnForwardOffset
+		+ SpawnForwardDirection * ProjectileSpawnForwardOffset
 		+ FVector(0.0f, 0.0f, ProjectileSpawnHeightOffset);
+	// Recalculate from the elevated muzzle position; reusing the pawn-origin direction offsets the whole trajectory upward.
+	FVector AimDirection = (TargetLocation - SpawnLocation).GetSafeNormal();
+	if (AimDirection.IsNearlyZero())
+	{
+		AimDirection = SpawnForwardDirection;
+	}
 	FActorSpawnParameters SpawnParameters;
 	SpawnParameters.Owner = AvatarPawn;
 	SpawnParameters.Instigator = AvatarPawn;
