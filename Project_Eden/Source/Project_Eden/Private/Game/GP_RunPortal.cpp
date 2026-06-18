@@ -53,6 +53,8 @@ void AGP_RunPortal::HandleOverlapBegin(UPrimitiveComponent* OverlappedComp, AAct
 	if (bAllPassed)
 	{
 		OnPortalActivated();
-		Destroy();
+		// Delay destroy by one frame so the TeleportTo replication reaches clients
+		// before the actor is torn off.
+		SetLifeSpan(0.1f);
 	}
 }
