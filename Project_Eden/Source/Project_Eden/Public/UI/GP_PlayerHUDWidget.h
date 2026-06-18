@@ -14,6 +14,9 @@ class UTextureRenderTarget2D;
 class UAbilitySystemComponent;
 class UGP_AttributeSet;
 class UGP_MinimapSubsystem;
+class UGP_SkillSlotHUDWidget;
+class AGP_PlayerState;
+class UGP_SkillData;
 
 struct FGPAttributeDelegateBinding
 {
@@ -64,6 +67,14 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "EldenRing HUD|Minimap")
 	void RefreshMinimapBackgroundFromSubsystem();
+
+	// Call after BindToASC to wire up the two equipped-skill slot widgets.
+	UFUNCTION(BlueprintCallable, Category = "EldenRing HUD|Skill")
+	void BindSkillSlots(AGP_PlayerState* PS);
+
+private:
+	UFUNCTION()
+	void OnEquippedSkillChanged(FGameplayTag SlotTag, UGP_SkillData* SkillData);
 
 protected:
 	virtual void NativePreConstruct() override;
@@ -136,8 +147,15 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EldenRing HUD|Minimap", meta = (AllowPrivateAccess = "true"))
 	bool bInvertMinimapPlayerArrowRotation = false;
 
+	UPROPERTY(BlueprintReadOnly, Category = "HUD|Skill", meta = (BindWidgetOptional, AllowPrivateAccess = "true"))
+	TObjectPtr<UGP_SkillSlotHUDWidget> SkillSlot1;
+
+	UPROPERTY(BlueprintReadOnly, Category = "HUD|Skill", meta = (BindWidgetOptional, AllowPrivateAccess = "true"))
+	TObjectPtr<UGP_SkillSlotHUDWidget> SkillSlot2;
+
 	TWeakObjectPtr<UAbilitySystemComponent> BoundPlayerASC;
 	TWeakObjectPtr<UAbilitySystemComponent> BoundBossASC;
+	TWeakObjectPtr<AGP_PlayerState> BoundSkillPlayerState;
 	TArray<FGPAttributeDelegateBinding> PlayerAttributeDelegateHandles;
 	TArray<FGPAttributeDelegateBinding> BossAttributeDelegateHandles;
 	bool bHasCachedMinimapPlayerArrowAngle = false;

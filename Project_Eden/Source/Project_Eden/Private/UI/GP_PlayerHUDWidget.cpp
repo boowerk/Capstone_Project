@@ -11,6 +11,9 @@
 #include "Engine/World.h"
 #include "GameFramework/Pawn.h"
 #include "UI/GP_MinimapSubsystem.h"
+#include "UI/GP_SkillSlotHUDWidget.h"
+#include "Player/GP_PlayerState.h"
+#include "AbilitySystem/Abilities/GP_SkillData.h"
 
 UGP_PlayerHUDWidget::UGP_PlayerHUDWidget(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -537,4 +540,56 @@ void UGP_PlayerHUDWidget::OnASCInitializedCallback(UAbilitySystemComponent* ASC,
 void UGP_PlayerHUDWidget::HandleMinimapRenderTargetChanged(UTextureRenderTarget2D* InRenderTarget)
 {
 	SetMinimapRenderTarget(InRenderTarget);
+}
+
+void UGP_PlayerHUDWidget::BindSkillSlots(AGP_PlayerState* PS)
+{
+	if (!IsValid(PS) || !BoundPlayerASC.IsValid())
+	{
+		return;
+	}
+
+	UAbilitySystemComponent* ASC = BoundPlayerASC.Get();
+
+	// Slot tags match the convention used in GP_PlayerState (Slot01, Slot02).
+	static const FGameplayTag Slot1Tag = FGameplayTag::RequestGameplayTag(TEXT("GPTags.Ability.Skill.Slot01"), false);
+	static const FGameplayTag Slot2Tag = FGameplayTag::RequestGameplayTag(TEXT("GPTags.Ability.Skill.Slot02"), false);
+
+	if (SkillSlot1)
+	{
+		UGP_SkillData* Data = PS->GetEquippedSkillData(Slot1Tag);
+		if (IsValid(Data))
+		{
+			SkillSlot1->SetupSlot(ASC, Data, FText::FromString(TEXT("E")));
+		}
+		else
+		{
+			SkillSlot1->ClearSlot();
+		}
+	}
+
+	if (SkillSlot2)
+	{
+		UGP_SkillData* Data = PS->GetEquippedSkillData(Slot2Tag);
+		if (IsValid(Data))
+		{
+			SkillSlot2->SetupSlot(ASC, Data, FText::FromString(TEXT("R")));
+		}
+		else
+		{
+			SkillSlot2->ClearSlot();
+		}
+	}
+
+	// Re-bind whenever the player swaps skills.
+	BoundSkillPlayerState = PS;
+	PS->OnEquippedSkillChanged.AddUniqueDynamic(this, &UGP_PlayerHUDWidget::OnEquippedSkillChanged);
+}
+
+void UGP_PlayerHUDWidget::OnEquippedSkillChanged(FGameplayTag /*SlotTag*/, UGP_SkillData* /*SkillData*/)
+{
+	if (BoundSkillPlayerState.IsValid())
+	{
+		BindSkillSlots(BoundSkillPlayerState.Get());
+	}
 }

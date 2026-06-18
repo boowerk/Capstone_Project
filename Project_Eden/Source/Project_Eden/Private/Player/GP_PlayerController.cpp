@@ -79,6 +79,10 @@ void AGP_PlayerController::BeginPlay()
 			if (UAbilitySystemComponent* ASC = BaseChar->GetAbilitySystemComponent())
 			{
 				HUDWidget->BindToASC(ASC);
+				if (AGP_PlayerState* GPPS = GetPlayerState<AGP_PlayerState>())
+				{
+					HUDWidget->BindSkillSlots(GPPS);
+				}
 			}
 		}
 	}
