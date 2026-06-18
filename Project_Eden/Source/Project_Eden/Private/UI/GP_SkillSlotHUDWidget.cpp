@@ -17,6 +17,11 @@ void UGP_SkillSlotHUDWidget::SetupSlot(UAbilitySystemComponent* InASC, UGP_Skill
 	BoundASC = InASC;
 	SkillData = InSkillData;
 
+	if (Text_Key)
+	{
+		Text_Key->SetText(InKeyLabel);
+	}
+
 	if (SkillData)
 	{
 		CooldownTag = SkillData->CooldownTag;
@@ -26,11 +31,6 @@ void UGP_SkillSlotHUDWidget::SetupSlot(UAbilitySystemComponent* InASC, UGP_Skill
 	{
 		CooldownTag = FGameplayTag();
 		CooldownDuration = 0.f;
-	}
-
-	if (Text_Key)
-	{
-		Text_Key->SetText(InKeyLabel);
 	}
 
 	RefreshIcon();

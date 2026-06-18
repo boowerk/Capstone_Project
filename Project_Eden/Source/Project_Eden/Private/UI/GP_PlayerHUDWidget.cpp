@@ -558,27 +558,13 @@ void UGP_PlayerHUDWidget::BindSkillSlots(AGP_PlayerState* PS)
 	if (SkillSlot1)
 	{
 		UGP_SkillData* Data = PS->GetEquippedSkillData(Slot1Tag);
-		if (IsValid(Data))
-		{
-			SkillSlot1->SetupSlot(ASC, Data, FText::FromString(TEXT("E")));
-		}
-		else
-		{
-			SkillSlot1->ClearSlot();
-		}
+		SkillSlot1->SetupSlot(ASC, Data, FText::FromString(TEXT("Q")));
 	}
 
 	if (SkillSlot2)
 	{
 		UGP_SkillData* Data = PS->GetEquippedSkillData(Slot2Tag);
-		if (IsValid(Data))
-		{
-			SkillSlot2->SetupSlot(ASC, Data, FText::FromString(TEXT("R")));
-		}
-		else
-		{
-			SkillSlot2->ClearSlot();
-		}
+		SkillSlot2->SetupSlot(ASC, Data, FText::FromString(TEXT("E")));
 	}
 
 	// Re-bind whenever the player swaps skills.
