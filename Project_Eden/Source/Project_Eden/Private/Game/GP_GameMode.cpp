@@ -10,6 +10,10 @@
 AGP_GameMode::AGP_GameMode()
 {
 	GameStateClass = AGP_GameState::StaticClass();
+
+	// Match the lobby's seamless transition so arriving clients are carried
+	// into this map instead of being dropped during the load.
+	bUseSeamlessTravel = true;
 }
 
 void AGP_GameMode::BeginPlay()

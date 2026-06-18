@@ -10,6 +10,12 @@ AGP_LobbyGameMode::AGP_LobbyGameMode()
 {
 	PlayerControllerClass = AGP_LobbyPlayerController::StaticClass();
 	PlayerStateClass = AGP_LobbyPlayerState::StaticClass();
+
+	// Keep clients connected through the map load. Non-seamless ServerTravel
+	// disconnects every client while the server blocks on the map load; a slow
+	// load (24s+ observed) then times the clients out and bounces them to the
+	// menu. Seamless travel streams the transition without dropping connections.
+	bUseSeamlessTravel = true;
 }
 
 void AGP_LobbyGameMode::BeginPlay()
