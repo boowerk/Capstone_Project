@@ -41,15 +41,15 @@ AGP_CrystalSeraphBossCharacter::AGP_CrystalSeraphBossCharacter()
 	CrystalGroggyAbilityClass = UGP_CrystalSeraphGroggyAbility::StaticClass();
 	CrystalTeleportAbilityClass = UGP_CrystalSeraphTeleportAbility::StaticClass();
 
-	// Crystal Seraph uses a minimal attack/idle tree so flying combat never enters ground EQS movement branches.
-	static ConstructorHelpers::FObjectFinder<UBehaviorTree> CrystalBehaviorTreeFinder(TEXT("/Game/Characters/EnemyCharacter/BT/Boss/BT_CrystalSeraph.BT_CrystalSeraph"));
+	// Crystal Seraph keeps the shared boss patrol/chase/reposition flow and specializes only its scored attack patterns.
+	static ConstructorHelpers::FObjectFinder<UBehaviorTree> CrystalBehaviorTreeFinder(TEXT("/Game/Characters/EnemyCharacter/BT/Boss/BT_BossCommon.BT_BossCommon"));
 	if (CrystalBehaviorTreeFinder.Succeeded())
 	{
 		BehaviorTreeAssetOverride = CrystalBehaviorTreeFinder.Object;
 	}
 
-	// Keep the dedicated tree on the shared enemy Blackboard schema consumed by the common boss tasks and services.
-	static ConstructorHelpers::FObjectFinder<UBlackboardData> CrystalBlackboardFinder(TEXT("/Game/Characters/EnemyCharacter/BT/Common/BB_EnemyCommon.BB_EnemyCommon"));
+	// The boss Blackboard extends the common schema with Crystal Seraph prism, laser, teleport, and core state keys.
+	static ConstructorHelpers::FObjectFinder<UBlackboardData> CrystalBlackboardFinder(TEXT("/Game/Characters/EnemyCharacter/BT/Boss/BB_BossCommon.BB_BossCommon"));
 	if (CrystalBlackboardFinder.Succeeded())
 	{
 		BlackboardAssetOverride = CrystalBlackboardFinder.Object;
@@ -75,14 +75,14 @@ void AGP_CrystalSeraphBossCharacter::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
 
-	// Reapply Crystal Seraph AI assets after serialized Blueprint or placed-instance defaults load.
-	if (UBehaviorTree* CrystalBehaviorTree = LoadObject<UBehaviorTree>(nullptr, TEXT("/Game/Characters/EnemyCharacter/BT/Boss/BT_CrystalSeraph.BT_CrystalSeraph")))
+	// Reapply shared boss AI assets after serialized Blueprint or placed-instance defaults load.
+	if (UBehaviorTree* CrystalBehaviorTree = LoadObject<UBehaviorTree>(nullptr, TEXT("/Game/Characters/EnemyCharacter/BT/Boss/BT_BossCommon.BT_BossCommon")))
 	{
 		BehaviorTreeAssetOverride = CrystalBehaviorTree;
 	}
 
-	// The dedicated BT uses the shared enemy Blackboard schema rather than the legacy boss Blackboard override.
-	if (UBlackboardData* CrystalBlackboard = LoadObject<UBlackboardData>(nullptr, TEXT("/Game/Characters/EnemyCharacter/BT/Common/BB_EnemyCommon.BB_EnemyCommon")))
+	// BB_BossCommon supplies the optional Crystal Seraph keys while inheriting the common enemy schema.
+	if (UBlackboardData* CrystalBlackboard = LoadObject<UBlackboardData>(nullptr, TEXT("/Game/Characters/EnemyCharacter/BT/Boss/BB_BossCommon.BB_BossCommon")))
 	{
 		BlackboardAssetOverride = CrystalBlackboard;
 	}
