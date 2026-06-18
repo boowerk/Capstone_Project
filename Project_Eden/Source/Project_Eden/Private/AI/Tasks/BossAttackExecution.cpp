@@ -104,6 +104,11 @@ namespace BossAttackExecution
 	{
 		FGPBossAttackPatternContext Context;
 		Context.DefaultAttackAbilityTag = DefaultAttackAbilityTag;
+		if (const AGP_EnemyCharacter* EnemyCharacter = Cast<AGP_EnemyCharacter>(ControlledPawn))
+		{
+			// Generic boss characters currently represent Sans; specialized Matador/Crystal branches suppress or bypass this candidate.
+			Context.bCanUseBossGroundHands = EnemyCharacter->IsBossEnemy();
+		}
 
 		if (!IsValid(BlackboardComponent))
 		{

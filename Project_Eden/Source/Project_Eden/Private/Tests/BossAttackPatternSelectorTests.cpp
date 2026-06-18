@@ -138,6 +138,25 @@ bool FBossAttackPatternSelectorScoresTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSansGroundHandsPatternSelectorTest,
+	"ProjectEden.AI.Boss.PatternSelector.SansGroundHands",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSansGroundHandsPatternSelectorTest::RunTest(const FString& Parameters)
+{
+	using namespace BossAttackPatternSelectorTests;
+
+	FGPBossAttackPatternContext Context = MakeBaseContext();
+	Context.bCanUseBossGroundHands = true;
+	Context.DistanceToTarget = 620.0f;
+	return ExpectTopPattern(
+		*this,
+		TEXT("Sans generic boss evaluation selects ground hands"),
+		Context,
+		GPTags::Ability::Enemy::Attack_BossGroundHands);
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FCrystalSeraphPatternSelectorTest,
 	"ProjectEden.AI.Boss.PatternSelector.CrystalSeraph",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

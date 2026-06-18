@@ -230,6 +230,18 @@ TArray<FGPBossAttackPatternCandidate> FGPBossAttackPatternSelector::BuildCandida
 		AddCandidate(Candidates, GPTags::Ability::Enemy::Attack_BossArea, AreaScore, TEXT("Area"));
 	}
 
+	if (!Context.bSuppressGenericBossAttacks && Context.bCanUseBossGroundHands
+		&& FGPBossAttackPatternRanges::IsWithinReach(DistanceToTarget, FGPBossAttackPatternRanges::GroundHandsReach))
+	{
+		// Ground hands is a high-commitment Sans pressure pattern; its ability cooldown rotates the next scored candidate afterward.
+		const float GroundHandsScore = 0.58f
+			+ PreferredRangeFit * 0.18f
+			+ PhaseBonus
+			+ (bPressureMode ? 0.08f : 0.0f)
+			+ (bPlayerFirstFocus ? 0.08f : 0.0f);
+		AddCandidate(Candidates, GPTags::Ability::Enemy::Attack_BossGroundHands, GroundHandsScore, TEXT("GroundHands"));
+	}
+
 	Candidates.Sort([](const FGPBossAttackPatternCandidate& Left, const FGPBossAttackPatternCandidate& Right)
 	{
 		return Left.Score > Right.Score;
