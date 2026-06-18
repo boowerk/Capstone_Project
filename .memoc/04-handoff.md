@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-05-21T07:03:24
+updated: 2026-06-18T13:22:06+09:00
 status: active
 tags:
   - memoc
@@ -11,10 +11,12 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-06-17T03:59:58+09:00
+Last synced: 2026-06-18T13:22:06+09:00
 
 ## Crystal Seraph Boss Handoff
 
+- Commits `1c9cd768`, `759988f2`, and `e9616312` throttle pattern starts, restore prism/laser rotation, and force `BT_BossCommon`/`BB_BossCommon`. Editor build and the Crystal Seraph selector automation test passed.
+- PIE still needs runtime confirmation that attacks are at least 2.5s apart and the shared patrol/chase/reposition branches behave acceptably with `MOVE_Flying`.
 - Native prototype is complete and builds: use `AGP_CrystalSeraphBossCharacter` as the C++ parent for a BP child. The constructor assigns `/Game/Characters/MaskMan/SK_MaskMan` as the requested prototype mesh.
 - Add these optional Blackboard keys to the Crystal Seraph BB asset if using BT scoring: `WingCoreBreakCount` int, `bCanExposeWingCore` bool, `bWingCoreExposed` bool, `CrystalPrismActor` object, `bCanUseLaserPattern` bool, and `bCanUsePrismPattern` bool. Existing shared keys `bIsGroggy`, `PreferredHoverHeight`, `PreferredAirRange`, and `bShouldTeleport` are reused.
 - Prototype visuals use engine basic shapes. Create BP children for `GP_CrystalPrismActor`, `GP_SeraphLaserActor`, `GP_WingCoreHitActor`, `GP_CrystalShardProjectile`, and `GP_CrystalSanctuaryMarkerActor` to assign final meshes/materials/Niagara.

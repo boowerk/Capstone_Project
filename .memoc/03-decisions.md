@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-06-18T05:59:00+09:00
+updated: 2026-06-18T13:22:06+09:00
 status: active
 tags:
   - memoc
@@ -34,5 +34,5 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 - Prefer `Capsule -> UEFNSourceMesh` and `Capsule -> CharacterMesh0` sibling hierarchy over `Capsule -> UEFNSourceMesh -> CharacterMesh0`; preserve retargeting by connecting `ABP_MaskMan_Player` Retarget Pose From Mesh `SourceMeshComponent` to `RetargetSourceMesh`, filling it from C++, and ticking `UEFNSourceMesh` before `CharacterMesh0`.
 
 ### 2026-06-18
-- Run Crystal Seraph through a dedicated attack/idle Behavior Tree; model aerial repositioning as the scored Teleport GAS pattern instead of shared ground Chase/Reposition/EQS branches.
-- Reapply Crystal Seraph BT/Blackboard assets in `OnConstruction` so legacy Blueprint and placed-instance serialization cannot silently restore the common ground boss tree.
+- Supersede the dedicated Crystal Seraph attack/idle tree: enforce `BT_BossCommon`/`BB_BossCommon` so patrol, chase, and reposition behavior stays shared while GAS scoring specializes attacks.
+- Gate Crystal Seraph damage/teleport patterns through one boss-owned minimum cadence, but let the groggy state reaction bypass it.
