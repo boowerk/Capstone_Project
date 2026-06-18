@@ -248,4 +248,11 @@ private:
 	bool ShouldSmoothMoveDirection() const;
 	void ResetMoveDirectionSmoothing();
 	void Input_MoveCompleted(const FInputActionValue& Value);
+
+	// Adds the configured Input Mapping Contexts to the local player's Enhanced
+	// Input subsystem. Safe to call multiple times; no-op on non-local or when
+	// the subsystem is not yet available (e.g. early during dedicated-server
+	// client travel). Called from both SetupInputComponent and BeginPlay so a
+	// null subsystem at input-setup time on clients does not leave input unbound.
+	void AddInputMappingContexts();
 };

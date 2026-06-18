@@ -106,7 +106,11 @@ void UGP_LobbyWidget::BindToPlayerStates()
 	{
 		if (AGP_LobbyPlayerState* LPS = Cast<AGP_LobbyPlayerState>(PS))
 		{
-			LPS->OnReadyChanged.AddDynamic(this, &UGP_LobbyWidget::OnPlayerReadyChanged);
+			if (BoundPlayerStates.Contains(LPS))
+			{
+				continue;
+			}
+			LPS->OnReadyChanged.AddUniqueDynamic(this, &UGP_LobbyWidget::OnPlayerReadyChanged);
 			BoundPlayerStates.Add(LPS);
 		}
 	}

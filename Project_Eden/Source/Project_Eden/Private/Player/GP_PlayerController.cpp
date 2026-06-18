@@ -36,6 +36,19 @@ void AGP_PlayerController::BeginPlay()
 {
 	Super::BeginPlay();
 
+	// Retry mapping-context registration here: by BeginPlay the local player is
+	// guaranteed to exist on clients, covering the case where SetupInputComponent
+	// ran before the subsystem was available (dedicated-server client travel).
+	AddInputMappingContexts();
+
+	if (IsLocalController())
+	{
+		// After ServerTravel from the lobby the viewport may still be in UIOnly
+		// mode (the lobby controller set it). Force game input back on.
+		SetInputMode(FInputModeGameOnly());
+		SetShowMouseCursor(false);
+	}
+
 	if (!IsLocalController() || HUDWidget)
 	{
 		return;
@@ -223,14 +236,12 @@ void AGP_PlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
 
-	UEnhancedInputLocalPlayerSubsystem* InputSubsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer());
-	if (!IsValid(InputSubsystem)) return;
-
-	for (UInputMappingContext* Context : InputMappingContexts)
-	{
-		InputSubsystem->AddMappingContext(Context, 0);
-	}
-
+	// Add mapping contexts when possible, but do NOT early-return if the
+	// subsystem is unavailable: on dedicated-server clients GetLocalPlayer() can
+	// be null at input-setup time, and bailing here would skip all BindAction
+	// calls below, leaving the player completely uncontrollable. BeginPlay
+	// retries AddInputMappingContexts() once the local player exists.
+	AddInputMappingContexts();
 
 	UEnhancedInputComponent* EnhancedInputComponent = CastChecked<UEnhancedInputComponent>(InputComponent);
 
@@ -293,6 +304,28 @@ void AGP_PlayerController::SetupInputComponent()
 	else
 	{
 		InputComponent->BindKey(EKeys::Tab, IE_Pressed, this, &ThisClass::Input_ToggleCharacterStatsMenu);
+	}
+}
+
+void AGP_PlayerController::AddInputMappingContexts()
+{
+	if (!IsLocalController())
+	{
+		return;
+	}
+
+	UEnhancedInputLocalPlayerSubsystem* InputSubsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer());
+	if (!IsValid(InputSubsystem))
+	{
+		return;
+	}
+
+	for (UInputMappingContext* Context : InputMappingContexts)
+	{
+		if (Context)
+		{
+			InputSubsystem->AddMappingContext(Context, 0);
+		}
 	}
 }
 
