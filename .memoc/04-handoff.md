@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-06-19T07:13:33+09:00
+updated: 2026-06-19T07:20:38+09:00
 status: active
 tags:
   - memoc
@@ -11,12 +11,12 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-06-19T07:13:33+09:00
+Last synced: 2026-06-19T07:20:38+09:00
 
 ## Basic Ranged Enemy Handoff
 
-- Commits `573e1707` and `ab0171f4` add an overridable shared hit point and a native player-aimed projectile for `BP_BasicEnemy_Ranged` while retaining `BT_EnemyCommon` patrol/chase/attack flow.
-- UHT and all relevant compile actions passed. Close the running editor and rerun the full `Project_EdenEditor Win64 Development` build because the final link was blocked only by the loaded `UnrealEditor-Project_Eden.dll` (`LNK1104`). Then PIE-check the 850 cm attack band, trajectory, and damage.
+- Commits `573e1707`, `ab0171f4`, and `d526e4f9` add an overridable shared hit point and a native player-aimed projectile for `BP_BasicEnemy_Ranged` while retaining `BT_EnemyCommon` patrol/chase/attack flow. Aim is recalculated from the elevated spawn point to the player capsule center.
+- Full `Project_EdenEditor Win64 Development` build passed. PIE-check the 850 cm attack band, trajectory, and damage.
 
 ## Crystal Seraph Boss Handoff
 
