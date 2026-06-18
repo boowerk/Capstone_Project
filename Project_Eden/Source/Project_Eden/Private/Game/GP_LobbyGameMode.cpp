@@ -48,6 +48,17 @@ void AGP_LobbyGameMode::BroadcastRefreshPlayerList()
 	}
 }
 
+void AGP_LobbyGameMode::BroadcastLoading()
+{
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		if (AGP_LobbyPlayerController* LPC = Cast<AGP_LobbyPlayerController>(It->Get()))
+		{
+			LPC->ClientShowLoading();
+		}
+	}
+}
+
 void AGP_LobbyGameMode::OnPlayerReadyChanged(AGP_LobbyPlayerState* PlayerState, bool bIsReady)
 {
 	BroadcastRefreshPlayerList();
@@ -72,6 +83,7 @@ void AGP_LobbyGameMode::CheckAllReady()
 	}
 
 	OnAllPlayersReady();
+	BroadcastLoading();
 	TravelToGame();
 }
 

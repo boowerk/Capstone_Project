@@ -15,6 +15,9 @@ public:
 	UFUNCTION(Client, Reliable)
 	void ClientRefreshPlayerList();
 
+	UFUNCTION(Client, Reliable)
+	void ClientShowLoading();
+
 protected:
 	virtual void BeginPlay() override;
 

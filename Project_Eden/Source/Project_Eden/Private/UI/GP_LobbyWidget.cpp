@@ -7,6 +7,7 @@
 #include "GameFramework/GameStateBase.h"
 #include "GameFramework/PlayerState.h"
 #include "UI/GP_LobbyPlayerRowWidget.h"
+#include "TimerManager.h"
 
 void UGP_LobbyWidget::NativeConstruct()
 {
@@ -19,10 +20,28 @@ void UGP_LobbyWidget::NativeConstruct()
 
 	BindToPlayerStates();
 	RefreshPlayerList();
+
+	// PlayerArray replicates without a change event, and players may join after
+	// this widget is built, so poll periodically to keep the list in sync.
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().SetTimer(RefreshTimerHandle, FTimerDelegate::CreateWeakLambda(this, [this]()
+		{
+			if (IsValid(this) && !bIsLoading)
+			{
+				NotifyPlayerListChanged();
+			}
+		}), 0.5f, true);
+	}
 }
 
 void UGP_LobbyWidget::NativeDestruct()
 {
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(RefreshTimerHandle);
+	}
+
 	UnbindFromPlayerStates();
 	Super::NativeDestruct();
 }
@@ -74,14 +93,25 @@ void UGP_LobbyWidget::RefreshPlayerList()
 		}
 
 		const FString Name = LPS->GetPlayerName();
-		const FString Status = LPS->IsReady() ? TEXT("준비완료") : TEXT("대기중...");
+		FString Status;
+		bool bShowReady;
+		if (bIsLoading)
+		{
+			Status = TEXT("로딩중...");
+			bShowReady = true;
+		}
+		else
+		{
+			bShowReady = LPS->IsReady();
+			Status = bShowReady ? TEXT("준비완료") : TEXT("대기중...");
+		}
 
 		if (PlayerRowWidgetClass)
 		{
 			UGP_LobbyPlayerRowWidget* Row = CreateWidget<UGP_LobbyPlayerRowWidget>(GetOwningPlayer(), PlayerRowWidgetClass);
 			if (Row)
 			{
-				Row->SetPlayerInfo(Name, LPS->IsReady());
+				Row->SetPlayerInfo(Name, bShowReady, bIsLoading);
 				Box_PlayerList->AddChildToVerticalBox(Row);
 			}
 		}
@@ -136,5 +166,17 @@ void UGP_LobbyWidget::OnPlayerReadyChanged(AGP_LobbyPlayerState* PlayerState, bo
 void UGP_LobbyWidget::NotifyPlayerListChanged()
 {
 	BindToPlayerStates();
+	RefreshPlayerList();
+}
+
+void UGP_LobbyWidget::ShowLoadingState()
+{
+	bIsLoading = true;
+
+	if (Button_Ready)
+	{
+		Button_Ready->SetIsEnabled(false);
+	}
+
 	RefreshPlayerList();
 }

@@ -18,7 +18,7 @@ class PROJECT_EDEN_API UGP_LobbyPlayerRowWidget : public UUserWidget
 	GENERATED_BODY()
 
 public:
-	void SetPlayerInfo(const FString& PlayerName, bool bReady);
+	void SetPlayerInfo(const FString& PlayerName, bool bReady, bool bIsLoading = false);
 
 private:
 	UPROPERTY(meta = (BindWidgetOptional))

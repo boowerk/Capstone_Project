@@ -39,5 +39,6 @@ private:
 	void OnPlayerReadyChanged(AGP_LobbyPlayerState* PlayerState, bool bIsReady);
 
 	void BroadcastRefreshPlayerList();
+	void BroadcastLoading();
 	void TravelToGame();
 };

@@ -38,3 +38,11 @@ void AGP_LobbyPlayerController::ClientRefreshPlayerList_Implementation()
 		LobbyWidget->NotifyPlayerListChanged();
 	}
 }
+
+void AGP_LobbyPlayerController::ClientShowLoading_Implementation()
+{
+	if (IsValid(LobbyWidget))
+	{
+		LobbyWidget->ShowLoadingState();
+	}
+}

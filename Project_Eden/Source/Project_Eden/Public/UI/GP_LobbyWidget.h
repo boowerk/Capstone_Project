@@ -26,6 +26,10 @@ class PROJECT_EDEN_API UGP_LobbyWidget : public UUserWidget
 public:
 	void NotifyPlayerListChanged();
 
+	// Called by the server just before ServerTravel. Locks the UI and shows
+	// "로딩중" for all players so the last ready-state update is never missed.
+	void ShowLoadingState();
+
 protected:
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
@@ -46,6 +50,7 @@ private:
 	TObjectPtr<UVerticalBox> Box_PlayerList;
 
 	bool bIsReady = false;
+	bool bIsLoading = false;
 
 	UFUNCTION()
 	void OnReadyClicked();
@@ -58,6 +63,10 @@ private:
 
 	UFUNCTION()
 	void OnPlayerReadyChanged(AGP_LobbyPlayerState* PlayerState, bool bReady);
+
+	// PlayerArray replicates to clients with no change notification, so poll it
+	// on a timer to pick up players that join after this widget was constructed.
+	FTimerHandle RefreshTimerHandle;
 
 	// Tracks bound player states so we can unbind on destruct.
 	UPROPERTY()
