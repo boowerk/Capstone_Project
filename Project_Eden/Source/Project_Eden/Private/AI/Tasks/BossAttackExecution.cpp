@@ -11,6 +11,7 @@
 #include "Characters/GP_CrystalSeraphStateComponent.h"
 #include "Characters/GP_EnemyCharacter.h"
 #include "Characters/GP_MatadorBossStateComponent.h"
+#include "Engine/World.h"
 
 namespace BossAttackExecution
 {
@@ -159,6 +160,23 @@ namespace BossAttackExecution
 			Context.bIsGroggy = CrystalStateComponent->IsGroggy();
 			Context.bWingCoreExposed = CrystalStateComponent->IsWingCoreExposed();
 			Context.bCrystalPrismActive = IsValid(CrystalStateComponent->GetCrystalPrismActor());
+		}
+
+		if (const AGP_CrystalSeraphBossCharacter* CrystalSeraphBoss = Cast<AGP_CrystalSeraphBossCharacter>(ControlledPawn))
+		{
+			const UWorld* World = CrystalSeraphBoss->GetWorld();
+			const float WorldTimeSeconds = World != nullptr ? World->GetTimeSeconds() : 0.0f;
+			Context.PreferredHoverHeight = CrystalSeraphBoss->GetPreferredHoverHeight();
+			Context.PreferredAirRange = CrystalSeraphBoss->GetPreferredAirRange();
+			Context.TimeSinceLastLaser = WorldTimeSeconds - CrystalSeraphBoss->GetLastLaserPatternTime();
+			Context.TimeSinceLastPrism = WorldTimeSeconds - CrystalSeraphBoss->GetLastPrismPatternTime();
+			// Derive special-pattern readiness from authoritative actor state when a legacy BT runs on the common Blackboard schema.
+			Context.bCanUseLaserPattern = Context.bCanUseLaserPattern
+				|| (Context.bCrystalPrismActive && Context.TimeSinceLastLaser >= CrystalSeraphBoss->GetLaserPatternCooldown());
+			Context.bCanUsePrismPattern = Context.bCanUsePrismPattern
+				|| (!Context.bCrystalPrismActive && Context.TimeSinceLastPrism >= CrystalSeraphBoss->GetPrismPatternCooldown());
+			Context.bShouldTeleport = Context.bShouldTeleport
+				|| CrystalSeraphBoss->ShouldTeleportForCrystalSeraph(Context.DistanceToTarget);
 		}
 
 		return Context;
