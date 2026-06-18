@@ -15,6 +15,13 @@ class PROJECT_EDEN_API UGP_CrystalSeraphPatternAbility : public UGP_GameplayAbil
 public:
 	UGP_CrystalSeraphPatternAbility();
 
+	virtual bool CanActivateAbility(
+		const FGameplayAbilitySpecHandle Handle,
+		const FGameplayAbilityActorInfo* ActorInfo,
+		const FGameplayTagContainer* SourceTags = nullptr,
+		const FGameplayTagContainer* TargetTags = nullptr,
+		FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
+
 	virtual void ActivateAbility(
 		const FGameplayAbilitySpecHandle Handle,
 		const FGameplayAbilityActorInfo* ActorInfo,
@@ -23,6 +30,7 @@ public:
 
 protected:
 	virtual bool ExecuteCrystalSeraphPattern(AGP_CrystalSeraphBossCharacter* CrystalSeraphBoss, const FGameplayEventData* TriggerEventData);
+	virtual bool UsesSharedPatternCadence() const { return true; }
 	AActor* ResolvePatternTarget(const FGameplayEventData* TriggerEventData) const;
 };
 
@@ -36,6 +44,8 @@ public:
 
 protected:
 	virtual bool ExecuteCrystalSeraphPattern(AGP_CrystalSeraphBossCharacter* CrystalSeraphBoss, const FGameplayEventData* TriggerEventData) override;
+	// Groggy is a state reaction and must interrupt immediately instead of waiting for the attack cadence.
+	virtual bool UsesSharedPatternCadence() const override { return false; }
 };
 
 UCLASS(Blueprintable)

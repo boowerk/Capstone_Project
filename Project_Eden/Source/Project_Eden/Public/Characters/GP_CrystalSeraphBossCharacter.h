@@ -67,6 +67,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Boss|Crystal Seraph")
 	float GetLastPrismPatternTime() const { return LastPrismPatternTime; }
 
+	UFUNCTION(BlueprintPure, Category = "Boss|Crystal Seraph")
+	bool CanStartCrystalSeraphPattern() const;
+
+	// Reserves the shared attack cadence before a GAS pattern executes so back-to-back BT tasks cannot pass the same check.
+	bool TryStartCrystalSeraphPattern();
+
 protected:
 	virtual void OnConstruction(const FTransform& Transform) override;
 	virtual void BeginPlay() override;
@@ -145,6 +151,9 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph|Air", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "s"))
 	float TacticalTeleportCooldown = 1.0f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph|Combat", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "s"))
+	float MinimumPatternInterval = 2.5f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph|Prism", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "s"))
 	float PrismPatternCooldown = 16.0f;
 
@@ -171,6 +180,7 @@ private:
 
 	float LastLaserPatternTime = -BIG_NUMBER;
 	float LastPrismPatternTime = -BIG_NUMBER;
+	float LastPatternStartTime = -BIG_NUMBER;
 	float LastTacticalTeleportTime = -BIG_NUMBER;
 	int32 TacticalTeleportSequence = 0;
 	FTimerHandle GroggyRecoveryTimerHandle;

@@ -88,6 +88,25 @@ void AGP_CrystalSeraphBossCharacter::OnConstruction(const FTransform& Transform)
 	}
 }
 
+bool AGP_CrystalSeraphBossCharacter::CanStartCrystalSeraphPattern() const
+{
+	const UWorld* World = GetWorld();
+	return World == nullptr
+		|| World->GetTimeSeconds() - LastPatternStartTime >= FMath::Max(0.0f, MinimumPatternInterval);
+}
+
+bool AGP_CrystalSeraphBossCharacter::TryStartCrystalSeraphPattern()
+{
+	if (!HasAuthority() || !CanStartCrystalSeraphPattern())
+	{
+		return false;
+	}
+
+	// Reserve before spawning actors because the BT can immediately execute another task before its service ticks again.
+	LastPatternStartTime = GetWorld() != nullptr ? GetWorld()->GetTimeSeconds() : LastPatternStartTime;
+	return true;
+}
+
 void AGP_CrystalSeraphBossCharacter::BeginPlay()
 {
 	Super::BeginPlay();

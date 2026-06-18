@@ -25,7 +25,7 @@ namespace BossAttackExecution
 	EBTNodeResult::Type ExecuteBestPattern(
 		UAbilitySystemComponent* ASC,
 		const APawn* ControlledPawn,
-		const UBlackboardComponent* BlackboardComponent,
+		UBlackboardComponent* BlackboardComponent,
 		const FGameplayTag& DefaultAttackAbilityTag,
 		const AActor* TargetActor);
 }

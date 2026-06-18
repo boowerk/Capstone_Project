@@ -7,6 +7,7 @@
 #include "AI/Debug/EnemyAIDebugUtils.h"
 #include "AI/Tasks/EnemyBTTaskCommon.h"
 #include "BehaviorTree/BlackboardComponent.h"
+#include "Characters/GP_CrystalSeraphBossCharacter.h"
 #include "Characters/GP_CrystalSeraphStateComponent.h"
 #include "Characters/GP_EnemyCharacter.h"
 #include "Characters/GP_MatadorBossStateComponent.h"
@@ -166,7 +167,7 @@ namespace BossAttackExecution
 	EBTNodeResult::Type ExecuteBestPattern(
 		UAbilitySystemComponent* ASC,
 		const APawn* ControlledPawn,
-		const UBlackboardComponent* BlackboardComponent,
+		UBlackboardComponent* BlackboardComponent,
 		const FGameplayTag& DefaultAttackAbilityTag,
 		const AActor* TargetActor)
 	{
@@ -188,6 +189,13 @@ namespace BossAttackExecution
 
 			if (TryActivateAbilityByTag(ASC, Candidate.AbilityTag))
 			{
+				if (Cast<AGP_CrystalSeraphBossCharacter>(ControlledPawn) != nullptr
+					&& HasBlackboardKey(BlackboardComponent, EnemyBlackboardKeys::bCanAttack))
+				{
+					// Leave the common BT Attack branch immediately; the tactics service will reopen it after the cadence expires.
+					BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bCanAttack, false);
+				}
+
 				UE_LOG(
 					LogEnemyAI,
 					Log,

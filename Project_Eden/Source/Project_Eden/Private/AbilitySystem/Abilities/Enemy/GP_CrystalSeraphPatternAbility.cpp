@@ -9,6 +9,26 @@ UGP_CrystalSeraphPatternAbility::UGP_CrystalSeraphPatternAbility()
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
 }
 
+bool UGP_CrystalSeraphPatternAbility::CanActivateAbility(
+	const FGameplayAbilitySpecHandle Handle,
+	const FGameplayAbilityActorInfo* ActorInfo,
+	const FGameplayTagContainer* SourceTags,
+	const FGameplayTagContainer* TargetTags,
+	FGameplayTagContainer* OptionalRelevantTags) const
+{
+	if (!Super::CanActivateAbility(Handle, ActorInfo, SourceTags, TargetTags, OptionalRelevantTags))
+	{
+		return false;
+	}
+
+	const AGP_CrystalSeraphBossCharacter* CrystalSeraphBoss = ActorInfo != nullptr
+		? Cast<AGP_CrystalSeraphBossCharacter>(ActorInfo->AvatarActor.Get())
+		: nullptr;
+	// Reject stale BT attack requests at GAS activation time, not only when the tactics service refreshes Blackboard.
+	return !UsesSharedPatternCadence()
+		|| (IsValid(CrystalSeraphBoss) && CrystalSeraphBoss->CanStartCrystalSeraphPattern());
+}
+
 void UGP_CrystalSeraphPatternAbility::ActivateAbility(
 	const FGameplayAbilitySpecHandle Handle,
 	const FGameplayAbilityActorInfo* ActorInfo,
@@ -24,7 +44,12 @@ void UGP_CrystalSeraphPatternAbility::ActivateAbility(
 	}
 
 	AGP_CrystalSeraphBossCharacter* CrystalSeraphBoss = Cast<AGP_CrystalSeraphBossCharacter>(GetAvatarActorFromActorInfo());
-	const bool bStarted = HasAuthority(&ActivationInfo) && IsValid(CrystalSeraphBoss) && ExecuteCrystalSeraphPattern(CrystalSeraphBoss, TriggerEventData);
+	const bool bCadenceReserved = !UsesSharedPatternCadence()
+		|| (HasAuthority(&ActivationInfo) && IsValid(CrystalSeraphBoss) && CrystalSeraphBoss->TryStartCrystalSeraphPattern());
+	const bool bStarted = bCadenceReserved
+		&& HasAuthority(&ActivationInfo)
+		&& IsValid(CrystalSeraphBoss)
+		&& ExecuteCrystalSeraphPattern(CrystalSeraphBoss, TriggerEventData);
 	UE_LOG(
 		LogEnemyAI,
 		Log,
