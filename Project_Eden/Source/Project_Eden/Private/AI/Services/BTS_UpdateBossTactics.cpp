@@ -260,6 +260,12 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 	const bool bCanTriggerCrystalSeraphGroggy = IsValid(CrystalSeraphStateComponent) && WingCoreBreakCount >= WingCoreBreakTarget && !bCrystalSeraphGroggy;
 	const float CrystalPreferredHoverHeight = IsValid(CrystalSeraphBoss) ? CrystalSeraphBoss->GetPreferredHoverHeight() : PreferredHoverHeight;
 	const float CrystalPreferredAirRange = IsValid(CrystalSeraphBoss) ? CrystalSeraphBoss->GetPreferredAirRange() : PreferredAirRange;
+	// Actor-owned timestamps keep prism and laser eligible until used instead of depending on a narrow global clock window.
+	const bool bCrystalPatternIntervalReady = IsValid(CrystalSeraphBoss) && CrystalSeraphBoss->CanStartCrystalSeraphPattern();
+	const bool bCrystalLaserCooldownReady = IsValid(CrystalSeraphBoss)
+		&& WorldTimeSeconds - CrystalSeraphBoss->GetLastLaserPatternTime() >= CrystalSeraphBoss->GetLaserPatternCooldown();
+	const bool bCrystalPrismCooldownReady = IsValid(CrystalSeraphBoss)
+		&& WorldTimeSeconds - CrystalSeraphBoss->GetLastPrismPatternTime() >= CrystalSeraphBoss->GetPrismPatternCooldown();
 	const bool bCrystalLaserRangeAllowed = BTS_UpdateBossTactics_Internal::IsDistanceInRange(DistanceToTarget, CrystalLaserMinRange, CrystalLaserMaxRange);
 	const bool bCrystalPrismRangeAllowed = BTS_UpdateBossTactics_Internal::IsDistanceInRange(DistanceToTarget, CrystalPrismMinRange, CrystalPrismMaxRange);
 	bool bCanUseCrystalLaserPattern = IsValid(CrystalSeraphStateComponent)
@@ -271,7 +277,8 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 		&& bCrystalPrismActive
 		&& bHasLineOfSight
 		&& bCrystalLaserRangeAllowed
-		&& BTS_UpdateBossTactics_Internal::IsPatternWindowOpen(WorldTimeSeconds, CrystalLaserPatternInterval, CrystalLaserPatternWindow);
+		&& bCrystalPatternIntervalReady
+		&& bCrystalLaserCooldownReady;
 	bool bCanUseCrystalPrismPattern = IsValid(CrystalSeraphStateComponent)
 		&& bHasTarget
 		&& !bReturningHome
@@ -280,14 +287,15 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 		&& !bWingCoreExposed
 		&& !bCrystalPrismActive
 		&& bCrystalPrismRangeAllowed
-		&& BTS_UpdateBossTactics_Internal::IsPatternWindowOpen(WorldTimeSeconds, CrystalPrismPatternInterval, CrystalPrismPatternWindow);
+		&& bCrystalPatternIntervalReady
+		&& bCrystalPrismCooldownReady;
 	const bool bCrystalShouldTeleport = IsValid(CrystalSeraphBoss)
 		&& bHasTarget
 		&& !bReturningHome
 		&& !bCrystalSeraphGroggy
 		&& !bWingCoreExposed
 		&& (CrystalSeraphBoss->ShouldTeleportForCrystalSeraph(DistanceToTarget) || !bHasLineOfSight);
-	const bool bCanUseCrystalTeleportPattern = bCrystalShouldTeleport;
+	const bool bCanUseCrystalTeleportPattern = bCrystalShouldTeleport && bCrystalPatternIntervalReady;
 	const bool bCanUseCrystalBasicPattern = IsValid(CrystalSeraphStateComponent)
 		&& bHasTarget
 		&& !bReturningHome
@@ -296,6 +304,7 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 		&& !bWingCoreExposed
 		&& !bCrystalShouldTeleport
 		&& bHasLineOfSight
+		&& bCrystalPatternIntervalReady
 		&& DistanceToTarget <= FMath::Max(0.0f, CrystalShardMaxRange);
 
 	if (bMatadorGroggy)
@@ -353,6 +362,7 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 			&& !bReturningHome
 			&& !bShouldPhaseTransition
 			&& !bWingCoreExposed
+			&& bCrystalPatternIntervalReady
 			&& BossPhase >= 2
 			&& bHasLineOfSight
 			&& BTS_UpdateBossTactics_Internal::IsDistanceInRange(DistanceToTarget, CrystalPreferredAirRange * 0.5f, AreaAttackRange)

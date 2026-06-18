@@ -158,6 +158,15 @@ bool FCrystalSeraphPatternSelectorTest::RunTest(const FString& Parameters)
 	Context.PreferredAirRange = 1100.0f;
 	ExpectTopPattern(*this, TEXT("Crystal Seraph uses shard as its normal range fallback"), Context, GPTags::Ability::Boss::CrystalSeraph::Basic);
 
+	// Crystal mechanics must outrank the shard fallback whenever their service-owned readiness flags are open.
+	Context.bCanUsePrismPattern = true;
+	ExpectTopPattern(*this, TEXT("Crystal Seraph creates a ready prism before using shards"), Context, GPTags::Ability::Boss::CrystalSeraph::Prism);
+
+	Context.bCanUsePrismPattern = false;
+	Context.bCrystalPrismActive = true;
+	Context.bCanUseLaserPattern = true;
+	ExpectTopPattern(*this, TEXT("Crystal Seraph fires its laser while a prism is active"), Context, GPTags::Ability::Boss::CrystalSeraph::Laser);
+
 	return true;
 }
 
