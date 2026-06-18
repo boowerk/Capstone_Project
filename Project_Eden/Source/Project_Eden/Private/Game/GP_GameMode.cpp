@@ -368,6 +368,30 @@ void AGP_GameMode::FinishRun(bool bVictory)
 	}
 
 	OnRunFinished(bVictory);
+
+	// Send the party back to the lobby after a beat so the result screen shows.
+	if (UWorld* World = GetWorld())
+	{
+		if (ReturnToLobbyDelay > 0.0f)
+		{
+			World->GetTimerManager().SetTimer(ReturnToLobbyTimerHandle, this,
+				&AGP_GameMode::ReturnToLobby, ReturnToLobbyDelay, false);
+		}
+		else
+		{
+			ReturnToLobby();
+		}
+	}
+}
+
+void AGP_GameMode::ReturnToLobby()
+{
+	if (UWorld* World = GetWorld())
+	{
+		// Seamless ServerTravel carries every connected client back together.
+		const FString URL = FString::Printf(TEXT("/Game/Maps/%s?listen"), *ReturnMapName);
+		World->ServerTravel(URL);
+	}
 }
 
 AGP_GameState* AGP_GameMode::GetGPGameState() const

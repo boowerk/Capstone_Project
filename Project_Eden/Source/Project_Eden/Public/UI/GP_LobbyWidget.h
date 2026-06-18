@@ -17,6 +17,7 @@ class UGP_LobbyPlayerRowWidget;
  *   Button_Ready      (UButton)      — toggles ready state
  *   Text_PlayerCount  (UTextBlock)   — shows "X / Y"
  *   Box_PlayerList    (UVerticalBox) — populated at runtime with player rows
+ *   Button_Leave      (UButton, optional) — leaves the lobby back to main menu
  */
 UCLASS()
 class PROJECT_EDEN_API UGP_LobbyWidget : public UUserWidget
@@ -49,11 +50,17 @@ private:
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UVerticalBox> Box_PlayerList;
 
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UButton> Button_Leave;
+
 	bool bIsReady = false;
 	bool bIsLoading = false;
 
 	UFUNCTION()
 	void OnReadyClicked();
+
+	UFUNCTION()
+	void OnLeaveClicked();
 
 	// Rebuilds Box_PlayerList from current GameState.PlayerArray.
 	void RefreshPlayerList();

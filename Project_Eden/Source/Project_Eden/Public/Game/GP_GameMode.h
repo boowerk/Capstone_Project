@@ -49,6 +49,14 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run")
 	TSubclassOf<AGP_RunPortal> PortalClass;
 
+	// Map to send the party back to once a run ends (victory or defeat). The
+	// delay lets clients see the result screen before the lobby travel kicks in.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run")
+	FString ReturnMapName = TEXT("MainMap/LobbyMap");
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run", meta = (ClampMin = "0.0"))
+	float ReturnToLobbyDelay = 8.0f;
+
 private:
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<AGP_EnemySpawnVolume>> OrderedZones;
@@ -61,6 +69,8 @@ private:
 	bool bRunStarted = false;
 	bool bRunFinished = false;
 
+	FTimerHandle ReturnToLobbyTimerHandle;
+
 	void GatherZones();
 	void UnlockZone(int32 ZoneIndex);
 	void StartZone(int32 ZoneIndex);
@@ -72,6 +82,7 @@ private:
 	void AdvanceZone();
 	void SpawnPortalToZone(int32 FromZoneIndex, int32 ToZoneIndex);
 	void FinishRun(bool bVictory);
+	void ReturnToLobby();
 
 	UFUNCTION()
 	void HandlePlayerEnteredZone(AGP_EnemySpawnVolume* Zone);

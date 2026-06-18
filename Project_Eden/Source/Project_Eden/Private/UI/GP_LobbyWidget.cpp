@@ -7,6 +7,7 @@
 #include "GameFramework/GameStateBase.h"
 #include "GameFramework/PlayerState.h"
 #include "UI/GP_LobbyPlayerRowWidget.h"
+#include "Game/GP_GameInstance.h"
 #include "TimerManager.h"
 
 void UGP_LobbyWidget::NativeConstruct()
@@ -16,6 +17,11 @@ void UGP_LobbyWidget::NativeConstruct()
 	if (Button_Ready)
 	{
 		Button_Ready->OnClicked.AddDynamic(this, &UGP_LobbyWidget::OnReadyClicked);
+	}
+
+	if (Button_Leave)
+	{
+		Button_Leave->OnClicked.AddDynamic(this, &UGP_LobbyWidget::OnLeaveClicked);
 	}
 
 	BindToPlayerStates();
@@ -59,6 +65,14 @@ void UGP_LobbyWidget::OnReadyClicked()
 	if (Button_Ready)
 	{
 		// BP can style this further via OnReadyChanged delegate.
+	}
+}
+
+void UGP_LobbyWidget::OnLeaveClicked()
+{
+	if (UGP_GameInstance* GameInstance = GetGameInstance<UGP_GameInstance>())
+	{
+		GameInstance->ReturnToMainMenu();
 	}
 }
 
