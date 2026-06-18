@@ -43,10 +43,14 @@ void AGP_RunPortal::HandleOverlapBegin(UPrimitiveComponent* OverlappedComp, AAct
 	Player->TeleportTo(TargetLocation, Player->GetActorRotation());
 	OnPlayerPassedThrough(Player);
 
-	// Count total connected players and destroy once everyone has entered.
+	// Destroy when every player in the level has passed through.
 	TArray<AActor*> AllPlayers;
 	UGameplayStatics::GetAllActorsOfClass(this, AGP_PlayerCharacter::StaticClass(), AllPlayers);
-	if (PlayersEntered.Num() >= AllPlayers.Num())
+
+	const bool bAllPassed = AllPlayers.Num() > 0 &&
+		PlayersEntered.Num() >= AllPlayers.Num();
+
+	if (bAllPassed)
 	{
 		OnPortalActivated();
 		Destroy();

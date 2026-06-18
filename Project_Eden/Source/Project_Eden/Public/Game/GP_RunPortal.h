@@ -42,7 +42,7 @@ protected:
 	FVector TargetLocation = FVector::ZeroVector;
 
 private:
-	UPROPERTY()
+	// Tracks which players have already passed through to prevent double-teleport.
 	TSet<TObjectPtr<AGP_PlayerCharacter>> PlayersEntered;
 
 	UFUNCTION()
