@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-06-19T07:20:38+09:00
+updated: 2026-06-19T08:18:31+09:00
 status: active
 tags:
   - memoc
@@ -11,10 +11,11 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-06-19T07:20:38+09:00
+Last synced: 2026-06-19T08:18:31+09:00
 
 ## Current Status
 
+- Sans Ground Hands is a native GAS pattern. `UGP_BossGroundHandsAttack` schedules three waves of three staggered strikes around the current player position; `AGP_BossGroundHandActor` owns the 0.75s red decal warning, primitive placeholder hand, floor trace, rise/retract motion, set-by-caller damage, and vertical launch. Generic boss selection/grants include `Attack_BossGroundHands`; Matador and Crystal Seraph continue through their specialized selector branches.
 - Matador bull/decoy loop now has explicit bull states, proximity-based decoy redirect/return-hit radii, prototype player-overlap redirect via `TryRedirectTowardDecoy()`, decoy-hit success gated to `RedirectedByPlayer`, delayed groggy teleport to the decoy location, and a BP hook `BP_OnDecoyVanishRequested(VanishDelay)` for smoke vanish VFX. `GP_BullChargeActor` owns a native `BullActorVisual` child actor component using `/Game/Meshes/Bull/SK/Bull`, and `BP_Boss_Matador.BullChargeActorClass` points to native `/Script/Project_Eden.GP_BullChargeActor`. Redirect success is limited by charging state, one-time use, max distance, and facing angle; `UGP_MatadorBossStateComponent::TryRedirectActiveBullTowardDecoy(PlayerActor)` is the player parry/deflect call site. Decoy vanish spawns a temporary Niagara default `NS_Free_Magic_Hit2`, hides mesh, and disables collision. Matador state suppresses generic boss selector candidates (`Basic`, `Sweep`, `Area`, `Summon`), and `BTS_UpdateBossTactics` keeps Matador area disabled so bull/decoy remains primary pressure. Matador melee specials are native GAS abilities: `UGP_MatadorRapierThrustAbility` has 5s target tracking, rapier glow scalar, direction lock, 0.5s commit delay, 7500cm line-box thrust damage, and no C++ forward step so root-motion montages can own movement; `UGP_MatadorCapeGustAbility` has 1s prepare, direction lock, 30deg cone damage/knockback, optional slow GE, and low-health multi-burst. Bull and Cape/Rapier activation now mutually block through active bull checks and `MatadorMeleeActive`. `AGP_MatadorMageBossCharacter` grants them natively, and `BP_Boss_Matador` points to `/Game/GAS_Pattern/AbilitySystem/Abilities/EnemyAbilities/Matador/BP_GA_MatadorRapierThrust` and `BP_GA_MatadorCapeGust`. `BossAttackPatternSelector` scores Bull > Cape/Rapier, and `BTS_UpdateBossTactics` counts Matador melee range as an attack request to avoid chase/reposition stutter. External UBT remains blocked by active Live Coding, and MCP `LiveCoding.Compile` was issued after the bull proximity redirect + mutual exclusion patch.
 - `BP_Boss_Matador` uses correct `BT_Boss_Matador` and `BB_Boss_Matador` overrides. The shared `EnemyAIController` boss runtime evaluation test cycle default is now disabled, preventing old Sans/common boss Basic/Sweep/Area/Summon sample cycling from driving Matador behavior unless explicitly re-enabled for testing.
 - Matador bull pattern is now structured as a staged matador loop instead of a simple projectile: bull spawns away with a VFX hook/default Niagara, starts toward the decoy, first decoy contact triggers `BP_OnDecoyRedirectedBull` and redirects toward the player, player overlap/prototype redirect returns it to the decoy, and only that return hit records chain success. Non-final return calls `BP_OnDecoyBullReturned`; 3rd/groggy return calls decoy vanish/break and boss teleport flow.

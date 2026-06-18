@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-06-18T13:22:06+09:00
+updated: 2026-06-19T08:18:31+09:00
 status: active
 tags:
   - memoc
@@ -36,3 +36,6 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 ### 2026-06-18
 - Supersede the dedicated Crystal Seraph attack/idle tree: enforce `BT_BossCommon`/`BB_BossCommon` so patrol, chase, and reposition behavior stays shared while GAS scoring specializes attacks.
 - Gate Crystal Seraph damage/teleport patterns through one boss-owned minimum cadence, but let the groggy state reaction bypass it.
+
+### 2026-06-19
+- Keep Sans Ground Hands in the shared boss GAS selector: the ability owns wave scheduling and cooldown, while replicated strike actors own telegraph, motion, damage, and launch presentation.

@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-06-19T07:20:38+09:00
+updated: 2026-06-19T08:18:31+09:00
 status: active
 tags:
   - memoc
@@ -11,7 +11,13 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-06-19T07:20:38+09:00
+Last synced: 2026-06-19T08:18:31+09:00
+
+## Sans Ground Hands Handoff
+
+- Commits `f4e75d83` and `8a7fbc60` add the native strike actor plus `Attack_BossGroundHands` GAS ability/selector/default grant. Defaults are 3 hands per wave, 3 waves, 0.22s hand stagger, 1.55s wave interval, 0.75s red decal warning, and 8s ability cooldown.
+- Full `Project_EdenEditor Win64 Development` build and `ProjectEden.AI.Boss.PatternSelector.SansGroundHands` passed. PIE still needs visual timing, decal projection, hit collision, damage, and vertical launch/fall verification.
+- The broader `ScoreCases` test still has an unrelated existing Matador expectation mismatch (Cape expected, Rapier selected); the Sans-specific test is isolated and green.
 
 ## Basic Ranged Enemy Handoff
 
