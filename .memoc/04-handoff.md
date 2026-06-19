@@ -98,6 +98,7 @@ Last synced: 2026-06-19T08:31:17+09:00
 
 ## Next Steps
 
+- For PLAZA_DE_TOROS runtime construction: close editor/game or press Ctrl+Alt+F11 to disable active Live Coding, then rebuild. Place `AGP_LevelBuildAnimator` in the arena, set `TargetActorTag=PLAZA_DE_TOROS`, tag all controlled structure actors with `PLAZA_DE_TOROS`, and tune `PieceDuration`, `PieceOverlapDelay`, `UndergroundOffset`, `MirrorSpiralRadius`, `StartYawTwist`, `RiseOvershoot`, and order mode in Details.
 - Build and PIE-test the corrected latest `feature/vfx-skills-impact` merge: Primary attack VisualCues, augment VFX priority, Matador AI/BT, and map asset loads.
 - Future skill UI requirement: when an upgrade augment transforms a skill, replace the skill-slot presentation so it appears evolved. Add augment presentation overrides such as `SkillNameOverride`, `SkillDescriptionOverride`, and `SkillIconOverride`, then resolve the latest applicable selected augment before base `UGP_SkillData` display fields.
 - Point `UGP_CharacterAnimInstance` (or the active AnimBP path) at `CHT_MM_MaskMan_Root` instead of the stock relaxed chooser fallback.
@@ -108,6 +109,7 @@ Last synced: 2026-06-19T08:31:17+09:00
 
 ## Blockers
 
+- Full C++ build for `AGP_LevelBuildAnimator` used the correct `D:\Engine\Windows\Engine\Build\BatchFiles\Build.bat` path and real `.uproject`; UHT passed, but compile stopped with `Unable to build while Live Coding is active`. Need editor/game exit or Ctrl+Alt+F11 before rebuild.
 - Latest Live Coding attempt after the final boss-binding idempotency edit is stuck in UBA `Low on memory` retry logs, not a C++ syntax error. Per user preference, ask for editor rebuild/restart instead of forcing another UBT build.
 - Directly injecting a new `AnimGraphNode_ChooserPlayer` into `ABP_UEFNSource_Player` through tooling caused an editor crash; avoid blind graph-node creation in the production AnimBP.
 - `MovementDirection_Recent` was not reliably visible in the chooser UI during authoring. The first custom `Run` chooser pass may omit or duplicate that column until the variable is exposed cleanly.

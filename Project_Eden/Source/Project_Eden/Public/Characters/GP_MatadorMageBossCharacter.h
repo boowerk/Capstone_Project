@@ -71,7 +71,7 @@ private:
 	void StopMainBodyMovement() const;
 	AActor* ResolvePatternTarget(AActor* ExplicitTargetActor) const;
 	FVector ResolveDecoySpawnLocation(AActor* TargetActor) const;
-	FVector ResolveBullSpawnLocation(AActor* TargetActor) const;
+	FVector ResolveBullSpawnLocation(AActor* DecoyActor, AActor* PlayerTargetActor) const;
 	FRotator ResolveFacingRotation(const FVector& FromLocation, const FVector& ToLocation) const;
 
 private:
@@ -113,6 +113,9 @@ private:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Matador|Placement", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "cm"))
 	float BullSpawnDistanceFromTarget = 3000.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Matador|Placement", meta = (AllowPrivateAccess = "true", Units = "cm"))
+	float BullSpawnSideOffsetFromPlayerLine = 450.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Matador|Placement", meta = (AllowPrivateAccess = "true", Units = "cm"))
 	float BullSpawnHeightOffset = 35.0f;

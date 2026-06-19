@@ -234,7 +234,7 @@ AGP_BullChargeActor* AGP_MatadorMageBossCharacter::SpawnBullPattern(AActor* Patt
 		TargetActor = ResolvePatternTarget(PatternTargetActor);
 	}
 
-	const FVector SpawnLocation = ResolveBullSpawnLocation(DecoyActor);
+	const FVector SpawnLocation = ResolveBullSpawnLocation(DecoyActor, TargetActor);
 	FVector ChargeDirection = (DecoyActor->GetActorLocation() - SpawnLocation).GetSafeNormal2D();
 	if (ChargeDirection.IsNearlyZero())
 	{
@@ -260,13 +260,15 @@ AGP_BullChargeActor* AGP_MatadorMageBossCharacter::SpawnBullPattern(AActor* Patt
 	{
 		// Bull starts as a matador scene: offscreen bull -> decoy lure -> decoy redirects to player -> player redirects back.
 		BullActor->InitializeBullCharge(DecoyActor, TargetActor, DecoyActor, MatadorStateComponent, ChargeDirection);
-		UE_LOG(LogTemp, Log, TEXT("[MatadorBull] Spawned toward decoy. Boss=%s Decoy=%s Player=%s Bull=%s Spawn=%s DecoyLoc=%s Direction=%s"),
+		const FString PlayerLocationString = IsValid(TargetActor) ? TargetActor->GetActorLocation().ToCompactString() : TEXT("Invalid");
+		UE_LOG(LogTemp, Log, TEXT("[MatadorBull] Spawned toward decoy. Boss=%s Decoy=%s Player=%s Bull=%s Spawn=%s DecoyLoc=%s PlayerLoc=%s Direction=%s"),
 			*GetNameSafe(this),
 			*GetNameSafe(DecoyActor),
 			*GetNameSafe(TargetActor),
 			*GetNameSafe(BullActor),
 			*SpawnLocation.ToCompactString(),
 			*DecoyActor->GetActorLocation().ToCompactString(),
+			*PlayerLocationString,
 			*ChargeDirection.ToCompactString());
 	}
 
@@ -562,20 +564,26 @@ FVector AGP_MatadorMageBossCharacter::ResolveDecoySpawnLocation(AActor* TargetAc
 	return DesiredLocation;
 }
 
-FVector AGP_MatadorMageBossCharacter::ResolveBullSpawnLocation(AActor* TargetActor) const
+FVector AGP_MatadorMageBossCharacter::ResolveBullSpawnLocation(AActor* DecoyActor, AActor* PlayerTargetActor) const
 {
-	const FVector TargetLocation = IsValid(TargetActor) ? TargetActor->GetActorLocation() : GetActorLocation() + GetActorForwardVector() * PreferredAirRange;
-	FVector FromBossToTarget = (TargetLocation - GetActorLocation()).GetSafeNormal2D();
-	if (FromBossToTarget.IsNearlyZero())
+	const FVector DecoyLocation = IsValid(DecoyActor) ? DecoyActor->GetActorLocation() : GetActorLocation();
+	const FVector PlayerLocation = IsValid(PlayerTargetActor) ? PlayerTargetActor->GetActorLocation() : GetActorLocation() + GetActorForwardVector() * PreferredAirRange;
+	FVector FromDecoyToPlayer = (PlayerLocation - DecoyLocation).GetSafeNormal2D();
+	if (FromDecoyToPlayer.IsNearlyZero())
 	{
-		FromBossToTarget = GetActorForwardVector().GetSafeNormal2D();
+		FromDecoyToPlayer = GetActorForwardVector().GetSafeNormal2D();
 	}
-	if (FromBossToTarget.IsNearlyZero())
+	if (FromDecoyToPlayer.IsNearlyZero())
 	{
-		FromBossToTarget = FVector::ForwardVector;
+		FromDecoyToPlayer = FVector::ForwardVector;
 	}
 
-	FVector DesiredLocation = TargetLocation + FromBossToTarget * BullSpawnDistanceFromTarget + FVector(0.0f, 0.0f, BullSpawnHeightOffset);
+	const FVector SideDirection = FRotator(0.0f, 90.0f, 0.0f).RotateVector(FromDecoyToPlayer).GetSafeNormal2D();
+	FVector DesiredLocation =
+		DecoyLocation
+		- FromDecoyToPlayer * BullSpawnDistanceFromTarget
+		+ SideDirection * BullSpawnSideOffsetFromPlayerLine
+		+ FVector(0.0f, 0.0f, BullSpawnHeightOffset);
 
 	if (UNavigationSystemV1* NavigationSystem = UNavigationSystemV1::GetCurrent(GetWorld()))
 	{
