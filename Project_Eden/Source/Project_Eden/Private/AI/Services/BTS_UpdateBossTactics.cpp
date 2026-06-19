@@ -17,6 +17,15 @@
 
 namespace BTS_UpdateBossTactics_Internal
 {
+	struct FTacticalStateSnapshot
+	{
+		bool bShouldRetreat = false;
+		bool bCanAttack = false;
+		bool bShouldReposition = false;
+		bool bShouldChase = false;
+		bool bShouldReturnHome = false;
+	};
+
 	bool HasBlackboardKey(const UBlackboardComponent* BlackboardComponent, const FName& KeyName)
 	{
 		return IsValid(BlackboardComponent) && BlackboardComponent->GetKeyID(KeyName) != FBlackboard::InvalidKey;
@@ -79,17 +88,60 @@ namespace BTS_UpdateBossTactics_Internal
 		const float SafeDistance = FMath::Max(0.0f, Distance);
 		return SafeDistance >= FMath::Max(0.0f, MinRange) && SafeDistance <= FMath::Max(MinRange, MaxRange);
 	}
+
+	FTacticalStateSnapshot CaptureTacticalState(const UBlackboardComponent* BlackboardComponent)
+	{
+		FTacticalStateSnapshot Snapshot;
+		if (!IsValid(BlackboardComponent))
+		{
+			return Snapshot;
+		}
+
+		Snapshot.bShouldRetreat = BlackboardComponent->GetValueAsBool(EnemyBlackboardKeys::bShouldRetreat);
+		Snapshot.bCanAttack = BlackboardComponent->GetValueAsBool(EnemyBlackboardKeys::bCanAttack);
+		Snapshot.bShouldReposition = BlackboardComponent->GetValueAsBool(EnemyBlackboardKeys::bShouldReposition);
+		Snapshot.bShouldChase = BlackboardComponent->GetValueAsBool(EnemyBlackboardKeys::bShouldChase);
+		Snapshot.bShouldReturnHome = GetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldReturnHome);
+		return Snapshot;
+	}
+
+	void RequestRootReevaluationIfStateChanged(
+		UBehaviorTreeComponent& OwnerComp,
+		const FTacticalStateSnapshot& PreviousState)
+	{
+		const FTacticalStateSnapshot CurrentState = CaptureTacticalState(OwnerComp.GetBlackboardComponent());
+		const bool bStateChanged = PreviousState.bShouldRetreat != CurrentState.bShouldRetreat
+			|| PreviousState.bCanAttack != CurrentState.bCanAttack
+			|| PreviousState.bShouldReposition != CurrentState.bShouldReposition
+			|| PreviousState.bShouldChase != CurrentState.bShouldChase
+			|| PreviousState.bShouldReturnHome != CurrentState.bShouldReturnHome;
+		if (!bStateChanged || !OwnerComp.IsRunning() || OwnerComp.IsRestartPending() || OwnerComp.IsAbortPending())
+		{
+			return;
+		}
+
+		if (AEnemyAIController* EnemyAIController = Cast<AEnemyAIController>(OwnerComp.GetAIOwner()))
+		{
+			// Defer the restart because services execute inside the Behavior Tree component tick.
+			EnemyAIController->RequestBehaviorTreeRootReevaluation();
+		}
+	}
 }
 
 UBTS_UpdateBossTactics::UBTS_UpdateBossTactics()
 {
 	NodeName = TEXT("Update Boss Tactics");
+	// The derived service publishes the final state after shared observations are refreshed.
+	bRestartTreeOnTacticalStateChange = false;
 }
 
 void UBTS_UpdateBossTactics::TickNode(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, float DeltaSeconds)
 {
+	const BTS_UpdateBossTactics_Internal::FTacticalStateSnapshot PreviousState =
+		BTS_UpdateBossTactics_Internal::CaptureTacticalState(OwnerComp.GetBlackboardComponent());
 	Super::TickNode(OwnerComp, NodeMemory, DeltaSeconds);
 	UpdateBossTactics(OwnerComp);
+	BTS_UpdateBossTactics_Internal::RequestRootReevaluationIfStateChanged(OwnerComp, PreviousState);
 }
 
 void UBTS_UpdateBossTactics::OnSearchStart(FBehaviorTreeSearchData& SearchData)
@@ -208,6 +260,12 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 	const bool bCanTriggerCrystalSeraphGroggy = IsValid(CrystalSeraphStateComponent) && WingCoreBreakCount >= WingCoreBreakTarget && !bCrystalSeraphGroggy;
 	const float CrystalPreferredHoverHeight = IsValid(CrystalSeraphBoss) ? CrystalSeraphBoss->GetPreferredHoverHeight() : PreferredHoverHeight;
 	const float CrystalPreferredAirRange = IsValid(CrystalSeraphBoss) ? CrystalSeraphBoss->GetPreferredAirRange() : PreferredAirRange;
+	// Actor-owned timestamps keep prism and laser eligible until used instead of depending on a narrow global clock window.
+	const bool bCrystalPatternIntervalReady = IsValid(CrystalSeraphBoss) && CrystalSeraphBoss->CanStartCrystalSeraphPattern();
+	const bool bCrystalLaserCooldownReady = IsValid(CrystalSeraphBoss)
+		&& WorldTimeSeconds - CrystalSeraphBoss->GetLastLaserPatternTime() >= CrystalSeraphBoss->GetLaserPatternCooldown();
+	const bool bCrystalPrismCooldownReady = IsValid(CrystalSeraphBoss)
+		&& WorldTimeSeconds - CrystalSeraphBoss->GetLastPrismPatternTime() >= CrystalSeraphBoss->GetPrismPatternCooldown();
 	const bool bCrystalLaserRangeAllowed = BTS_UpdateBossTactics_Internal::IsDistanceInRange(DistanceToTarget, CrystalLaserMinRange, CrystalLaserMaxRange);
 	const bool bCrystalPrismRangeAllowed = BTS_UpdateBossTactics_Internal::IsDistanceInRange(DistanceToTarget, CrystalPrismMinRange, CrystalPrismMaxRange);
 	bool bCanUseCrystalLaserPattern = IsValid(CrystalSeraphStateComponent)
@@ -219,7 +277,8 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 		&& bCrystalPrismActive
 		&& bHasLineOfSight
 		&& bCrystalLaserRangeAllowed
-		&& BTS_UpdateBossTactics_Internal::IsPatternWindowOpen(WorldTimeSeconds, CrystalLaserPatternInterval, CrystalLaserPatternWindow);
+		&& bCrystalPatternIntervalReady
+		&& bCrystalLaserCooldownReady;
 	bool bCanUseCrystalPrismPattern = IsValid(CrystalSeraphStateComponent)
 		&& bHasTarget
 		&& !bReturningHome
@@ -228,9 +287,25 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 		&& !bWingCoreExposed
 		&& !bCrystalPrismActive
 		&& bCrystalPrismRangeAllowed
-		&& BTS_UpdateBossTactics_Internal::IsPatternWindowOpen(WorldTimeSeconds, CrystalPrismPatternInterval, CrystalPrismPatternWindow);
-	bool bCrystalForceRangeReposition = false;
-	bool bCrystalShouldTeleport = IsValid(CrystalSeraphBoss) && bHasTarget && !bReturningHome && CrystalSeraphBoss->ShouldTeleportForCrystalSeraph(DistanceToTarget);
+		&& bCrystalPatternIntervalReady
+		&& bCrystalPrismCooldownReady;
+	const bool bCrystalShouldTeleport = IsValid(CrystalSeraphBoss)
+		&& bHasTarget
+		&& !bReturningHome
+		&& !bCrystalSeraphGroggy
+		&& !bWingCoreExposed
+		&& (CrystalSeraphBoss->ShouldTeleportForCrystalSeraph(DistanceToTarget) || !bHasLineOfSight);
+	const bool bCanUseCrystalTeleportPattern = bCrystalShouldTeleport && bCrystalPatternIntervalReady;
+	const bool bCanUseCrystalBasicPattern = IsValid(CrystalSeraphStateComponent)
+		&& bHasTarget
+		&& !bReturningHome
+		&& !bShouldPhaseTransition
+		&& !bCrystalSeraphGroggy
+		&& !bWingCoreExposed
+		&& !bCrystalShouldTeleport
+		&& bHasLineOfSight
+		&& bCrystalPatternIntervalReady
+		&& DistanceToTarget <= FMath::Max(0.0f, CrystalShardMaxRange);
 
 	if (bMatadorGroggy)
 	{
@@ -287,15 +362,12 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 			&& !bReturningHome
 			&& !bShouldPhaseTransition
 			&& !bWingCoreExposed
+			&& bCrystalPatternIntervalReady
 			&& BossPhase >= 2
 			&& bHasLineOfSight
 			&& BTS_UpdateBossTactics_Internal::IsDistanceInRange(DistanceToTarget, CrystalPreferredAirRange * 0.5f, AreaAttackRange)
 			&& BTS_UpdateBossTactics_Internal::IsPatternWindowOpen(WorldTimeSeconds, AreaAttackInterval, AreaAttackWindow);
 
-		if (!bCanUseCrystalLaserPattern && !bCanUseCrystalPrismPattern && (DistanceToTarget < CrystalPreferredAirRange * 0.65f || bCrystalShouldTeleport))
-		{
-			bCrystalForceRangeReposition = true;
-		}
 	}
 
 	if (!bMatadorGroggy && !bCrystalSeraphGroggy && IsValid(EnemyAIController) && EnemyAIController->IsBossRuntimeEvaluationTestCycleActive() && bHasTarget && !bReturningHome && bHasLineOfSight)
@@ -317,12 +389,14 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 		|| bCanUseMatadorMeleePattern
 		|| bCanUseCrystalLaserPattern
 		|| bCanUseCrystalPrismPattern
+		|| bCanUseCrystalTeleportPattern
+		|| bCanUseCrystalBasicPattern
 		|| bCanSummonAdds
 		|| bCanUseAreaAttack
 		|| bCanUseSweepAttack
 		|| bCanUseHeavyAttack;
 
-	if (bMatadorForceRangeReposition || bCrystalForceRangeReposition)
+	if (bMatadorForceRangeReposition)
 	{
 		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanAttack, false);
 		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldRetreat, true);
@@ -337,12 +411,25 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldReposition, false);
 		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldChase, false);
 	}
+	else if (bMatadorGroggy || bCrystalSeraphGroggy || (bIsCrystalSeraphBoss && bWingCoreExposed))
+	{
+		// Vulnerability windows are stationary and must not fall through to the shared Chase branch.
+		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanAttack, false);
+		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldRetreat, false);
+		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldReposition, false);
+		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldChase, false);
+	}
 	else if (bHasTarget && !bReturningHome && !bShouldReposition)
 	{
 		// If no boss attack can reach, keep the boss moving instead of playing whiffed attacks.
 		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanAttack, false);
 		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldRetreat, false);
 		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldChase, true);
+	}
+	else if (bIsMatadorBoss || bIsCrystalSeraphBoss)
+	{
+		// Never inherit a stale generic attack request while a boss is returning home or already repositioning.
+		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanAttack, false);
 	}
 
 	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldBossPhaseTransition, bShouldPhaseTransition);

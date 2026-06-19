@@ -64,6 +64,7 @@ namespace GPTags
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Attack_BossHeavy); // 보스 강공격
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Attack_BossArea);  // 보스 광역 공격
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Attack_BossSweep); // 보스 전방 휩쓸기 공격
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Attack_BossGroundHands); // Sans rising ground-hands pattern
             
 			// 유틸리티 및 특수 계열
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Utility_Dash);   // 이동기 돌진기 등
@@ -91,6 +92,7 @@ namespace GPTags
 				UE_DECLARE_GAMEPLAY_TAG_EXTERN(Prism);
 				UE_DECLARE_GAMEPLAY_TAG_EXTERN(Area);
 				UE_DECLARE_GAMEPLAY_TAG_EXTERN(Groggy);
+				UE_DECLARE_GAMEPLAY_TAG_EXTERN(Teleport);
 			}
 		}
 	}

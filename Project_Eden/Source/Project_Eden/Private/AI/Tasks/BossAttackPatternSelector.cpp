@@ -93,6 +93,13 @@ TArray<FGPBossAttackPatternCandidate> FGPBossAttackPatternSelector::BuildCandida
 			return Candidates;
 		}
 
+		if (Context.bShouldTeleport)
+		{
+			// Crystal Seraph re-enters its authored air range before evaluating damage patterns.
+			AddCandidate(Candidates, GPTags::Ability::Boss::CrystalSeraph::Teleport, 4.0f, TEXT("CrystalTeleport"));
+			return Candidates;
+		}
+
 		const bool bCanUseCrystalLaser = Context.bCanUseLaserPattern && FGPBossAttackPatternRanges::IsWithinCrystalLaserRange(DistanceToTarget);
 		const bool bCanUseCrystalPrism = Context.bCanUsePrismPattern && FGPBossAttackPatternRanges::IsWithinCrystalPrismRange(DistanceToTarget);
 		const float CrystalPhaseBonus = FMath::Clamp(static_cast<float>(BossPhase - 1) * 0.2f, 0.0f, 0.45f);
@@ -221,6 +228,18 @@ TArray<FGPBossAttackPatternCandidate> FGPBossAttackPatternSelector::BuildCandida
 			+ (1.0f - Aggression) * 0.12f
 			+ (bHoldMode || bRetreatMode ? 0.2f : 0.0f);
 		AddCandidate(Candidates, GPTags::Ability::Enemy::Attack_BossArea, AreaScore, TEXT("Area"));
+	}
+
+	if (!Context.bSuppressGenericBossAttacks && Context.bCanUseBossGroundHands
+		&& FGPBossAttackPatternRanges::IsWithinReach(DistanceToTarget, FGPBossAttackPatternRanges::GroundHandsReach))
+	{
+		// Ground hands is a high-commitment Sans pressure pattern; its ability cooldown rotates the next scored candidate afterward.
+		const float GroundHandsScore = 0.58f
+			+ PreferredRangeFit * 0.18f
+			+ PhaseBonus
+			+ (bPressureMode ? 0.08f : 0.0f)
+			+ (bPlayerFirstFocus ? 0.08f : 0.0f);
+		AddCandidate(Candidates, GPTags::Ability::Enemy::Attack_BossGroundHands, GroundHandsScore, TEXT("GroundHands"));
 	}
 
 	Candidates.Sort([](const FGPBossAttackPatternCandidate& Left, const FGPBossAttackPatternCandidate& Right)

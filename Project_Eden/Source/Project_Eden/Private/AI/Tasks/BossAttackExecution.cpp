@@ -7,9 +7,11 @@
 #include "AI/Debug/EnemyAIDebugUtils.h"
 #include "AI/Tasks/EnemyBTTaskCommon.h"
 #include "BehaviorTree/BlackboardComponent.h"
+#include "Characters/GP_CrystalSeraphBossCharacter.h"
 #include "Characters/GP_CrystalSeraphStateComponent.h"
 #include "Characters/GP_EnemyCharacter.h"
 #include "Characters/GP_MatadorBossStateComponent.h"
+#include "Engine/World.h"
 
 namespace BossAttackExecution
 {
@@ -102,6 +104,11 @@ namespace BossAttackExecution
 	{
 		FGPBossAttackPatternContext Context;
 		Context.DefaultAttackAbilityTag = DefaultAttackAbilityTag;
+		if (const AGP_EnemyCharacter* EnemyCharacter = Cast<AGP_EnemyCharacter>(ControlledPawn))
+		{
+			// Generic boss characters currently represent Sans; specialized Matador/Crystal branches suppress or bypass this candidate.
+			Context.bCanUseBossGroundHands = EnemyCharacter->IsBossEnemy();
+		}
 
 		if (!IsValid(BlackboardComponent))
 		{
@@ -160,13 +167,30 @@ namespace BossAttackExecution
 			Context.bCrystalPrismActive = IsValid(CrystalStateComponent->GetCrystalPrismActor());
 		}
 
+		if (const AGP_CrystalSeraphBossCharacter* CrystalSeraphBoss = Cast<AGP_CrystalSeraphBossCharacter>(ControlledPawn))
+		{
+			const UWorld* World = CrystalSeraphBoss->GetWorld();
+			const float WorldTimeSeconds = World != nullptr ? World->GetTimeSeconds() : 0.0f;
+			Context.PreferredHoverHeight = CrystalSeraphBoss->GetPreferredHoverHeight();
+			Context.PreferredAirRange = CrystalSeraphBoss->GetPreferredAirRange();
+			Context.TimeSinceLastLaser = WorldTimeSeconds - CrystalSeraphBoss->GetLastLaserPatternTime();
+			Context.TimeSinceLastPrism = WorldTimeSeconds - CrystalSeraphBoss->GetLastPrismPatternTime();
+			// Derive special-pattern readiness from authoritative actor state when a legacy BT runs on the common Blackboard schema.
+			Context.bCanUseLaserPattern = Context.bCanUseLaserPattern
+				|| (Context.bCrystalPrismActive && Context.TimeSinceLastLaser >= CrystalSeraphBoss->GetLaserPatternCooldown());
+			Context.bCanUsePrismPattern = Context.bCanUsePrismPattern
+				|| (!Context.bCrystalPrismActive && Context.TimeSinceLastPrism >= CrystalSeraphBoss->GetPrismPatternCooldown());
+			Context.bShouldTeleport = Context.bShouldTeleport
+				|| CrystalSeraphBoss->ShouldTeleportForCrystalSeraph(Context.DistanceToTarget);
+		}
+
 		return Context;
 	}
 
 	EBTNodeResult::Type ExecuteBestPattern(
 		UAbilitySystemComponent* ASC,
 		const APawn* ControlledPawn,
-		const UBlackboardComponent* BlackboardComponent,
+		UBlackboardComponent* BlackboardComponent,
 		const FGameplayTag& DefaultAttackAbilityTag,
 		const AActor* TargetActor)
 	{
@@ -188,6 +212,13 @@ namespace BossAttackExecution
 
 			if (TryActivateAbilityByTag(ASC, Candidate.AbilityTag))
 			{
+				if (Cast<AGP_CrystalSeraphBossCharacter>(ControlledPawn) != nullptr
+					&& HasBlackboardKey(BlackboardComponent, EnemyBlackboardKeys::bCanAttack))
+				{
+					// Leave the common BT Attack branch immediately; the tactics service will reopen it after the cadence expires.
+					BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bCanAttack, false);
+				}
+
 				UE_LOG(
 					LogEnemyAI,
 					Log,

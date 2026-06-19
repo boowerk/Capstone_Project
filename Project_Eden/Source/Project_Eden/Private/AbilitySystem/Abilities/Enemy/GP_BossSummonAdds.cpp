@@ -17,7 +17,9 @@ UGP_BossSummonAdds::UGP_BossSummonAdds()
 	AbilityAssetTags.AddTag(GPTags::Ability::Enemy::Utility_BossSummon);
 	SetAssetTags(AbilityAssetTags);
 
-	static ConstructorHelpers::FClassFinder<AGP_EnemyCharacter> MeleeEnemyFinder(TEXT("/Game/Characters/EnemyCharacter/BP_Enemy_Melee"));
+	// Sans summons the maintained basic melee template instead of the removed legacy enemy asset.
+	static ConstructorHelpers::FClassFinder<AGP_EnemyCharacter> MeleeEnemyFinder(
+		TEXT("/Game/Characters/EnemyCharacter/Basic/BP_BasicEnemy_Melee"));
 	if (MeleeEnemyFinder.Succeeded())
 	{
 		SummonedEnemyClass = MeleeEnemyFinder.Class;
