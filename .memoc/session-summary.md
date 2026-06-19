@@ -8,21 +8,19 @@ status: active
 tags: [memoc, memoc/state]
 ---
 # Session Summary
-Last: 2026-06-18T00:27:00+09:00
+Last: 2026-06-18T15:40:00+09:00
 Replace, do not append. Keep <800B.
 
 ## Status
-- Matador body floats/does nothing; active decoy owns melee, bull lure/redirect/counter loop.
-- `BP_Boss_Matador` uses `BP_MatadorDecoy`.
+- Configured DragonSkull Control Rig in `/Game/Meshes/Monsters/DragonSkull`.
+- Current rig asset found/updated: `CR_DeagonBone_SimpleJaw`; `CR_DeagonBone` is no longer present in the folder after user refresh/reimport.
+- Controls: `global_ctrl > root_ctrl > body_offset_ctrl > head_ctrl`, plus `jaw_upper_ctrl` and `jaw_lower_ctrl`.
+- Forward Solve graph maps `body_offset_ctrl -> root`, `head_ctrl -> Head`, `jaw_upper_ctrl -> jaw_upper`, `jaw_lower_ctrl -> jaw_lower` using global-space transforms.
 
 ## Changed
-- Bull decoy pass now moves by cubic curve delta (`EvaluateCurve(next)-EvaluateCurve(prev)`) instead of free-steering, so the path actually reaches the player-facing exit.
-- Decoy-to-player redirect stores `LockedRedirectDirection`, then turns toward it via `PlayerRedirectTurnInterpSpeed` instead of snapping; yellow debug line marks the fixed direction.
-- Decoy/near-decoy blocking now treats decoy-owned/attached/nearby hits as redirect-safe via `IsBlockingHitSafeNearDecoy`, reducing bull deletion during lure/pass.
-- Bull spawn now uses decoy-player axis with side offset 450cm; curve side strengths tuned to P1=0.32/P2=0.16 for slight decoy pass without large miss.
-- Bull player impact no longer destroys/finishes bull. It applies damage once per hit actor, launches player along charge direction, sends hit-react event, and bull keeps charging.
-- Player attack counter no longer depends on valid GE/ASC; if hit detects bull it calls `TryRedirectTowardDecoy`, logs success/reject reason, and locks bull direction to decoy.
-- Body collision remains damage/knockback only.
+- Rebuilt `CR_DeagonBone_SimpleJaw` after asset normalization/reimport so controls are placed from current skeleton bone initial transforms.
+- Fixed stale Control Rig offsets: controls are placed first in global space, then parented with maintain-global; graph drives translation/rotation only, never scale.
+- Verified control global positions match `root`, `Head`, `jaw_upper`, and `jaw_lower`; all controls scale `1`.
 
 ## Resume
-- Compile in editor. Test bull body collision, primary counter, and decoy orbit feel.
+- Open `CR_DeagonBone_SimpleJaw`, move/rotate `body_offset_ctrl`, `head_ctrl`, `jaw_upper_ctrl`, and `jaw_lower_ctrl`; corresponding skull bones should follow. If the mesh still appears flipped in SkeletalMesh editor too, fix FBX axis/root rotation in DCC and reimport.
