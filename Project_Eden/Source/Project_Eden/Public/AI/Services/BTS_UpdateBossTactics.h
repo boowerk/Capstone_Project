@@ -18,6 +18,7 @@ protected:
 	virtual void TickNode(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, float DeltaSeconds) override;
 	virtual void OnSearchStart(FBehaviorTreeSearchData& SearchData) override;
 	virtual FString GetStaticServiceDescription() const override;
+	virtual bool ShouldDeferTacticalBranchSelection() const override { return true; }
 
 	// 보스 체력이 이 비율 이하가 되면 2페이즈 패턴을 연다.
 	UPROPERTY(EditAnywhere, Category = "AI|Boss", meta = (ClampMin = "0.0", ClampMax = "1.0"))
@@ -99,6 +100,9 @@ protected:
 
 	UPROPERTY(EditAnywhere, Category = "AI|Boss|Crystal Seraph", meta = (ClampMin = "0.0", Units = "cm"))
 	float CrystalPrismMaxRange = 1800.0f;
+
+	UPROPERTY(EditAnywhere, Category = "AI|Boss|Crystal Seraph", meta = (ClampMin = "0.0", Units = "cm"))
+	float CrystalShardMaxRange = 2400.0f;
 
 private:
 	void UpdateBossTactics(UBehaviorTreeComponent& OwnerComp) const;

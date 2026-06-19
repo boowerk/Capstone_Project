@@ -18,6 +18,7 @@ protected:
 	virtual void TickNode(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, float DeltaSeconds) override;
 	virtual void OnSearchStart(FBehaviorTreeSearchData& SearchData) override;
 	virtual FString GetStaticServiceDescription() const override;
+	virtual bool ShouldDeferTacticalBranchSelection() const { return false; }
 
 	// Designers can widen this band if attacks flicker near PreferredRange.
 	UPROPERTY(EditAnywhere, Category = "AI|Tactics", meta = (ClampMin = "0.0"))

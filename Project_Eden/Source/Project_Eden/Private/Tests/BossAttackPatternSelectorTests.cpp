@@ -138,6 +138,58 @@ bool FBossAttackPatternSelectorScoresTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSansGroundHandsPatternSelectorTest,
+	"ProjectEden.AI.Boss.PatternSelector.SansGroundHands",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSansGroundHandsPatternSelectorTest::RunTest(const FString& Parameters)
+{
+	using namespace BossAttackPatternSelectorTests;
+
+	FGPBossAttackPatternContext Context = MakeBaseContext();
+	Context.bCanUseBossGroundHands = true;
+	Context.DistanceToTarget = 620.0f;
+	return ExpectTopPattern(
+		*this,
+		TEXT("Sans generic boss evaluation selects ground hands"),
+		Context,
+		GPTags::Ability::Enemy::Attack_BossGroundHands);
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FCrystalSeraphPatternSelectorTest,
+	"ProjectEden.AI.Boss.PatternSelector.CrystalSeraph",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCrystalSeraphPatternSelectorTest::RunTest(const FString& Parameters)
+{
+	using namespace BossAttackPatternSelectorTests;
+
+	FGPBossAttackPatternContext Context = MakeBaseContext();
+	Context.bIsCrystalSeraph = true;
+	Context.bShouldTeleport = true;
+	Context.DistanceToTarget = 2300.0f;
+	ExpectTopPattern(*this, TEXT("Crystal Seraph teleports before distant attacks"), Context, GPTags::Ability::Boss::CrystalSeraph::Teleport);
+
+	Context = MakeBaseContext();
+	Context.bIsCrystalSeraph = true;
+	Context.DistanceToTarget = 1100.0f;
+	Context.PreferredAirRange = 1100.0f;
+	ExpectTopPattern(*this, TEXT("Crystal Seraph uses shard as its normal range fallback"), Context, GPTags::Ability::Boss::CrystalSeraph::Basic);
+
+	// Crystal mechanics must outrank the shard fallback whenever their service-owned readiness flags are open.
+	Context.bCanUsePrismPattern = true;
+	ExpectTopPattern(*this, TEXT("Crystal Seraph creates a ready prism before using shards"), Context, GPTags::Ability::Boss::CrystalSeraph::Prism);
+
+	Context.bCanUsePrismPattern = false;
+	Context.bCrystalPrismActive = true;
+	Context.bCanUseLaserPattern = true;
+	ExpectTopPattern(*this, TEXT("Crystal Seraph fires its laser while a prism is active"), Context, GPTags::Ability::Boss::CrystalSeraph::Laser);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FBossAttackPatternSelectorLiveEvaluationTest,
 	"ProjectEden.AI.Boss.PatternSelector.LiveEvaluationChangesPattern",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

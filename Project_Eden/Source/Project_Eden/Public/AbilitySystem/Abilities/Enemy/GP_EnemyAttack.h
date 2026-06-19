@@ -23,6 +23,9 @@ public:
 		const FGameplayEventData* TriggerEventData) override;
 
 protected:
+	// Derived enemy archetypes can replace the shared overlap hit while keeping montage and gameplay-event timing.
+	virtual void PerformAttackHit();
+
 	// Animation notifies can send this event when a montage should apply the hit.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS|Skill|Mechanics")
 	FGameplayTag AttackEventTag;
@@ -41,8 +44,6 @@ private:
 
 	UFUNCTION()
 	void OnAttackEventReceived(FGameplayEventData Payload);
-
-	void PerformAttackHit();
 
 	bool bHasAppliedAttackHit = false;
 };

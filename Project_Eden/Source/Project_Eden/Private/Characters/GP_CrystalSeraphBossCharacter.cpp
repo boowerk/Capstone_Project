@@ -11,7 +11,9 @@
 #include "Actors/GP_CrystalShardProjectile.h"
 #include "Actors/GP_SeraphLaserActor.h"
 #include "Actors/GP_WingCoreHitActor.h"
+#include "BehaviorTree/BehaviorTree.h"
 #include "BehaviorTree/BlackboardComponent.h"
+#include "BehaviorTree/BlackboardData.h"
 #include "Characters/GP_CrystalSeraphStateComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/World.h"
@@ -37,6 +39,21 @@ AGP_CrystalSeraphBossCharacter::AGP_CrystalSeraphBossCharacter()
 	CrystalPrismAbilityClass = UGP_CrystalSeraphPrismAbility::StaticClass();
 	CrystalAreaAbilityClass = UGP_CrystalSeraphAreaAbility::StaticClass();
 	CrystalGroggyAbilityClass = UGP_CrystalSeraphGroggyAbility::StaticClass();
+	CrystalTeleportAbilityClass = UGP_CrystalSeraphTeleportAbility::StaticClass();
+
+	// Crystal Seraph keeps the shared boss patrol/chase/reposition flow and specializes only its scored attack patterns.
+	static ConstructorHelpers::FObjectFinder<UBehaviorTree> CrystalBehaviorTreeFinder(TEXT("/Game/Characters/EnemyCharacter/BT/Boss/BT_BossCommon.BT_BossCommon"));
+	if (CrystalBehaviorTreeFinder.Succeeded())
+	{
+		BehaviorTreeAssetOverride = CrystalBehaviorTreeFinder.Object;
+	}
+
+	// The boss Blackboard extends the common schema with Crystal Seraph prism, laser, teleport, and core state keys.
+	static ConstructorHelpers::FObjectFinder<UBlackboardData> CrystalBlackboardFinder(TEXT("/Game/Characters/EnemyCharacter/BT/Boss/BB_BossCommon.BB_BossCommon"));
+	if (CrystalBlackboardFinder.Succeeded())
+	{
+		BlackboardAssetOverride = CrystalBlackboardFinder.Object;
+	}
 
 	if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
 	{
@@ -52,6 +69,42 @@ AGP_CrystalSeraphBossCharacter::AGP_CrystalSeraphBossCharacter()
 	{
 		GetMesh()->SetSkeletalMesh(MaskManMeshFinder.Object);
 	}
+}
+
+void AGP_CrystalSeraphBossCharacter::OnConstruction(const FTransform& Transform)
+{
+	Super::OnConstruction(Transform);
+
+	// Reapply shared boss AI assets after serialized Blueprint or placed-instance defaults load.
+	if (UBehaviorTree* CrystalBehaviorTree = LoadObject<UBehaviorTree>(nullptr, TEXT("/Game/Characters/EnemyCharacter/BT/Boss/BT_BossCommon.BT_BossCommon")))
+	{
+		BehaviorTreeAssetOverride = CrystalBehaviorTree;
+	}
+
+	// BB_BossCommon supplies the optional Crystal Seraph keys while inheriting the common enemy schema.
+	if (UBlackboardData* CrystalBlackboard = LoadObject<UBlackboardData>(nullptr, TEXT("/Game/Characters/EnemyCharacter/BT/Boss/BB_BossCommon.BB_BossCommon")))
+	{
+		BlackboardAssetOverride = CrystalBlackboard;
+	}
+}
+
+bool AGP_CrystalSeraphBossCharacter::CanStartCrystalSeraphPattern() const
+{
+	const UWorld* World = GetWorld();
+	return World == nullptr
+		|| World->GetTimeSeconds() - LastPatternStartTime >= FMath::Max(0.0f, MinimumPatternInterval);
+}
+
+bool AGP_CrystalSeraphBossCharacter::TryStartCrystalSeraphPattern()
+{
+	if (!HasAuthority() || !CanStartCrystalSeraphPattern())
+	{
+		return false;
+	}
+
+	// Reserve before spawning actors because the BT can immediately execute another task before its service ticks again.
+	LastPatternStartTime = GetWorld() != nullptr ? GetWorld()->GetTimeSeconds() : LastPatternStartTime;
+	return true;
 }
 
 void AGP_CrystalSeraphBossCharacter::BeginPlay()
@@ -268,6 +321,61 @@ void AGP_CrystalSeraphBossCharacter::RequestRecoverFromGroggy()
 	MoveToHoverLocation();
 }
 
+bool AGP_CrystalSeraphBossCharacter::RequestTeleportToPreferredCombatPosition(AActor* PatternTargetActor)
+{
+	if (!HasAuthority() || !IsValid(CrystalSeraphStateComponent) || CrystalSeraphStateComponent->IsGroggy())
+	{
+		return false;
+	}
+
+	AActor* TargetActor = ResolvePatternTarget(PatternTargetActor);
+	if (!IsValid(TargetActor))
+	{
+		return false;
+	}
+
+	const float WorldTimeSeconds = GetWorld() != nullptr ? GetWorld()->GetTimeSeconds() : 0.0f;
+	if (WorldTimeSeconds - LastTacticalTeleportTime < FMath::Max(0.0f, TacticalTeleportCooldown))
+	{
+		// Repeated BT evaluations during the cooldown are already satisfied by the previous teleport.
+		return true;
+	}
+
+	FVector HorizontalAway = (GetActorLocation() - TargetActor->GetActorLocation()).GetSafeNormal2D();
+	if (HorizontalAway.IsNearlyZero())
+	{
+		HorizontalAway = -TargetActor->GetActorForwardVector().GetSafeNormal2D();
+	}
+	if (HorizontalAway.IsNearlyZero())
+	{
+		HorizontalAway = FVector::ForwardVector;
+	}
+	const float OrbitAngleDegrees = TacticalTeleportSequence % 2 == 0 ? 45.0f : -45.0f;
+	HorizontalAway = HorizontalAway.RotateAngleAxis(OrbitAngleDegrees, FVector::UpVector).GetSafeNormal2D();
+	++TacticalTeleportSequence;
+
+	const FVector TargetLocation = TargetActor->GetActorLocation();
+	const FVector Destination(
+		TargetLocation.X + HorizontalAway.X * GetPreferredAirRange(),
+		TargetLocation.Y + HorizontalAway.Y * GetPreferredAirRange(),
+		TargetLocation.Z + GetPreferredHoverHeight());
+	const FRotator FacingRotation = (TargetLocation - Destination).Rotation();
+
+	if (AAIController* AIController = Cast<AAIController>(GetController()))
+	{
+		AIController->StopMovement();
+	}
+
+	SetActorLocationAndRotation(Destination, FRotator(0.0f, FacingRotation.Yaw, 0.0f), false, nullptr, ETeleportType::TeleportPhysics);
+	LastTacticalTeleportTime = WorldTimeSeconds;
+
+	UE_LOG(LogTemp, Log, TEXT("[CrystalSeraph] Tactical teleport: Boss=%s Target=%s Destination=%s"),
+		*GetNameSafe(this),
+		*GetNameSafe(TargetActor),
+		*Destination.ToCompactString());
+	return true;
+}
+
 bool AGP_CrystalSeraphBossCharacter::ShouldTeleportForCrystalSeraph(float DistanceToTarget) const
 {
 	const float SafeDistance = FMath::Max(0.0f, DistanceToTarget);
@@ -366,6 +474,7 @@ void AGP_CrystalSeraphBossCharacter::GrantCrystalSeraphPatternAbilities()
 		CrystalPrismAbilityClass,
 		CrystalAreaAbilityClass,
 		CrystalGroggyAbilityClass,
+		CrystalTeleportAbilityClass,
 	};
 
 	for (const TSubclassOf<UGameplayAbility>& AbilityClass : CrystalAbilities)

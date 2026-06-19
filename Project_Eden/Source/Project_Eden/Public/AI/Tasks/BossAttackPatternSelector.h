@@ -15,6 +15,7 @@ struct PROJECT_EDEN_API FGPBossAttackPatternRanges
 	static constexpr float BasicAttackReach = 360.0f;
 	static constexpr float SweepAttackReach = 830.0f;
 	static constexpr float AreaAttackReach = 850.0f;
+	static constexpr float GroundHandsReach = 850.0f;
 	static constexpr float BullPatternMinRange = 0.0f;
 	static constexpr float BullPatternMaxRange = 5000.0f;
 	static constexpr float MatadorRapierMinRange = 350.0f;
@@ -46,6 +47,7 @@ struct FGPBossAttackPatternContext
 	bool bCanUseBossHeavyAttack = false;
 	bool bCanUseBossSweepAttack = false;
 	bool bCanUseBossAreaAttack = false;
+	bool bCanUseBossGroundHands = false;
 	bool bCanSummonAdds = false;
 	int32 ChainBreakCount = 0;
 	int32 ChainBreakTarget = 3;
