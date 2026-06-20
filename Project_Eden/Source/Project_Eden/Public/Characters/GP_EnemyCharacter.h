@@ -12,6 +12,7 @@ class UBehaviorTree;
 class UBlackboardData;
 class UEnemyAIRangeVisualizationComponent;
 class UEnemyArchetypeData;
+class UGP_EnemyDeathAbility;
 class UPDA_EnemyAnimationSet;
 class AGP_PlayerState;
 struct FDataTableRowHandle;
@@ -71,6 +72,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "AI|Combat")
 	FGameplayTag GetDefaultAttackAbilityTag() const { return DefaultAttackAbilityTag; }
+
+	UFUNCTION(BlueprintPure, Category = "Enemy|Death")
+	bool IsDead() const { return bIsDead; }
 
 	UFUNCTION(BlueprintPure, Category = "AI")
 	UBehaviorTree* GetBehaviorTreeAssetOverride() const { return BehaviorTreeAssetOverride; }
@@ -169,12 +173,21 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|Abilities", meta = (EditCondition = "bGrantDefaultEnemyAttackAbility"))
 	FGameplayTag DefaultAttackAbilityTag;
 
+	// Every enemy receives one tag-addressable death ability unless StartupAbilities already supplies a custom replacement.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|Abilities")
+	bool bGrantDefaultEnemyDeathAbility = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|Abilities", meta = (EditCondition = "bGrantDefaultEnemyDeathAbility"))
+	TSubclassOf<UGameplayAbility> DefaultEnemyDeathAbilityClass;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Progression", meta = (ClampMin = "0.0"))
 	float XPReward = 25.0f;
 
 	virtual void HandlePostDamageTaken(AActor* InstigatorActor, float DamageAmount, FGameplayTag ElementTag) override;
 
 private:
+	friend class UGP_EnemyDeathAbility;
+
 #if WITH_EDITORONLY_DATA
 	UPROPERTY(VisibleAnywhere, Category = "AI|Debug", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UEnemyAIRangeVisualizationComponent> AIRangeVisualizer;
@@ -189,11 +202,21 @@ private:
 	FVector BehaviorAnchorLocation = FVector::ZeroVector;
 	bool bHasBehaviorAnchorLocation = false;
 	bool bXPRewardGranted = false;
+	bool bDeathRequested = false;
+	bool bIsDead = false;
+	TWeakObjectPtr<AActor> LastDamageInstigator;
 
 	const FEnemyArchetypeTuning* ResolveEnemyArchetypeTuning() const;
 	int32 ResolvePersonalitySeed() const;
 	void GiveDefaultEnemyAttackAbility();
+	void GiveDefaultEnemyDeathAbility();
 	void GiveDefaultBossPatternAbilities();
+
+	UFUNCTION()
+	void HandleOutOfHealth(AActor* InstigatorActor, AActor* TargetActor);
+
+	void RequestDeath(AActor* InstigatorActor);
+	void EnterDeathStateFromAbility();
 	void RefreshAIRangeVisualizers();
 	void GrantXPRewardToInstigator(AActor* InstigatorActor);
 	AGP_PlayerState* ResolveInstigatorPlayerState(AActor* InstigatorActor) const;

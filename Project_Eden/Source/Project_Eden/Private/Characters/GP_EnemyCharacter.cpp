@@ -11,6 +11,7 @@
 #include "AbilitySystem/Abilities/Enemy/GP_BossSummonAdds.h"
 #include "AbilitySystem/Abilities/Enemy/GP_BossSweepAttack.h"
 #include "AbilitySystem/Abilities/Enemy/GP_EnemyAttack.h"
+#include "AbilitySystem/Abilities/Enemy/GP_EnemyDeathAbility.h"
 #include "AbilitySystem/GP_AbilitySystemComponent.h"
 #include "AbilitySystem/GP_AttributeSet.h"
 #include "Animation/PDA_EnemyAnimationSet.h"
@@ -32,6 +33,7 @@ AGP_EnemyCharacter::AGP_EnemyCharacter()
 
 	DefaultEnemyAttackAbilityClass = UGP_EnemyAttack::StaticClass();
 	DefaultAttackAbilityTag = GPTags::Ability::Enemy::Attack_Melee;
+	DefaultEnemyDeathAbilityClass = UGP_EnemyDeathAbility::StaticClass();
 
 	// 적은 배치/스폰 시 공용 AIController를 자동 점유해 BT/Blackboard 초기화를 컨트롤러에 위임한다.
 	AIControllerClass = AEnemyAIController::StaticClass();
@@ -127,6 +129,11 @@ void AGP_EnemyCharacter::BeginPlay()
 
 	GetAbilitySystemComponent()->InitAbilityActorInfo(this, this);
 	OnASCInitialized.Broadcast(GetAbilitySystemComponent(), GetAttributeSet());
+	if (UGP_AttributeSet* EnemyAttributeSet = Cast<UGP_AttributeSet>(GetAttributeSet()))
+	{
+		// AttributeSet publishes the terminal health event; the enemy translates it into a GAS death request.
+		EnemyAttributeSet->OnOutOfHealth.AddUniqueDynamic(this, &ThisClass::HandleOutOfHealth);
+	}
 
 	if (!HasAuthority())
 	{
@@ -134,6 +141,7 @@ void AGP_EnemyCharacter::BeginPlay()
 	}
 
 	GiveStartupAbilities();
+	GiveDefaultEnemyDeathAbility();
 	GiveDefaultEnemyAttackAbility();
 	if (bIsBossEnemy && bGrantDefaultBossPatternAbilities)
 	{
@@ -227,6 +235,27 @@ void AGP_EnemyCharacter::GiveDefaultEnemyAttackAbility()
 	}
 }
 
+void AGP_EnemyCharacter::GiveDefaultEnemyDeathAbility()
+{
+	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+	if (!bGrantDefaultEnemyDeathAbility || !IsValid(ASC) || !DefaultEnemyDeathAbilityClass)
+	{
+		return;
+	}
+
+	for (const FGameplayAbilitySpec& AbilitySpec : ASC->GetActivatableAbilities())
+	{
+		if (IsValid(AbilitySpec.Ability)
+			&& AbilitySpec.Ability->GetAssetTags().HasTagExact(GPTags::Ability::Enemy::Death))
+		{
+			// A tag-compatible StartupAbility is the extension point for a future animated death ability.
+			return;
+		}
+	}
+
+	ASC->GiveAbility(FGameplayAbilitySpec(DefaultEnemyDeathAbilityClass));
+}
+
 void AGP_EnemyCharacter::HandlePostDamageTaken(AActor* InstigatorActor, float DamageAmount, FGameplayTag ElementTag)
 {
 	Super::HandlePostDamageTaken(InstigatorActor, DamageAmount, ElementTag);
@@ -239,6 +268,52 @@ void AGP_EnemyCharacter::HandlePostDamageTaken(AActor* InstigatorActor, float Da
 
 	bXPRewardGranted = true;
 	GrantXPRewardToInstigator(InstigatorActor);
+}
+
+void AGP_EnemyCharacter::HandleOutOfHealth(AActor* InstigatorActor, AActor* TargetActor)
+{
+	if (TargetActor != this || !HasAuthority())
+	{
+		return;
+	}
+
+	RequestDeath(InstigatorActor);
+}
+
+void AGP_EnemyCharacter::RequestDeath(AActor* InstigatorActor)
+{
+	if (!HasAuthority() || bIsDead || bDeathRequested)
+	{
+		return;
+	}
+
+	bDeathRequested = true;
+	LastDamageInstigator = InstigatorActor;
+	UGP_AbilitySystemComponent* ASC = Cast<UGP_AbilitySystemComponent>(GetAbilitySystemComponent());
+	const bool bDeathAbilityStarted = IsValid(ASC)
+		&& ASC->TryActivateAbilityByTag(GPTags::Ability::Enemy::Death);
+	if (!bDeathAbilityStarted)
+	{
+		// Death is a mandatory invariant, so a missing/misconfigured custom ability cannot leave a zero-health enemy alive.
+		UE_LOG(LogTemp, Warning, TEXT("[EnemyDeath] Death ability failed; applying native fallback. Enemy=%s"), *GetNameSafe(this));
+		EnterDeathStateFromAbility();
+	}
+}
+
+void AGP_EnemyCharacter::EnterDeathStateFromAbility()
+{
+	if (!HasAuthority() || bIsDead)
+	{
+		return;
+	}
+
+	bIsDead = true;
+	bDeathRequested = true;
+	if (UAbilitySystemComponent* ASC = GetAbilitySystemComponent())
+	{
+		// The persistent loose tag remains after the short death ability ends and identifies the terminal state to GAS queries.
+		ASC->AddLooseGameplayTag(GPTags::Ability::Enemy::Death);
+	}
 }
 
 void AGP_EnemyCharacter::GrantXPRewardToInstigator(AActor* InstigatorActor)
