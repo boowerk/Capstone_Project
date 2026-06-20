@@ -13,6 +13,11 @@ tags:
 
 Last synced: 2026-06-19T08:31:17+09:00
 
+## Enemy Death Handoff
+
+- Commits `4783ba61` and `a0ae0cb4` implement shared HP-zero death for melee, ranged, flying, and boss children of `AGP_EnemyCharacter`. Editor build and `ProjectEden.Combat.EnemyDeath.Lifecycle` passed.
+- PIE-check representative enemy/Boss assets for lethal damage and the 2-second default despawn. No editor assignment is required; later animation work should implement `BP_OnDeathStarted` and tune `DeathDespawnDelay`.
+
 ## FurnaceWalker Handoff
 
 - `ABP_FurnaceWalker`: stationary uses full-body `DefaultSlot`; movement layers its attack pose from `spine_01` over locomotion. Existing Idle/Jog pin order is user-corrected; do not rewire it blindly. ABP changes remain uncompiled/unsaved by request.
