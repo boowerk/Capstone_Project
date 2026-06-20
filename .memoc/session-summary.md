@@ -2,20 +2,21 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-06-21T06:30:00+09:00
+updated: 2026-06-21T06:40:00+09:00
 status: active
 ---
 # Session Summary
-Last: 2026-06-21T06:30:00+09:00
+Last: 2026-06-21T06:40:00+09:00
 
 ## Status
-- Enemy leash fix completed in `aa0522f5` + `971d8f29`.
-- A valid target prevents return-home; target loss outside `ReturnHomeDistance` starts return; seeing the player again interrupts return.
+- Minimap fix completed in `2641dbab` + `a0a1a7d8`.
+- FullMap no longer adds CaptureHeight every 0.2s; PCG refresh preserves Follow mode and HUD brush size.
+- Capture is orthographic BaseColor without lighting, shadows, VFX, decals, or debug overlays.
 - User-owned `L_MainMap.umap` remains untouched/uncommitted.
 
 ## Verified
 - Editor build passed.
-- `ProjectEden.AI.Enemy.LeashPolicy` passed.
+- `ProjectEden.UI.Minimap.CaptureStability` passed.
 
 ## Resume
-- PIE-check melee/ranged/flying chase beyond their old leash, target loss outside it, and player re-entry during return.
+- PIE-check map contrast and selectively re-enable decals only if required for navigation markings.

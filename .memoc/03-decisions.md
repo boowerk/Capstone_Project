@@ -47,3 +47,4 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 
 ### 2026-06-21
 - Treat `ReturnHomeDistance` as recovery after target loss, not an unconditional combat cutoff. A valid target prevents leash return, and a newly perceived target interrupts a return already in progress.
+- Minimap FollowTarget alone owns periodic capture; FullMap capture is event-driven. Use orthographic BaseColor and exclude lighting, shadows, translucent/particle VFX, decals, and debug overlays for 2D readability.

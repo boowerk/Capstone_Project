@@ -13,6 +13,10 @@ tags:
 
 Last synced: 2026-06-19T08:31:17+09:00
 
+## Minimap Handoff
+
+- Commits `2641dbab` and `a0a1a7d8` fix the FullMap 0.2s `CaptureHeight` accumulation (Z, not Y), preserve Follow mode across PCG refresh, stop render-target brush reflow, and switch to flat BaseColor capture. Editor build and `ProjectEden.UI.Minimap.CaptureStability` passed; PIE-check final material contrast and whether any desired translucent floor decals need selective re-enabling.
+
 ## Enemy Leash Handoff
 
 - Commits `aa0522f5` and `971d8f29` fix active enemies abruptly ignoring the player at `ReturnHomeDistance`. Full editor build and `ProjectEden.AI.Enemy.LeashPolicy` passed; PIE-check chase beyond the old limit, target loss outside the limit, and re-engagement during return.
