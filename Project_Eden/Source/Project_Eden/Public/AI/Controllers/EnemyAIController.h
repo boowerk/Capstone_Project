@@ -137,6 +137,7 @@ protected:
 
 	void ConfigureSightSense();
 	void RefreshTargetActorFromPerception();
+	bool HasCurrentlyPerceivedTargetCandidate() const;
 	void GatherPerceptionTargetCandidates(TArray<AActor*>& OutVisibleCandidates, TArray<AActor*>& OutKnownCandidates) const;
 	AActor* SelectBestTargetActorFromPerception() const;
 	AActor* SelectFallbackPlayerTargetByDistance() const;

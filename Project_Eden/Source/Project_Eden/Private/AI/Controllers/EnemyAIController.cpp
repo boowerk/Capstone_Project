@@ -675,12 +675,28 @@ void AEnemyAIController::RefreshTargetActorFromPerception()
 {
 	if (bLeashReturnHomeActive)
 	{
-		// While returning home, perception can keep seeing the player but should not restart chase.
+		if (HasCurrentlyPerceivedTargetCandidate())
+		{
+			// A visible player is an active encounter, so cancel the leash instead of ignoring them until the exact home point.
+			UE_LOG(LogEnemyAI, Log, TEXT("[Leash] Return home interrupted by visible target: %s"), *EnemyAIDebugUtils::DescribeActor(GetPawn()));
+			SetLeashReturnHomeActive(false);
+			return;
+		}
+
+		// A remembered or expired stimulus cannot pull the enemy away while the leash owns movement.
 		SetBlackboardTargetActor(nullptr);
 		return;
 	}
 
 	SetBlackboardTargetActor(SelectBestTargetActorFromPerception());
+}
+
+bool AEnemyAIController::HasCurrentlyPerceivedTargetCandidate() const
+{
+	TArray<AActor*> VisibleCandidates;
+	TArray<AActor*> KnownCandidates;
+	GatherPerceptionTargetCandidates(VisibleCandidates, KnownCandidates);
+	return !VisibleCandidates.IsEmpty();
 }
 
 AActor* AEnemyAIController::SelectBestTargetActorFromPerception() const
