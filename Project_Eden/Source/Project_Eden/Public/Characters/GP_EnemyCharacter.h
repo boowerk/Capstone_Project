@@ -12,6 +12,7 @@ class UBehaviorTree;
 class UBlackboardData;
 class UEnemyAIRangeVisualizationComponent;
 class UEnemyArchetypeData;
+class UPDA_EnemyAnimationSet;
 class AGP_PlayerState;
 struct FDataTableRowHandle;
 struct FEnemyArchetypeTuning;
@@ -34,6 +35,9 @@ public:
 	AGP_EnemyCharacter();
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 	virtual UAttributeSet* GetAttributeSet() const override;
+	virtual void UpdateAnimationSet() override;
+
+	UPDA_EnemyAnimationSet* GetEnemyAnimationSet() const { return EnemyAnimationSet; }
 
 	UFUNCTION(BlueprintPure, Category = "Boss")
 	bool IsBossEnemy() const { return bIsBossEnemy; }
@@ -80,6 +84,10 @@ public:
 protected:
 	virtual void OnConstruction(const FTransform& Transform) override;
 	virtual void BeginPlay() override;
+
+	/** Enemy-only visual and combat animation data. Leave the legacy base AnimationSet empty for new enemies. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation")
+	TObjectPtr<UPDA_EnemyAnimationSet> EnemyAnimationSet;
 
 	// 향후 EQS나 복귀 로직에서 사용할 기준 위치를 월드에 배치할 수 있도록 유지한다.
 	UPROPERTY(EditInstanceOnly, Category = "AI", meta = (MakeEditWidget = "true"))
