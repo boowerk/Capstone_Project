@@ -13,6 +13,13 @@ tags:
 
 Last synced: 2026-06-19T08:31:17+09:00
 
+## FurnaceWalker Handoff
+
+- `ABP_FurnaceWalker`: stationary uses full-body `DefaultSlot`; movement layers its attack pose from `spine_01` over locomotion. Existing Idle/Jog pin order is user-corrected; do not rewire it blindly. ABP changes remain uncompiled/unsaved by request.
+- `UPDA_EnemyAnimationSet` is newly added but not built. `AGP_EnemyCharacter` exposes `EnemyAnimationSet` and applies its mesh/AnimBP; `UGP_EnemyAttack` reads its attacks, falling back to legacy `PDA_CharacterAnimationSet` for unmigrated bosses. After external build, create and assign `PDA_FW_EnemyAnimationSet`, then clear the legacy `AnimationSet` on `BP_FurnaceWalker`.
+- FurnaceWalker target attacks: Mutant Punch L/R and Zombie Smashing L/R. Each selected montage has direct `AttackHit`/`ActionEnd` events; all use 0.25s Blend Out. Smashing events: 1.63s/3.45s.
+- No MCP build: use the user's correct engine/UBT workflow, then PIE-check mesh/ABP assignment, random alternating attacks, event damage/release, and upper-body movement attacks.
+
 ## Sans Ground Hands Handoff
 
 - Commit `e080f16c` updates `UGP_BossSummonAdds` to spawn `Basic/BP_BasicEnemy_Melee`; full editor build passed and startup logs showed no class-finder failure for the new path.

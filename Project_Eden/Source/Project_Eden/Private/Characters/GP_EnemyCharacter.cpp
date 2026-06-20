@@ -13,6 +13,7 @@
 #include "AbilitySystem/Abilities/Enemy/GP_EnemyAttack.h"
 #include "AbilitySystem/GP_AbilitySystemComponent.h"
 #include "AbilitySystem/GP_AttributeSet.h"
+#include "Animation/PDA_EnemyAnimationSet.h"
 #include "Engine/DataTable.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/Pawn.h"
@@ -51,6 +52,26 @@ AGP_EnemyCharacter::AGP_EnemyCharacter()
 UAttributeSet* AGP_EnemyCharacter::GetAttributeSet() const
 {
 	return AttributeSet;
+}
+
+void AGP_EnemyCharacter::UpdateAnimationSet()
+{
+	if (!IsValid(EnemyAnimationSet))
+	{
+		// Existing enemies and bosses can continue using the legacy shared asset until migrated.
+		Super::UpdateAnimationSet();
+		return;
+	}
+
+	if (IsValid(EnemyAnimationSet->CharacterMesh))
+	{
+		GetMesh()->SetSkeletalMeshAsset(EnemyAnimationSet->CharacterMesh);
+	}
+
+	if (EnemyAnimationSet->AnimBlueprintClass)
+	{
+		GetMesh()->SetAnimInstanceClass(EnemyAnimationSet->AnimBlueprintClass);
+	}
 }
 
 UAbilitySystemComponent* AGP_EnemyCharacter::GetAbilitySystemComponent() const
