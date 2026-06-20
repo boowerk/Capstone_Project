@@ -675,15 +675,7 @@ void AEnemyAIController::RefreshTargetActorFromPerception()
 {
 	if (bLeashReturnHomeActive)
 	{
-		if (HasCurrentlyPerceivedTargetCandidate())
-		{
-			// A visible player is an active encounter, so cancel the leash instead of ignoring them until the exact home point.
-			UE_LOG(LogEnemyAI, Log, TEXT("[Leash] Return home interrupted by visible target: %s"), *EnemyAIDebugUtils::DescribeActor(GetPawn()));
-			SetLeashReturnHomeActive(false);
-			return;
-		}
-
-		// A remembered or expired stimulus cannot pull the enemy away while the leash owns movement.
+		// The tactics service owns re-engagement using anchor-distance hysteresis; perception only records candidates here.
 		SetBlackboardTargetActor(nullptr);
 		return;
 	}

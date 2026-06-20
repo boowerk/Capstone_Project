@@ -34,6 +34,7 @@ public:
 
 	// BT services can ask perception to rescore targets after a leash state or tactical state change.
 	void RequestTargetActorReevaluation();
+	bool HasCurrentlyPerceivedTargetCandidate() const;
 
 	// Boss tactics services use this to open deterministic pattern windows while validating runtime evaluation changes.
 	bool IsBossRuntimeEvaluationTestCycleActive() const;
@@ -137,7 +138,6 @@ protected:
 
 	void ConfigureSightSense();
 	void RefreshTargetActorFromPerception();
-	bool HasCurrentlyPerceivedTargetCandidate() const;
 	void GatherPerceptionTargetCandidates(TArray<AActor*>& OutVisibleCandidates, TArray<AActor*>& OutKnownCandidates) const;
 	AActor* SelectBestTargetActorFromPerception() const;
 	AActor* SelectFallbackPlayerTargetByDistance() const;

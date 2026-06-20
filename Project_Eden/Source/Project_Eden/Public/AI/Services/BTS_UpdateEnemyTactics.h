@@ -60,6 +60,10 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "AI|Leash", meta = (ClampMin = "0.0"))
 	float ReturnHomeAcceptanceRadius = 150.0f;
 
+	// Re-engage only after returning inside this fraction of the outer leash, preventing chase/return oscillation at the boundary.
+	UPROPERTY(EditAnywhere, Category = "AI|Leash", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float ReturnHomeReengageDistanceRatio = 0.75f;
+
 private:
 	void UpdateTactics(UBehaviorTreeComponent& OwnerComp) const;
 	void RestartTreeIfTacticalStateChanged(

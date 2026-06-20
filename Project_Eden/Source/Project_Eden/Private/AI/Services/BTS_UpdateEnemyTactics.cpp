@@ -196,12 +196,28 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 	FEnemyLeashObservation LeashObservation;
 	LeashObservation.bEnabled = bEnableLeashReturnHome && IsValid(EnemyAIController);
 	LeashObservation.bCurrentlyReturningHome = IsValid(EnemyAIController) && EnemyAIController->IsLeashReturnHomeActive();
-	LeashObservation.bHasActiveTarget = IsValid(TargetActor);
+	LeashObservation.bHasVisibleTarget = IsValid(EnemyAIController) && EnemyAIController->HasCurrentlyPerceivedTargetCandidate();
 	LeashObservation.bReturnMoveStoppedNearHome = bReturnMoveStoppedNearHome;
 	LeashObservation.DistanceFromHome = DistanceFromHome;
 	LeashObservation.MaxChaseDistanceFromHome = EffectiveMaxChaseDistanceFromHome;
+	LeashObservation.ReengageDistanceFromHome = FMath::Max(
+		EffectiveReturnHomeAcceptanceRadius,
+		EffectiveMaxChaseDistanceFromHome * FMath::Clamp(ReturnHomeReengageDistanceRatio, 0.0f, 1.0f));
 	LeashObservation.ReturnHomeAcceptanceRadius = EffectiveReturnHomeAcceptanceRadius;
 	const bool bShouldReturnHome = EnemyLeashPolicy::ShouldReturnHome(LeashObservation);
+	const bool bReengagingDuringReturn = LeashObservation.bCurrentlyReturningHome
+		&& !bShouldReturnHome
+		&& LeashObservation.bHasVisibleTarget
+		&& DistanceFromHome > EffectiveReturnHomeAcceptanceRadius;
+	if (bReengagingDuringReturn)
+	{
+		UE_LOG(
+			LogEnemyAI,
+			Log,
+			TEXT("[Leash] Visible target re-engaged inside anchor hysteresis: DistFromHome=%.0f Pawn=%s"),
+			DistanceFromHome,
+			*EnemyAIDebugUtils::DescribeActor(ControlledPawn));
+	}
 
 	if (IsValid(EnemyAIController))
 	{
