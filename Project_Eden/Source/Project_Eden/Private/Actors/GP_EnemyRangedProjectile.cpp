@@ -91,6 +91,6 @@ void AGP_EnemyRangedProjectile::OnProjectileOverlap(UPrimitiveComponent* Overlap
 
 	TArray<AActor*> HitActors{OtherActor};
 	UGP_BlueprintLibrary::SendGameplayEventToActors(GetInstigator(), HitActors, HitEventTag);
-	MulticastPlayHitEffect(GetActorLocation());
+	MulticastPlayHitEffect(GetActorLocation(), GetActorRotation(), ImpactVisualActorClass, NAME_None, 1.0f);
 	Destroy();
 }

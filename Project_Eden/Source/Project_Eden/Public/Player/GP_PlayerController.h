@@ -14,6 +14,7 @@ class UGP_SkillAugmentData;
 class UGP_SkillAugmentPoolData;
 class UGP_SkillData;
 class UGP_SkillPoolData;
+class UGP_SkillSelectWidget;
 class UGP_TestSkillSet;
 class UGP_PlayerHUDWidget;
 class UInputAction;
@@ -135,6 +136,15 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UGP_CharacterStatsMenuWidget> CharacterStatsMenuWidget;
 
+	UPROPERTY(EditDefaultsOnly, Category = "UI|Skill")
+	TSubclassOf<UGP_SkillSelectWidget> SkillSelectWidgetClass;
+
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|UI")
+	TObjectPtr<UInputAction> OpenSkillSelectAction;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UGP_SkillSelectWidget> SkillSelectWidget;
+
 	UPROPERTY(EditDefaultsOnly, Category = "UI|Augment")
 	TSubclassOf<UGP_AugmentSelectWidget> AugmentSelectWidgetClass;
 
@@ -229,6 +239,11 @@ private:
 	void OpenCharacterStatsMenu();
 	void CloseCharacterStatsMenu();
 	void ApplyCharacterStatsMenuInputMode(bool bMenuOpen);
+	void Input_ToggleSkillSelect();
+	bool EnsureSkillSelectWidget();
+	void OpenSkillSelect();
+	void CloseSkillSelect();
+	void ApplySkillSelectInputMode(bool bMenuOpen);
 	FVector2D ResolveEffectiveMoveInput(const AGP_PlayerCharacter* PlayerCharacter) const;
 	void UpdateMovementSpeed(float DeltaSeconds);
 	void UpdateCharacterRotation(float DeltaSeconds);

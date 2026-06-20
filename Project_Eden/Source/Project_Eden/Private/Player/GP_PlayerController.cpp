@@ -24,6 +24,7 @@
 #include "Player/GP_PlayerState.h"
 #include "UI/GP_AugmentSelectWidget.h"
 #include "UI/GP_CharacterStatsMenuWidget.h"
+#include "UI/GP_SkillSelectWidget.h"
 #include "UI/GP_PlayerHUDWidget.h"
 
 AGP_PlayerController::AGP_PlayerController()
@@ -308,6 +309,11 @@ void AGP_PlayerController::SetupInputComponent()
 	else
 	{
 		InputComponent->BindKey(EKeys::Tab, IE_Pressed, this, &ThisClass::Input_ToggleCharacterStatsMenu);
+	}
+
+	if (OpenSkillSelectAction)
+	{
+		EnhancedInputComponent->BindAction(OpenSkillSelectAction, ETriggerEvent::Started, this, &ThisClass::Input_ToggleSkillSelect);
 	}
 }
 
@@ -1009,6 +1015,87 @@ void AGP_PlayerController::Input_ToggleCharacterStatsMenu()
 	else
 	{
 		OpenCharacterStatsMenu();
+	}
+}
+
+void AGP_PlayerController::Input_ToggleSkillSelect()
+{
+	// Derive open state from the widget itself so the picker's own close button
+	// (which calls RemoveFromParent) and this toggle stay in sync.
+	const bool bOpen = IsValid(SkillSelectWidget) && SkillSelectWidget->IsInViewport();
+	if (bOpen)
+	{
+		CloseSkillSelect();
+	}
+	else
+	{
+		OpenSkillSelect();
+	}
+}
+
+bool AGP_PlayerController::EnsureSkillSelectWidget()
+{
+	if (IsValid(SkillSelectWidget))
+	{
+		return true;
+	}
+
+	if (!SkillSelectWidgetClass)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("SkillSelectWidgetClass is not set on %s. Assign a Widget Blueprint based on GP_SkillSelectWidget."), *GetName());
+		return false;
+	}
+
+	SkillSelectWidget = CreateWidget<UGP_SkillSelectWidget>(this, SkillSelectWidgetClass);
+	return IsValid(SkillSelectWidget);
+}
+
+void AGP_PlayerController::OpenSkillSelect()
+{
+	if (!EnsureSkillSelectWidget())
+	{
+		return;
+	}
+
+	if (!SkillSelectWidget->IsInViewport())
+	{
+		SkillSelectWidget->AddToViewport(50);
+	}
+
+	SkillSelectWidget->RefreshSkillSelection();
+	SkillSelectWidget->SetVisibility(ESlateVisibility::Visible);
+	ApplySkillSelectInputMode(true);
+}
+
+void AGP_PlayerController::CloseSkillSelect()
+{
+	// Mirror the widget's own close path (RemoveFromParent) so both routes end
+	// in the same state; IsInViewport() then reports closed.
+	if (IsValid(SkillSelectWidget) && SkillSelectWidget->IsInViewport())
+	{
+		SkillSelectWidget->RemoveFromParent();
+	}
+
+	ApplySkillSelectInputMode(false);
+}
+
+void AGP_PlayerController::ApplySkillSelectInputMode(bool bMenuOpen)
+{
+	// Multiplayer: never freeze movement/look — the skill picker is non-blocking,
+	// so the player (and everyone else) keeps moving while it is open. Only the
+	// mouse cursor is toggled so the picker can be clicked.
+	bShowMouseCursor = bMenuOpen;
+
+	if (bMenuOpen)
+	{
+		FInputModeGameAndUI InputMode;
+		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+		InputMode.SetHideCursorDuringCapture(false);
+		SetInputMode(InputMode);
+	}
+	else
+	{
+		SetInputMode(FInputModeGameOnly());
 	}
 }
 
