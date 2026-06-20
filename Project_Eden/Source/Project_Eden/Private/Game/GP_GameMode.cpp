@@ -22,6 +22,12 @@ void AGP_GameMode::BeginPlay()
 
 	GatherZones();
 
+	// Start every region dead; zones revive their regions as the run is cleared.
+	if (AGP_GameState* GPGameState = GetGPGameState())
+	{
+		GPGameState->InitRegionStates(RegionCount, DeadRegionState);
+	}
+
 	// Subscribe to all volumes; unlock zone 0 so it fires when the first player steps in.
 	for (AGP_EnemySpawnVolume* Zone : OrderedZones)
 	{
@@ -299,7 +305,20 @@ void AGP_GameMode::CompleteCurrentZone()
 		return;
 	}
 
-	OnZoneCompleted(CurrentZoneIndex, OrderedZones[CurrentZoneIndex]);
+	AGP_EnemySpawnVolume* ClearedZone = OrderedZones[CurrentZoneIndex];
+
+	// Revive this zone's regions: the cleared city brings its surrounding nature
+	// regions back to life. Server writes the replicated state; clients apply the
+	// landscape/vegetation change via GameState's OnRegionStateChanged.
+	if (AGP_GameState* GPGameState = GetGPGameState())
+	{
+		for (int32 RegionId : ClearedZone->GetRegionsToRevive())
+		{
+			GPGameState->SetRegionState(RegionId, AliveRegionState);
+		}
+	}
+
+	OnZoneCompleted(CurrentZoneIndex, ClearedZone);
 	AdvanceZone();
 }
 

@@ -45,6 +45,7 @@ public:
 	int32 GetZoneOrder() const { return ZoneOrder; }
 	bool IsBossZone() const { return bIsBossZone; }
 	FText GetDisplayName() const { return DisplayName; }
+	const TArray<int32>& GetRegionsToRevive() const { return RegionsToRevive; }
 	const TArray<FGP_EnemySpawnEntry>& GetSpawns() const { return Spawns; }
 	const TArray<TObjectPtr<AGP_EnemySpawnMarker>>& GetMarkers() const { return Markers; }
 	int32 GetMarkerCount() const { return Markers.Num(); }
@@ -78,6 +79,11 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Zone")
 	bool bIsBossZone = false;
+
+	// Region ids that revive (turn alive) when this zone is cleared. Lets a city
+	// clear light up its surrounding nature regions. Empty = revives nothing.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Zone|Region")
+	TArray<int32> RegionsToRevive;
 
 	// Box-fallback composition (used when no markers exist, or for boss zones).
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Zone")
