@@ -13,6 +13,7 @@ class UBlackboardData;
 class UEnemyAIRangeVisualizationComponent;
 class UEnemyArchetypeData;
 class UGP_EnemyDeathAbility;
+class UGP_WidgetComponent;
 class UPDA_EnemyAnimationSet;
 class AGP_EnemyCharacter;
 class AGP_PlayerState;
@@ -79,6 +80,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Enemy|Death")
 	bool IsDead() const { return bIsDead; }
+
+	UFUNCTION(BlueprintPure, Category = "Enemy|UI")
+	UGP_WidgetComponent* GetWorldHealthBarComponent() const { return WorldHealthBarComponent; }
 
 	// Public authority entry point also supports scripted kills while zero-health deaths arrive through AttributeSet.
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Enemy|Death")
@@ -194,6 +198,10 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Progression", meta = (ClampMin = "0.0"))
 	float XPReward = 25.0f;
 
+	// Regular enemies show this bar automatically; bosses keep using the dedicated HUD boss bar.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|UI")
+	bool bShowWorldHealthBar = true;
+
 	// No death montage is played yet; the actor remains visible in its current pose until this delay expires.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|Death", meta = (ClampMin = "0.0", Units = "s"))
 	float DeathDespawnDelay = 2.0f;
@@ -216,6 +224,9 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<UAttributeSet> AttributeSet;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Enemy|UI", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UGP_WidgetComponent> WorldHealthBarComponent;
 
 	FVector BehaviorAnchorLocation = FVector::ZeroVector;
 	bool bHasBehaviorAnchorLocation = false;
@@ -244,6 +255,7 @@ private:
 
 	void EnterDeathStateFromAbility();
 	void ApplyDeathState();
+	void RefreshWorldHealthBarVisibility();
 	void RefreshAIRangeVisualizers();
 	void GrantXPRewardToInstigator(AActor* InstigatorActor);
 	AGP_PlayerState* ResolveInstigatorPlayerState(AActor* InstigatorActor) const;

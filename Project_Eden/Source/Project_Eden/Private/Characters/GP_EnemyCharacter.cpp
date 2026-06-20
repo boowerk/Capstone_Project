@@ -25,6 +25,9 @@
 #include "GameplayTags/GP_Tags.h"
 #include "Net/UnrealNetwork.h"
 #include "Player/GP_PlayerState.h"
+#include "UI/GP_AttributeWidget.h"
+#include "UI/GP_WidgetComponent.h"
+#include "UObject/ConstructorHelpers.h"
 
 AGP_EnemyCharacter::AGP_EnemyCharacter()
 {
@@ -39,6 +42,23 @@ AGP_EnemyCharacter::AGP_EnemyCharacter()
 	DefaultEnemyAttackAbilityClass = UGP_EnemyAttack::StaticClass();
 	DefaultAttackAbilityTag = GPTags::Ability::Enemy::Attack_Melee;
 	DefaultEnemyDeathAbilityClass = UGP_EnemyDeathAbility::StaticClass();
+
+	WorldHealthBarComponent = CreateDefaultSubobject<UGP_WidgetComponent>(TEXT("WorldHealthBarComponent"));
+	WorldHealthBarComponent->SetupAttachment(GetRootComponent());
+	WorldHealthBarComponent->SetRelativeLocation(FVector(0.0f, 0.0f, 135.0f));
+	WorldHealthBarComponent->SetWidgetSpace(EWidgetSpace::Screen);
+	WorldHealthBarComponent->SetDrawAtDesiredSize(true);
+	WorldHealthBarComponent->SetPivot(FVector2D(0.5f, 1.0f));
+	WorldHealthBarComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	WorldHealthBarComponent->SetGenerateOverlapEvents(false);
+	WorldHealthBarComponent->SetCastShadow(false);
+
+	// Existing Blueprint enemies receive the shared health bar asset through their native parent automatically.
+	static ConstructorHelpers::FClassFinder<UGP_AttributeWidget> EnemyHealthBarFinder(TEXT("/Game/UI/WBP_EnemyHealthBar"));
+	if (EnemyHealthBarFinder.Succeeded())
+	{
+		WorldHealthBarComponent->SetWidgetClass(EnemyHealthBarFinder.Class);
+	}
 
 	// 적은 배치/스폰 시 공용 AIController를 자동 점유해 BT/Blackboard 초기화를 컨트롤러에 위임한다.
 	AIControllerClass = AEnemyAIController::StaticClass();
@@ -96,6 +116,8 @@ void AGP_EnemyCharacter::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
 
+	RefreshWorldHealthBarVisibility();
+
 	// Keep editor range rings in sync when designers move the anchor or change range values.
 	RefreshAIRangeVisualizers();
 }
@@ -126,6 +148,7 @@ FText AGP_EnemyCharacter::GetBossDisplayName() const
 void AGP_EnemyCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+	RefreshWorldHealthBarVisibility();
 
 	if (!IsValid(GetAbilitySystemComponent()))
 	{
@@ -348,6 +371,7 @@ void AGP_EnemyCharacter::ApplyDeathState()
 	}
 
 	bDeathStateApplied = true;
+	RefreshWorldHealthBarVisibility();
 	SetCanBeDamaged(false);
 	SetActorTickEnabled(false);
 	SetActorEnableCollision(false);
@@ -389,6 +413,17 @@ void AGP_EnemyCharacter::ApplyDeathState()
 			SetLifeSpan(DeathDespawnDelay);
 		}
 	}
+}
+
+void AGP_EnemyCharacter::RefreshWorldHealthBarVisibility()
+{
+	if (!IsValid(WorldHealthBarComponent))
+	{
+		return;
+	}
+
+	// Bosses already have a dedicated HUD bar, while dead enemies must not leave an orphaned screen-space bar.
+	WorldHealthBarComponent->SetVisibility(bShowWorldHealthBar && !bIsBossEnemy && !bIsDead, true);
 }
 
 void AGP_EnemyCharacter::GrantXPRewardToInstigator(AActor* InstigatorActor)
