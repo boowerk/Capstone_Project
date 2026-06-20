@@ -81,10 +81,14 @@ void UGP_PlayerHUDWidget::SetMinimapRenderTarget(UTextureRenderTarget2D* InRende
 	{
 		return;
 	}
+	if (BoundMinimapRenderTarget.Get() == InRenderTarget && BackgroundImage->GetBrush().GetResourceObject() == InRenderTarget)
+	{
+		return;
+	}
 
 	FSlateBrush Brush = BackgroundImage->GetBrush();
 	Brush.SetResourceObject(InRenderTarget);
-	Brush.ImageSize = FVector2D(InRenderTarget->SizeX, InRenderTarget->SizeY);
+	// Preserve the designer-authored brush size so a 1024px render target cannot reflow the HUD layout.
 	BackgroundImage->SetBrush(Brush);
 
 	BoundMinimapRenderTarget = InRenderTarget;

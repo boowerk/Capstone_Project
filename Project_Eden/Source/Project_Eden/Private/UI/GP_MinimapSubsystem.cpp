@@ -39,7 +39,6 @@ void UGP_MinimapSubsystem::CaptureFullMap(AActor* BoundsActor)
 	}
 
 	CaptureActor->CaptureFullMap(BoundsActor);
-	BroadcastCurrentRenderTarget();
 }
 
 void UGP_MinimapSubsystem::NotifyPcgLayoutReady(float CaptureDelay)
@@ -54,7 +53,7 @@ void UGP_MinimapSubsystem::NotifyPcgLayoutReady(float CaptureDelay)
 
 	if (CaptureDelay <= 0.0f)
 	{
-		CaptureFullMap(nullptr);
+		RefreshCurrentCapture();
 		return;
 	}
 
@@ -66,11 +65,20 @@ void UGP_MinimapSubsystem::NotifyPcgLayoutReady(float CaptureDelay)
 			if (WeakSubsystem.IsValid())
 			{
 				// PCG 스폰이 한 프레임 이상 늦게 반영될 수 있어 지연 후 현재 월드를 다시 캡처합니다.
-				WeakSubsystem->CaptureFullMap(nullptr);
+				// Refresh the current mode after PCG settles; forcing FullMap here used to break player-follow capture.
+				WeakSubsystem->RefreshCurrentCapture();
 			}
 		},
 		CaptureDelay,
 		false);
+}
+
+void UGP_MinimapSubsystem::RefreshCurrentCapture()
+{
+	if (AGP_MinimapCaptureActor* CaptureActor = ResolveCaptureActor())
+	{
+		CaptureActor->RequestCapture();
+	}
 }
 
 AGP_MinimapCaptureActor* UGP_MinimapSubsystem::GetActiveCaptureActor()

@@ -7,6 +7,7 @@
 class USceneCaptureComponent2D;
 class USceneComponent;
 class UTextureRenderTarget2D;
+class FMinimapCaptureStabilityTest;
 
 UENUM(BlueprintType)
 enum class EGPMinimapCaptureMode : uint8
@@ -93,8 +94,13 @@ protected:
 	EGPMinimapCaptureMode CaptureMode = EGPMinimapCaptureMode::FollowTarget;
 
 private:
+	friend class FMinimapCaptureStabilityTest;
+
 	FBox ResolveBounds(AActor* BoundsActor) const;
 	AActor* ResolveDefaultFollowTarget() const;
+	FVector ResolveFallbackFullMapCenter();
+	void CacheInitialGroundCenter();
+	void ConfigureFlat2DCapture();
 	void ApplyTopDownTransform(const FVector& Center, float OrthoWidth, float Yaw);
 	void CaptureForCurrentMode();
 
@@ -102,5 +108,7 @@ private:
 	TObjectPtr<AActor> FollowTargetActor;
 
 	float FollowCaptureAccumulator = 0.0f;
+	FVector InitialGroundCenter = FVector::ZeroVector;
+	bool bHasInitialGroundCenter = false;
 	bool bCaptureInitialized = false;
 };

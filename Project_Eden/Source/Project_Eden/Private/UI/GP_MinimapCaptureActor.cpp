@@ -18,19 +18,20 @@ AGP_MinimapCaptureActor::AGP_MinimapCaptureActor()
 	SceneCapture = CreateDefaultSubobject<USceneCaptureComponent2D>(TEXT("MinimapSceneCapture"));
 	SceneCapture->SetupAttachment(SceneRoot);
 	SceneCapture->ProjectionType = ECameraProjectionMode::Orthographic;
-	SceneCapture->CaptureSource = ESceneCaptureSource::SCS_FinalColorLDR;
 	SceneCapture->PrimitiveRenderMode = ESceneCapturePrimitiveRenderMode::PRM_RenderScenePrimitives;
 	SceneCapture->bCaptureEveryFrame = false;
 	SceneCapture->bCaptureOnMovement = false;
 	SceneCapture->bAlwaysPersistRenderingState = true;
 	SceneCapture->bUseRayTracingIfEnabled = false;
 	SceneCapture->LODDistanceFactor = 2.0f;
+	ConfigureFlat2DCapture();
 }
 
 void AGP_MinimapCaptureActor::BeginPlay()
 {
 	Super::BeginPlay();
 
+	CacheInitialGroundCenter();
 	InitializeCapture();
 
 	if (bRegisterWithSubsystem)
@@ -56,7 +57,13 @@ void AGP_MinimapCaptureActor::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
-	if (CaptureMode != EGPMinimapCaptureMode::FollowTarget || !IsValid(FollowTargetActor))
+	// Full-map capture is event-driven. Ticking it used the elevated camera as the next ground center and added CaptureHeight every interval.
+	if (CaptureMode != EGPMinimapCaptureMode::FollowTarget)
+	{
+		return;
+	}
+
+	if (!IsValid(FollowTargetActor))
 	{
 		SetFollowTarget(ResolveDefaultFollowTarget());
 		if (!IsValid(FollowTargetActor))
@@ -77,6 +84,8 @@ void AGP_MinimapCaptureActor::Tick(float DeltaSeconds)
 
 void AGP_MinimapCaptureActor::InitializeCapture()
 {
+	ConfigureFlat2DCapture();
+
 	if (bCaptureInitialized && IsValid(RenderTarget) && SceneCapture && SceneCapture->TextureTarget == RenderTarget)
 	{
 		return;
@@ -117,7 +126,7 @@ void AGP_MinimapCaptureActor::CaptureFullMap(AActor* BoundsActor)
 	}
 
 	float DesiredOrthoWidth = FullMapOrthoWidth;
-	FVector CaptureCenter = GetActorLocation();
+	FVector CaptureCenter = ResolveFallbackFullMapCenter();
 
 	const FBox BoundsBox = ResolveBounds(DefaultBoundsActor);
 	if (BoundsBox.IsValid)
@@ -154,8 +163,6 @@ void AGP_MinimapCaptureActor::RequestCapture()
 	{
 		SceneCapture->CaptureScene();
 	}
-
-	OnRenderTargetChanged.Broadcast(RenderTarget);
 }
 
 FBox AGP_MinimapCaptureActor::ResolveBounds(AActor* BoundsActor) const
@@ -173,6 +180,61 @@ AActor* AGP_MinimapCaptureActor::ResolveDefaultFollowTarget() const
 {
 	// The player pawn can appear after the HUD or capture actor, so resolve it lazily whenever capture needs it.
 	return UGameplayStatics::GetPlayerPawn(this, 0);
+}
+
+FVector AGP_MinimapCaptureActor::ResolveFallbackFullMapCenter()
+{
+	if (IsValid(FollowTargetActor))
+	{
+		return FollowTargetActor->GetActorLocation();
+	}
+
+	if (AActor* DefaultFollowTarget = ResolveDefaultFollowTarget())
+	{
+		return DefaultFollowTarget->GetActorLocation();
+	}
+
+	CacheInitialGroundCenter();
+	return InitialGroundCenter;
+}
+
+void AGP_MinimapCaptureActor::CacheInitialGroundCenter()
+{
+	if (bHasInitialGroundCenter)
+	{
+		return;
+	}
+
+	// Cache the authored/spawned ground center once; never derive a new center from the already elevated capture camera.
+	InitialGroundCenter = GetActorLocation();
+	bHasInitialGroundCenter = true;
+}
+
+void AGP_MinimapCaptureActor::ConfigureFlat2DCapture()
+{
+	if (!SceneCapture)
+	{
+		return;
+	}
+
+	// BaseColor plus an orthographic projection produces a readable 2D map without scene lighting or shadows.
+	SceneCapture->ProjectionType = ECameraProjectionMode::Orthographic;
+	SceneCapture->CaptureSource = ESceneCaptureSource::SCS_BaseColor;
+	SceneCapture->ShowFlags.SetLighting(false);
+	SceneCapture->ShowFlags.SetDynamicShadows(false);
+	SceneCapture->ShowFlags.SetPostProcessing(false);
+	SceneCapture->ShowFlags.SetFog(false);
+	SceneCapture->ShowFlags.SetVolumetricFog(false);
+	SceneCapture->ShowFlags.SetTranslucency(false);
+	SceneCapture->ShowFlags.SetParticles(false);
+	SceneCapture->ShowFlags.SetDecals(false);
+	SceneCapture->ShowFlags.SetBloom(false);
+	SceneCapture->ShowFlags.SetAmbientOcclusion(false);
+	SceneCapture->ShowFlags.SetMotionBlur(false);
+	SceneCapture->ShowFlags.SetBounds(false);
+	SceneCapture->ShowFlags.SetCollision(false);
+	SceneCapture->ShowFlags.SetDebugAI(false);
+	SceneCapture->ShowFlags.SetNavigation(false);
 }
 
 void AGP_MinimapCaptureActor::ApplyTopDownTransform(const FVector& Center, float OrthoWidth, float Yaw)
