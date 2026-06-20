@@ -19,6 +19,7 @@
 #include "GameFramework/Pawn.h"
 #include "GameplayTags/GP_Tags.h"
 #include "Player/GP_PlayerState.h"
+#include "GameFramework/GameStateBase.h"
 
 AGP_EnemyCharacter::AGP_EnemyCharacter()
 {
@@ -287,13 +288,28 @@ void AGP_EnemyCharacter::GrantXPRewardToInstigator(AActor* InstigatorActor)
 		return;
 	}
 
-	AGP_PlayerState* InstigatorPlayerState = ResolveInstigatorPlayerState(InstigatorActor);
-	if (!IsValid(InstigatorPlayerState))
+	// Shared-XP co-op: every player in the match gains the full reward, not just
+	// the one who landed the killing blow. Server-authoritative (callers guard on
+	// HasAuthority), so this loops the replicated PlayerArray once.
+	const UWorld* World = GetWorld();
+	const AGameStateBase* GameState = World ? World->GetGameState() : nullptr;
+	if (!GameState)
 	{
+		// Fall back to the instigator alone if the game state isn't available yet.
+		if (AGP_PlayerState* InstigatorPlayerState = ResolveInstigatorPlayerState(InstigatorActor))
+		{
+			InstigatorPlayerState->AddXP(XPReward);
+		}
 		return;
 	}
 
-	InstigatorPlayerState->AddXP(XPReward);
+	for (APlayerState* PartyPlayerState : GameState->PlayerArray)
+	{
+		if (AGP_PlayerState* GPPlayerState = Cast<AGP_PlayerState>(PartyPlayerState))
+		{
+			GPPlayerState->AddXP(XPReward);
+		}
+	}
 }
 
 AGP_PlayerState* AGP_EnemyCharacter::ResolveInstigatorPlayerState(AActor* InstigatorActor) const
