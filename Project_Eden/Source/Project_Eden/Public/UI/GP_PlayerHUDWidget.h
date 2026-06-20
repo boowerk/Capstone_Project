@@ -72,6 +72,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "EldenRing HUD|Skill")
 	void BindSkillSlots(AGP_PlayerState* PS);
 
+	// Idempotent retry hook: binds the skill slots once the owning PlayerState is
+	// available. Safe to call every tick — it no-ops after the first successful
+	// bind. Needed because on a dedicated client the PlayerState/ASC can arrive
+	// after the controller's one-shot BeginPlay binding attempt.
+	UFUNCTION(BlueprintCallable, Category = "EldenRing HUD|Skill")
+	void EnsureSkillSlotsBound();
+
 private:
 	UFUNCTION()
 	void OnEquippedSkillChanged(FGameplayTag SlotTag, UGP_SkillData* SkillData);

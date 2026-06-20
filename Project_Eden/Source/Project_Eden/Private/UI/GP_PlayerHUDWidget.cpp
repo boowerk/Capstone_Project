@@ -535,6 +535,18 @@ void UGP_PlayerHUDWidget::RefreshPreview()
 void UGP_PlayerHUDWidget::OnASCInitializedCallback(UAbilitySystemComponent* ASC, UAttributeSet* AS)
 {
 	BindToASC(ASC);
+
+	// On a dedicated-server client the ASC (and equipped skill data) arrive after
+	// the controller's BeginPlay binding attempt, so re-bind the skill slots here
+	// once the ASC is ready. Otherwise the slot icons stay empty even though the
+	// skill list (which reads the always-loaded skill pool) shows them fine.
+	if (APlayerController* OwningPC = GetOwningPlayer())
+	{
+		if (AGP_PlayerState* GPPS = OwningPC->GetPlayerState<AGP_PlayerState>())
+		{
+			BindSkillSlots(GPPS);
+		}
+	}
 }
 
 void UGP_PlayerHUDWidget::HandleMinimapRenderTargetChanged(UTextureRenderTarget2D* InRenderTarget)
@@ -544,11 +556,15 @@ void UGP_PlayerHUDWidget::HandleMinimapRenderTargetChanged(UTextureRenderTarget2
 
 void UGP_PlayerHUDWidget::BindSkillSlots(AGP_PlayerState* PS)
 {
-	if (!IsValid(PS) || !BoundPlayerASC.IsValid())
+	if (!IsValid(PS))
 	{
 		return;
 	}
 
+	// The icon only needs the (replicated) equipped SkillData from the PlayerState;
+	// the ASC is just for cooldown polling and may still be null on a dedicated
+	// client. Bind regardless so icons appear, and rely on OnEquippedSkillChanged /
+	// the ASC rebind to fill in cooldowns once it arrives.
 	UAbilitySystemComponent* ASC = BoundPlayerASC.Get();
 
 	// Slot tags match the convention used in GP_PlayerState (Slot01, Slot02).
@@ -577,5 +593,24 @@ void UGP_PlayerHUDWidget::OnEquippedSkillChanged(FGameplayTag /*SlotTag*/, UGP_S
 	if (BoundSkillPlayerState.IsValid())
 	{
 		BindSkillSlots(BoundSkillPlayerState.Get());
+	}
+}
+
+void UGP_PlayerHUDWidget::EnsureSkillSlotsBound()
+{
+	// Once BindSkillSlots succeeds it caches BoundSkillPlayerState and subscribes
+	// to OnEquippedSkillChanged, so later equips are handled by the delegate — no
+	// need to keep retrying.
+	if (BoundSkillPlayerState.IsValid())
+	{
+		return;
+	}
+
+	if (APlayerController* OwningPC = GetOwningPlayer())
+	{
+		if (AGP_PlayerState* GPPS = OwningPC->GetPlayerState<AGP_PlayerState>())
+		{
+			BindSkillSlots(GPPS);
+		}
 	}
 }
