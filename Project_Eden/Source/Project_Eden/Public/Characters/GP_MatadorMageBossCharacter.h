@@ -53,6 +53,7 @@ public:
 	bool ShouldTeleportForMatador(float DistanceToTarget) const;
 
 protected:
+	virtual void Tick(float DeltaSeconds) override;
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
@@ -65,9 +66,12 @@ private:
 
 	void GrantMatadorPatternAbilities();
 	void HandleMatadorFallbackPatternTick();
+	void TeleportToPendingGroggyDecoyLocation();
+	void UpdateDecoyFollow(float DeltaSeconds);
+	void StopMainBodyMovement() const;
 	AActor* ResolvePatternTarget(AActor* ExplicitTargetActor) const;
 	FVector ResolveDecoySpawnLocation(AActor* TargetActor) const;
-	FVector ResolveBullSpawnLocation(AActor* TargetActor) const;
+	FVector ResolveBullSpawnLocation(AActor* DecoyActor, AActor* PlayerTargetActor) const;
 	FRotator ResolveFacingRotation(const FVector& FromLocation, const FVector& ToLocation) const;
 
 private:
@@ -89,6 +93,12 @@ private:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Matador|Abilities", meta = (AllowPrivateAccess = "true"))
 	TSubclassOf<UGameplayAbility> MatadorGroggyAbilityClass;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Matador|Abilities", meta = (AllowPrivateAccess = "true"))
+	TSubclassOf<UGameplayAbility> MatadorRapierThrustAbilityClass;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Matador|Abilities", meta = (AllowPrivateAccess = "true"))
+	TSubclassOf<UGameplayAbility> MatadorCapeGustAbilityClass;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Matador", meta = (AllowPrivateAccess = "true"))
 	bool bAutoSpawnDecoyOnBeginPlay = true;
 
@@ -102,10 +112,25 @@ private:
 	float DecoySideOffset = 420.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Matador|Placement", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "cm"))
-	float BullSpawnDistanceFromTarget = 1350.0f;
+	float BullSpawnDistanceFromTarget = 3000.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Matador|Placement", meta = (AllowPrivateAccess = "true", Units = "cm"))
+	float BullSpawnSideOffsetFromPlayerLine = 450.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Matador|Placement", meta = (AllowPrivateAccess = "true", Units = "cm"))
 	float BullSpawnHeightOffset = 35.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Matador|Placement", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "cm"))
+	float DecoyCapsuleCenterHeight = 100.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Matador|Decoy", meta = (AllowPrivateAccess = "true"))
+	bool bDecoyFollowsTarget = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Matador|Decoy", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "cm/s"))
+	float DecoyFollowSpeed = 650.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Matador|Decoy", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "cm"))
+	float DecoyFollowDesiredDistance = 650.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Matador|Air", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "cm"))
 	float PreferredHoverHeight = 650.0f;
@@ -119,18 +144,30 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Matador|Groggy", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "s"))
 	float GroggyDuration = 5.0f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Matador|Groggy", meta = (AllowPrivateAccess = "true"))
+	bool bTeleportToDecoyOnGroggy = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Matador|Groggy", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "s"))
+	float GroggyDecoyTeleportDelay = 0.35f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Matador|Groggy", meta = (AllowPrivateAccess = "true", Units = "cm"))
+	float GroggyDecoyTeleportHeightOffset = 0.0f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Matador|AI", meta = (AllowPrivateAccess = "true"))
-	bool bUseFallbackMatadorPatternLoop = false;
+	bool bUseFallbackMatadorPatternLoop = true;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Matador|AI", meta = (AllowPrivateAccess = "true", ClampMin = "0.1", Units = "s"))
-	float FallbackPatternInterval = 6.0f;
+	float FallbackPatternInterval = 4.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Matador|AI", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "cm"))
-	float FallbackBullMinRange = 450.0f;
+	float FallbackBullMinRange = 0.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Matador|AI", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "cm"))
-	float FallbackBullMaxRange = 2400.0f;
+	float FallbackBullMaxRange = 5000.0f;
 
 	FTimerHandle GroggyRecoveryTimerHandle;
+	FTimerHandle GroggyDecoyTeleportTimerHandle;
 	FTimerHandle FallbackPatternTimerHandle;
+	FVector PendingGroggyDecoyTeleportLocation = FVector::ZeroVector;
+	bool bHasPendingGroggyDecoyTeleportLocation = false;
 };

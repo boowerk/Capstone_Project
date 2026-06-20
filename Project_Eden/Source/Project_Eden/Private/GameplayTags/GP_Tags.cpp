@@ -80,6 +80,7 @@ namespace GPTags
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Attack_BossHeavy, "GPTags.Ability.Enemy.Attack_BossHeavy", "보스 강공격");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Attack_BossArea, "GPTags.Ability.Enemy.Attack_BossArea", "보스 광역 공격");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Attack_BossSweep, "GPTags.Ability.Enemy.Attack_BossSweep", "보스 전방 휩쓸기 공격");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Attack_BossGroundHands, "GPTags.Ability.Enemy.Attack_BossGroundHands", "Sans 바닥 손 상승 패턴");
             
             // 유틸리티 및 특수 계열
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Utility_Dash, "GPTags.Ability.Enemy.Utility_Dash", "적 이동/돌진기");
@@ -94,6 +95,11 @@ namespace GPTags
         }
         namespace Boss
         {
+            namespace Matador
+            {
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(RapierThrust, "GPTags.Ability.Boss.Matador.RapierThrust", "마타도르 레이피어 찌르기 패턴");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(CapeGust, "GPTags.Ability.Boss.Matador.CapeGust", "마타도르 붉은 천 풍압 패턴");
+            }
             namespace CrystalSeraph
             {
                 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Basic, "GPTags.Ability.Boss.CrystalSeraph.Basic", "크리스탈 세라프 크리스탈 샤드 패턴");
@@ -101,6 +107,7 @@ namespace GPTags
                 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Prism, "GPTags.Ability.Boss.CrystalSeraph.Prism", "크리스탈 세라프 프리즘 소환 패턴");
                 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Area, "GPTags.Ability.Boss.CrystalSeraph.Area", "크리스탈 세라프 유리 성역 패턴");
                 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Groggy, "GPTags.Ability.Boss.CrystalSeraph.Groggy", "크리스탈 세라프 그로기 진입 패턴");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(Teleport, "GPTags.Ability.Boss.CrystalSeraph.Teleport", "크리스탈 세라프 공중 전투 위치 재배치");
             }
         }
     }
@@ -153,6 +160,7 @@ namespace GPTags
                 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Aggroed, "GPTags.State.Status.Enemy.Aggroed", "어그로 끌린 상태");
                 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Enraged, "GPTags.State.Status.Enemy.Enraged", "광폭화 상태");
                 UE_DEFINE_GAMEPLAY_TAG_COMMENT(MatadorGuarded, "GPTags.State.Status.Enemy.MatadorGuarded", "마타도르 보스 기본 피해 감쇠 상태");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(MatadorMeleeActive, "GPTags.State.Status.Enemy.MatadorMeleeActive", "마타도르 전용 근접 패턴 진행 중");
                 UE_DEFINE_GAMEPLAY_TAG_COMMENT(CrystalGuarded, "GPTags.State.Status.Enemy.CrystalGuarded", "크리스탈 세라프 기본 피해 감쇠 상태");
                 UE_DEFINE_GAMEPLAY_TAG_COMMENT(WingCoreExposed, "GPTags.State.Status.Enemy.WingCoreExposed", "크리스탈 세라프 날개 코어 노출 상태");
                 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Groggy, "GPTags.State.Status.Enemy.Groggy", "적 그로기 상태");
@@ -252,6 +260,14 @@ namespace GPTags
     // [7] Cooldown : 쿨다운
     namespace Cooldown
     {
+        namespace Enemy
+        {
+            namespace Matador
+            {
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(RapierThrust, "GPTags.Cooldown.Enemy.Matador.RapierThrust", "마타도르 레이피어 찌르기 쿨다운");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(CapeGust, "GPTags.Cooldown.Enemy.Matador.CapeGust", "마타도르 붉은 천 풍압 쿨다운");
+            }
+        }
         namespace Skill
         {
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(WaterPuddle, "GPTags.Cooldown.Skill.WaterPuddle", "물웅덩이 스킬 쿨다운");

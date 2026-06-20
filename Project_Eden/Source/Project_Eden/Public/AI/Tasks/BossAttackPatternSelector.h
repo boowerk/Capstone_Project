@@ -15,8 +15,12 @@ struct PROJECT_EDEN_API FGPBossAttackPatternRanges
 	static constexpr float BasicAttackReach = 360.0f;
 	static constexpr float SweepAttackReach = 830.0f;
 	static constexpr float AreaAttackReach = 850.0f;
-	static constexpr float BullPatternMinRange = 450.0f;
-	static constexpr float BullPatternMaxRange = 2400.0f;
+	static constexpr float GroundHandsReach = 850.0f;
+	static constexpr float BullPatternMinRange = 0.0f;
+	static constexpr float BullPatternMaxRange = 5000.0f;
+	static constexpr float MatadorRapierMinRange = 350.0f;
+	static constexpr float MatadorRapierMaxRange = 1050.0f;
+	static constexpr float MatadorCapeGustReach = 700.0f;
 	static constexpr float CrystalLaserMinRange = 450.0f;
 	static constexpr float CrystalLaserMaxRange = 2200.0f;
 	static constexpr float CrystalPrismMinRange = 500.0f;
@@ -24,6 +28,7 @@ struct PROJECT_EDEN_API FGPBossAttackPatternRanges
 
 	static bool IsWithinReach(float DistanceToTarget, float AttackReach);
 	static bool IsWithinBullPatternRange(float DistanceToTarget);
+	static bool IsWithinMatadorRapierRange(float DistanceToTarget);
 	static bool IsWithinCrystalLaserRange(float DistanceToTarget);
 	static bool IsWithinCrystalPrismRange(float DistanceToTarget);
 };
@@ -42,12 +47,14 @@ struct FGPBossAttackPatternContext
 	bool bCanUseBossHeavyAttack = false;
 	bool bCanUseBossSweepAttack = false;
 	bool bCanUseBossAreaAttack = false;
+	bool bCanUseBossGroundHands = false;
 	bool bCanSummonAdds = false;
 	int32 ChainBreakCount = 0;
 	int32 ChainBreakTarget = 3;
 	bool bIsGroggy = false;
 	bool bCanUseBullPattern = false;
 	bool bBullPatternActive = false;
+	bool bSuppressGenericBossAttacks = false;
 	bool bShouldTeleport = false;
 	float PreferredHoverHeight = 650.0f;
 	float PreferredAirRange = 1100.0f;

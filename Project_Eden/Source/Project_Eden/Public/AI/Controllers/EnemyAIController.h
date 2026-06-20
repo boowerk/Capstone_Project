@@ -114,7 +114,7 @@ protected:
 
 	// Local boss test mode cycles evaluation values so each boss attack pattern can be observed in play.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AI|LLM|Testing")
-	bool bEnableBossRuntimeEvaluationTestCycle = true;
+	bool bEnableBossRuntimeEvaluationTestCycle = false;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AI|LLM|Testing", meta = (ClampMin = "0.25"))
 	float BossRuntimeEvaluationTestInterval = 2.5f;

@@ -392,7 +392,7 @@ Last: 2026-06-06T22:10:00+09:00
 ## Resume
 - Start with `02-current-project-state.md` and `04-handoff.md`, then verify the live AnimBP / chooser path in PIE.
 
-## [2026-06-09T06:21:41] archived summary (698B)
+## [2026-06-17T04:47:15] archived summary (1776B)
 
 ---
 memoc: true
@@ -400,139 +400,23 @@ type: state
 scope: project-memory
 status: active
 tags: [memoc, memoc/state]
-updated: 2026-06-09T00:00:00+09:00
+updated: 2026-06-17T13:01:55+09:00
 ---
 # Session Summary
-Last: 2026-06-09
+Last: 2026-06-17T13:01:55+09:00
 
 ## Status
-- Distinct-skill direction active; element gating is deprecated.
-- MagmaShot and DarkSoloProjectile use shared projectile execution with skill-owned projectile/impact visuals.
-- Optional direct/splash projectile damage exists.
-- New ground targeting: cursor preview, range clamp, ground trace, server target validation, and release-to-confirm.
-- `UGP_Skill_LightningStrike` added as a targeted area-strike base.
+- Matador bull loop is staged: bull spawns away, charges decoy, decoy redirects to player, player redirect back to decoy records success, 3 successes trigger decoy vanish + boss teleport.
+- `GP_BullChargeActor` owns native `BullActorVisual` using `/Game/Meshes/Bull/SK/Bull`; `BP_Boss_Matador.BullChargeActorClass` points to native `/Script/Project_Eden.GP_BullChargeActor`.
+- `BT_Boss_Matador`/`BB_Boss_Matador` are assigned, and `EnemyAIController` runtime boss test cycle default is disabled so old Sans/common cycling does not drive Matador.
+- Matador state now suppresses generic boss attack selector candidates (`Basic`, `Sweep`, `Area`, `Summon`), and `BTS_UpdateBossTactics` keeps Matador area disabled. Bull/decoy should be primary pressure.
 
 ## Next
-- User builds.
-- Create LightningStrike GA, preview actor, impact actor, DA, then PIE/network test.
-
-## [2026-06-09T08:25:05] archived summary (942B)
-
----
-memoc: true
-type: state
-scope: project-memory
-created: 2026-06-09T08:13:24
-updated: 2026-06-09T08:13:24
-status: active
-tags:
-  - memoc
-  - memoc/state
----
-# Session Summary
-Last: 2026-06-09T17:25:00
-Replace, do not append. Keep <800B.
-History: worklog. Resume risks: 04-handoff.md.
-
-## Status
-- Analyzed game logs: found that skill data resolves correctly (e.g. `DA_Skill_MagmaShot` not null), but projectile spawning is bypassed.
-- Added logs to narrow down early return in `SpawnProjectiles`.
-
-## Changed
-- `GP_Skill_NetTestProjectile.cpp`: Added logs to track `SpawnProjectiles` early return variables.
-- `GP_SkillBase.cpp`: Added logs inside `GetSkillSpawnActorClass` and `GetSkillVisualActorClass`.
-
-## Open Tasks
-- User recompiles C++, runs Dedicated Server + Game Client, tests skills, and shares logs.
-
-## Resume
-- Check logs to see which parameter (e.g. `SpawnActorClass`) is null causing the early return in `SpawnProjectiles`.
-
-## [2026-06-09T08:33:26] archived summary (802B)
-
----
-memoc: true
-type: state
-scope: project-memory
-created: 2026-06-09T08:25:05
-updated: 2026-06-09T17:34:00
-status: active
-tags:
-  - memoc
-  - memoc/state
----
-# Session Summary
-Last: 2026-06-09T17:34:00
-Replace, do not append. Keep <800B.
-History: worklog. Resume risks: 04-handoff.md.
-
-## Status
-- Added logs to track Client-Server RPC communication during skill confirmation.
-
-## Changed
-- GP_PlayerController.cpp: Added logs to SendSkillSelectionEvent and Server RPC.
-- GP_TargetedSkillBase.cpp: Added logs to ActivateAbility, ConfirmSelectionFromPayload, and TryCommitAndExecute.
-
-## Open Tasks
-- User rebuilds and runs Dedicated Server + Client to gather logs of skill casting confirm flow.
-
-## Resume
-- Analyze logs to see if Confirm RPC reaches server and if server processes Confirm Selection.
-
-## [2026-06-13T12:23:49] archived summary (873B)
-
----
-memoc: true
-type: state
-scope: project-memory
-created: 2026-06-09T08:33:26
-updated: 2026-06-13T00:00:00
-status: active
-tags:
-  - memoc
-  - memoc/state
----
-# Session Summary
-Last: 2026-06-13
-Replace, do not append. Keep <800B.
-
-## Status
-- Big Hammer Giant Impact augment created and registered once in the skill test pool.
-- Dark Stone, Ice Mist, Lightning Storm, Big Hammer complete.
-- Projectile radius augments sync gameplay splash and Niagara baseline.
-- Projectile spread angle configurable per SkillData.
-- Projectile augment supports infinite pierce: hit once per enemy, cross unlimited targets.
-- Merged vfx-skills-impact (plaza arena, dusk lighting, matador AI, movement fixes).
-
-## Open Tasks
-- Verify merging results.
-- Set Dark Solo Void Pierce `Projectile Infinite Pierce=true`; test aligned enemies and wall collision.
-- Continue skill-specific augments.
-
-## [2026-06-17T07:46:35] archived summary (1391B)
-
----
-memoc: true
-type: state
-scope: project-memory
-status: active
-tags: [memoc, memoc/state]
-updated: 2026-06-17T03:59:58+09:00
----
-# Session Summary
-Last: 2026-06-17T03:59:58+09:00
-
-## Status
-- Added Blueprintable basic enemy parents: `AGP_MeleeEnemyCharacter`, `AGP_RangedEnemyCharacter`, and `AGP_FlyingEnemyCharacter`.
-- Parents set editable ranges/perception, built-in AI tuning, common `BT_EnemyCommon`/`BB_EnemyCommon`, `/Game/Characters/MaskMan/SK_MaskMan`, movement defaults, and melee/ranged GAS attack tags.
-- Added `UGP_EnemyRangedAttack` and made `BTT_ExecuteEnemyAttack` use each enemy parent's default attack tag when the shared task is still on melee.
-- Created BP templates under `/Game/Characters/EnemyCharacter/Basic`: `BP_BasicEnemy_Melee`, `BP_BasicEnemy_Ranged`, `BP_BasicEnemy_Flying`.
-- Existing editor asset/map changes were left untouched.
-
-## Next
-- In editor, duplicate or subclass the three Basic BP templates to make concrete enemies, then override `AI|Perception`, `AI|Config`, movement speed, and `Enemy|Abilities` per enemy type.
-- PIE-check common BT behavior, ranged hit reach, and flying movement height/pathing.
+- Replace prototype overlap redirect with real parry/deflect input by calling `TryRedirectActiveBullTowardDecoy(PlayerActor)`.
+- Replace temporary decoy vanish Niagara with a real smoke/poof Niagara asset when available.
+- Add/assign real decoy matador-deflect animation in BP via `BP_OnDecoyRedirectedBull`; add player parry animation/input instead of current overlap prototype.
+- Remove unused temporary `/Game/Characters/EnemyCharacter/Boss/BP_Boss_Matador/BP_MatadorBullChargeActor` after user confirms cleanup.
+- If Matador becomes too passive, add a dedicated Matador-only ranged poke/cooldown instead of reusing common boss area spam.
 
 ## Verify
-- `Project_EdenEditor Win64 Development` build succeeded.
-- UE Python BP creation script ran successfully, but commandlet returned failure because existing `Content/Maps/DemoMap/TestMap.umap` is unloadable.
+- User reported editor Live Coding compile succeeded after the generic attack suppression patch. Full external UBT still needs Live Coding disabled/closed editor.

@@ -2,19 +2,25 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-06-17T07:55:00+09:00
+created: 2026-06-17T04:47:15
+updated: 2026-06-19T08:31:17+09:00
 status: active
-tags:
-  - memoc
-  - memoc/state
-created: 2026-06-17T07:48:57
+tags: [memoc, memoc/state]
 ---
 # Session Summary
-Last: 2026-06-17T07:55:00+09:00
+Last: 2026-06-19T08:31:17+09:00
+Replace, do not append. Keep <800B.
 
 ## Status
-- Gameplay direction confirmed: linear city progression (city clear -> boss room -> next city); element & shrinking-zone ideas dropped. Priority = playable vertical slice.
-- Added run-progression C++ skeleton: `AGP_GameMode` + `AGP_GameState` + `AGP_EnemyCharacter::OnEnemyDied`. Needs build + `BP_ProjectEden_Gamemode` reparent + BP zone wiring + PIE.
+- Sans Ground Hands runs 3 staggered hands x 3 waves with a 0.75s red decal; hits deal damage and launch upward.
+- Sans summon now uses `Basic/BP_BasicEnemy_Melee` instead of the removed legacy asset.
+
+## Verified
+- Full editor build and Sans Ground Hands selector test passed.
+- PIE decal, timing, collision, and launch remain unverified.
+
+## Commits
+- `f4e75d83`, `8a7fbc60`, `e080f16c`.
 
 ## Resume
-- Use `memoc search "<topic>" --limit 5` first; load `02-current-project-state.md` or `04-handoff.md` only when needed.
+- User-owned MainMap and untracked Matador memo remain untouched.

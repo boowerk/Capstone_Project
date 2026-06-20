@@ -3,6 +3,7 @@
 #include "AI/Data/EnemyBlackboardKeys.h"
 #include "AbilitySystem/Abilities/Enemy/GP_MatadorBullPatternAbility.h"
 #include "AbilitySystem/Abilities/Enemy/GP_MatadorGroggyAbility.h"
+#include "AbilitySystem/Abilities/Enemy/GP_MatadorMeleeAbilities.h"
 #include "AbilitySystemComponent.h"
 #include "Actors/GP_BullChargeActor.h"
 #include "Actors/GP_ChainEffectActor.h"
@@ -22,6 +23,7 @@
 
 AGP_MatadorMageBossCharacter::AGP_MatadorMageBossCharacter()
 {
+	PrimaryActorTick.bCanEverTick = true;
 	bIsBossEnemy = true;
 	BossDisplayName = NSLOCTEXT("GPMatadorMageBoss", "BossDisplayName", "Matador Mage");
 
@@ -32,6 +34,8 @@ AGP_MatadorMageBossCharacter::AGP_MatadorMageBossCharacter()
 	BullChargeActorClass = AGP_BullChargeActor::StaticClass();
 	MatadorBullPatternAbilityClass = UGP_MatadorBullPatternAbility::StaticClass();
 	MatadorGroggyAbilityClass = UGP_MatadorGroggyAbility::StaticClass();
+	MatadorRapierThrustAbilityClass = UGP_MatadorRapierThrustAbility::StaticClass();
+	MatadorCapeGustAbilityClass = UGP_MatadorCapeGustAbility::StaticClass();
 
 	static ConstructorHelpers::FObjectFinder<UBehaviorTree> BossBehaviorTreeFinder(TEXT("/Game/Characters/EnemyCharacter/BT/Boss/BT_Boss_Matador.BT_Boss_Matador"));
 	if (BossBehaviorTreeFinder.Succeeded())
@@ -51,6 +55,19 @@ AGP_MatadorMageBossCharacter::AGP_MatadorMageBossCharacter()
 	{
 		GetMesh()->SetSkeletalMesh(MaskManMeshFinder.Object);
 	}
+}
+
+void AGP_MatadorMageBossCharacter::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+
+	if (!HasAuthority() || !IsValid(MatadorStateComponent) || MatadorStateComponent->IsGroggy())
+	{
+		return;
+	}
+
+	StopMainBodyMovement();
+	UpdateDecoyFollow(DeltaSeconds);
 }
 
 void AGP_MatadorMageBossCharacter::BeginPlay()
@@ -97,6 +114,7 @@ void AGP_MatadorMageBossCharacter::EndPlay(const EEndPlayReason::Type EndPlayRea
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(GroggyRecoveryTimerHandle);
+		World->GetTimerManager().ClearTimer(GroggyDecoyTeleportTimerHandle);
 		World->GetTimerManager().ClearTimer(FallbackPatternTimerHandle);
 	}
 
@@ -210,14 +228,14 @@ AGP_BullChargeActor* AGP_MatadorMageBossCharacter::SpawnBullPattern(AActor* Patt
 		return nullptr;
 	}
 
-	AActor* TargetActor = ResolvePatternTarget(PatternTargetActor);
+	AActor* TargetActor = UGameplayStatics::GetPlayerPawn(this, 0);
 	if (!IsValid(TargetActor))
 	{
-		TargetActor = DecoyActor;
+		TargetActor = ResolvePatternTarget(PatternTargetActor);
 	}
 
-	const FVector SpawnLocation = ResolveBullSpawnLocation(TargetActor);
-	FVector ChargeDirection = (TargetActor->GetActorLocation() - SpawnLocation).GetSafeNormal2D();
+	const FVector SpawnLocation = ResolveBullSpawnLocation(DecoyActor, TargetActor);
+	FVector ChargeDirection = (DecoyActor->GetActorLocation() - SpawnLocation).GetSafeNormal2D();
 	if (ChargeDirection.IsNearlyZero())
 	{
 		ChargeDirection = GetActorForwardVector().GetSafeNormal2D();
@@ -240,8 +258,18 @@ AGP_BullChargeActor* AGP_MatadorMageBossCharacter::SpawnBullPattern(AActor* Patt
 
 	if (IsValid(BullActor))
 	{
-		// Bull charge owns collision and damage; the boss ability only requests the pattern result.
-		BullActor->InitializeBullCharge(TargetActor, DecoyActor, MatadorStateComponent, ChargeDirection);
+		// Bull starts as a matador scene: offscreen bull -> decoy lure -> decoy redirects to player -> player redirects back.
+		BullActor->InitializeBullCharge(DecoyActor, TargetActor, DecoyActor, MatadorStateComponent, ChargeDirection);
+		const FString PlayerLocationString = IsValid(TargetActor) ? TargetActor->GetActorLocation().ToCompactString() : TEXT("Invalid");
+		UE_LOG(LogTemp, Log, TEXT("[MatadorBull] Spawned toward decoy. Boss=%s Decoy=%s Player=%s Bull=%s Spawn=%s DecoyLoc=%s PlayerLoc=%s Direction=%s"),
+			*GetNameSafe(this),
+			*GetNameSafe(DecoyActor),
+			*GetNameSafe(TargetActor),
+			*GetNameSafe(BullActor),
+			*SpawnLocation.ToCompactString(),
+			*DecoyActor->GetActorLocation().ToCompactString(),
+			*PlayerLocationString,
+			*ChargeDirection.ToCompactString());
 	}
 
 	return BullActor;
@@ -295,6 +323,16 @@ void AGP_MatadorMageBossCharacter::HandleMatadorGroggyChanged(bool bNewGroggy)
 
 	if (bNewGroggy)
 	{
+		bHasPendingGroggyDecoyTeleportLocation = false;
+		if (bTeleportToDecoyOnGroggy)
+		{
+			if (AActor* DecoyActor = IsValid(MatadorStateComponent) ? MatadorStateComponent->GetDecoyActor() : nullptr)
+			{
+				PendingGroggyDecoyTeleportLocation = DecoyActor->GetActorLocation() + FVector(0.0f, 0.0f, GroggyDecoyTeleportHeightOffset);
+				bHasPendingGroggyDecoyTeleportLocation = true;
+			}
+		}
+
 		if (AActor* ActiveBullActor = IsValid(MatadorStateComponent) ? MatadorStateComponent->GetActiveBullActor() : nullptr)
 		{
 			// Groggy cancels any lingering bull so the opening is readable and damage stays unguarded.
@@ -310,6 +348,16 @@ void AGP_MatadorMageBossCharacter::HandleMatadorGroggyChanged(bool bNewGroggy)
 				&ThisClass::RequestRecoverFromGroggy,
 				FMath::Max(0.0f, GroggyDuration),
 				false);
+
+			if (bHasPendingGroggyDecoyTeleportLocation)
+			{
+				World->GetTimerManager().SetTimer(
+					GroggyDecoyTeleportTimerHandle,
+					this,
+					&ThisClass::TeleportToPendingGroggyDecoyLocation,
+					FMath::Max(0.0f, GroggyDecoyTeleportDelay),
+					false);
+			}
 		}
 		return;
 	}
@@ -317,12 +365,39 @@ void AGP_MatadorMageBossCharacter::HandleMatadorGroggyChanged(bool bNewGroggy)
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(GroggyRecoveryTimerHandle);
+		World->GetTimerManager().ClearTimer(GroggyDecoyTeleportTimerHandle);
 	}
+	bHasPendingGroggyDecoyTeleportLocation = false;
 
 	if (bAutoSpawnDecoyOnBeginPlay)
 	{
 		EnsureMatadorDecoy();
 	}
+}
+
+void AGP_MatadorMageBossCharacter::TeleportToPendingGroggyDecoyLocation()
+{
+	if (!HasAuthority() || !bHasPendingGroggyDecoyTeleportLocation)
+	{
+		return;
+	}
+
+	FVector TeleportLocation = PendingGroggyDecoyTeleportLocation;
+	if (UNavigationSystemV1* NavigationSystem = UNavigationSystemV1::GetCurrent(GetWorld()))
+	{
+		FNavLocation ProjectedLocation;
+		if (NavigationSystem->ProjectPointToNavigation(TeleportLocation, ProjectedLocation, FVector(220.0f, 220.0f, 320.0f)))
+		{
+			TeleportLocation = ProjectedLocation.Location + FVector(0.0f, 0.0f, GroggyDecoyTeleportHeightOffset);
+		}
+	}
+
+	SetActorLocation(TeleportLocation, false, nullptr, ETeleportType::TeleportPhysics);
+	bHasPendingGroggyDecoyTeleportLocation = false;
+
+	UE_LOG(LogTemp, Log, TEXT("[MatadorAI] Groggy teleport to decoy location. Boss=%s Location=%s"),
+		*GetNameSafe(this),
+		*TeleportLocation.ToCompactString());
 }
 
 void AGP_MatadorMageBossCharacter::GrantMatadorPatternAbilities()
@@ -342,6 +417,8 @@ void AGP_MatadorMageBossCharacter::GrantMatadorPatternAbilities()
 	{
 		MatadorBullPatternAbilityClass,
 		MatadorGroggyAbilityClass,
+		MatadorRapierThrustAbilityClass,
+		MatadorCapeGustAbilityClass,
 	};
 
 	for (const TSubclassOf<UGameplayAbility>& AbilityClass : MatadorAbilities)
@@ -385,6 +462,60 @@ void AGP_MatadorMageBossCharacter::HandleMatadorFallbackPatternTick()
 	}
 }
 
+void AGP_MatadorMageBossCharacter::StopMainBodyMovement() const
+{
+	if (AAIController* AIController = Cast<AAIController>(GetController()))
+	{
+		AIController->StopMovement();
+	}
+}
+
+void AGP_MatadorMageBossCharacter::UpdateDecoyFollow(float DeltaSeconds)
+{
+	if (!bDecoyFollowsTarget || IsBullPatternActive())
+	{
+		return;
+	}
+
+	AGP_MatadorBossDecoyActor* DecoyActor = IsValid(MatadorStateComponent)
+		? Cast<AGP_MatadorBossDecoyActor>(MatadorStateComponent->GetActiveDecoyActor())
+		: nullptr;
+	AActor* TargetActor = UGameplayStatics::GetPlayerPawn(this, 0);
+	if (!IsValid(DecoyActor) || !IsValid(TargetActor))
+	{
+		return;
+	}
+
+	FVector FromTargetToDecoy = DecoyActor->GetActorLocation() - TargetActor->GetActorLocation();
+	FromTargetToDecoy.Z = 0.0f;
+	if (FromTargetToDecoy.IsNearlyZero())
+	{
+		FromTargetToDecoy = -TargetActor->GetActorForwardVector().GetSafeNormal2D();
+	}
+	if (FromTargetToDecoy.IsNearlyZero())
+	{
+		FromTargetToDecoy = -FVector::ForwardVector;
+	}
+
+	FVector DesiredLocation = TargetActor->GetActorLocation()
+		+ FromTargetToDecoy.GetSafeNormal2D() * FMath::Max(0.0f, DecoyFollowDesiredDistance);
+	if (UNavigationSystemV1* NavigationSystem = UNavigationSystemV1::GetCurrent(GetWorld()))
+	{
+		FNavLocation ProjectedLocation;
+		if (NavigationSystem->ProjectPointToNavigation(DesiredLocation, ProjectedLocation, FVector(220.0f, 220.0f, 280.0f)))
+		{
+			DesiredLocation = ProjectedLocation.Location + FVector(0.0f, 0.0f, DecoyCapsuleCenterHeight);
+		}
+	}
+	const FVector NewLocation = FMath::VInterpConstantTo(
+		DecoyActor->GetActorLocation(),
+		DesiredLocation,
+		FMath::Max(0.0f, DeltaSeconds),
+		FMath::Max(0.0f, DecoyFollowSpeed));
+	const FRotator NewRotation = ResolveFacingRotation(NewLocation, TargetActor->GetActorLocation());
+	DecoyActor->SetActorLocationAndRotation(NewLocation, NewRotation, true, nullptr, ETeleportType::None);
+}
+
 AActor* AGP_MatadorMageBossCharacter::ResolvePatternTarget(AActor* ExplicitTargetActor) const
 {
 	if (IsValid(ExplicitTargetActor))
@@ -426,27 +557,33 @@ FVector AGP_MatadorMageBossCharacter::ResolveDecoySpawnLocation(AActor* TargetAc
 		// Project prototype spawns to navmesh so the chain/decoy are usable in existing boss arenas.
 		if (NavigationSystem->ProjectPointToNavigation(DesiredLocation, ProjectedLocation, FVector(220.0f, 220.0f, 280.0f)))
 		{
-			DesiredLocation = ProjectedLocation.Location;
+			DesiredLocation = ProjectedLocation.Location + FVector(0.0f, 0.0f, DecoyCapsuleCenterHeight);
 		}
 	}
 
 	return DesiredLocation;
 }
 
-FVector AGP_MatadorMageBossCharacter::ResolveBullSpawnLocation(AActor* TargetActor) const
+FVector AGP_MatadorMageBossCharacter::ResolveBullSpawnLocation(AActor* DecoyActor, AActor* PlayerTargetActor) const
 {
-	const FVector TargetLocation = IsValid(TargetActor) ? TargetActor->GetActorLocation() : GetActorLocation() + GetActorForwardVector() * PreferredAirRange;
-	FVector FromTargetToBoss = (GetActorLocation() - TargetLocation).GetSafeNormal2D();
-	if (FromTargetToBoss.IsNearlyZero())
+	const FVector DecoyLocation = IsValid(DecoyActor) ? DecoyActor->GetActorLocation() : GetActorLocation();
+	const FVector PlayerLocation = IsValid(PlayerTargetActor) ? PlayerTargetActor->GetActorLocation() : GetActorLocation() + GetActorForwardVector() * PreferredAirRange;
+	FVector FromDecoyToPlayer = (PlayerLocation - DecoyLocation).GetSafeNormal2D();
+	if (FromDecoyToPlayer.IsNearlyZero())
 	{
-		FromTargetToBoss = -GetActorForwardVector().GetSafeNormal2D();
+		FromDecoyToPlayer = GetActorForwardVector().GetSafeNormal2D();
 	}
-	if (FromTargetToBoss.IsNearlyZero())
+	if (FromDecoyToPlayer.IsNearlyZero())
 	{
-		FromTargetToBoss = -FVector::ForwardVector;
+		FromDecoyToPlayer = FVector::ForwardVector;
 	}
 
-	FVector DesiredLocation = TargetLocation + FromTargetToBoss * BullSpawnDistanceFromTarget + FVector(0.0f, 0.0f, BullSpawnHeightOffset);
+	const FVector SideDirection = FRotator(0.0f, 90.0f, 0.0f).RotateVector(FromDecoyToPlayer).GetSafeNormal2D();
+	FVector DesiredLocation =
+		DecoyLocation
+		- FromDecoyToPlayer * BullSpawnDistanceFromTarget
+		+ SideDirection * BullSpawnSideOffsetFromPlayerLine
+		+ FVector(0.0f, 0.0f, BullSpawnHeightOffset);
 
 	if (UNavigationSystemV1* NavigationSystem = UNavigationSystemV1::GetCurrent(GetWorld()))
 	{

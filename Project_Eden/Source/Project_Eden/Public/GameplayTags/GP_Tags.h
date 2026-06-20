@@ -84,6 +84,7 @@ namespace GPTags
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Attack_BossHeavy); // 보스 강공격
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Attack_BossArea);  // 보스 광역 공격
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Attack_BossSweep); // 보스 전방 휩쓸기 공격
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Attack_BossGroundHands); // Sans rising ground-hands pattern
             
 			// 유틸리티 및 특수 계열
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Utility_Dash);   // 이동기 돌진기 등
@@ -98,6 +99,11 @@ namespace GPTags
 		}
 		namespace Boss
 		{
+			namespace Matador
+			{
+				UE_DECLARE_GAMEPLAY_TAG_EXTERN(RapierThrust);
+				UE_DECLARE_GAMEPLAY_TAG_EXTERN(CapeGust);
+			}
 			namespace CrystalSeraph
 			{
 				// Native ability tags keep Crystal Seraph pattern activation in the shared GAS/BT path.
@@ -106,6 +112,7 @@ namespace GPTags
 				UE_DECLARE_GAMEPLAY_TAG_EXTERN(Prism);
 				UE_DECLARE_GAMEPLAY_TAG_EXTERN(Area);
 				UE_DECLARE_GAMEPLAY_TAG_EXTERN(Groggy);
+				UE_DECLARE_GAMEPLAY_TAG_EXTERN(Teleport);
 			}
 		}
 	}
@@ -157,6 +164,7 @@ namespace GPTags
 				UE_DECLARE_GAMEPLAY_TAG_EXTERN(Aggroed);    // 어그로
 				UE_DECLARE_GAMEPLAY_TAG_EXTERN(Enraged);    // 광폭화
 				UE_DECLARE_GAMEPLAY_TAG_EXTERN(MatadorGuarded); // Matador guarded damage reduction state
+				UE_DECLARE_GAMEPLAY_TAG_EXTERN(MatadorMeleeActive); // Matador melee special is active
 				UE_DECLARE_GAMEPLAY_TAG_EXTERN(CrystalGuarded); // Crystal Seraph guarded damage reduction state
 				UE_DECLARE_GAMEPLAY_TAG_EXTERN(WingCoreExposed); // Crystal Seraph partial vulnerability window
 				UE_DECLARE_GAMEPLAY_TAG_EXTERN(Groggy);         // Groggy removes guarded damage reduction
@@ -258,6 +266,14 @@ namespace GPTags
 	// [7] Cooldown : 쿨다운
 	namespace Cooldown
 	{
+		namespace Enemy
+		{
+			namespace Matador
+			{
+				UE_DECLARE_GAMEPLAY_TAG_EXTERN(RapierThrust);
+				UE_DECLARE_GAMEPLAY_TAG_EXTERN(CapeGust);
+			}
+		}
 		namespace Skill
 		{
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(WaterPuddle);

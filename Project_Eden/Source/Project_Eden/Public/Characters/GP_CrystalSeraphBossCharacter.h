@@ -43,6 +43,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Boss|Crystal Seraph")
 	void RequestRecoverFromGroggy();
 
+	UFUNCTION(BlueprintCallable, Category = "Boss|Crystal Seraph")
+	bool RequestTeleportToPreferredCombatPosition(AActor* PatternTargetActor);
+
 	UFUNCTION(BlueprintPure, Category = "Boss|Crystal Seraph")
 	float GetPreferredHoverHeight() const { return FMath::Max(0.0f, PreferredHoverHeight); }
 
@@ -64,7 +67,14 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Boss|Crystal Seraph")
 	float GetLastPrismPatternTime() const { return LastPrismPatternTime; }
 
+	UFUNCTION(BlueprintPure, Category = "Boss|Crystal Seraph")
+	bool CanStartCrystalSeraphPattern() const;
+
+	// Reserves the shared attack cadence before a GAS pattern executes so back-to-back BT tasks cannot pass the same check.
+	bool TryStartCrystalSeraphPattern();
+
 protected:
+	virtual void OnConstruction(const FTransform& Transform) override;
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void HandlePostDamageTaken(AActor* InstigatorActor, float DamageAmount, FGameplayTag ElementTag) override;
@@ -120,6 +130,9 @@ private:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Crystal Seraph|Abilities", meta = (AllowPrivateAccess = "true"))
 	TSubclassOf<UGameplayAbility> CrystalGroggyAbilityClass;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Crystal Seraph|Abilities", meta = (AllowPrivateAccess = "true"))
+	TSubclassOf<UGameplayAbility> CrystalTeleportAbilityClass;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph|Abilities", meta = (AllowPrivateAccess = "true"))
 	bool bGrantCrystalSeraphPatternAbilities = true;
 
@@ -134,6 +147,12 @@ private:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph|Air", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "cm"))
 	float FarTeleportDistance = 1900.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph|Air", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "s"))
+	float TacticalTeleportCooldown = 1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph|Combat", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "s"))
+	float MinimumPatternInterval = 2.5f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph|Prism", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "s"))
 	float PrismPatternCooldown = 16.0f;
@@ -161,5 +180,8 @@ private:
 
 	float LastLaserPatternTime = -BIG_NUMBER;
 	float LastPrismPatternTime = -BIG_NUMBER;
+	float LastPatternStartTime = -BIG_NUMBER;
+	float LastTacticalTeleportTime = -BIG_NUMBER;
+	int32 TacticalTeleportSequence = 0;
 	FTimerHandle GroggyRecoveryTimerHandle;
 };

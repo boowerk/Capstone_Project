@@ -2,8 +2,8 @@
 memoc: true
 type: core
 scope: project-memory
-created: 2026-06-17T07:46:35
-updated: 2026-06-17T07:46:35
+created: 2026-06-17T04:47:15
+updated: 2026-06-17T04:47:15
 status: active
 tags:
   - memoc
@@ -22,12 +22,15 @@ This is the fast entry map for agents. Start here, then open only the docs relev
 ## Project Snapshot
 
 <!-- memoc:snapshot:start -->
-- Last synced: 2026-06-17T07:46:35
+- Last synced: 2026-06-17T04:47:15
 - Detected stack: Not detected
 
 ### Source Directories
 
 - `.claude`
+- `.dance-of-tal`
+- `.opencode`
+- `.vs`
 - `Project_Eden`
 <!-- memoc:snapshot:end -->
 
