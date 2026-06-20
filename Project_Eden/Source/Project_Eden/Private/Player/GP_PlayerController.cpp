@@ -183,35 +183,51 @@ bool AGP_PlayerController::OpenAugmentSelectWidget(const TArray<UGP_SkillAugment
 	}
 
 	AugmentSelectWidget->SetCandidateAugments(Candidates);
-	if (!AugmentSelectWidget->IsInViewport())
+
+	// SetIgnoreMoveInput/SetIgnoreLookInput push onto a ref-count stack, not a
+	// bool — only arm them on the closed->open transition, otherwise a second
+	// level-up while the picker is still open pushes a second "ignore" that the
+	// single matching Close call never balances, permanently locking look input.
+	const bool bWasAlreadyOpen = AugmentSelectWidget->IsInViewport();
+	if (!bWasAlreadyOpen)
 	{
 		AugmentSelectWidget->AddToViewport(80);
+
+		bShowMouseCursor = true;
+		SetIgnoreMoveInput(true);
+		SetIgnoreLookInput(true);
+
+		FInputModeGameAndUI InputMode;
+		InputMode.SetWidgetToFocus(AugmentSelectWidget->TakeWidget());
+		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+		InputMode.SetHideCursorDuringCapture(false);
+		SetInputMode(InputMode);
 	}
-
-	bShowMouseCursor = true;
-	SetIgnoreMoveInput(true);
-	SetIgnoreLookInput(true);
-
-	FInputModeGameAndUI InputMode;
-	InputMode.SetWidgetToFocus(AugmentSelectWidget->TakeWidget());
-	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-	InputMode.SetHideCursorDuringCapture(false);
-	SetInputMode(InputMode);
 
 	return true;
 }
 
 void AGP_PlayerController::CloseAugmentSelectWidget()
 {
+	const bool bWasOpen = IsValid(AugmentSelectWidget) && AugmentSelectWidget->IsInViewport();
+
 	if (IsValid(AugmentSelectWidget))
 	{
 		AugmentSelectWidget->RemoveFromParent();
 		AugmentSelectWidget = nullptr;
 	}
 
+	if (!bWasOpen)
+	{
+		return;
+	}
+
 	bShowMouseCursor = false;
-	SetIgnoreMoveInput(false);
-	SetIgnoreLookInput(false);
+	// SetIgnoreMoveInput/SetIgnoreLookInput are ref-counted, so a single matching
+	// "false" can leave the counter > 0 (and movement/look permanently locked) if
+	// the picker was opened more than once. Reset the flags outright to guarantee
+	// control is fully restored on close.
+	ResetIgnoreInputFlags();
 	SetInputMode(FInputModeGameOnly());
 }
 

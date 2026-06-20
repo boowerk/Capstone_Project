@@ -7,6 +7,7 @@
 #include "AbilitySystem/GP_AttributeSet.h"
 #include "AbilitySystem/Abilities/GP_SkillData.h"
 #include "GameplayTags/GP_Tags.h"
+#include "Player/GP_PlayerController.h"
 
 
 AGP_PlayerState::AGP_PlayerState()
@@ -334,6 +335,14 @@ void AGP_PlayerState::AddXP(float Amount)
 	if (bLeveledUp)
 	{
 		OnLevelUp(CurrentLevel);
+
+		// OnRep_CurrentLevel never fires on the server for its own authoritative
+		// value, so a listen-server host needs this call here too; RequestOpenAugmentSelect
+		// itself only acts if the controller is local (the host's own).
+		if (AGP_PlayerController* PC = Cast<AGP_PlayerController>(GetPlayerController()))
+		{
+			PC->RequestOpenAugmentSelect();
+		}
 	}
 
 	if (bDebugXPChanges)
@@ -477,6 +486,14 @@ void AGP_PlayerState::OnRep_CurrentLevel(int32 PreviousLevel)
 	if (CurrentLevel > PreviousLevel)
 	{
 		OnLevelUp(CurrentLevel);
+
+		// Runs on every client this PlayerState replicates to; RequestOpenAugmentSelect
+		// internally checks IsLocalController() so only the leveling player's own
+		// controller actually opens the picker.
+		if (AGP_PlayerController* PC = Cast<AGP_PlayerController>(GetPlayerController()))
+		{
+			PC->RequestOpenAugmentSelect();
+		}
 	}
 }
 
