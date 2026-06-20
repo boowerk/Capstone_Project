@@ -13,20 +13,20 @@ bool FEnemyLeashPolicyTest::RunTest(const FString& Parameters)
 	FEnemyLeashObservation Observation;
 	Observation.DistanceFromHome = 2500.0f;
 	Observation.MaxChaseDistanceFromHome = 2200.0f;
+	Observation.ReengageDistanceFromHome = 1650.0f;
 	Observation.ReturnHomeAcceptanceRadius = 150.0f;
 
-	// This is the reported regression: crossing the leash must not discard a player who is still visibly engaged.
-	Observation.bHasActiveTarget = true;
-	TestFalse(TEXT("Visible combat target prevents an abrupt return home"), EnemyLeashPolicy::ShouldReturnHome(Observation));
-
-	Observation.bHasActiveTarget = false;
-	TestTrue(TEXT("Losing the target outside the leash starts return home"), EnemyLeashPolicy::ShouldReturnHome(Observation));
+	// Crossing the authored anchor boundary must start a real return even if the chased player remains visible.
+	Observation.bHasVisibleTarget = true;
+	TestTrue(TEXT("Crossing the outer leash starts return home"), EnemyLeashPolicy::ShouldReturnHome(Observation));
 
 	Observation.bCurrentlyReturningHome = true;
-	Observation.bHasActiveTarget = true;
-	TestFalse(TEXT("Seeing the player again interrupts return home"), EnemyLeashPolicy::ShouldReturnHome(Observation));
+	TestTrue(TEXT("Visible target outside the inner boundary cannot cause return oscillation"), EnemyLeashPolicy::ShouldReturnHome(Observation));
 
-	Observation.bHasActiveTarget = false;
+	Observation.DistanceFromHome = 1500.0f;
+	TestFalse(TEXT("Visible target inside the inner boundary interrupts return home"), EnemyLeashPolicy::ShouldReturnHome(Observation));
+
+	Observation.bHasVisibleTarget = false;
 	TestTrue(TEXT("Return home remains active while still outside acceptance"), EnemyLeashPolicy::ShouldReturnHome(Observation));
 
 	Observation.DistanceFromHome = 100.0f;
