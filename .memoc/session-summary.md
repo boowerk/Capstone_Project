@@ -3,24 +3,22 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-06-17T04:47:15
-updated: 2026-06-19T08:31:17+09:00
+updated: 2026-06-20T12:29:00+09:00
 status: active
-tags: [memoc, memoc/state]
+tags:
+  - memoc
+  - memoc/state
 ---
 # Session Summary
-Last: 2026-06-19T08:31:17+09:00
+Last: 2026-06-20T12:29:00+09:00
 Replace, do not append. Keep <800B.
 
 ## Status
-- Sans Ground Hands runs 3 staggered hands x 3 waves with a 0.75s red decal; hits deal damage and launch upward.
-- Sans summon now uses `Basic/BP_BasicEnemy_Melee` instead of the removed legacy asset.
+- `/Game/Maps/MainMap/L_GameMap` has 9 jittered `BP_RegionSeed`, 3 `BP_CityAnchor`, 1 curved `BP_CityRoadSpline`, and `RegionStateManager`.
+- Layout used fixed random seed `1337`; seed BaseType uses `CITY_CANDIDATE` for region indices `0,7,2`, `NATURE` for others.
 
 ## Verified
-- Full editor build and Sans Ground Hands selector test passed.
-- PIE decal, timing, collision, and launch remain unverified.
-
-## Commits
-- `f4e75d83`, `8a7fbc60`, `e080f16c`.
+- Unreal Python verified actor labels, positions, city anchor `TargetRegionIndex`, nearest target seed, road spline points, `RegionCount=9`, `StateRT=RT_RegionState_9x1`, `RegionStateCount=4`, and saved `L_GameMap`.
 
 ## Resume
-- User-owned MainMap and untracked Matador memo remain untouched.
+- RegionIdTexture left unchanged; bake remains pending.
