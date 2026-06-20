@@ -32,6 +32,8 @@ public class Project_Eden : ModuleRules
         });
 
 		PrivateDependencyModuleNames.AddRange(new string[] { 
+			// Minimap double buffering waits for SceneCapture render commands before exposing a completed frame to UMG.
+			"RenderCore",
 			"Slate", 
 			"SlateCore"
 		});

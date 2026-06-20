@@ -7,6 +7,7 @@
 class USceneCaptureComponent2D;
 class USceneComponent;
 class UTextureRenderTarget2D;
+class FRenderCommandFence;
 class FMinimapCaptureStabilityTest;
 
 UENUM(BlueprintType)
@@ -25,6 +26,7 @@ class PROJECT_EDEN_API AGP_MinimapCaptureActor : public AActor
 
 public:
 	AGP_MinimapCaptureActor();
+	virtual ~AGP_MinimapCaptureActor() override;
 
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
@@ -101,14 +103,23 @@ private:
 	FVector ResolveFallbackFullMapCenter();
 	void CacheInitialGroundCenter();
 	void ConfigureFlat2DCapture();
+	UTextureRenderTarget2D* CreateTransientRenderTarget(const FName ObjectName);
+	void PromoteCompletedCapture();
 	void ApplyTopDownTransform(const FVector& Center, float OrthoWidth, float Yaw);
 	void CaptureForCurrentMode();
 
 	UPROPERTY(Transient)
 	TObjectPtr<AActor> FollowTargetActor;
 
+	// SceneCapture writes only to this back buffer; RenderTarget remains stable for UMG until promotion.
+	UPROPERTY(Transient)
+	TObjectPtr<UTextureRenderTarget2D> CaptureBackBuffer;
+
 	float FollowCaptureAccumulator = 0.0f;
 	FVector InitialGroundCenter = FVector::ZeroVector;
+	// The fence prevents promotion while the render thread is still filling CaptureBackBuffer.
+	TUniquePtr<FRenderCommandFence> CaptureCompletionFence;
 	bool bHasInitialGroundCenter = false;
 	bool bCaptureInitialized = false;
+	bool bHasPendingCapture = false;
 };

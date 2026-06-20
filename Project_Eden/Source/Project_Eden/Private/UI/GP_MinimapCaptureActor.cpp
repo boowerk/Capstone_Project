@@ -5,9 +5,11 @@
 #include "Engine/TextureRenderTarget2D.h"
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
+#include "RenderCommandFence.h"
 #include "UI/GP_MinimapSubsystem.h"
 
 AGP_MinimapCaptureActor::AGP_MinimapCaptureActor()
+	: CaptureCompletionFence(MakeUnique<FRenderCommandFence>())
 {
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.bStartWithTickEnabled = true;
@@ -26,6 +28,8 @@ AGP_MinimapCaptureActor::AGP_MinimapCaptureActor()
 	SceneCapture->LODDistanceFactor = 2.0f;
 	ConfigureFlat2DCapture();
 }
+
+AGP_MinimapCaptureActor::~AGP_MinimapCaptureActor() = default;
 
 void AGP_MinimapCaptureActor::BeginPlay()
 {
@@ -56,6 +60,7 @@ void AGP_MinimapCaptureActor::BeginPlay()
 void AGP_MinimapCaptureActor::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+	PromoteCompletedCapture();
 
 	// Full-map capture is event-driven. Ticking it used the elevated camera as the next ground center and added CaptureHeight every interval.
 	if (CaptureMode != EGPMinimapCaptureMode::FollowTarget)
@@ -86,24 +91,24 @@ void AGP_MinimapCaptureActor::InitializeCapture()
 {
 	ConfigureFlat2DCapture();
 
-	if (bCaptureInitialized && IsValid(RenderTarget) && SceneCapture && SceneCapture->TextureTarget == RenderTarget)
+	if (bCaptureInitialized && IsValid(RenderTarget) && IsValid(CaptureBackBuffer))
 	{
 		return;
 	}
 
 	if (!IsValid(RenderTarget))
 	{
-		RenderTarget = NewObject<UTextureRenderTarget2D>(this, TEXT("GeneratedMinimapRenderTarget"));
-		RenderTarget->RenderTargetFormat = ETextureRenderTargetFormat::RTF_RGBA8;
-		// The render target is displayed directly by UMG, so keep its fallback alpha opaque.
-		RenderTarget->ClearColor = FLinearColor(0.015f, 0.015f, 0.015f, 1.0f);
-		RenderTarget->InitAutoFormat(RenderTargetSize, RenderTargetSize);
-		RenderTarget->UpdateResourceImmediate(true);
+		RenderTarget = CreateTransientRenderTarget(TEXT("GeneratedMinimapRenderTargetFront"));
+	}
+	if (!IsValid(CaptureBackBuffer))
+	{
+		CaptureBackBuffer = CreateTransientRenderTarget(TEXT("GeneratedMinimapRenderTargetBack"));
 	}
 
 	if (SceneCapture)
 	{
-		SceneCapture->TextureTarget = RenderTarget;
+		// Never capture into the texture currently sampled by UMG.
+		SceneCapture->TextureTarget = CaptureBackBuffer;
 		SceneCapture->ProjectionType = ECameraProjectionMode::Orthographic;
 		SceneCapture->PrimitiveRenderMode = ESceneCapturePrimitiveRenderMode::PRM_RenderScenePrimitives;
 		SceneCapture->bCaptureEveryFrame = false;
@@ -153,17 +158,34 @@ void AGP_MinimapCaptureActor::CaptureAroundTarget(AActor* TargetActor)
 
 void AGP_MinimapCaptureActor::SetFollowTarget(AActor* TargetActor)
 {
+	if (SceneCapture && IsValid(FollowTargetActor))
+	{
+		SceneCapture->HiddenActors.Remove(FollowTargetActor);
+	}
+
 	FollowTargetActor = TargetActor;
+	if (SceneCapture && IsValid(FollowTargetActor))
+	{
+		// The HUD arrow represents the player; hiding the pawn also prevents attack meshes from covering the map capture.
+		SceneCapture->HiddenActors.AddUnique(FollowTargetActor);
+	}
 }
 
 void AGP_MinimapCaptureActor::RequestCapture()
 {
 	InitializeCapture();
+	PromoteCompletedCapture();
 
-	if (SceneCapture)
+	if (bHasPendingCapture || !SceneCapture || !IsValid(CaptureBackBuffer))
 	{
-		SceneCapture->CaptureScene();
+		return;
 	}
+
+	SceneCapture->TextureTarget = CaptureBackBuffer;
+	SceneCapture->CaptureScene();
+	// Wait for the RHI submission so attack-time render load cannot expose a partially cleared capture to UMG.
+	CaptureCompletionFence->BeginFence(FRenderCommandFence::ESyncDepth::RHIThread);
+	bHasPendingCapture = true;
 }
 
 FBox AGP_MinimapCaptureActor::ResolveBounds(AActor* BoundsActor) const
@@ -241,6 +263,34 @@ void AGP_MinimapCaptureActor::ConfigureFlat2DCapture()
 	SceneCapture->ShowFlags.SetNavigation(false);
 	SceneCapture->PostProcessSettings.bOverride_VignetteIntensity = true;
 	SceneCapture->PostProcessSettings.VignetteIntensity = 0.0f;
+}
+
+UTextureRenderTarget2D* AGP_MinimapCaptureActor::CreateTransientRenderTarget(const FName ObjectName)
+{
+	UTextureRenderTarget2D* NewRenderTarget = NewObject<UTextureRenderTarget2D>(this, ObjectName);
+	if (!NewRenderTarget)
+	{
+		return nullptr;
+	}
+
+	NewRenderTarget->RenderTargetFormat = ETextureRenderTargetFormat::RTF_RGBA8;
+	// The render target is displayed directly by UMG, so keep its fallback alpha opaque.
+	NewRenderTarget->ClearColor = FLinearColor(0.015f, 0.015f, 0.015f, 1.0f);
+	NewRenderTarget->InitAutoFormat(RenderTargetSize, RenderTargetSize);
+	NewRenderTarget->UpdateResourceImmediate(true);
+	return NewRenderTarget;
+}
+
+void AGP_MinimapCaptureActor::PromoteCompletedCapture()
+{
+	if (!bHasPendingCapture || !CaptureCompletionFence || !CaptureCompletionFence->IsFenceComplete() || !IsValid(CaptureBackBuffer))
+	{
+		return;
+	}
+
+	Swap(RenderTarget, CaptureBackBuffer);
+	bHasPendingCapture = false;
+	OnRenderTargetChanged.Broadcast(RenderTarget);
 }
 
 void AGP_MinimapCaptureActor::ApplyTopDownTransform(const FVector& Center, float OrthoWidth, float Yaw)
