@@ -15,7 +15,7 @@ Last synced: 2026-06-19T08:31:17+09:00
 
 ## Current Status
 
-- Minimap capture is stable and flat: only FollowTarget ticks at 0.2s, FullMap is event-driven, PCG refresh preserves the current mode, and capture uses orthographic BaseColor with lighting/shadows/VFX/debug overlays disabled.
+- Minimap capture is stable and flat: only FollowTarget ticks at 0.2s, FullMap is event-driven, PCG refresh preserves the current mode, and capture uses orthographic opaque FinalColorLDR with lighting/shadows/VFX/debug overlays disabled. RenderTarget may remain null because runtime creates it.
 - Enemy leash uses anchor hysteresis: crossing `ReturnHomeDistance` starts return even with a target; after returning inside 75% of that distance, a visible player interrupts return and reopens combat.
 - Basic melee, ranged, and flying enemies inherit a native screen-space `WorldHealthBarComponent` from `AGP_EnemyCharacter`. It uses `WBP_EnemyHealthBar`, tracks GAS Health/MaxHealth, stays visible at full health, and hides on death; bosses keep the dedicated HUD bar.
 - All enemy archetypes share `AGP_EnemyCharacter` death handling: zero Health activates the server-only Death Ability, persists the Death GAS tag, stops AI/movement/collision, and schedules despawn.

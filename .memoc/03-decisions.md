@@ -47,4 +47,4 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 
 ### 2026-06-21
 - Superseded by `93ac0b15`: crossing `ReturnHomeDistance` starts anchor return even with an active target. A visible player can re-engage after the enemy returns inside 75% of the outer distance, preventing boundary oscillation.
-- Minimap FollowTarget alone owns periodic capture; FullMap capture is event-driven. Use orthographic BaseColor and exclude lighting, shadows, translucent/particle VFX, decals, and debug overlays for 2D readability.
+- Minimap FollowTarget alone owns periodic capture; FullMap capture is event-driven. Use orthographic FinalColorLDR for UMG-safe opaque alpha, then exclude lighting, shadows, translucent/particle VFX, decals, and debug overlays for 2D readability.

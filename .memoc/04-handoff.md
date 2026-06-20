@@ -15,7 +15,7 @@ Last synced: 2026-06-19T08:31:17+09:00
 
 ## Minimap Handoff
 
-- Commits `2641dbab` and `a0a1a7d8` fix the FullMap 0.2s `CaptureHeight` accumulation (Z, not Y), preserve Follow mode across PCG refresh, stop render-target brush reflow, and switch to flat BaseColor capture. Editor build and `ProjectEden.UI.Minimap.CaptureStability` passed; PIE-check final material contrast and whether any desired translucent floor decals need selective re-enabling.
+- Commits `2641dbab`, `c46e718f`, and tests fix FullMap Z accumulation, preserve Follow mode, stop brush reflow, and use flat opaque FinalColorLDR. BaseColor was rejected because its alpha can make direct UMG display transparent. Build and `ProjectEden.UI.Minimap.CaptureStability` passed; PIE-check final contrast.
 
 ## Enemy Leash Handoff
 
