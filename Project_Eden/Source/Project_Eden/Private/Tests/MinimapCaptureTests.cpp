@@ -44,6 +44,19 @@ bool FMinimapCaptureStabilityTest::RunTest(const FString& Parameters)
 		TestFalse(TEXT("Minimap capture excludes particles"), SceneCapture->ShowFlags.Particles);
 	}
 
+	CaptureActor->InitializeCapture();
+	TestNotNull(TEXT("Minimap creates a display render target"), CaptureActor->RenderTarget.Get());
+	TestNotNull(TEXT("Minimap creates a separate capture back buffer"), CaptureActor->CaptureBackBuffer.Get());
+	TestNotEqual(
+		TEXT("Scene capture never writes into the texture currently displayed by UMG"),
+		CaptureActor->RenderTarget.Get(),
+		CaptureActor->CaptureBackBuffer.Get());
+	if (SceneCapture)
+	{
+		// Compare the resolved pointers explicitly because TObjectPtr and raw-pointer template deduction differs by engine version.
+		TestTrue(TEXT("Scene capture targets the back buffer"), SceneCapture->TextureTarget.Get() == CaptureActor->CaptureBackBuffer.Get());
+	}
+
 	// Validate the production HUD contract so the subsystem always has a visible Image to receive the render target.
 	UClass* HUDWidgetClass = LoadClass<UUserWidget>(nullptr, TEXT("/Game/UI/HUD/WBP_PlayerHUDWidget.WBP_PlayerHUDWidget_C"));
 	UWidgetBlueprintGeneratedClass* HUDGeneratedClass = Cast<UWidgetBlueprintGeneratedClass>(HUDWidgetClass);
