@@ -1,9 +1,11 @@
 #include "Characters/GP_EnemyCharacter.h"
 
 #include "AI/Controllers/EnemyAIController.h"
+#include "AIController.h"
 #include "AI/Data/EnemyArchetypeData.h"
 #include "AI/Data/EnemyLLMEvaluation.h"
 #include "AI/Debug/EnemyAIRangeVisualizationComponent.h"
+#include "BrainComponent.h"
 #include "AbilitySystem/Abilities/Enemy/GP_BossAreaAttack.h"
 #include "AbilitySystem/Abilities/Enemy/GP_BossBasicAttack.h"
 #include "AbilitySystem/Abilities/Enemy/GP_BossGroundHandsAttack.h"
@@ -15,10 +17,13 @@
 #include "AbilitySystem/GP_AbilitySystemComponent.h"
 #include "AbilitySystem/GP_AttributeSet.h"
 #include "Animation/PDA_EnemyAnimationSet.h"
+#include "Components/CapsuleComponent.h"
 #include "Engine/DataTable.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/Pawn.h"
 #include "GameplayTags/GP_Tags.h"
+#include "Net/UnrealNetwork.h"
 #include "Player/GP_PlayerState.h"
 
 AGP_EnemyCharacter::AGP_EnemyCharacter()
@@ -235,6 +240,14 @@ void AGP_EnemyCharacter::GiveDefaultEnemyAttackAbility()
 	}
 }
 
+void AGP_EnemyCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(AGP_EnemyCharacter, bIsDead);
+	DOREPLIFETIME(AGP_EnemyCharacter, DeathInstigatorActor);
+}
+
 void AGP_EnemyCharacter::GiveDefaultEnemyDeathAbility()
 {
 	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
@@ -288,7 +301,7 @@ void AGP_EnemyCharacter::RequestDeath(AActor* InstigatorActor)
 	}
 
 	bDeathRequested = true;
-	LastDamageInstigator = InstigatorActor;
+	DeathInstigatorActor = InstigatorActor;
 	UGP_AbilitySystemComponent* ASC = Cast<UGP_AbilitySystemComponent>(GetAbilitySystemComponent());
 	const bool bDeathAbilityStarted = IsValid(ASC)
 		&& ASC->TryActivateAbilityByTag(GPTags::Ability::Enemy::Death);
@@ -313,6 +326,68 @@ void AGP_EnemyCharacter::EnterDeathStateFromAbility()
 	{
 		// The persistent loose tag remains after the short death ability ends and identifies the terminal state to GAS queries.
 		ASC->AddLooseGameplayTag(GPTags::Ability::Enemy::Death);
+	}
+
+	ApplyDeathState();
+	ForceNetUpdate();
+}
+
+void AGP_EnemyCharacter::OnRep_IsDead()
+{
+	if (bIsDead)
+	{
+		ApplyDeathState();
+	}
+}
+
+void AGP_EnemyCharacter::ApplyDeathState()
+{
+	if (bDeathStateApplied)
+	{
+		return;
+	}
+
+	bDeathStateApplied = true;
+	SetCanBeDamaged(false);
+	SetActorTickEnabled(false);
+	SetActorEnableCollision(false);
+
+	if (UCapsuleComponent* EnemyCapsule = GetCapsuleComponent())
+	{
+		EnemyCapsule->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
+
+	if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
+	{
+		MovementComponent->StopMovementImmediately();
+		MovementComponent->DisableMovement();
+	}
+
+	// Notify presentation before scheduling destruction so a zero-delay setup can still react safely.
+	OnEnemyDeathStarted.Broadcast(this, DeathInstigatorActor);
+	BP_OnDeathStarted(DeathInstigatorActor);
+
+	if (HasAuthority())
+	{
+		if (AAIController* AIController = Cast<AAIController>(GetController()))
+		{
+			AIController->StopMovement();
+			if (UBrainComponent* BrainComponent = AIController->GetBrainComponent())
+			{
+				// Stop the Behavior Tree before detaching so no task can enqueue another attack during the corpse delay.
+				BrainComponent->StopLogic(TEXT("Enemy health reached zero"));
+			}
+		}
+
+		DetachFromControllerPendingDestroy();
+		if (DeathDespawnDelay <= KINDA_SMALL_NUMBER)
+		{
+			Destroy();
+		}
+		else
+		{
+			SetLifeSpan(DeathDespawnDelay);
+		}
 	}
 }
 

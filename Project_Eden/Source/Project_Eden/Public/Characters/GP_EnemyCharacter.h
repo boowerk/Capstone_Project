@@ -14,10 +14,13 @@ class UEnemyAIRangeVisualizationComponent;
 class UEnemyArchetypeData;
 class UGP_EnemyDeathAbility;
 class UPDA_EnemyAnimationSet;
+class AGP_EnemyCharacter;
 class AGP_PlayerState;
 struct FDataTableRowHandle;
 struct FEnemyArchetypeTuning;
 struct FEnemyLLMEvaluation;
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnEnemyDeathStarted, AGP_EnemyCharacter*, Enemy, AActor*, InstigatorActor);
 
 UENUM(BlueprintType)
 enum class EGPEnemyCombatArchetype : uint8
@@ -34,6 +37,7 @@ class PROJECT_EDEN_API AGP_EnemyCharacter : public AGP_BaseCharacter
 
 public:
 	AGP_EnemyCharacter();
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 	virtual UAttributeSet* GetAttributeSet() const override;
 	virtual void UpdateAnimationSet() override;
@@ -75,6 +79,13 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Enemy|Death")
 	bool IsDead() const { return bIsDead; }
+
+	// Public authority entry point also supports scripted kills while zero-health deaths arrive through AttributeSet.
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Enemy|Death")
+	void RequestDeath(AActor* InstigatorActor);
+
+	UPROPERTY(BlueprintAssignable, Category = "Enemy|Death")
+	FOnEnemyDeathStarted OnEnemyDeathStarted;
 
 	UFUNCTION(BlueprintPure, Category = "AI")
 	UBehaviorTree* GetBehaviorTreeAssetOverride() const { return BehaviorTreeAssetOverride; }
@@ -183,7 +194,14 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Progression", meta = (ClampMin = "0.0"))
 	float XPReward = 25.0f;
 
+	// No death montage is played yet; the actor remains visible in its current pose until this delay expires.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|Death", meta = (ClampMin = "0.0", Units = "s"))
+	float DeathDespawnDelay = 2.0f;
+
 	virtual void HandlePostDamageTaken(AActor* InstigatorActor, float DamageAmount, FGameplayTag ElementTag) override;
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "Enemy|Death")
+	void BP_OnDeathStarted(AActor* InstigatorActor);
 
 private:
 	friend class UGP_EnemyDeathAbility;
@@ -203,8 +221,14 @@ private:
 	bool bHasBehaviorAnchorLocation = false;
 	bool bXPRewardGranted = false;
 	bool bDeathRequested = false;
+
+	UPROPERTY(ReplicatedUsing = OnRep_IsDead)
 	bool bIsDead = false;
-	TWeakObjectPtr<AActor> LastDamageInstigator;
+
+	UPROPERTY(Replicated)
+	TObjectPtr<AActor> DeathInstigatorActor;
+
+	bool bDeathStateApplied = false;
 
 	const FEnemyArchetypeTuning* ResolveEnemyArchetypeTuning() const;
 	int32 ResolvePersonalitySeed() const;
@@ -215,8 +239,11 @@ private:
 	UFUNCTION()
 	void HandleOutOfHealth(AActor* InstigatorActor, AActor* TargetActor);
 
-	void RequestDeath(AActor* InstigatorActor);
+	UFUNCTION()
+	void OnRep_IsDead();
+
 	void EnterDeathStateFromAbility();
+	void ApplyDeathState();
 	void RefreshAIRangeVisualizers();
 	void GrantXPRewardToInstigator(AActor* InstigatorActor);
 	AGP_PlayerState* ResolveInstigatorPlayerState(AActor* InstigatorActor) const;
