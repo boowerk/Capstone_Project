@@ -2,20 +2,20 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-06-20T22:20:00+09:00
+updated: 2026-06-21T06:30:00+09:00
 status: active
 ---
 # Session Summary
-Last: 2026-06-20T22:20:00+09:00
+Last: 2026-06-21T06:30:00+09:00
 
 ## Status
-- Regular enemies now inherit a screen-space `WorldHealthBarComponent` using `WBP_EnemyHealthBar` and GAS Health/MaxHealth.
-- Bars show at full health, hide on death, and stay disabled for bosses using the HUD bar.
+- Enemy leash fix completed in `aa0522f5` + `971d8f29`.
+- A valid target prevents return-home; target loss outside `ReturnHomeDistance` starts return; seeing the player again interrupts return.
 - User-owned `L_MainMap.umap` remains untouched/uncommitted.
 
 ## Verified
 - Editor build passed.
-- `ProjectEden.UI.EnemyHealthBar.Defaults` passed.
+- `ProjectEden.AI.Enemy.LeashPolicy` passed.
 
 ## Resume
-- PIE-check bar height on melee, ranged, flying, and large meshes. Adjust the inherited component transform per Blueprint only when a nonstandard mesh needs it.
+- PIE-check melee/ranged/flying chase beyond their old leash, target loss outside it, and player re-entry during return.

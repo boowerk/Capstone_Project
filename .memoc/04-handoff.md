@@ -13,6 +13,10 @@ tags:
 
 Last synced: 2026-06-19T08:31:17+09:00
 
+## Enemy Leash Handoff
+
+- Commits `aa0522f5` and `971d8f29` fix active enemies abruptly ignoring the player at `ReturnHomeDistance`. Full editor build and `ProjectEden.AI.Enemy.LeashPolicy` passed; PIE-check chase beyond the old limit, target loss outside the limit, and re-engagement during return.
+
 ## Enemy Health Bar Handoff
 
 - Commits `6c668c6b` and `130afeb2` attach `WBP_EnemyHealthBar` to the shared enemy parent at Z=135, keep it visible at full health, bind GAS Health/MaxHealth, hide it for bosses/dead enemies, and add a passing defaults test. Editor build passed; PIE visual placement still needs checking on differently sized meshes.

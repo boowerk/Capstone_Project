@@ -44,3 +44,6 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 - Enemy death follows the GAS boundary: `UGP_AttributeSet` detects terminal Health, `UGP_EnemyDeathAbility` orchestrates the server transition, and `AGP_EnemyCharacter` owns AI shutdown, collision/movement disablement, replication, and despawn.
 - Keep death presentation separate from death rules. `BP_OnDeathStarted` and `OnEnemyDeathStarted` are optional hooks; no Blueprint setup is required for death correctness.
 - Regular enemies own one native screen-space health bar through `AGP_EnemyCharacter`; `UGP_WidgetComponent` binds the shared Health/MaxHealth pair. Bosses remain on the dedicated HUD boss bar to avoid duplicate UI.
+
+### 2026-06-21
+- Treat `ReturnHomeDistance` as recovery after target loss, not an unconditional combat cutoff. A valid target prevents leash return, and a newly perceived target interrupts a return already in progress.
