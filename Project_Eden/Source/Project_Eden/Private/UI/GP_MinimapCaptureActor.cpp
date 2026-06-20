@@ -95,7 +95,8 @@ void AGP_MinimapCaptureActor::InitializeCapture()
 	{
 		RenderTarget = NewObject<UTextureRenderTarget2D>(this, TEXT("GeneratedMinimapRenderTarget"));
 		RenderTarget->RenderTargetFormat = ETextureRenderTargetFormat::RTF_RGBA8;
-		RenderTarget->ClearColor = FLinearColor::Transparent;
+		// The render target is displayed directly by UMG, so keep its fallback alpha opaque.
+		RenderTarget->ClearColor = FLinearColor(0.015f, 0.015f, 0.015f, 1.0f);
 		RenderTarget->InitAutoFormat(RenderTargetSize, RenderTargetSize);
 		RenderTarget->UpdateResourceImmediate(true);
 	}
@@ -217,12 +218,15 @@ void AGP_MinimapCaptureActor::ConfigureFlat2DCapture()
 		return;
 	}
 
-	// BaseColor plus an orthographic projection produces a readable 2D map without scene lighting or shadows.
+	// FinalColorLDR preserves opaque alpha for direct UMG display; show flags keep the result flat and shadow-free.
 	SceneCapture->ProjectionType = ECameraProjectionMode::Orthographic;
-	SceneCapture->CaptureSource = ESceneCaptureSource::SCS_BaseColor;
+	SceneCapture->CaptureSource = ESceneCaptureSource::SCS_FinalColorLDR;
 	SceneCapture->ShowFlags.SetLighting(false);
+	SceneCapture->ShowFlags.SetSkyLighting(false);
 	SceneCapture->ShowFlags.SetDynamicShadows(false);
 	SceneCapture->ShowFlags.SetPostProcessing(false);
+	SceneCapture->ShowFlags.SetAtmosphere(false);
+	SceneCapture->ShowFlags.SetAntiAliasing(false);
 	SceneCapture->ShowFlags.SetFog(false);
 	SceneCapture->ShowFlags.SetVolumetricFog(false);
 	SceneCapture->ShowFlags.SetTranslucency(false);
@@ -235,6 +239,8 @@ void AGP_MinimapCaptureActor::ConfigureFlat2DCapture()
 	SceneCapture->ShowFlags.SetCollision(false);
 	SceneCapture->ShowFlags.SetDebugAI(false);
 	SceneCapture->ShowFlags.SetNavigation(false);
+	SceneCapture->PostProcessSettings.bOverride_VignetteIntensity = true;
+	SceneCapture->PostProcessSettings.VignetteIntensity = 0.0f;
 }
 
 void AGP_MinimapCaptureActor::ApplyTopDownTransform(const FVector& Center, float OrthoWidth, float Yaw)
