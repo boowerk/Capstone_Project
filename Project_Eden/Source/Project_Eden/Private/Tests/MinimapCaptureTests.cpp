@@ -1,9 +1,12 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Components/SceneCaptureComponent2D.h"
+#include "Components/Image.h"
 #include "Engine/World.h"
 #include "Misc/AutomationTest.h"
 #include "UI/GP_MinimapCaptureActor.h"
+#include "Blueprint/WidgetBlueprintGeneratedClass.h"
+#include "Blueprint/WidgetTree.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FMinimapCaptureStabilityTest,
@@ -35,10 +38,26 @@ bool FMinimapCaptureStabilityTest::RunTest(const FString& Parameters)
 	if (SceneCapture)
 	{
 		TestEqual(TEXT("Minimap uses orthographic projection"), SceneCapture->ProjectionType, ECameraProjectionMode::Orthographic);
-		TestEqual(TEXT("Minimap captures flat base color"), SceneCapture->CaptureSource, ESceneCaptureSource::SCS_BaseColor);
+		TestEqual(TEXT("Minimap captures opaque UI color"), SceneCapture->CaptureSource, ESceneCaptureSource::SCS_FinalColorLDR);
 		TestFalse(TEXT("Minimap capture excludes lighting"), SceneCapture->ShowFlags.Lighting);
 		TestFalse(TEXT("Minimap capture excludes shadows"), SceneCapture->ShowFlags.DynamicShadows);
 		TestFalse(TEXT("Minimap capture excludes particles"), SceneCapture->ShowFlags.Particles);
+	}
+
+	// Validate the production HUD contract so the subsystem always has a visible Image to receive the render target.
+	UClass* HUDWidgetClass = LoadClass<UUserWidget>(nullptr, TEXT("/Game/UI/HUD/WBP_PlayerHUDWidget.WBP_PlayerHUDWidget_C"));
+	UWidgetBlueprintGeneratedClass* HUDGeneratedClass = Cast<UWidgetBlueprintGeneratedClass>(HUDWidgetClass);
+	UWidgetTree* HUDWidgetTree = HUDGeneratedClass ? HUDGeneratedClass->GetWidgetTreeArchetype() : nullptr;
+	UImage* MinimapBackgroundImage = HUDWidgetTree
+		? Cast<UImage>(HUDWidgetTree->FindWidget(TEXT("MinimapBackgroundImage")))
+		: nullptr;
+	TestNotNull(TEXT("Production HUD contains MinimapBackgroundImage"), MinimapBackgroundImage);
+	if (MinimapBackgroundImage)
+	{
+		TestTrue(
+			TEXT("Production minimap background is visible"),
+			MinimapBackgroundImage->GetVisibility() != ESlateVisibility::Collapsed
+				&& MinimapBackgroundImage->GetVisibility() != ESlateVisibility::Hidden);
 	}
 
 	const FVector GroundCenter(400.0f, 500.0f, 25.0f);
