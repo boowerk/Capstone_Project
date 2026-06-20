@@ -16,7 +16,7 @@ Last synced: 2026-06-19T08:31:17+09:00
 ## Current Status
 
 - Minimap capture is stable and flat: only FollowTarget ticks at 0.2s, FullMap is event-driven, PCG refresh preserves the current mode, and capture uses orthographic BaseColor with lighting/shadows/VFX/debug overlays disabled.
-- Enemy leash return no longer overrides an active `TargetActor`. Enemies return only after losing the target outside `ReturnHomeDistance`, and currently perceived players interrupt an in-progress return immediately.
+- Enemy leash uses anchor hysteresis: crossing `ReturnHomeDistance` starts return even with a target; after returning inside 75% of that distance, a visible player interrupts return and reopens combat.
 - Basic melee, ranged, and flying enemies inherit a native screen-space `WorldHealthBarComponent` from `AGP_EnemyCharacter`. It uses `WBP_EnemyHealthBar`, tracks GAS Health/MaxHealth, stays visible at full health, and hides on death; bosses keep the dedicated HUD bar.
 - All enemy archetypes share `AGP_EnemyCharacter` death handling: zero Health activates the server-only Death Ability, persists the Death GAS tag, stops AI/movement/collision, and schedules despawn.
 - Death presentation is animation-free; Blueprint children may later use `BP_OnDeathStarted` or `OnEnemyDeathStarted` without changing gameplay rules.
@@ -204,7 +204,7 @@ Last synced: 2026-05-23T00:00:00
 ## Completed Tasks
 
 - Fixed minimap capture-height accumulation/HUD brush reflow and added stability coverage (`2641dbab`, `a0a1a7d8`).
-- Fixed the common enemy leash state machine and added transition coverage (`aa0522f5`, `971d8f29`).
+- Added the common enemy leash state machine, then refined it to anchor return with stable re-engagement hysteresis (`aa0522f5`, `971d8f29`, `93ac0b15`, `177bc9ad`).
 - Added and verified shared overhead health bars for regular enemies (`6c668c6b`, `130afeb2`).
 - Added and verified the shared GAS enemy death pipeline and replicated/idempotent corpse lifecycle (`4783ba61`, `a0ae0cb4`).
 - Created `Diagonal_Path_Curvature_Analysis.md` containing diagnostic details on the forward-to-diagonal trajectory angularity.

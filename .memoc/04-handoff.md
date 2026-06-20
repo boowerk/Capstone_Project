@@ -19,7 +19,7 @@ Last synced: 2026-06-19T08:31:17+09:00
 
 ## Enemy Leash Handoff
 
-- Commits `aa0522f5` and `971d8f29` fix active enemies abruptly ignoring the player at `ReturnHomeDistance`. Full editor build and `ProjectEden.AI.Enemy.LeashPolicy` passed; PIE-check chase beyond the old limit, target loss outside the limit, and re-engagement during return.
+- Commits `93ac0b15` and `177bc9ad` finalize anchor leash behavior: crossing the outer distance starts return, and a visible player re-engages inside the default 75% inner boundary. Editor build and `ProjectEden.AI.Enemy.LeashPolicy` passed; PIE-check actual BT movement at both boundaries.
 
 ## Enemy Health Bar Handoff
 
