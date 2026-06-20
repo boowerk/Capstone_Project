@@ -15,6 +15,7 @@ Last synced: 2026-06-19T08:31:17+09:00
 
 ## Current Status
 
+- Basic melee, ranged, and flying enemies inherit a native screen-space `WorldHealthBarComponent` from `AGP_EnemyCharacter`. It uses `WBP_EnemyHealthBar`, tracks GAS Health/MaxHealth, stays visible at full health, and hides on death; bosses keep the dedicated HUD bar.
 - All enemy archetypes share `AGP_EnemyCharacter` death handling: zero Health activates the server-only Death Ability, persists the Death GAS tag, stops AI/movement/collision, and schedules despawn.
 - Death presentation is animation-free; Blueprint children may later use `BP_OnDeathStarted` or `OnEnemyDeathStarted` without changing gameplay rules.
 - FurnaceWalker enemy foundation created: `/Game/Characters/EnemyCharacter/Monsters/FurnaceWalker/BP_FurnaceWalker` inherits `BP_BasicEnemy_Melee`, keeps common AI/GAS melee setup, and now uses `/Game/Meshes/Monsters/FurnaceWalker/furnacewalker`. `RTG_FurnaceWalker` maps UEFN mannequin source to the FurnaceWalker IK rig. User added retargeted Idle/Jog, six attack, hit-react, and death sequences under `/Game/Characters/EnemyCharacter/Monsters/FurnaceWalker/Animations`. `/Game/Characters/EnemyCharacter/Monsters/FurnaceWalker/ABP_FurnaceWalker` is assigned to the child mesh and compiled: EventGraph calculates owner velocity magnitude into `Speed`; AnimGraph chooses Idle/Jog through a full-body `DefaultSlot`. `/Game/Characters/EnemyCharacter/Monsters/FurnaceWalker/AM_FW_Attack` remains `PDA_FW_AnimationSet.PrimaryAttackMontage` fallback, while six attack montages (`AM_FW_Zombie_Smashing_R/L`, `AM_FW_Zombie_Punching_R/L`, `AM_FW_Mutant_Punch_R/L`) are registered in `LightAttackMontages`. Each source attack sequence has `UGP_AnimNotify_SendGameplayEvent` for `GPTags.Event.Enemy.AttackHit` at common 45% timing and `GPTags.Event.Enemy.ActionEnd` near montage end. `GP_EnemyAttack` now chooses opposite-side L/R random first, avoids immediate repeats as fallback, listens for Enemy `ActionEnd`, and still ends on montage completion if the notify is missing. Pending: rebuild from correct engine/UBT path, then PIE-check locomotion, random attack selection, hit timing, ActionEnd release, and capsule/mesh offset.
@@ -200,6 +201,7 @@ Last synced: 2026-05-23T00:00:00
 
 ## Completed Tasks
 
+- Added and verified shared overhead health bars for regular enemies (`6c668c6b`, `130afeb2`).
 - Added and verified the shared GAS enemy death pipeline and replicated/idempotent corpse lifecycle (`4783ba61`, `a0ae0cb4`).
 - Created `Diagonal_Path_Curvature_Analysis.md` containing diagnostic details on the forward-to-diagonal trajectory angularity.
 - Resolved missing declaration `GetActiveMovementSpeedProfile` in `GP_PlayerCharacter.h`, fixing multiple C++ compilation errors and verified successful build.
