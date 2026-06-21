@@ -33,6 +33,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Boss|Crystal Seraph")
 	float GetCollisionRadius() const;
 
+	UFUNCTION(BlueprintPure, Category = "Boss|Crystal Seraph|VFX")
+	FVector GetPrismAuraScale() const { return PrismAuraScale; }
+
 protected:
 	UFUNCTION(BlueprintImplementableEvent, Category = "Boss|Crystal Seraph")
 	void BP_OnLaserReflected(AGP_SeraphLaserActor* LaserActor, const FVector& ReflectedDirection);
@@ -65,6 +68,10 @@ private:
 	// Keep the prototype crystal readable while allowing a Blueprint child to replace or retune its visual footprint.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph", meta = (AllowPrivateAccess = "true"))
 	FVector PrismVisualScale = FVector(2.1f, 2.1f, 2.9f);
+
+	// Aura scale is independent from the enlarged mesh so designers can keep the persistent effect close to the crystal.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph|VFX", meta = (AllowPrivateAccess = "true"))
+	FVector PrismAuraScale = FVector(0.55f);
 
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Boss|Crystal Seraph", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<AGP_CrystalSeraphBossCharacter> BossOwner;

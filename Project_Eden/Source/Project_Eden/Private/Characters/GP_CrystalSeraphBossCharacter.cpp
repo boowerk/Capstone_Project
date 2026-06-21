@@ -166,7 +166,8 @@ AActor* AGP_CrystalSeraphBossCharacter::RequestSpawnCrystalPrism(AActor* Pattern
 	for (int32 PrismIndex = 0; PrismIndex < SafePrismCount; ++PrismIndex)
 	{
 		const FVector SpawnLocation = ResolvePrismSpawnLocation(TargetActor, PrismIndex, SafePrismCount);
-		const FRotator SpawnRotation = (GetActorLocation() - SpawnLocation).Rotation();
+		// Crystals remain vertically aligned; aiming at the airborne boss previously introduced an unwanted pitch tilt.
+		const FRotator SpawnRotation = FRotator::ZeroRotator;
 		AActor* PrismActor = SpawnConfiguredActor(
 			CrystalPrismActorClass,
 			SpawnLocation,

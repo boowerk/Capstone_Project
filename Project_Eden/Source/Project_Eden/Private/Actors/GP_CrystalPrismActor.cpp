@@ -60,7 +60,11 @@ void AGP_CrystalPrismActor::BeginPlay()
 		FMath::Max(0.01f, PrismVisualScale.Y),
 		FMath::Max(0.01f, PrismVisualScale.Z)));
 	ReflectionCollision->SetSphereRadius(GetCollisionRadius());
-	VisualCueComponent->ActivatePersistentCue(GPTags::GameplayCue::Ability::Active_Magic, PrismMesh, FVector::ZeroVector, FRotator::ZeroRotator, FVector(1.25f));
+	const FVector SafeAuraScale(
+		FMath::Max(0.01f, PrismAuraScale.X),
+		FMath::Max(0.01f, PrismAuraScale.Y),
+		FMath::Max(0.01f, PrismAuraScale.Z));
+	VisualCueComponent->ActivatePersistentCue(GPTags::GameplayCue::Ability::Active_Magic, PrismMesh, FVector::ZeroVector, FRotator::ZeroRotator, SafeAuraScale);
 	SetLifeSpan(FMath::Max(0.0f, PrismLifeSpan));
 }
 
