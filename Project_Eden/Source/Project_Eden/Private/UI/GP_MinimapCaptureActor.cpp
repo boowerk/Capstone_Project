@@ -5,11 +5,76 @@
 #include "Engine/TextureRenderTarget2D.h"
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
-#include "RenderCommandFence.h"
+#include "RHI.h"
+#include "RHICommandList.h"
+#include "RenderingThread.h"
 #include "UI/GP_MinimapSubsystem.h"
 
+namespace
+{
+	struct FGPMinimapCaptureGPUFenceState
+	{
+		FGPUFenceRHIRef Fence;
+		TAtomic<bool> bWriteIssued { false };
+	};
+}
+
+class FGPMinimapCaptureGPUFence
+{
+public:
+	bool ArmAfterCapture()
+	{
+		TSharedRef<FGPMinimapCaptureGPUFenceState, ESPMode::ThreadSafe> NewState =
+			MakeShared<FGPMinimapCaptureGPUFenceState, ESPMode::ThreadSafe>();
+		NewState->Fence = RHICreateGPUFence(TEXT("MinimapCaptureCompletion"));
+		if (!NewState->Fence.IsValid())
+		{
+			State.Reset();
+			return false;
+		}
+
+		State = NewState;
+		if (GUsingNullRHI)
+		{
+			// NullRHI has no GPU command context for WriteGPUFence; automation drives completion through the test override.
+			return true;
+		}
+
+		ENQUEUE_RENDER_COMMAND(WriteMinimapCaptureGPUFence)(
+			[NewState](FRHICommandListImmediate& RHICmdList)
+			{
+				// This command is queued after CaptureScene, so signaling covers all prior capture GPU work.
+				RHICmdList.WriteGPUFence(NewState->Fence);
+				NewState->bWriteIssued.Store(true);
+			});
+		return true;
+	}
+
+	bool IsComplete() const
+	{
+		return State.IsValid()
+			&& State->bWriteIssued.Load()
+			&& State->Fence.IsValid()
+			&& State->Fence->NumPendingWriteCommands.GetValue() == 0
+			&& State->Fence->Poll();
+	}
+
+	bool HasFence() const
+	{
+		return State.IsValid() && State->Fence.IsValid();
+	}
+
+	void Reset()
+	{
+		State.Reset();
+	}
+
+private:
+	TSharedPtr<FGPMinimapCaptureGPUFenceState, ESPMode::ThreadSafe> State;
+};
+
 AGP_MinimapCaptureActor::AGP_MinimapCaptureActor()
-	: CaptureCompletionFence(MakeUnique<FRenderCommandFence>())
+	: CaptureCompletionFence(MakeShared<FGPMinimapCaptureGPUFence, ESPMode::ThreadSafe>())
 {
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.bStartWithTickEnabled = true;
@@ -183,9 +248,8 @@ void AGP_MinimapCaptureActor::RequestCapture()
 
 	SceneCapture->TextureTarget = CaptureBackBuffer;
 	SceneCapture->CaptureScene();
-	// Wait for the RHI submission so attack-time render load cannot expose a partially cleared capture to UMG.
-	CaptureCompletionFence->BeginFence(FRenderCommandFence::ESyncDepth::RHIThread);
-	bHasPendingCapture = true;
+	// The GPU fence is written after CaptureScene; keep the existing front buffer if the fence cannot be armed.
+	bHasPendingCapture = CaptureCompletionFence.IsValid() && CaptureCompletionFence->ArmAfterCapture();
 }
 
 FBox AGP_MinimapCaptureActor::ResolveBounds(AActor* BoundsActor) const
@@ -283,14 +347,31 @@ UTextureRenderTarget2D* AGP_MinimapCaptureActor::CreateTransientRenderTarget(con
 
 void AGP_MinimapCaptureActor::PromoteCompletedCapture()
 {
-	if (!bHasPendingCapture || !CaptureCompletionFence || !CaptureCompletionFence->IsFenceComplete() || !IsValid(CaptureBackBuffer))
+	if (!bHasPendingCapture || !IsCaptureGPUFenceComplete() || !IsValid(CaptureBackBuffer))
 	{
 		return;
 	}
 
 	Swap(RenderTarget, CaptureBackBuffer);
 	bHasPendingCapture = false;
+	CaptureCompletionFence->Reset();
 	OnRenderTargetChanged.Broadcast(RenderTarget);
+}
+
+bool AGP_MinimapCaptureActor::IsCaptureGPUFenceComplete() const
+{
+#if WITH_DEV_AUTOMATION_TESTS
+	if (CaptureGPUFenceCompletionOverride.IsSet())
+	{
+		return CaptureGPUFenceCompletionOverride.GetValue();
+	}
+#endif
+	return CaptureCompletionFence.IsValid() && CaptureCompletionFence->IsComplete();
+}
+
+bool AGP_MinimapCaptureActor::HasCaptureGPUFence() const
+{
+	return CaptureCompletionFence.IsValid() && CaptureCompletionFence->HasFence();
 }
 
 void AGP_MinimapCaptureActor::ApplyTopDownTransform(const FVector& Center, float OrthoWidth, float Yaw)

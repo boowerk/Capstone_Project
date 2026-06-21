@@ -7,7 +7,7 @@
 class USceneCaptureComponent2D;
 class USceneComponent;
 class UTextureRenderTarget2D;
-class FRenderCommandFence;
+class FGPMinimapCaptureGPUFence;
 class FMinimapCaptureStabilityTest;
 
 UENUM(BlueprintType)
@@ -104,6 +104,8 @@ private:
 	void CacheInitialGroundCenter();
 	void ConfigureFlat2DCapture();
 	UTextureRenderTarget2D* CreateTransientRenderTarget(const FName ObjectName);
+	bool IsCaptureGPUFenceComplete() const;
+	bool HasCaptureGPUFence() const;
 	void PromoteCompletedCapture();
 	void ApplyTopDownTransform(const FVector& Center, float OrthoWidth, float Yaw);
 	void CaptureForCurrentMode();
@@ -117,8 +119,11 @@ private:
 
 	float FollowCaptureAccumulator = 0.0f;
 	FVector InitialGroundCenter = FVector::ZeroVector;
-	// The fence prevents promotion while the render thread is still filling CaptureBackBuffer.
-	TUniquePtr<FRenderCommandFence> CaptureCompletionFence;
+	// The GPU fence prevents promotion while SceneCapture or Niagara work is still filling CaptureBackBuffer.
+	TSharedPtr<FGPMinimapCaptureGPUFence, ESPMode::ThreadSafe> CaptureCompletionFence;
+#if WITH_DEV_AUTOMATION_TESTS
+	TOptional<bool> CaptureGPUFenceCompletionOverride;
+#endif
 	bool bHasInitialGroundCenter = false;
 	bool bCaptureInitialized = false;
 	bool bHasPendingCapture = false;
