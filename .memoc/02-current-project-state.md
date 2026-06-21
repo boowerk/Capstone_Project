@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-06-21T17:45:00+09:00
+updated: 2026-06-22T00:54:00+09:00
 status: active
 tags:
   - memoc
@@ -11,7 +11,7 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-06-21T17:45:00+09:00
+Last synced: 2026-06-22T00:54:00+09:00
 
 ## Current Status
 
@@ -36,7 +36,7 @@ Last synced: 2026-06-21T17:45:00+09:00
 - `UBTT_ExecuteBossAttack` no longer reports success when GAS pattern activation fails. Granted-but-blocked/cooldowned boss pattern candidates are logged, the next scored candidate is attempted, and the BT task fails only when no candidate can activate.
 - Crystal Seraph native boss prototype is implemented from `CrystalSeraphBoss_Plan.md`: `AGP_CrystalSeraphBossCharacter` uses requested `/Game/Characters/MaskMan/SK_MaskMan` as the prototype skeletal mesh, owns `UGP_CrystalSeraphStateComponent`, grants native Crystal Seraph pattern abilities, and exposes BlueprintCallable requests for prism, laser, shard, sanctuary, wing-core exposure, groggy, and recover.
 - Crystal Seraph now enforces shared `BT_BossCommon`/`BB_BossCommon` in its native constructor and `OnConstruction`, retaining boss patrol, chase, and reposition flow. GAS activation atomically reserves a 2.5s shared attack cadence (groggy bypasses it), successful attacks immediately leave the Attack branch, and prism/laser readiness uses last-use cooldown timestamps instead of narrow world-time windows. Editor build and `ProjectEden.AI.Boss.PatternSelector.CrystalSeraph` passed; PIE patrol/chase validation remains.
-- Crystal Seraph pattern actors exist in C++: `AGP_CrystalPrismActor`, `AGP_SeraphLaserActor`, `AGP_WingCoreHitActor`, `AGP_CrystalShardProjectile`, and `AGP_CrystalSanctuaryMarkerActor`. They use basic engine shapes as prototype visuals and expose BP events for polished VFX.
+- Crystal Seraph pattern actors exist in C++: `AGP_CrystalPrismActor`, `AGP_SeraphLaserActor`, `AGP_WingCoreHitActor`, `AGP_CrystalShardProjectile`, and `AGP_CrystalSanctuaryMarkerActor`. Prism now spawns three evenly spaced crystals around the target; its default visual scale is `2.1/2.1/2.9` with a matching 150cm reflection radius. Engine-shape visuals and BP hooks remain replaceable.
 - Boss AI/GAS integration now has Crystal Seraph native tags, optional Blackboard keys, selector scoring, BT service/task mirroring, and damage-state multipliers: guarded `0.15`, wing-core exposed `0.5`, groggy `1.0`.
 - Minimap terrain capture is resilient to missing level setup: `UGP_MinimapSubsystem` auto-spawns a transient `AGP_MinimapCaptureActor` when no placed capture actor exists, initializes the render target, and broadcasts it to HUD listeners.
 - `AGP_MinimapCaptureActor` now renders scene primitives from a top-down capture, lazily reacquires the player pawn follow target, and updates capture around the player so terrain can appear in the HUD minimap.

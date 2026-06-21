@@ -2,19 +2,18 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-06-21T17:45:00+09:00
+updated: 2026-06-22T00:54:00+09:00
 status: active
 ---
 # Session Summary
 
 ## Status
-- Dark Armor Knight native GAS boss completed in `4abb1dc1`, `85c40d78`, `0d0da2aa`, `1c837936`.
-- Shared Boss_Common handles patrol/chase; state component owns guard/parry/groggy; selector requests dedicated GAS patterns.
-- `BP_DarkArmorKnight` uses `SK_KnightBoss`; wave/crack/charge visuals are replaceable Engine primitives.
-- User-owned `L_MainMap.umap` and `WBP_PlayerHUDWidget.uasset` remain uncommitted.
+- Crystal Seraph prism now spawns 3 crystals on a 650cm target-centered ring (`d79c7f35`).
+- Prism prototype scale is 2.1/2.1/2.9; reflection radius is 150cm and both remain BP-editable.
+- User-owned editor config, map, and HUD assets remain uncommitted.
 
 ## Verified
-- Editor build and DarkKnight selector/guard lifecycle automation passed.
+- Editor build plus PrismCluster and existing GroggyLifecycle tests passed.
 
 ## Resume
-- Place BP; tune Anim Class and mesh/capsule transform. Replace primitive pattern visuals later through BP child classes.
+- PIE-check crystal size/spacing; tune `PrismVisualScale` or boss `PrismRingRadius` if needed.
