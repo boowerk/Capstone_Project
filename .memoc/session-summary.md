@@ -2,18 +2,17 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-06-22T01:14:00+09:00
+updated: 2026-06-22T01:40:00+09:00
 status: active
 ---
 # Session Summary
 
 ## Status
-- Shared VisualCue resolver now serves player SkillData and actor-owned Niagara (`50569b35`).
-- Crystal prism, shard, laser, and sanctuary patterns have persistent and multicast one-shot VFX (`5fab4c1f`).
+- Seraph prisms are upright again and editable aura scale is reduced to 0.55 (`c8aac963`).
 - User-owned editor config, map, and HUD assets remain uncommitted.
 
 ## Verified
-- Editor build and all `ProjectEden.Combat.CrystalSeraph` tests passed.
+- Changed units compile; final link/test is blocked by the open editor holding the module DLL.
 
 ## Resume
-- PIE-check Niagara scale/orientation; tune actor `VisualCueComponent.VisualCues` in BP if needed.
+- Close Unreal Editor, rebuild, run PrismCluster, then PIE-check upright crystals and aura size.
