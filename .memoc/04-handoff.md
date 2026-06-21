@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-06-22T00:54:00+09:00
+updated: 2026-06-22T01:14:00+09:00
 status: active
 tags:
   - memoc
@@ -11,7 +11,7 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-06-22T00:54:00+09:00
+Last synced: 2026-06-22T01:14:00+09:00
 
 ## Dark Armor Knight Boss Handoff
 
@@ -61,6 +61,7 @@ Last synced: 2026-06-22T00:54:00+09:00
 
 ## Crystal Seraph Boss Handoff
 
+- Commits `50569b35`, `5fab4c1f`, and `7ed563c2` share the player visual-cue resolver with actor-owned presentation and add default Niagara to prism, shard, laser, and sanctuary patterns. Full build and all `ProjectEden.Combat.CrystalSeraph` tests pass. No required editor assignment; PIE-check asset scale/orientation and override each actor's `VisualCueComponent.VisualCues` in BP if art tuning is needed.
 - Commits `d79c7f35` and `b12a5dd5` enlarge the prototype prism and spawn three non-overlapping crystals on a 650cm target-centered ring. Editor build, PrismCluster, and existing GroggyLifecycle tests pass; PIE-check visual spacing and tune `PrismVisualScale` / `PrismRingRadius` only if needed.
 - Commits `a70a62cd` and `416d16f5` fix the logged teleport-to-leash-to-Patrol loop without editing BT assets. Tactical teleports clamp inside the anchor margin, the Patrol EQS task yields to ReturnHome, and flying vector moves use direct altitude-preserving paths. Build and PatrolRecovery/GroggyLifecycle/selector tests pass; PIE-check that Patrol fallback logs no longer spam.
 - Commits `7a94b1ac` and `8dfa6c98` route each reflected laser into one break stage; the third causes a gravity fall. Falling hits do not count, the first grounded player hit starts `GroggyDuration` (final phase: `FinalPhaseGroggyDuration`), and Boss_Common resumes on return to hover. Build plus lifecycle/selector tests pass; PIE-check presentation and tune only those durations if desired.
