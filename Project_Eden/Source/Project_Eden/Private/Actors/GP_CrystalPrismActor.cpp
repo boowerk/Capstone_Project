@@ -70,8 +70,8 @@ bool AGP_CrystalPrismActor::NotifyLaserHit(AGP_SeraphLaserActor* LaserActor, con
 		return false;
 	}
 
-	// Reflection success is the mechanic trigger; the wing core owns the actual damage window.
-	BossOwner->RequestExposeWingCore();
+	// Every successful reflected laser breaks one wing-core stage; the third stage drops the boss into groggy.
+	BossOwner->RequestWingCoreBreak();
 	BP_OnLaserReflected(LaserActor, ReflectedDirection);
 	return true;
 }

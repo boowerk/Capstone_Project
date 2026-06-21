@@ -14,10 +14,14 @@
 #include "BehaviorTree/BehaviorTree.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "BehaviorTree/BlackboardData.h"
+#include "BrainComponent.h"
 #include "Characters/GP_CrystalSeraphStateComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/Controller.h"
+#include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerState.h"
 #include "Kismet/GameplayStatics.h"
 #include "NavigationSystem.h"
 #include "TimerManager.h"
@@ -284,7 +288,7 @@ void AGP_CrystalSeraphBossCharacter::RequestExposeWingCore(float ExposureDuratio
 
 void AGP_CrystalSeraphBossCharacter::RequestWingCoreBreak()
 {
-	if (!HasAuthority() || !IsValid(CrystalSeraphStateComponent))
+	if (!HasAuthority() || !IsValid(CrystalSeraphStateComponent) || CrystalSeraphStateComponent->IsGroggy())
 	{
 		return;
 	}
@@ -312,11 +316,16 @@ void AGP_CrystalSeraphBossCharacter::RequestEnterGroggy()
 
 void AGP_CrystalSeraphBossCharacter::RequestRecoverFromGroggy()
 {
-	if (!HasAuthority() || !IsValid(CrystalSeraphStateComponent))
+	if (!HasAuthority() || IsDead() || !IsValid(CrystalSeraphStateComponent) || !CrystalSeraphStateComponent->IsGroggy())
 	{
 		return;
 	}
 
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(GroggyRecoveryTimerHandle);
+	}
+	bGroggyRecoveryScheduled = false;
 	CrystalSeraphStateComponent->RecoverFromGroggy();
 	MoveToHoverLocation();
 }
@@ -386,7 +395,30 @@ void AGP_CrystalSeraphBossCharacter::HandlePostDamageTaken(AActor* InstigatorAct
 {
 	Super::HandlePostDamageTaken(InstigatorActor, DamageAmount, ElementTag);
 
-	if (!HasAuthority() || !IsValid(CrystalSeraphStateComponent) || !CrystalSeraphStateComponent->IsWingCoreExposed())
+	if (!HasAuthority() || !IsValid(CrystalSeraphStateComponent))
+	{
+		return;
+	}
+
+	if (IsDead())
+	{
+		if (UWorld* World = GetWorld())
+		{
+			// A lethal groggy hit cancels recovery so the shared death lifecycle remains terminal.
+			World->GetTimerManager().ClearTimer(GroggyRecoveryTimerHandle);
+		}
+		bGroggyRecoveryScheduled = false;
+		return;
+	}
+
+	if (CrystalSeraphStateComponent->IsGroggy())
+	{
+		// The vulnerability window begins only after the grounded boss takes a real player hit.
+		ScheduleGroggyRecoveryAfterPlayerHit(InstigatorActor, DamageAmount);
+		return;
+	}
+
+	if (!CrystalSeraphStateComponent->IsWingCoreExposed())
 	{
 		return;
 	}
@@ -412,24 +444,30 @@ void AGP_CrystalSeraphBossCharacter::HandleCrystalSeraphGroggyChanged(bool bNewG
 	{
 		World->GetTimerManager().ClearTimer(GroggyRecoveryTimerHandle);
 	}
+	bGroggyRecoveryScheduled = false;
 
 	if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
 	{
 		MovementComponent->GravityScale = bNewGroggy ? 1.0f : 0.0f;
-		MovementComponent->SetMovementMode(bNewGroggy ? MOVE_Walking : MOVE_Flying);
+		MovementComponent->DefaultLandMovementMode = bNewGroggy ? MOVE_Walking : MOVE_Flying;
+		// Entering Falling preserves the visible drop instead of teleporting the boss directly to the floor.
+		MovementComponent->SetMovementMode(bNewGroggy ? MOVE_Falling : MOVE_Flying);
 	}
 
-	if (bNewGroggy)
+	if (AAIController* AIController = Cast<AAIController>(GetController()))
 	{
-		SetActorLocation(ResolveGroundGroggyLocation(), false, nullptr, ETeleportType::TeleportPhysics);
-		if (UWorld* World = GetWorld())
+		AIController->StopMovement();
+		if (UBrainComponent* BrainComponent = AIController->GetBrainComponent())
 		{
-			World->GetTimerManager().SetTimer(
-				GroggyRecoveryTimerHandle,
-				this,
-				&ThisClass::RequestRecoverFromGroggy,
-				ResolveCurrentGroggyDuration(),
-				false);
+			if (bNewGroggy)
+			{
+				// Pause Boss_Common while gravity and the grounded vulnerability window own the boss.
+				BrainComponent->PauseLogic(TEXT("Crystal Seraph groggy"));
+			}
+			else
+			{
+				BrainComponent->ResumeLogic(TEXT("Crystal Seraph recovered"));
+			}
 		}
 	}
 }
@@ -541,20 +579,6 @@ FVector AGP_CrystalSeraphBossCharacter::ResolvePrismSpawnLocation(AActor* Target
 	return DesiredLocation;
 }
 
-FVector AGP_CrystalSeraphBossCharacter::ResolveGroundGroggyLocation() const
-{
-	const FVector TraceStart = GetActorLocation();
-	const FVector TraceEnd = TraceStart - FVector(0.0f, 0.0f, 5000.0f);
-	FHitResult GroundHit;
-	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(CrystalSeraphGroggyGround), false, this);
-	if (GetWorld() && GetWorld()->LineTraceSingleByChannel(GroundHit, TraceStart, TraceEnd, ECC_WorldStatic, QueryParams))
-	{
-		return GroundHit.ImpactPoint + FVector(0.0f, 0.0f, 96.0f);
-	}
-
-	return GetActorLocation() - FVector(0.0f, 0.0f, PreferredHoverHeight);
-}
-
 FVector AGP_CrystalSeraphBossCharacter::ResolveHoverLocation() const
 {
 	AActor* TargetActor = ResolvePatternTarget(nullptr);
@@ -574,6 +598,71 @@ float AGP_CrystalSeraphBossCharacter::ResolveCurrentGroggyDuration() const
 	const float MaxHealth = ResolveBossMaxHealth();
 	const float HealthRatio = IsValid(GPAttributeSet) ? GPAttributeSet->GetHealth() / MaxHealth : 1.0f;
 	return HealthRatio <= FinalPhaseHealthRatio ? FinalPhaseGroggyDuration : GroggyDuration;
+}
+
+bool AGP_CrystalSeraphBossCharacter::IsPlayerDamageInstigator(const AActor* InstigatorActor) const
+{
+	if (!IsValid(InstigatorActor))
+	{
+		return false;
+	}
+
+	if (const APawn* InstigatorPawn = Cast<APawn>(InstigatorActor))
+	{
+		return InstigatorPawn->IsPlayerControlled();
+	}
+
+	if (const AController* InstigatorController = Cast<AController>(InstigatorActor))
+	{
+		return InstigatorController->IsPlayerController();
+	}
+
+	if (Cast<APlayerState>(InstigatorActor) != nullptr)
+	{
+		return true;
+	}
+
+	// Projectile and area actors preserve the player's controller through their instigator chain.
+	const AController* InstigatorController = InstigatorActor->GetInstigatorController();
+	return IsValid(InstigatorController) && InstigatorController->IsPlayerController();
+}
+
+void AGP_CrystalSeraphBossCharacter::ScheduleGroggyRecoveryAfterPlayerHit(AActor* InstigatorActor, float DamageAmount)
+{
+	if (bGroggyRecoveryScheduled || DamageAmount <= 0.0f || !IsPlayerDamageInstigator(InstigatorActor))
+	{
+		return;
+	}
+
+	const UCharacterMovementComponent* MovementComponent = GetCharacterMovement();
+	if (!IsValid(MovementComponent) || !MovementComponent->IsMovingOnGround())
+	{
+		// A hit during the fall must not consume the required post-landing player hit.
+		return;
+	}
+
+	bGroggyRecoveryScheduled = true;
+	const float RecoveryDelay = ResolveCurrentGroggyDuration();
+	UE_LOG(LogTemp, Log, TEXT("[CrystalSeraph] Grounded player hit armed recovery. Boss=%s Delay=%.2f"),
+		*GetNameSafe(this),
+		RecoveryDelay);
+
+	if (RecoveryDelay <= 0.0f)
+	{
+		RequestRecoverFromGroggy();
+		return;
+	}
+
+	if (UWorld* World = GetWorld())
+	{
+		// One-shot scheduling prevents repeated combo hits from postponing or accelerating the recovery.
+		World->GetTimerManager().SetTimer(
+			GroggyRecoveryTimerHandle,
+			this,
+			&ThisClass::RequestRecoverFromGroggy,
+			RecoveryDelay,
+			false);
+	}
 }
 
 void AGP_CrystalSeraphBossCharacter::MoveToHoverLocation()

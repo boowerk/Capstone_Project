@@ -7,6 +7,7 @@
 
 class UGameplayAbility;
 class UGP_CrystalSeraphStateComponent;
+class FCrystalSeraphGroggyLifecycleTest;
 
 UCLASS(Blueprintable)
 class PROJECT_EDEN_API AGP_CrystalSeraphBossCharacter : public AGP_EnemyCharacter
@@ -70,6 +71,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Boss|Crystal Seraph")
 	bool CanStartCrystalSeraphPattern() const;
 
+	UFUNCTION(BlueprintPure, Category = "Boss|Crystal Seraph")
+	bool IsGroggyRecoveryScheduled() const { return bGroggyRecoveryScheduled; }
+
 	// Reserves the shared attack cadence before a GAS pattern executes so back-to-back BT tasks cannot pass the same check.
 	bool TryStartCrystalSeraphPattern();
 
@@ -80,6 +84,8 @@ protected:
 	virtual void HandlePostDamageTaken(AActor* InstigatorActor, float DamageAmount, FGameplayTag ElementTag) override;
 
 private:
+	friend class FCrystalSeraphGroggyLifecycleTest;
+
 	UFUNCTION()
 	void HandleCrystalSeraphGroggyChanged(bool bNewGroggy);
 
@@ -89,10 +95,11 @@ private:
 	void GrantCrystalSeraphPatternAbilities();
 	AActor* ResolvePatternTarget(AActor* ExplicitTargetActor) const;
 	FVector ResolvePrismSpawnLocation(AActor* TargetActor) const;
-	FVector ResolveGroundGroggyLocation() const;
 	FVector ResolveHoverLocation() const;
 	float ResolveBossMaxHealth() const;
 	float ResolveCurrentGroggyDuration() const;
+	bool IsPlayerDamageInstigator(const AActor* InstigatorActor) const;
+	void ScheduleGroggyRecoveryAfterPlayerHit(AActor* InstigatorActor, float DamageAmount);
 	void MoveToHoverLocation();
 	AActor* SpawnConfiguredActor(TSubclassOf<AActor> ActorClass, const FVector& Location, const FRotator& Rotation, FName DebugName);
 
@@ -184,4 +191,5 @@ private:
 	float LastTacticalTeleportTime = -BIG_NUMBER;
 	int32 TacticalTeleportSequence = 0;
 	FTimerHandle GroggyRecoveryTimerHandle;
+	bool bGroggyRecoveryScheduled = false;
 };
