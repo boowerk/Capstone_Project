@@ -15,6 +15,7 @@ Last synced: 2026-06-21T15:10:00+09:00
 
 ## Minimap Handoff
 
+- Commits `42b72f57` and `19340f27` remove periodic RenderTarget swapping/rebinding. UMG keeps one stable display target while SceneCapture remains isolated on a back buffer; completed captures are GPU-copied only after the capture fence, and the pipeline remains blocked until the copy fence completes. Editor build plus NullRHI and D3D12 offscreen `ProjectEden.UI.Minimap.CaptureStability` passed. No editor setup is required; PIE-check repeated attack Niagara visually.
 - Commits `23aedf2b` and `0bfa780f` replace render-command-only promotion with an `FRHIGPUFence` completion gate. The old front buffer remains bound until the capture fence write is issued, pending writes drain, and `Poll()` succeeds. Editor build, NullRHI automation, and real D3D12 offscreen `ProjectEden.UI.Minimap.CaptureStability` passed; PIE-check attack Niagara visually.
 - Commits `d64bc60c` and `88d85765` prevent attack-time flicker with front/back render targets, RHI-fence promotion, and player exclusion. Build and `ProjectEden.UI.Minimap.CaptureStability` passed; PIE-check repeated attacks with production VFX. No editor setup is required.
 - Commits `2641dbab`, `c46e718f`, and tests fix FullMap Z accumulation, preserve Follow mode, stop brush reflow, and use flat opaque FinalColorLDR. BaseColor was rejected because its alpha can make direct UMG display transparent. Build and `ProjectEden.UI.Minimap.CaptureStability` passed; PIE-check final contrast.
