@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-06-21T14:15:00+09:00
+updated: 2026-06-21T14:29:00+09:00
 status: active
 tags:
   - memoc
@@ -11,7 +11,7 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-06-21T14:15:00+09:00
+Last synced: 2026-06-21T14:29:00+09:00
 
 ## Minimap Handoff
 
@@ -52,6 +52,7 @@ Last synced: 2026-06-21T14:15:00+09:00
 
 ## Crystal Seraph Boss Handoff
 
+- Commits `a70a62cd` and `416d16f5` fix the logged teleport-to-leash-to-Patrol loop without editing BT assets. Tactical teleports clamp inside the anchor margin, the Patrol EQS task yields to ReturnHome, and flying vector moves use direct altitude-preserving paths. Build and PatrolRecovery/GroggyLifecycle/selector tests pass; PIE-check that Patrol fallback logs no longer spam.
 - Commits `7a94b1ac` and `8dfa6c98` route each reflected laser into one break stage; the third causes a gravity fall. Falling hits do not count, the first grounded player hit starts `GroggyDuration` (final phase: `FinalPhaseGroggyDuration`), and Boss_Common resumes on return to hover. Build plus lifecycle/selector tests pass; PIE-check presentation and tune only those durations if desired.
 - Commits `1c9cd768`, `759988f2`, and `e9616312` throttle pattern starts, restore prism/laser rotation, and force `BT_BossCommon`/`BB_BossCommon`. Editor build and the Crystal Seraph selector automation test passed.
 - PIE still needs runtime confirmation that attacks are at least 2.5s apart and the shared patrol/chase/reposition branches behave acceptably with `MOVE_Flying`.

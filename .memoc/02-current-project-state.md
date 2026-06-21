@@ -196,6 +196,7 @@ Last synced: 2026-05-23T00:00:00
 
 ## Open Tasks
 
+- PIE-check Crystal Seraph before/after target acquisition and after tactical teleports; `[Patrol] Fallback move location selected` must not spam and `[Leash] Return home finished` must remain reachable.
 - PIE-check Crystal Seraph's visible fall, grounded hit gate, and return-to-hover timing; tune `GroggyDuration` / `FinalPhaseGroggyDuration` on the boss Blueprint if needed.
 - PIE-check that repeated player attacks no longer blank the minimap under real VFX/render load; build and `ProjectEden.UI.Minimap.CaptureStability` pass.
 - Verify runtime behavior in PIE for source motion, visible state transitions, and retarget fidelity with Blueprint trajectory preferred at runtime.
@@ -205,6 +206,7 @@ Last synced: 2026-05-23T00:00:00
 
 ## Completed Tasks
 
+- Stopped Crystal Seraph's infinite Patrol loop by clamping tactical teleports inside the anchor leash, yielding Patrol to ReturnHome, and using direct altitude-preserving movement for flying vector goals (`a70a62cd`, `416d16f5`).
 - Restored Crystal Seraph's reflected-laser groggy lifecycle: three reflections cause a physical fall, a post-landing player hit arms delayed recovery, and Boss_Common pauses until recovery (`7a94b1ac`, `8dfa6c98`).
 - Prevented attack-time minimap flicker by separating the displayed render target from the SceneCapture back buffer and promoting it only after an RHI render fence completes (`d64bc60c`, `88d85765`).
 - Fixed minimap capture-height accumulation/HUD brush reflow and added stability coverage (`2641dbab`, `a0a1a7d8`).
