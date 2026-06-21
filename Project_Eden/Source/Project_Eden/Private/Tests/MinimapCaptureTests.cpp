@@ -57,6 +57,24 @@ bool FMinimapCaptureStabilityTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Scene capture targets the back buffer"), SceneCapture->TextureTarget.Get() == CaptureActor->CaptureBackBuffer.Get());
 	}
 
+	UTextureRenderTarget2D* StableFrontBuffer = CaptureActor->RenderTarget.Get();
+	UTextureRenderTarget2D* PendingBackBuffer = CaptureActor->CaptureBackBuffer.Get();
+	CaptureActor->RequestCapture();
+	TestTrue(TEXT("Minimap capture arms an RHI GPU fence"), CaptureActor->HasCaptureGPUFence());
+	TestTrue(TEXT("Minimap marks the GPU capture as pending"), CaptureActor->bHasPendingCapture);
+
+	CaptureActor->CaptureGPUFenceCompletionOverride = false;
+	CaptureActor->PromoteCompletedCapture();
+	TestTrue(TEXT("Incomplete GPU capture keeps the existing HUD render target"), CaptureActor->RenderTarget.Get() == StableFrontBuffer);
+	TestTrue(TEXT("Incomplete GPU capture keeps the same back buffer pending"), CaptureActor->CaptureBackBuffer.Get() == PendingBackBuffer);
+	TestTrue(TEXT("Incomplete GPU capture remains pending"), CaptureActor->bHasPendingCapture);
+
+	CaptureActor->CaptureGPUFenceCompletionOverride = true;
+	CaptureActor->PromoteCompletedCapture();
+	TestTrue(TEXT("Completed GPU capture promotes the finished back buffer"), CaptureActor->RenderTarget.Get() == PendingBackBuffer);
+	TestFalse(TEXT("Completed GPU capture clears the pending state"), CaptureActor->bHasPendingCapture);
+	CaptureActor->CaptureGPUFenceCompletionOverride.Reset();
+
 	// Validate the production HUD contract so the subsystem always has a visible Image to receive the render target.
 	UClass* HUDWidgetClass = LoadClass<UUserWidget>(nullptr, TEXT("/Game/UI/HUD/WBP_PlayerHUDWidget.WBP_PlayerHUDWidget_C"));
 	UWidgetBlueprintGeneratedClass* HUDGeneratedClass = Cast<UWidgetBlueprintGeneratedClass>(HUDWidgetClass);
