@@ -4,6 +4,7 @@
 #include "AbilitySystemComponent.h"
 #include "HAL/IConsoleManager.h"
 #include "Math/UnrealMathUtility.h"
+#include "Characters/GP_DarkArmorKnightStateComponent.h"
 
 static TAutoConsoleVariable<int32> CVarGPDamageExecLog(
     TEXT("gp.DamageExec.Log"),
@@ -201,9 +202,26 @@ void UGP_DamageExecCalculation::Execute_Implementation(const FGameplayEffectCust
     }
     Damage_Final *= BossStateDamageMultiplier;
 
+	// Dark Knight owns directional guard/parry rules; the shared execution only supplies authoritative source/target context.
+	float DarkKnightStateDamageMultiplier = 1.0f;
+	if (TargetASC != nullptr)
+	{
+		AActor* TargetAvatar = TargetASC->GetAvatarActor();
+		if (UGP_DarkArmorKnightStateComponent* DarkKnightState = IsValid(TargetAvatar)
+			? TargetAvatar->FindComponentByClass<UGP_DarkArmorKnightStateComponent>()
+			: nullptr)
+		{
+			const UAbilitySystemComponent* SourceASC = ExecutionParams.GetSourceAbilitySystemComponent();
+			AActor* DamageInstigator = SourceASC != nullptr ? SourceASC->GetAvatarActor() : nullptr;
+			const bool bHeavyAttack = Spec.GetDynamicAssetTags().HasTagExact(GPTags::Damage::Element::Brute);
+			DarkKnightStateDamageMultiplier = DarkKnightState->ResolveIncomingDamageMultiplier(DamageInstigator, bHeavyAttack);
+			Damage_Final *= DarkKnightStateDamageMultiplier;
+		}
+	}
+
     if (CVarGPDamageExecLog.GetValueOnAnyThread() != 0)
     {
-        UE_LOG(LogTemp, Log, TEXT("[DamageExec] Element=%s SkillMult=%.2f Base=%.2f Critical=%s CritMult=%.2f Modified=%.2f Armor=%.2f ArmorMitigation=%.3f Resistance=%.3f MatadorGuarded=%d CrystalGuarded=%d WingCoreExposed=%d TargetGroggy=%d BossStateMult=%.2f Final=%.2f"),
+        UE_LOG(LogTemp, Log, TEXT("[DamageExec] Element=%s SkillMult=%.2f Base=%.2f Critical=%s CritMult=%.2f Modified=%.2f Armor=%.2f ArmorMitigation=%.3f Resistance=%.3f MatadorGuarded=%d CrystalGuarded=%d WingCoreExposed=%d TargetGroggy=%d BossStateMult=%.2f DarkKnightMult=%.2f Final=%.2f"),
             ElementName,
             SkillDamageMultiplier,
             BaseDamage,
@@ -218,11 +236,17 @@ void UGP_DamageExecCalculation::Execute_Implementation(const FGameplayEffectCust
             bTargetWingCoreExposed ? 1 : 0,
             bTargetGroggy ? 1 : 0,
             BossStateDamageMultiplier,
+			DarkKnightStateDamageMultiplier,
             Damage_Final);
     }
 
     // 5. 마. 강인도 피해 산출
-    float ToughnessDamageBase = Spec.GetSetByCallerMagnitude(GPTags::Damage::Data::ToughnessBase, false, 0.0f);
+	float ToughnessDamageBase = Spec.GetSetByCallerMagnitude(GPTags::Damage::Data::ToughnessBase, false, 0.0f);
+	if (DarkKnightStateDamageMultiplier <= KINDA_SMALL_NUMBER)
+	{
+		// A successful parry cancels both health and toughness damage from that hit.
+		ToughnessDamageBase = 0.0f;
+	}
 
     OutExecutionOutput.AddOutputModifier(FGameplayModifierEvaluatedData(UGP_AttributeSet::GetDamageAttribute(), EGameplayModOp::Additive, Damage_Final));
     OutExecutionOutput.AddOutputModifier(FGameplayModifierEvaluatedData(UGP_AttributeSet::GetToughnessDamageAttribute(), EGameplayModOp::Additive, ToughnessDamageBase));
