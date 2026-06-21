@@ -3,9 +3,13 @@
 #include "Actors/GP_CrystalPrismActor.h"
 #include "Characters/GP_CrystalSeraphBossCharacter.h"
 #include "Characters/GP_CrystalSeraphStateComponent.h"
+#include "Components/SphereComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerState.h"
+#include "Engine/TargetPoint.h"
+#include "Kismet/GameplayStatics.h"
 #include "Misc/AutomationTest.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -80,6 +84,62 @@ bool FCrystalSeraphGroggyLifecycleTest::RunTest(const FString& Parameters)
 		TestFalse(TEXT("Recovery clears groggy"), StateComponent->IsGroggy());
 		TestFalse(TEXT("Recovery consumes the scheduled gate"), Boss->IsGroggyRecoveryScheduled());
 		TestEqual(TEXT("Recovered boss returns to flying movement"), Boss->GetCharacterMovement()->MovementMode, MOVE_Flying);
+	}
+
+	TestWorld->DestroyWorld(false);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FCrystalSeraphPrismClusterTest,
+	"ProjectEden.Combat.CrystalSeraph.PrismCluster",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCrystalSeraphPrismClusterTest::RunTest(const FString& Parameters)
+{
+	UWorld* TestWorld = UWorld::CreateWorld(EWorldType::Game, false);
+	if (!TestNotNull(TEXT("Created prism cluster test world"), TestWorld))
+	{
+		return false;
+	}
+
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AGP_CrystalSeraphBossCharacter* Boss = TestWorld->SpawnActor<AGP_CrystalSeraphBossCharacter>(
+		FVector(0.0f, 0.0f, 1000.0f),
+		FRotator::ZeroRotator,
+		SpawnParameters);
+	ATargetPoint* Target = TestWorld->SpawnActor<ATargetPoint>(
+		FVector(1000.0f, 0.0f, 0.0f),
+		FRotator::ZeroRotator,
+		SpawnParameters);
+	if (!TestNotNull(TEXT("Spawned cluster boss"), Boss) || !TestNotNull(TEXT("Spawned cluster target"), Target))
+	{
+		TestWorld->DestroyWorld(false);
+		return false;
+	}
+
+	UGP_CrystalSeraphStateComponent* StateComponent = Boss->GetCrystalSeraphStateComponent();
+	StateComponent->InitializeCrystalSeraphState(Boss);
+	AActor* PrimaryPrism = Boss->RequestSpawnCrystalPrism(Target);
+	TestNotNull(TEXT("Prism pattern returns a primary representative"), PrimaryPrism);
+	TestEqual(TEXT("State tracks the primary prism"), StateComponent->GetCrystalPrismActor(), PrimaryPrism);
+
+	TArray<AActor*> PrismActors;
+	UGameplayStatics::GetAllActorsOfClass(TestWorld, AGP_CrystalPrismActor::StaticClass(), PrismActors);
+	TestEqual(TEXT("Prism pattern lays three crystals"), PrismActors.Num(), 3);
+	for (int32 LeftIndex = 0; LeftIndex < PrismActors.Num(); ++LeftIndex)
+	{
+		const UStaticMeshComponent* PrismMesh = PrismActors[LeftIndex]->FindComponentByClass<UStaticMeshComponent>();
+		const USphereComponent* PrismCollision = PrismActors[LeftIndex]->FindComponentByClass<USphereComponent>();
+		TestTrue(TEXT("Crystal visual is larger than the previous prototype"), IsValid(PrismMesh) && PrismMesh->GetRelativeScale3D().X >= 2.0f);
+		TestTrue(TEXT("Crystal reflection collision matches its larger visual"), IsValid(PrismCollision) && PrismCollision->GetUnscaledSphereRadius() >= 150.0f);
+
+		for (int32 RightIndex = LeftIndex + 1; RightIndex < PrismActors.Num(); ++RightIndex)
+		{
+			// Ring placement must keep the enlarged crystals visibly separate.
+			TestTrue(TEXT("Prism cluster points do not overlap"), FVector::Dist2D(PrismActors[LeftIndex]->GetActorLocation(), PrismActors[RightIndex]->GetActorLocation()) > 500.0f);
+		}
 	}
 
 	TestWorld->DestroyWorld(false);
