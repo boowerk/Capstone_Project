@@ -24,6 +24,14 @@ class PROJECT_EDEN_API AGP_MinimapCaptureActor : public AActor
 {
 	GENERATED_BODY()
 
+private:
+	enum class EFrameTransferState : uint8
+	{
+		Idle,
+		WaitingForCapture,
+		WaitingForDisplayCopy
+	};
+
 public:
 	AGP_MinimapCaptureActor();
 	virtual ~AGP_MinimapCaptureActor() override;
@@ -104,9 +112,10 @@ private:
 	void CacheInitialGroundCenter();
 	void ConfigureFlat2DCapture();
 	UTextureRenderTarget2D* CreateTransientRenderTarget(const FName ObjectName);
-	bool IsCaptureGPUFenceComplete() const;
-	bool HasCaptureGPUFence() const;
-	void PromoteCompletedCapture();
+	bool IsTransferGPUFenceComplete() const;
+	bool HasTransferGPUFence() const;
+	bool QueueCapturedFrameToDisplay();
+	void AdvanceFrameTransfer();
 	void ApplyTopDownTransform(const FVector& Center, float OrthoWidth, float Yaw);
 	void CaptureForCurrentMode();
 
@@ -119,12 +128,12 @@ private:
 
 	float FollowCaptureAccumulator = 0.0f;
 	FVector InitialGroundCenter = FVector::ZeroVector;
-	// The GPU fence prevents promotion while SceneCapture or Niagara work is still filling CaptureBackBuffer.
+	// Capture and display-copy fences keep the HUD on its last complete frame throughout the transfer.
 	TSharedPtr<FGPMinimapCaptureGPUFence, ESPMode::ThreadSafe> CaptureCompletionFence;
 #if WITH_DEV_AUTOMATION_TESTS
 	TOptional<bool> CaptureGPUFenceCompletionOverride;
 #endif
+	EFrameTransferState FrameTransferState = EFrameTransferState::Idle;
 	bool bHasInitialGroundCenter = false;
 	bool bCaptureInitialized = false;
-	bool bHasPendingCapture = false;
 };

@@ -60,19 +60,33 @@ bool FMinimapCaptureStabilityTest::RunTest(const FString& Parameters)
 	UTextureRenderTarget2D* StableFrontBuffer = CaptureActor->RenderTarget.Get();
 	UTextureRenderTarget2D* PendingBackBuffer = CaptureActor->CaptureBackBuffer.Get();
 	CaptureActor->RequestCapture();
-	TestTrue(TEXT("Minimap capture arms an RHI GPU fence"), CaptureActor->HasCaptureGPUFence());
-	TestTrue(TEXT("Minimap marks the GPU capture as pending"), CaptureActor->bHasPendingCapture);
+	TestTrue(TEXT("Minimap capture arms an RHI GPU fence"), CaptureActor->HasTransferGPUFence());
+	TestTrue(
+		TEXT("Minimap waits for the back-buffer capture"),
+		CaptureActor->FrameTransferState == AGP_MinimapCaptureActor::EFrameTransferState::WaitingForCapture);
 
 	CaptureActor->CaptureGPUFenceCompletionOverride = false;
-	CaptureActor->PromoteCompletedCapture();
+	CaptureActor->AdvanceFrameTransfer();
 	TestTrue(TEXT("Incomplete GPU capture keeps the existing HUD render target"), CaptureActor->RenderTarget.Get() == StableFrontBuffer);
 	TestTrue(TEXT("Incomplete GPU capture keeps the same back buffer pending"), CaptureActor->CaptureBackBuffer.Get() == PendingBackBuffer);
-	TestTrue(TEXT("Incomplete GPU capture remains pending"), CaptureActor->bHasPendingCapture);
+	TestTrue(
+		TEXT("Incomplete GPU capture remains pending"),
+		CaptureActor->FrameTransferState == AGP_MinimapCaptureActor::EFrameTransferState::WaitingForCapture);
 
 	CaptureActor->CaptureGPUFenceCompletionOverride = true;
-	CaptureActor->PromoteCompletedCapture();
-	TestTrue(TEXT("Completed GPU capture promotes the finished back buffer"), CaptureActor->RenderTarget.Get() == PendingBackBuffer);
-	TestFalse(TEXT("Completed GPU capture clears the pending state"), CaptureActor->bHasPendingCapture);
+	CaptureActor->AdvanceFrameTransfer();
+	TestTrue(TEXT("Completed capture keeps the HUD bound to its stable render target"), CaptureActor->RenderTarget.Get() == StableFrontBuffer);
+	TestTrue(TEXT("Completed capture keeps SceneCapture isolated on the back buffer"), SceneCapture->TextureTarget.Get() == PendingBackBuffer);
+	TestTrue(
+		TEXT("Completed capture waits for the display copy fence"),
+		CaptureActor->FrameTransferState == AGP_MinimapCaptureActor::EFrameTransferState::WaitingForDisplayCopy);
+
+	CaptureActor->CaptureGPUFenceCompletionOverride = true;
+	CaptureActor->AdvanceFrameTransfer();
+	TestTrue(
+		TEXT("Completed display copy reopens the capture pipeline"),
+		CaptureActor->FrameTransferState == AGP_MinimapCaptureActor::EFrameTransferState::Idle);
+	TestTrue(TEXT("Display completion still keeps the original HUD texture object"), CaptureActor->RenderTarget.Get() == StableFrontBuffer);
 	CaptureActor->CaptureGPUFenceCompletionOverride.Reset();
 
 	// Validate the production HUD contract so the subsystem always has a visible Image to receive the render target.

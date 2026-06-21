@@ -7,6 +7,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "RHI.h"
 #include "RHICommandList.h"
+#include "RHIUtilities.h"
 #include "RenderingThread.h"
 #include "UI/GP_MinimapSubsystem.h"
 
@@ -22,7 +23,7 @@ namespace
 class FGPMinimapCaptureGPUFence
 {
 public:
-	bool ArmAfterCapture()
+	bool ArmAfterQueuedWork()
 	{
 		TSharedRef<FGPMinimapCaptureGPUFenceState, ESPMode::ThreadSafe> NewState =
 			MakeShared<FGPMinimapCaptureGPUFenceState, ESPMode::ThreadSafe>();
@@ -125,7 +126,7 @@ void AGP_MinimapCaptureActor::BeginPlay()
 void AGP_MinimapCaptureActor::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-	PromoteCompletedCapture();
+	AdvanceFrameTransfer();
 
 	// Full-map capture is event-driven. Ticking it used the elevated camera as the next ground center and added CaptureHeight every interval.
 	if (CaptureMode != EGPMinimapCaptureMode::FollowTarget)
@@ -239,9 +240,9 @@ void AGP_MinimapCaptureActor::SetFollowTarget(AActor* TargetActor)
 void AGP_MinimapCaptureActor::RequestCapture()
 {
 	InitializeCapture();
-	PromoteCompletedCapture();
+	AdvanceFrameTransfer();
 
-	if (bHasPendingCapture || !SceneCapture || !IsValid(CaptureBackBuffer))
+	if (FrameTransferState != EFrameTransferState::Idle || !SceneCapture || !IsValid(CaptureBackBuffer))
 	{
 		return;
 	}
@@ -249,7 +250,10 @@ void AGP_MinimapCaptureActor::RequestCapture()
 	SceneCapture->TextureTarget = CaptureBackBuffer;
 	SceneCapture->CaptureScene();
 	// The GPU fence is written after CaptureScene; keep the existing front buffer if the fence cannot be armed.
-	bHasPendingCapture = CaptureCompletionFence.IsValid() && CaptureCompletionFence->ArmAfterCapture();
+	if (CaptureCompletionFence.IsValid() && CaptureCompletionFence->ArmAfterQueuedWork())
+	{
+		FrameTransferState = EFrameTransferState::WaitingForCapture;
+	}
 }
 
 FBox AGP_MinimapCaptureActor::ResolveBounds(AActor* BoundsActor) const
@@ -345,20 +349,69 @@ UTextureRenderTarget2D* AGP_MinimapCaptureActor::CreateTransientRenderTarget(con
 	return NewRenderTarget;
 }
 
-void AGP_MinimapCaptureActor::PromoteCompletedCapture()
+void AGP_MinimapCaptureActor::AdvanceFrameTransfer()
 {
-	if (!bHasPendingCapture || !IsCaptureGPUFenceComplete() || !IsValid(CaptureBackBuffer))
+	if (FrameTransferState == EFrameTransferState::Idle || !IsTransferGPUFenceComplete())
 	{
 		return;
 	}
 
-	Swap(RenderTarget, CaptureBackBuffer);
-	bHasPendingCapture = false;
+	if (FrameTransferState == EFrameTransferState::WaitingForCapture)
+	{
+		if (!QueueCapturedFrameToDisplay())
+		{
+			// A failed copy leaves the last valid HUD frame untouched and reopens the capture pipeline.
+			FrameTransferState = EFrameTransferState::Idle;
+			CaptureCompletionFence->Reset();
+		}
+		return;
+	}
+
+	// The HUD remains bound to the same front RenderTarget object, so no Slate brush rebind is required here.
+	FrameTransferState = EFrameTransferState::Idle;
 	CaptureCompletionFence->Reset();
-	OnRenderTargetChanged.Broadcast(RenderTarget);
 }
 
-bool AGP_MinimapCaptureActor::IsCaptureGPUFenceComplete() const
+bool AGP_MinimapCaptureActor::QueueCapturedFrameToDisplay()
+{
+	if (!IsValid(RenderTarget) || !IsValid(CaptureBackBuffer) || !CaptureCompletionFence.IsValid())
+	{
+		return false;
+	}
+
+	if (!GUsingNullRHI)
+	{
+		FTextureRenderTargetResource* SourceResource = CaptureBackBuffer->GameThread_GetRenderTargetResource();
+		FTextureRenderTargetResource* DisplayResource = RenderTarget->GameThread_GetRenderTargetResource();
+		if (!SourceResource || !DisplayResource)
+		{
+			return false;
+		}
+
+		ENQUEUE_RENDER_COMMAND(CopyMinimapCaptureToStableDisplay)(
+			[SourceResource, DisplayResource](FRHICommandListImmediate& RHICmdList)
+			{
+				FRHITexture* SourceTexture = SourceResource->GetRenderTargetTexture();
+				FRHITexture* DisplayTexture = DisplayResource->GetRenderTargetTexture();
+				if (SourceTexture && DisplayTexture)
+				{
+					// Keep UMG on one stable texture object; only its completed GPU pixels are refreshed.
+					TransitionAndCopyTexture(RHICmdList, SourceTexture, DisplayTexture, {});
+				}
+			});
+	}
+
+	CaptureCompletionFence->Reset();
+	if (!CaptureCompletionFence->ArmAfterQueuedWork())
+	{
+		return false;
+	}
+
+	FrameTransferState = EFrameTransferState::WaitingForDisplayCopy;
+	return true;
+}
+
+bool AGP_MinimapCaptureActor::IsTransferGPUFenceComplete() const
 {
 #if WITH_DEV_AUTOMATION_TESTS
 	if (CaptureGPUFenceCompletionOverride.IsSet())
@@ -369,7 +422,7 @@ bool AGP_MinimapCaptureActor::IsCaptureGPUFenceComplete() const
 	return CaptureCompletionFence.IsValid() && CaptureCompletionFence->IsComplete();
 }
 
-bool AGP_MinimapCaptureActor::HasCaptureGPUFence() const
+bool AGP_MinimapCaptureActor::HasTransferGPUFence() const
 {
 	return CaptureCompletionFence.IsValid() && CaptureCompletionFence->HasFence();
 }
