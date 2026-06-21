@@ -81,6 +81,15 @@ bool FMinimapCaptureStabilityTest::RunTest(const FString& Parameters)
 		TEXT("Completed capture waits for the display copy fence"),
 		CaptureActor->FrameTransferState == AGP_MinimapCaptureActor::EFrameTransferState::WaitingForDisplayCopy);
 
+	CaptureActor->CaptureGPUFenceCompletionOverride = false;
+	// A new follow update must not reuse the back buffer while its previous frame is still copying to the HUD.
+	CaptureActor->RequestCapture();
+	TestTrue(
+		TEXT("Incomplete display copy keeps the capture pipeline occupied"),
+		CaptureActor->FrameTransferState == AGP_MinimapCaptureActor::EFrameTransferState::WaitingForDisplayCopy);
+	TestTrue(TEXT("Incomplete display copy never rebinds the HUD texture"), CaptureActor->RenderTarget.Get() == StableFrontBuffer);
+	TestTrue(TEXT("Blocked recapture preserves the isolated back buffer"), SceneCapture->TextureTarget.Get() == PendingBackBuffer);
+
 	CaptureActor->CaptureGPUFenceCompletionOverride = true;
 	CaptureActor->AdvanceFrameTransfer();
 	TestTrue(
