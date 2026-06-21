@@ -196,6 +196,7 @@ Last synced: 2026-05-23T00:00:00
 
 ## Open Tasks
 
+- PIE-check Crystal Seraph's visible fall, grounded hit gate, and return-to-hover timing; tune `GroggyDuration` / `FinalPhaseGroggyDuration` on the boss Blueprint if needed.
 - PIE-check that repeated player attacks no longer blank the minimap under real VFX/render load; build and `ProjectEden.UI.Minimap.CaptureStability` pass.
 - Verify runtime behavior in PIE for source motion, visible state transitions, and retarget fidelity with Blueprint trajectory preferred at runtime.
 - Connect `CHT_MM_MaskMan_Root` as the active chooser source for `UGP_CharacterAnimInstance` and validate `Idle / TurnInPlace / Run / Sprint / InAir`.
@@ -204,6 +205,7 @@ Last synced: 2026-05-23T00:00:00
 
 ## Completed Tasks
 
+- Restored Crystal Seraph's reflected-laser groggy lifecycle: three reflections cause a physical fall, a post-landing player hit arms delayed recovery, and Boss_Common pauses until recovery (`7a94b1ac`, `8dfa6c98`).
 - Prevented attack-time minimap flicker by separating the displayed render target from the SceneCapture back buffer and promoting it only after an RHI render fence completes (`d64bc60c`, `88d85765`).
 - Fixed minimap capture-height accumulation/HUD brush reflow and added stability coverage (`2641dbab`, `a0a1a7d8`).
 - Added the common enemy leash state machine, then refined it to anchor return with stable re-engagement hysteresis (`aa0522f5`, `971d8f29`, `93ac0b15`, `177bc9ad`).
