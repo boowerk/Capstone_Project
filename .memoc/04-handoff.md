@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-06-21T15:53:23+09:00
+updated: 2026-06-21T17:45:00+09:00
 status: active
 tags:
   - memoc
@@ -11,7 +11,13 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-06-21T15:53:23+09:00
+Last synced: 2026-06-21T17:45:00+09:00
+
+## Dark Armor Knight Boss Handoff
+
+- Commits `4abb1dc1`, `85c40d78`, `0d0da2aa`, and `1c837936` implement the plan as native GAS/state/AI layers and create `/Game/Characters/EnemyCharacter/Boss/BP_Boss_DarkArmorKnight/BP_DarkArmorKnight` with `SK_KnightBoss`.
+- Full editor build plus `ProjectEden.AI.Boss.PatternSelector.DarkArmorKnight` and `ProjectEden.Combat.DarkArmorKnight.GuardLifecycle` pass. Commandlet still reports the unrelated corrupt `Content/Maps/DemoMap/TestMap.umap` and missing Fab fence meshes.
+- Editor work: place `BP_DarkArmorKnight`; assign/tune its Anim Class and mesh/capsule transform for `SK_KnightBoss`. For final art, create BP children of DarkWave/GroundCrack/Charge actors, replace their primitive component meshes/materials/VFX, then assign those classes on the boss. Optional Dark Knight Blackboard mirror keys are not required for runtime truth.
 
 ## Minimap Handoff
 

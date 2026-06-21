@@ -2,19 +2,19 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-06-21T15:53:23+09:00
+updated: 2026-06-21T17:45:00+09:00
 status: active
 ---
 # Session Summary
 
 ## Status
-- `a88bfee6` captures the full PCG map once, waits for fenced GPU copy, then disables SceneCapture/tick.
-- `b3652834` adds fixed-map UV pan/zoom plus separate player/enemy UMG markers.
-- `e6806c69` covers one-shot shutdown, world-to-UV, UI material, and HUD marker host.
-- User-owned `L_MainMap.umap` remains untouched/uncommitted.
+- Dark Armor Knight native GAS boss completed in `4abb1dc1`, `85c40d78`, `0d0da2aa`, `1c837936`.
+- Shared Boss_Common handles patrol/chase; state component owns guard/parry/groggy; selector requests dedicated GAS patterns.
+- `BP_DarkArmorKnight` uses `SK_KnightBoss`; wave/crack/charge visuals are replaceable Engine primitives.
+- User-owned `L_MainMap.umap` and `WBP_PlayerHUDWidget.uasset` remain uncommitted.
 
 ## Verified
-- Editor build and real D3D12 offscreen minimap automation passed; material compiles cleanly.
+- Editor build and DarkKnight selector/guard lifecycle automation passed.
 
 ## Resume
-- Assign `M_UI_Minimap_StaticMap` to HUD `MinimapMapMaterial`; PIE-check orientation, map coverage, zoom, and red enemy points.
+- Place BP; tune Anim Class and mesh/capsule transform. Replace primitive pattern visuals later through BP child classes.

@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-06-21T15:53:23+09:00
+updated: 2026-06-21T17:45:00+09:00
 status: active
 tags:
   - memoc
@@ -11,10 +11,11 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-06-21T15:53:23+09:00
+Last synced: 2026-06-21T17:45:00+09:00
 
 ## Current Status
 
+- Dark Armor Knight is a native GAS boss prototype using shared `BT_BossCommon`/`BB_BossCommon`. `BP_DarkArmorKnight` uses `SK_KnightBoss`; its component owns replicated guard gauge, directional mitigation, parry/counter, guard break, groggy/recovery, and phase rules. Dedicated GAS abilities/actors cover Basic, Heavy, Sweep, Guard, Counter, Charge, DarkWave, GroundCrack, and Groggy. Charge/crack/wave placeholders use replaceable Engine basic shapes. Editor build and both DarkKnight selector/lifecycle automation tests pass; PIE presentation and AnimBP setup remain.
 - Minimap is now a one-shot PCG map pipeline (`a88bfee6`, `b3652834`, `e6806c69`): after PCG reports ready and stays idle for three polls, one orthographic full-map frame is captured from runtime PCG bounds, GPU-copied to the stable HUD RenderTarget, then SceneCapture and actor tick are disabled. `M_UI_Minimap_StaticMap` pans/zooms that fixed texture from C++ world-to-UV mapping; the player arrow and pooled `T_UI_Minimap_Point_Red` enemy Images remain separate UMG widgets.
 - Enemy leash uses anchor hysteresis: crossing `ReturnHomeDistance` starts return even with a target; after returning inside 75% of that distance, a visible player interrupts return and reopens combat.
 - Basic melee, ranged, and flying enemies inherit a native screen-space `WorldHealthBarComponent` from `AGP_EnemyCharacter`. It uses `WBP_EnemyHealthBar`, tracks GAS Health/MaxHealth, stays visible at full health, and hides on death; bosses keep the dedicated HUD bar.
