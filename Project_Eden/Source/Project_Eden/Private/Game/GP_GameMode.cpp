@@ -22,10 +22,11 @@ void AGP_GameMode::BeginPlay()
 
 	GatherZones();
 
-	// Start every region dead; zones revive their regions as the run is cleared.
-	if (AGP_GameState* GPGameState = GetGPGameState())
+	// Let placed BP actors bind to GameState delegates in their BeginPlay before
+	// the initial all-dead reset is broadcast on the server/listen host.
+	if (UWorld* World = GetWorld())
 	{
-		GPGameState->InitRegionStates(RegionCount, DeadRegionState);
+		World->GetTimerManager().SetTimerForNextTick(FTimerDelegate::CreateUObject(this, &AGP_GameMode::InitializeRegionStates));
 	}
 
 	// Subscribe to all volumes; unlock zone 0 so it fires when the first player steps in.
@@ -36,6 +37,14 @@ void AGP_GameMode::BeginPlay()
 	}
 
 	UnlockZone(0);
+}
+
+void AGP_GameMode::InitializeRegionStates()
+{
+	if (AGP_GameState* GPGameState = GetGPGameState())
+	{
+		GPGameState->InitRegionStates(RegionCount, DeadRegionState);
+	}
 }
 
 void AGP_GameMode::GatherZones()

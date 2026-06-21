@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-06-19T08:31:17+09:00
+updated: 2026-06-20T22:54:23+09:00
 status: active
 tags:
   - memoc
@@ -11,10 +11,12 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-06-19T08:31:17+09:00
+Last synced: 2026-06-20T22:54:23+09:00
 
 ## Current Status
 
+- `/Game/Maps/MainMap/L_GameMap` now has gameplay test actors for the city run: one `NavMeshBounds_MainMap` covering X `-37800..37800`, Y `-18900..18900`, Z `-1000..3000`, `RecastNavMesh-Default` after navigation rebuild, `SpawnZone_0..2` using native `AGP_EnemySpawnVolume` with 4000/4000/1000 `SpawnBox`, basic melee enemy x3, revive regions `[1,3]`, `[4,6]`, `[5,8]`, and a single `PlayerStart_City1` at city 1.
+- Region startup timing is patched in C++: `AGP_GameMode::BeginPlay` schedules `InitializeRegionStates()` for the next tick, so placed `BP_RegionStateManager` can bind to `AGP_GameState::OnRegionStateChanged` before the initial all-dead reset broadcast. Runtime test confirmed state `0` is healthy/alive; C++ defaults are now `DeadRegionState=3`, `AliveRegionState=0`. `L_GameMap` uses `BP_ProjectEden_Gamemode`, which inherits `GP_GameMode`; ensure any BP overrides match the same mapping.
 - `/Game/Maps/MainMap/L_GameMap` region layout was regenerated with fixed random seed `1337`: 9 jittered `BP_RegionSeed` actors across the centered landscape bounds, city-candidate seeds at indices `0,7,2`, `BP_CityAnchor` actors targeting those same indices and remaining nearest to their target seeds, a 5-point curved `BP_CityRoadSpline`, and `RegionStateManager` reading `RegionCount=9`, `StateRT=/Game/RegionSystem/RenderTargets/RT_RegionState_9x1`, `RegionStateCount=4`; `RegionIdTexture` remains unchanged pending bake.
 - DragonSkull Control Rig setup is now in place for `/Game/Meshes/Monsters/DragonSkull/CR_DeagonBone_SimpleJaw`; `CR_DeagonBone` is not currently present after user refresh/reimport. Controls are `global_ctrl > root_ctrl > body_offset_ctrl > head_ctrl`, with `jaw_upper_ctrl` and `jaw_lower_ctrl` under `head_ctrl`. After asset normalization, stale offsets were rebuilt by placing controls from current skeleton bone initial transforms first, then parenting with maintain-global. Forward Solve drives translation/rotation only, not scale. Verified control positions match `root`, `Head`, `jaw_upper`, and `jaw_lower`, all controls scale `1`.
 - `AGP_LevelBuildAnimator` now exists as a native runtime arena-construction prototype. It collects actors tagged `PLAZA_DE_TOROS`, stores their final transforms, generates underground/spiral/twisted start transforms, then builds them back with smooth per-piece interpolation. Ordering supports height-then-distance, height-then-random, distance-then-height, and random. Blueprint events expose build start/piece start/piece finish/finish hooks for Mirror Dimension VFX/audio polish. UHT passed; full compile is still blocked while Live Coding is active.

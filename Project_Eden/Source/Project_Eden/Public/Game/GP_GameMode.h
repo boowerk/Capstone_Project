@@ -57,18 +57,16 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run", meta = (ClampMin = "0.0"))
 	float ReturnToLobbyDelay = 8.0f;
 
-	// Region revival config. At BeginPlay all RegionCount regions are set to
-	// DeadRegionState; clearing a zone sets that zone's RegionsToRevive entries
-	// to AliveRegionState. Values index the RegionStateCount used by the
-	// landscape/vegetation material (0..RegionStateCount-1).
+	// Region revival config. In the current RegionStateManager/PCG setup,
+	// state 0 is the healthy/alive vegetation state.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Region", meta = (ClampMin = "0"))
 	int32 RegionCount = 9;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Region")
-	uint8 DeadRegionState = 0;
+	uint8 DeadRegionState = 3;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Region")
-	uint8 AliveRegionState = 3;
+	uint8 AliveRegionState = 0;
 
 private:
 	UPROPERTY(Transient)
@@ -85,6 +83,7 @@ private:
 	FTimerHandle ReturnToLobbyTimerHandle;
 
 	void GatherZones();
+	void InitializeRegionStates();
 	void UnlockZone(int32 ZoneIndex);
 	void StartZone(int32 ZoneIndex);
 	void SpawnZoneEnemies(AGP_EnemySpawnVolume* Zone);
