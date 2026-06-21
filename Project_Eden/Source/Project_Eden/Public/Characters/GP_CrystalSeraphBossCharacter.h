@@ -94,7 +94,7 @@ private:
 
 	void GrantCrystalSeraphPatternAbilities();
 	AActor* ResolvePatternTarget(AActor* ExplicitTargetActor) const;
-	FVector ResolvePrismSpawnLocation(AActor* TargetActor) const;
+	FVector ResolvePrismSpawnLocation(AActor* TargetActor, int32 PrismIndex, int32 TotalPrismCount) const;
 	FVector ResolveHoverLocation() const;
 	FVector ConstrainTacticalDestinationToAnchor(const FVector& DesiredDestination) const;
 	float ResolveBossMaxHealth() const;
@@ -167,6 +167,12 @@ private:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph|Prism", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "s"))
 	float PrismPatternCooldown = 16.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph|Prism", meta = (AllowPrivateAccess = "true", ClampMin = "1", ClampMax = "8"))
+	int32 PrismSpawnCount = 3;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph|Prism", meta = (AllowPrivateAccess = "true", ClampMin = "200.0", Units = "cm"))
+	float PrismRingRadius = 650.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph|Laser", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "s"))
 	float LaserPatternCooldown = 10.0f;

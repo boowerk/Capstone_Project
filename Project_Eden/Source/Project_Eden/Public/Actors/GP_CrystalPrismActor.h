@@ -53,7 +53,11 @@ private:
 	float ReflectionAngleDegrees = 120.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "cm"))
-	float CollisionRadius = 120.0f;
+	float CollisionRadius = 150.0f;
+
+	// Keep the prototype crystal readable while allowing a Blueprint child to replace or retune its visual footprint.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph", meta = (AllowPrivateAccess = "true"))
+	FVector PrismVisualScale = FVector(2.1f, 2.1f, 2.9f);
 
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Boss|Crystal Seraph", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<AGP_CrystalSeraphBossCharacter> BossOwner;

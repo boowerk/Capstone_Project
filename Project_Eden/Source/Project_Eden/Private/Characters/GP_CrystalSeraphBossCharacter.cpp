@@ -161,16 +161,38 @@ AActor* AGP_CrystalSeraphBossCharacter::RequestSpawnCrystalPrism(AActor* Pattern
 	}
 
 	AActor* TargetActor = ResolvePatternTarget(PatternTargetActor);
-	const FVector SpawnLocation = ResolvePrismSpawnLocation(TargetActor);
-	const FRotator SpawnRotation = FRotator::ZeroRotator;
-	AActor* PrismActor = SpawnConfiguredActor(CrystalPrismActorClass, SpawnLocation, SpawnRotation, TEXT("CrystalPrism"));
-	if (AGP_CrystalPrismActor* CrystalPrismActor = Cast<AGP_CrystalPrismActor>(PrismActor))
+	AActor* PrimaryPrismActor = nullptr;
+	const int32 SafePrismCount = FMath::Clamp(PrismSpawnCount, 1, 8);
+	for (int32 PrismIndex = 0; PrismIndex < SafePrismCount; ++PrismIndex)
 	{
-		CrystalPrismActor->InitializePrism(this);
+		const FVector SpawnLocation = ResolvePrismSpawnLocation(TargetActor, PrismIndex, SafePrismCount);
+		const FRotator SpawnRotation = (GetActorLocation() - SpawnLocation).Rotation();
+		AActor* PrismActor = SpawnConfiguredActor(
+			CrystalPrismActorClass,
+			SpawnLocation,
+			SpawnRotation,
+			FName(*FString::Printf(TEXT("CrystalPrism_%d"), PrismIndex + 1)));
+		if (!IsValid(PrismActor))
+		{
+			continue;
+		}
+
+		if (AGP_CrystalPrismActor* CrystalPrismActor = Cast<AGP_CrystalPrismActor>(PrismActor))
+		{
+			CrystalPrismActor->InitializePrism(this);
+		}
+		if (!IsValid(PrimaryPrismActor))
+		{
+			// The state component keeps one representative; laser collision already evaluates every prism actor in the world.
+			PrimaryPrismActor = PrismActor;
+		}
 	}
-	CrystalSeraphStateComponent->RegisterCrystalPrismActor(PrismActor);
-	LastPrismPatternTime = GetWorld() ? GetWorld()->GetTimeSeconds() : LastPrismPatternTime;
-	return PrismActor;
+	CrystalSeraphStateComponent->RegisterCrystalPrismActor(PrimaryPrismActor);
+	if (IsValid(PrimaryPrismActor))
+	{
+		LastPrismPatternTime = GetWorld() ? GetWorld()->GetTimeSeconds() : LastPrismPatternTime;
+	}
+	return PrimaryPrismActor;
 }
 
 bool AGP_CrystalSeraphBossCharacter::RequestStartLaserPattern(AActor* PatternTargetActor)
@@ -551,7 +573,7 @@ AActor* AGP_CrystalSeraphBossCharacter::ResolvePatternTarget(AActor* ExplicitTar
 	return UGameplayStatics::GetPlayerPawn(this, 0);
 }
 
-FVector AGP_CrystalSeraphBossCharacter::ResolvePrismSpawnLocation(AActor* TargetActor) const
+FVector AGP_CrystalSeraphBossCharacter::ResolvePrismSpawnLocation(AActor* TargetActor, int32 PrismIndex, int32 TotalPrismCount) const
 {
 	const FVector TargetLocation = IsValid(TargetActor) ? TargetActor->GetActorLocation() : GetActorLocation() + GetActorForwardVector() * PreferredAirRange;
 	FVector Right = GetActorRightVector().GetSafeNormal2D();
@@ -560,8 +582,12 @@ FVector AGP_CrystalSeraphBossCharacter::ResolvePrismSpawnLocation(AActor* Target
 		Right = FVector::RightVector;
 	}
 
-	const float SideSign = FMath::RandBool() ? 1.0f : -1.0f;
-	FVector DesiredLocation = TargetLocation + Right * SideSign * FMath::RandRange(500.0f, 800.0f);
+	const int32 SafeCount = FMath::Max(1, TotalPrismCount);
+	const float AngleStep = 360.0f / static_cast<float>(SafeCount);
+	const float AngleDegrees = AngleStep * static_cast<float>(FMath::Clamp(PrismIndex, 0, SafeCount - 1));
+	const FVector RadialDirection = Right.RotateAngleAxis(AngleDegrees, FVector::UpVector).GetSafeNormal2D();
+	// Even ring spacing prevents three enlarged crystals from obscuring one another around the player.
+	FVector DesiredLocation = TargetLocation + RadialDirection * FMath::Max(200.0f, PrismRingRadius);
 
 	if (UNavigationSystemV1* NavigationSystem = UNavigationSystemV1::GetCurrent(GetWorld()))
 	{

@@ -26,7 +26,7 @@ AGP_CrystalPrismActor::AGP_CrystalPrismActor()
 	PrismMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("PrismMesh"));
 	PrismMesh->SetupAttachment(SceneRoot);
 	PrismMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	PrismMesh->SetRelativeScale3D(FVector(1.6f, 1.6f, 2.2f));
+	PrismMesh->SetRelativeScale3D(PrismVisualScale);
 
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> ConeMeshFinder(TEXT("/Engine/BasicShapes/Cone.Cone"));
 	if (ConeMeshFinder.Succeeded())
@@ -39,6 +39,11 @@ void AGP_CrystalPrismActor::BeginPlay()
 {
 	Super::BeginPlay();
 
+	// Apply the editable scale at runtime so native and Blueprint prism classes use the same collision-readable size.
+	PrismMesh->SetRelativeScale3D(FVector(
+		FMath::Max(0.01f, PrismVisualScale.X),
+		FMath::Max(0.01f, PrismVisualScale.Y),
+		FMath::Max(0.01f, PrismVisualScale.Z)));
 	ReflectionCollision->SetSphereRadius(GetCollisionRadius());
 	SetLifeSpan(FMath::Max(0.0f, PrismLifeSpan));
 }
