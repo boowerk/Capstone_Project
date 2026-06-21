@@ -2,7 +2,10 @@
 
 #include "Components/SceneCaptureComponent2D.h"
 #include "Components/Image.h"
+#include "Components/CanvasPanel.h"
+#include "Components/Overlay.h"
 #include "Engine/World.h"
+#include "Materials/Material.h"
 #include "Misc/AutomationTest.h"
 #include "UI/GP_MinimapCaptureActor.h"
 #include "Blueprint/WidgetBlueprintGeneratedClass.h"
@@ -59,7 +62,7 @@ bool FMinimapCaptureStabilityTest::RunTest(const FString& Parameters)
 
 	UTextureRenderTarget2D* StableFrontBuffer = CaptureActor->RenderTarget.Get();
 	UTextureRenderTarget2D* PendingBackBuffer = CaptureActor->CaptureBackBuffer.Get();
-	CaptureActor->RequestCapture();
+	CaptureActor->CaptureFullMap();
 	TestTrue(TEXT("Minimap capture arms an RHI GPU fence"), CaptureActor->HasTransferGPUFence());
 	TestTrue(
 		TEXT("Minimap waits for the back-buffer capture"),
@@ -96,7 +99,39 @@ bool FMinimapCaptureStabilityTest::RunTest(const FString& Parameters)
 		TEXT("Completed display copy reopens the capture pipeline"),
 		CaptureActor->FrameTransferState == AGP_MinimapCaptureActor::EFrameTransferState::Idle);
 	TestTrue(TEXT("Display completion still keeps the original HUD texture object"), CaptureActor->RenderTarget.Get() == StableFrontBuffer);
+	TestTrue(TEXT("One-shot full-map pixels are marked ready after the display copy"), CaptureActor->IsFullMapCaptureReady());
+	TestFalse(TEXT("One-shot capture actor disables its tick after completion"), CaptureActor->IsActorTickEnabled());
+	if (SceneCapture)
+	{
+		TestFalse(TEXT("SceneCapture is inactive after the PCG map is copied"), SceneCapture->IsActive());
+	}
 	CaptureActor->CaptureGPUFenceCompletionOverride.Reset();
+
+	FVector2D CenterUV;
+	TestTrue(TEXT("Captured map center can be converted to UV"), CaptureActor->WorldToMapUV(CaptureActor->CapturedMapCenter, CenterUV));
+	TestTrue(TEXT("Captured map center resolves to texture center"), CenterUV.Equals(FVector2D(0.5f, 0.5f), KINDA_SMALL_NUMBER));
+
+	const FRotator CapturedRotation(-90.0f, CaptureActor->CapturedMapYaw, 0.0f);
+	const FVector QuarterRightLocation = CaptureActor->CapturedMapCenter
+		+ CapturedRotation.RotateVector(FVector::RightVector) * CaptureActor->CapturedMapOrthoWidth * 0.25f;
+	FVector2D QuarterRightUV;
+	CaptureActor->WorldToMapUV(QuarterRightLocation, QuarterRightUV);
+	TestTrue(TEXT("Camera-right world movement maps to positive U"), QuarterRightUV.Equals(FVector2D(0.75f, 0.5f), KINDA_SMALL_NUMBER));
+
+	const FVector QuarterUpLocation = CaptureActor->CapturedMapCenter
+		+ CapturedRotation.RotateVector(FVector::UpVector) * CaptureActor->CapturedMapOrthoWidth * 0.25f;
+	FVector2D QuarterUpUV;
+	CaptureActor->WorldToMapUV(QuarterUpLocation, QuarterUpUV);
+	TestTrue(TEXT("Camera-up world movement maps to negative texture V"), QuarterUpUV.Equals(FVector2D(0.5f, 0.25f), KINDA_SMALL_NUMBER));
+
+	UMaterial* StaticMapMaterial = LoadObject<UMaterial>(
+		nullptr,
+		TEXT("/Game/UI/HUD/Minimap/Materials/M_UI_Minimap_StaticMap.M_UI_Minimap_StaticMap"));
+	TestNotNull(TEXT("Static minimap UI material asset exists"), StaticMapMaterial);
+	if (StaticMapMaterial)
+	{
+		TestEqual(TEXT("Static minimap material uses the UI domain"), StaticMapMaterial->MaterialDomain, MD_UI);
+	}
 
 	// Validate the production HUD contract so the subsystem always has a visible Image to receive the render target.
 	UClass* HUDWidgetClass = LoadClass<UUserWidget>(nullptr, TEXT("/Game/UI/HUD/WBP_PlayerHUDWidget.WBP_PlayerHUDWidget_C"));
@@ -112,6 +147,10 @@ bool FMinimapCaptureStabilityTest::RunTest(const FString& Parameters)
 			TEXT("Production minimap background is visible"),
 			MinimapBackgroundImage->GetVisibility() != ESlateVisibility::Collapsed
 				&& MinimapBackgroundImage->GetVisibility() != ESlateVisibility::Hidden);
+		TestTrue(
+			TEXT("Production minimap background supports the runtime marker layer"),
+			Cast<UCanvasPanel>(MinimapBackgroundImage->GetParent()) != nullptr
+				|| Cast<UOverlay>(MinimapBackgroundImage->GetParent()) != nullptr);
 	}
 
 	const FVector GroundCenter(400.0f, 500.0f, 25.0f);
