@@ -9,6 +9,7 @@ class UBlackboardComponent;
 class UEnvQuery;
 class UBehaviorTree;
 class APawn;
+class FCrystalSeraphPatrolRecoveryTest;
 struct FEnvQueryRequest;
 struct FEnvQueryResult;
 
@@ -63,9 +64,12 @@ protected:
 	float MinimumMoveDistance = 250.0f;
 
 	FQueryFinishedSignature QueryFinishedDelegate;
+	friend class FCrystalSeraphPatrolRecoveryTest;
 
 	void ApplyNamedParams(FEnvQueryRequest& QueryRequest, const UBlackboardComponent* BlackboardComponent, const APawn* ControlledPawn) const;
 	FName GetMoveLocationKeyName() const;
+	bool IsPatrolQuery() const;
+	bool ShouldYieldToReturnHome(bool bShouldReturnHome) const;
 	bool TrySetNavigationFallbackLocation(UBlackboardComponent* BlackboardComponent, const APawn* ControlledPawn) const;
 	bool IsMoveLocationFarEnough(const APawn* ControlledPawn, const FVector& MoveLocation) const;
 	void OnQueryFinished(TSharedPtr<FEnvQueryResult> Result);

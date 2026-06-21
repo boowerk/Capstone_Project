@@ -364,10 +364,11 @@ bool AGP_CrystalSeraphBossCharacter::RequestTeleportToPreferredCombatPosition(AA
 	++TacticalTeleportSequence;
 
 	const FVector TargetLocation = TargetActor->GetActorLocation();
-	const FVector Destination(
+	const FVector DesiredDestination(
 		TargetLocation.X + HorizontalAway.X * GetPreferredAirRange(),
 		TargetLocation.Y + HorizontalAway.Y * GetPreferredAirRange(),
 		TargetLocation.Z + GetPreferredHoverHeight());
+	const FVector Destination = ConstrainTacticalDestinationToAnchor(DesiredDestination);
 	const FRotator FacingRotation = (TargetLocation - Destination).Rotation();
 
 	if (AAIController* AIController = Cast<AAIController>(GetController()))
@@ -378,10 +379,11 @@ bool AGP_CrystalSeraphBossCharacter::RequestTeleportToPreferredCombatPosition(AA
 	SetActorLocationAndRotation(Destination, FRotator(0.0f, FacingRotation.Yaw, 0.0f), false, nullptr, ETeleportType::TeleportPhysics);
 	LastTacticalTeleportTime = WorldTimeSeconds;
 
-	UE_LOG(LogTemp, Log, TEXT("[CrystalSeraph] Tactical teleport: Boss=%s Target=%s Destination=%s"),
+	UE_LOG(LogTemp, Log, TEXT("[CrystalSeraph] Tactical teleport: Boss=%s Target=%s Destination=%s AnchorClamped=%d"),
 		*GetNameSafe(this),
 		*GetNameSafe(TargetActor),
-		*Destination.ToCompactString());
+		*Destination.ToCompactString(),
+		Destination.Equals(DesiredDestination, 1.0f) ? 0 : 1);
 	return true;
 }
 
@@ -584,6 +586,28 @@ FVector AGP_CrystalSeraphBossCharacter::ResolveHoverLocation() const
 	AActor* TargetActor = ResolvePatternTarget(nullptr);
 	const FVector BaseLocation = IsValid(TargetActor) ? TargetActor->GetActorLocation() : GetActorLocation();
 	return FVector(GetActorLocation().X, GetActorLocation().Y, BaseLocation.Z + PreferredHoverHeight);
+}
+
+FVector AGP_CrystalSeraphBossCharacter::ConstrainTacticalDestinationToAnchor(const FVector& DesiredDestination) const
+{
+	const FVector AnchorLocation = GetBehaviorAnchorLocation();
+	const float SafeRadius = FMath::Max(
+		0.0f,
+		GetReturnHomeDistance() - FMath::Max(GetReturnHomeAcceptanceRadius(), TacticalTeleportAnchorBuffer));
+	FVector HorizontalOffset = DesiredDestination - AnchorLocation;
+	HorizontalOffset.Z = 0.0f;
+
+	if (HorizontalOffset.SizeSquared2D() <= FMath::Square(SafeRadius))
+	{
+		return DesiredDestination;
+	}
+
+	// Tactical movement must not trigger the shared leash that immediately clears the current combat target.
+	const FVector ClampedHorizontalOffset = HorizontalOffset.GetSafeNormal2D() * SafeRadius;
+	return FVector(
+		AnchorLocation.X + ClampedHorizontalOffset.X,
+		AnchorLocation.Y + ClampedHorizontalOffset.Y,
+		DesiredDestination.Z);
 }
 
 float AGP_CrystalSeraphBossCharacter::ResolveBossMaxHealth() const

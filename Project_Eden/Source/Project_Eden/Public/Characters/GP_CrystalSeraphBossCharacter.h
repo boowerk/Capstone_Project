@@ -96,6 +96,7 @@ private:
 	AActor* ResolvePatternTarget(AActor* ExplicitTargetActor) const;
 	FVector ResolvePrismSpawnLocation(AActor* TargetActor) const;
 	FVector ResolveHoverLocation() const;
+	FVector ConstrainTacticalDestinationToAnchor(const FVector& DesiredDestination) const;
 	float ResolveBossMaxHealth() const;
 	float ResolveCurrentGroggyDuration() const;
 	bool IsPlayerDamageInstigator(const AActor* InstigatorActor) const;
@@ -157,6 +158,9 @@ private:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph|Air", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "s"))
 	float TacticalTeleportCooldown = 1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph|Air", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "cm"))
+	float TacticalTeleportAnchorBuffer = 300.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph|Combat", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "s"))
 	float MinimumPatternInterval = 2.5f;

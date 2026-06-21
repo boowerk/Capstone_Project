@@ -11,8 +11,11 @@
 #include "BehaviorTree/BlackboardData.h"
 #include "Characters/GP_EnemyCharacter.h"
 #include "GameFramework/Actor.h"
+#include "GameFramework/Character.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/Pawn.h"
 #include "Kismet/GameplayStatics.h"
+#include "Navigation/PathFollowingComponent.h"
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISense_Sight.h"
 #include "Perception/AISenseConfig_Sight.h"
@@ -187,6 +190,52 @@ AEnemyAIController::AEnemyAIController()
 	}
 
 	ConfigureSightSense();
+}
+
+FPathFollowingRequestResult AEnemyAIController::MoveTo(const FAIMoveRequest& MoveRequest, FNavPathSharedPtr* OutPath)
+{
+	if (ShouldUseDirectFlyingMove(GetPawn(), MoveRequest))
+	{
+		FAIMoveRequest DirectFlyingRequest(ResolveDirectFlyingGoal(GetPawn(), MoveRequest));
+		DirectFlyingRequest
+			.SetUsePathfinding(false)
+			.SetAllowPartialPath(false)
+			.SetRequireNavigableEndLocation(false)
+			.SetProjectGoalLocation(false)
+			.SetCanStrafe(MoveRequest.CanStrafe())
+			.SetReachTestIncludesAgentRadius(MoveRequest.IsReachTestIncludingAgentRadius())
+			.SetReachTestIncludesGoalRadius(MoveRequest.IsReachTestIncludingGoalRadius())
+			.SetAcceptanceRadius(MoveRequest.GetAcceptanceRadius())
+			.SetUserData(MoveRequest.GetUserData())
+			.SetUserFlags(MoveRequest.GetUserFlags());
+
+		// Abstract navigation supplies a straight path so flying patrol does not fail every BT iteration on ground NavMesh projection.
+		return Super::MoveTo(DirectFlyingRequest, OutPath);
+	}
+
+	return Super::MoveTo(MoveRequest, OutPath);
+}
+
+bool AEnemyAIController::ShouldUseDirectFlyingMove(const APawn* ControlledPawn, const FAIMoveRequest& MoveRequest)
+{
+	const ACharacter* ControlledCharacter = Cast<ACharacter>(ControlledPawn);
+	const UCharacterMovementComponent* MovementComponent = IsValid(ControlledCharacter)
+		? ControlledCharacter->GetCharacterMovement()
+		: nullptr;
+	return !MoveRequest.IsMoveToActorRequest()
+		&& IsValid(MovementComponent)
+		&& MovementComponent->MovementMode == MOVE_Flying;
+}
+
+FVector AEnemyAIController::ResolveDirectFlyingGoal(const APawn* ControlledPawn, const FAIMoveRequest& MoveRequest)
+{
+	FVector DirectGoal = MoveRequest.GetGoalLocation();
+	if (IsValid(ControlledPawn))
+	{
+		// Recast patrol/EQS points are ground-based; preserve the flying pawn's current altitude for direct movement.
+		DirectGoal.Z = ControlledPawn->GetActorLocation().Z;
+	}
+	return DirectGoal;
 }
 
 void AEnemyAIController::OnPossess(APawn* InPawn)
