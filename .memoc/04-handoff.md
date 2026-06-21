@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-06-21T15:10:00+09:00
+updated: 2026-06-21T15:53:23+09:00
 status: active
 tags:
   - memoc
@@ -11,10 +11,11 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-06-21T15:10:00+09:00
+Last synced: 2026-06-21T15:53:23+09:00
 
 ## Minimap Handoff
 
+- Commits `a88bfee6`, `b3652834`, and `e6806c69` replace runtime follow capture with one full-map capture after PCG becomes idle. The stable texture is panned/zoomed by `M_UI_Minimap_StaticMap`; player arrow and pooled red enemy markers are separate UMG widgets. Assign `/Game/UI/HUD/Minimap/Materials/M_UI_Minimap_StaticMap` to `WBP_PlayerHUDWidget.MinimapMapMaterial`, then PIE-check map orientation, coverage, zoom, and markers. Editor build and real D3D12 offscreen `ProjectEden.UI.Minimap.CaptureStability` passed with no material compile warning.
 - Commits `42b72f57` and `19340f27` remove periodic RenderTarget swapping/rebinding. UMG keeps one stable display target while SceneCapture remains isolated on a back buffer; completed captures are GPU-copied only after the capture fence, and the pipeline remains blocked until the copy fence completes. Editor build plus NullRHI and D3D12 offscreen `ProjectEden.UI.Minimap.CaptureStability` passed. No editor setup is required; PIE-check repeated attack Niagara visually.
 - Commits `23aedf2b` and `0bfa780f` replace render-command-only promotion with an `FRHIGPUFence` completion gate. The old front buffer remains bound until the capture fence write is issued, pending writes drain, and `Poll()` succeeds. Editor build, NullRHI automation, and real D3D12 offscreen `ProjectEden.UI.Minimap.CaptureStability` passed; PIE-check attack Niagara visually.
 - Commits `d64bc60c` and `88d85765` prevent attack-time flicker with front/back render targets, RHI-fence promotion, and player exclusion. Build and `ProjectEden.UI.Minimap.CaptureStability` passed; PIE-check repeated attacks with production VFX. No editor setup is required.

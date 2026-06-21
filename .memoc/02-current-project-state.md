@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-06-21T15:10:00+09:00
+updated: 2026-06-21T15:53:23+09:00
 status: active
 tags:
   - memoc
@@ -11,11 +11,11 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-06-21T15:10:00+09:00
+Last synced: 2026-06-21T15:53:23+09:00
 
 ## Current Status
 
-- Minimap capture is stable and flat: only FollowTarget ticks at 0.2s, FullMap is event-driven, PCG refresh preserves the current mode, and capture uses orthographic opaque FinalColorLDR with lighting/shadows/VFX/debug overlays disabled. UMG now stays bound to one stable front RenderTarget; SceneCapture writes only to a back buffer, waits for its RHI GPU fence, copies completed pixels to the front on the GPU, and waits for the copy fence before reusing the pipeline. RenderTarget may remain null because runtime creates it.
+- Minimap is now a one-shot PCG map pipeline (`a88bfee6`, `b3652834`, `e6806c69`): after PCG reports ready and stays idle for three polls, one orthographic full-map frame is captured from runtime PCG bounds, GPU-copied to the stable HUD RenderTarget, then SceneCapture and actor tick are disabled. `M_UI_Minimap_StaticMap` pans/zooms that fixed texture from C++ world-to-UV mapping; the player arrow and pooled `T_UI_Minimap_Point_Red` enemy Images remain separate UMG widgets.
 - Enemy leash uses anchor hysteresis: crossing `ReturnHomeDistance` starts return even with a target; after returning inside 75% of that distance, a visible player interrupts return and reopens combat.
 - Basic melee, ranged, and flying enemies inherit a native screen-space `WorldHealthBarComponent` from `AGP_EnemyCharacter`. It uses `WBP_EnemyHealthBar`, tracks GAS Health/MaxHealth, stays visible at full health, and hides on death; bosses keep the dedicated HUD bar.
 - All enemy archetypes share `AGP_EnemyCharacter` death handling: zero Health activates the server-only Death Ability, persists the Death GAS tag, stops AI/movement/collision, and schedules despawn.
