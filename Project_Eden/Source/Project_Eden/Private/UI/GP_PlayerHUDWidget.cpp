@@ -1,5 +1,10 @@
 ﻿#include "UI/GP_PlayerHUDWidget.h"
 #include "Components/Image.h"
+#include "Components/CanvasPanel.h"
+#include "Components/CanvasPanelSlot.h"
+#include "Components/Overlay.h"
+#include "Components/OverlaySlot.h"
+#include "Components/PanelWidget.h"
 #include "Components/ProgressBar.h"
 #include "Components/TextBlock.h"
 #include "Components/Widget.h"
@@ -7,9 +12,15 @@
 #include "AbilitySystem/GP_AttributeSet.h"
 #include "Blueprint/WidgetTree.h"
 #include "Characters/GP_BaseCharacter.h"
+#include "Characters/GP_EnemyCharacter.h"
+#include "Engine/Texture2D.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
 #include "GameFramework/Pawn.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/MaterialInterface.h"
+#include "UObject/ConstructorHelpers.h"
 #include "UI/GP_MinimapSubsystem.h"
 
 UGP_PlayerHUDWidget::UGP_PlayerHUDWidget(const FObjectInitializer& ObjectInitializer)
@@ -17,6 +28,14 @@ UGP_PlayerHUDWidget::UGP_PlayerHUDWidget(const FObjectInitializer& ObjectInitial
 {
 	LocationText = FText::FromString(TEXT("LIMINAL ASHEN FIELD"));
 	BossText = FText::FromString(TEXT("Omen of the Drowned Belfry"));
+
+	// The red point texture is stable project content; the generated UI material remains an explicit HUD setting.
+	static ConstructorHelpers::FObjectFinder<UTexture2D> EnemyMarkerFinder(
+		TEXT("/Game/UI/HUD/Minimap/Textures/T_UI_Minimap_Point_Red.T_UI_Minimap_Point_Red"));
+	if (EnemyMarkerFinder.Succeeded())
+	{
+		MinimapEnemyMarkerTexture = EnemyMarkerFinder.Object;
+	}
 }
 
 void UGP_PlayerHUDWidget::NativePreConstruct()
@@ -32,6 +51,7 @@ void UGP_PlayerHUDWidget::NativeConstruct()
 	RefreshMinimapPlayerArrowRotation();
 	BindToMinimapSubsystem();
 	RefreshMinimapBackgroundFromSubsystem();
+	RefreshMinimapPresentation(0.0f);
 
 	// 1. 즉시 시도
 	APawn* OwningPawn = GetOwningPlayerPawn();
@@ -61,13 +81,17 @@ void UGP_PlayerHUDWidget::NativeDestruct()
 	}
 
 	BoundMinimapSubsystem.Reset();
+	EnemyMarkerPool.Reset();
+	MinimapMarkerCanvas = nullptr;
+	MinimapMaterialInstance = nullptr;
 	Super::NativeDestruct();
 }
 
 void UGP_PlayerHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
-	RefreshMinimapPlayerArrowRotation();
+	// Controller tick owns the marker interval; widget tick only supplies a zero-cost fallback for UV/rotation.
+	RefreshMinimapPresentation(0.0f);
 	if (!BoundMinimapRenderTarget.IsValid())
 	{
 		RefreshMinimapBackgroundFromSubsystem();
@@ -81,17 +105,82 @@ void UGP_PlayerHUDWidget::SetMinimapRenderTarget(UTextureRenderTarget2D* InRende
 	{
 		return;
 	}
-	if (BoundMinimapRenderTarget.Get() == InRenderTarget && BackgroundImage->GetBrush().GetResourceObject() == InRenderTarget)
+	UObject* ExpectedBrushResource = IsValid(MinimapMaterialInstance)
+		? static_cast<UObject*>(MinimapMaterialInstance.Get())
+		: static_cast<UObject*>(InRenderTarget);
+	if (BoundMinimapRenderTarget.Get() == InRenderTarget
+		&& BackgroundImage->GetBrush().GetResourceObject() == ExpectedBrushResource)
 	{
 		return;
 	}
 
-	FSlateBrush Brush = BackgroundImage->GetBrush();
-	Brush.SetResourceObject(InRenderTarget);
-	// Preserve the designer-authored brush size so a 1024px render target cannot reflow the HUD layout.
-	BackgroundImage->SetBrush(Brush);
-
 	BoundMinimapRenderTarget = InRenderTarget;
+	EnsureMinimapMaterial(InRenderTarget);
+}
+
+void UGP_PlayerHUDWidget::EnsureMinimapMaterial(UTextureRenderTarget2D* InRenderTarget)
+{
+	UImage* BackgroundImage = ResolveMinimapBackgroundImage();
+	if (!IsValid(BackgroundImage) || !IsValid(InRenderTarget))
+	{
+		return;
+	}
+
+	if (!IsValid(MinimapMaterialInstance) && IsValid(MinimapMapMaterial))
+	{
+		MinimapMaterialInstance = UMaterialInstanceDynamic::Create(MinimapMapMaterial, this);
+	}
+
+	FSlateBrush Brush = BackgroundImage->GetBrush();
+	if (IsValid(MinimapMaterialInstance))
+	{
+		// MapTexture never changes after initialization; only UV center and zoom are updated during play.
+		MinimapMaterialInstance->SetTextureParameterValue(TEXT("MapTexture"), InRenderTarget);
+		MinimapMaterialInstance->SetScalarParameterValue(TEXT("MapZoom"), MinimapZoom);
+		Brush.SetResourceObject(MinimapMaterialInstance);
+	}
+	else
+	{
+		// Direct render-target display remains a safe fallback until the UI material is assigned.
+		Brush.SetResourceObject(InRenderTarget);
+	}
+
+	// Preserve the designer-authored brush size so the 1024px map texture cannot reflow the HUD layout.
+	BackgroundImage->SetBrush(Brush);
+}
+
+void UGP_PlayerHUDWidget::RefreshMinimapPresentation(float DeltaSeconds)
+{
+	RefreshMinimapPlayerArrowRotation();
+	RefreshMinimapMapUV();
+	RefreshEnemyMinimapMarkers(DeltaSeconds);
+}
+
+void UGP_PlayerHUDWidget::RefreshMinimapMapUV()
+{
+	if (!IsValid(MinimapMaterialInstance) || !BoundMinimapSubsystem.IsValid())
+	{
+		return;
+	}
+
+	const APawn* OwningPawn = GetOwningPlayerPawn();
+	FVector2D PlayerMapUV;
+	if (!IsValid(OwningPawn) || !BoundMinimapSubsystem->WorldToMapUV(OwningPawn->GetActorLocation(), PlayerMapUV))
+	{
+		return;
+	}
+
+	if (PlayerMapUV.Equals(CachedPlayerMapUV, 0.0001f) && FMath::IsNearlyEqual(CachedMinimapZoom, MinimapZoom))
+	{
+		return;
+	}
+
+	// The material implements SourceUV = (WidgetUV - 0.5) / Zoom + PlayerMapUV.
+	MinimapMaterialInstance->SetScalarParameterValue(TEXT("MapCenterU"), PlayerMapUV.X);
+	MinimapMaterialInstance->SetScalarParameterValue(TEXT("MapCenterV"), PlayerMapUV.Y);
+	MinimapMaterialInstance->SetScalarParameterValue(TEXT("MapZoom"), MinimapZoom);
+	CachedPlayerMapUV = PlayerMapUV;
+	CachedMinimapZoom = MinimapZoom;
 }
 
 void UGP_PlayerHUDWidget::RefreshMinimapBackgroundFromSubsystem()
@@ -184,6 +273,189 @@ UImage* UGP_PlayerHUDWidget::ResolveMinimapBackgroundImage() const
 	});
 
 	return FoundImage;
+}
+
+bool UGP_PlayerHUDWidget::EnsureMinimapMarkerLayer()
+{
+	if (IsValid(MinimapMarkerCanvas))
+	{
+		return true;
+	}
+	if (UCanvasPanel* AuthoredMarkerCanvas = Cast<UCanvasPanel>(GetWidgetFromName(TEXT("RuntimeMinimapMarkerCanvas"))))
+	{
+		MinimapMarkerCanvas = AuthoredMarkerCanvas;
+		return true;
+	}
+
+	UImage* BackgroundImage = ResolveMinimapBackgroundImage();
+	UPanelWidget* ParentPanel = IsValid(BackgroundImage) ? BackgroundImage->GetParent() : nullptr;
+	if (!WidgetTree || !IsValid(ParentPanel))
+	{
+		return false;
+	}
+
+	MinimapMarkerCanvas = WidgetTree->ConstructWidget<UCanvasPanel>(
+		UCanvasPanel::StaticClass(),
+		TEXT("RuntimeMinimapMarkerCanvas"));
+	if (!IsValid(MinimapMarkerCanvas))
+	{
+		return false;
+	}
+
+	MinimapMarkerCanvas->SetVisibility(ESlateVisibility::HitTestInvisible);
+	MinimapMarkerCanvas->SetClipping(EWidgetClipping::ClipToBoundsAlways);
+
+	if (UCanvasPanel* ParentCanvas = Cast<UCanvasPanel>(ParentPanel))
+	{
+		UCanvasPanelSlot* MarkerLayerSlot = ParentCanvas->AddChildToCanvas(MinimapMarkerCanvas);
+		const UCanvasPanelSlot* BackgroundSlot = Cast<UCanvasPanelSlot>(BackgroundImage->Slot);
+		if (!MarkerLayerSlot || !BackgroundSlot)
+		{
+			ParentCanvas->RemoveChild(MinimapMarkerCanvas);
+			MinimapMarkerCanvas = nullptr;
+			return false;
+		}
+
+		// Clone the authored map Image layout so markers share its exact pixel space at every resolution.
+		MarkerLayerSlot->SetAnchors(BackgroundSlot->GetAnchors());
+		MarkerLayerSlot->SetOffsets(BackgroundSlot->GetOffsets());
+		MarkerLayerSlot->SetAlignment(BackgroundSlot->GetAlignment());
+		MarkerLayerSlot->SetAutoSize(BackgroundSlot->GetAutoSize());
+		MarkerLayerSlot->SetZOrder(BackgroundSlot->GetZOrder() + 1);
+		return true;
+	}
+
+	if (UOverlay* ParentOverlay = Cast<UOverlay>(ParentPanel))
+	{
+		UOverlaySlot* MarkerLayerSlot = ParentOverlay->AddChildToOverlay(MinimapMarkerCanvas);
+		const UOverlaySlot* BackgroundSlot = Cast<UOverlaySlot>(BackgroundImage->Slot);
+		if (!MarkerLayerSlot || !BackgroundSlot)
+		{
+			ParentOverlay->RemoveChild(MinimapMarkerCanvas);
+			MinimapMarkerCanvas = nullptr;
+			return false;
+		}
+
+		MarkerLayerSlot->SetPadding(BackgroundSlot->GetPadding());
+		MarkerLayerSlot->SetHorizontalAlignment(BackgroundSlot->GetHorizontalAlignment());
+		MarkerLayerSlot->SetVerticalAlignment(BackgroundSlot->GetVerticalAlignment());
+		return true;
+	}
+
+	// The shipped HUD uses Canvas/Overlay. A custom HUD can expose its own layer by naming it RuntimeMinimapMarkerCanvas.
+	MinimapMarkerCanvas = nullptr;
+	return false;
+}
+
+void UGP_PlayerHUDWidget::RefreshEnemyMinimapMarkers(float DeltaSeconds)
+{
+	EnemyMarkerRefreshAccumulator += FMath::Max(0.0f, DeltaSeconds);
+	if (EnemyMarkerRefreshAccumulator < MinimapEnemyRefreshInterval)
+	{
+		return;
+	}
+	EnemyMarkerRefreshAccumulator = 0.0f;
+
+	if (!BoundMinimapSubsystem.IsValid()
+		|| !BoundMinimapSubsystem->IsMinimapReady()
+		|| !IsValid(MinimapEnemyMarkerTexture)
+		|| !EnsureMinimapMarkerLayer())
+	{
+		for (UImage* Marker : EnemyMarkerPool)
+		{
+			if (IsValid(Marker))
+			{
+				Marker->SetVisibility(ESlateVisibility::Collapsed);
+			}
+		}
+		return;
+	}
+
+	const APawn* OwningPawn = GetOwningPlayerPawn();
+	FVector2D PlayerMapUV;
+	if (!IsValid(OwningPawn) || !BoundMinimapSubsystem->WorldToMapUV(OwningPawn->GetActorLocation(), PlayerMapUV))
+	{
+		return;
+	}
+
+	FVector2D MarkerLayerSize = MinimapMarkerCanvas->GetCachedGeometry().GetLocalSize();
+	if (MarkerLayerSize.IsNearlyZero())
+	{
+		if (const UImage* BackgroundImage = ResolveMinimapBackgroundImage())
+		{
+			MarkerLayerSize = BackgroundImage->GetCachedGeometry().GetLocalSize();
+		}
+	}
+	if (MarkerLayerSize.IsNearlyZero())
+	{
+		return;
+	}
+
+	int32 VisibleMarkerCount = 0;
+	for (TActorIterator<AGP_EnemyCharacter> It(GetWorld()); It; ++It)
+	{
+		AGP_EnemyCharacter* Enemy = *It;
+		if (!IsValid(Enemy) || Enemy->IsDead())
+		{
+			continue;
+		}
+
+		FVector2D EnemyMapUV;
+		if (!BoundMinimapSubsystem->WorldToMapUV(Enemy->GetActorLocation(), EnemyMapUV))
+		{
+			continue;
+		}
+
+		const FVector2D ScreenUV = FVector2D(0.5f, 0.5f) + ((EnemyMapUV - PlayerMapUV) * MinimapZoom);
+		if (FVector2D::Distance(ScreenUV, FVector2D(0.5f, 0.5f)) > MinimapMarkerVisibleRadius)
+		{
+			continue;
+		}
+
+		if (!EnemyMarkerPool.IsValidIndex(VisibleMarkerCount))
+		{
+			UImage* NewMarker = WidgetTree->ConstructWidget<UImage>(
+				UImage::StaticClass(),
+				FName(*FString::Printf(TEXT("RuntimeEnemyMinimapMarker_%d"), VisibleMarkerCount)));
+			if (!IsValid(NewMarker))
+			{
+				continue;
+			}
+			UCanvasPanelSlot* MarkerSlot = MinimapMarkerCanvas->AddChildToCanvas(NewMarker);
+			if (!MarkerSlot)
+			{
+				continue;
+			}
+
+			// The requested red point texture is displayed as an independent UMG icon, never baked into the map.
+			NewMarker->SetBrushFromTexture(MinimapEnemyMarkerTexture, true);
+			NewMarker->SetVisibility(ESlateVisibility::HitTestInvisible);
+			MarkerSlot->SetAutoSize(false);
+			MarkerSlot->SetAlignment(FVector2D(0.5f, 0.5f));
+			MarkerSlot->SetSize(FVector2D(MinimapEnemyMarkerSize));
+			EnemyMarkerPool.Add(NewMarker);
+		}
+
+		UImage* Marker = EnemyMarkerPool[VisibleMarkerCount];
+		if (IsValid(Marker))
+		{
+			Marker->SetVisibility(ESlateVisibility::HitTestInvisible);
+			if (UCanvasPanelSlot* MarkerSlot = Cast<UCanvasPanelSlot>(Marker->Slot))
+			{
+				MarkerSlot->SetPosition(ScreenUV * MarkerLayerSize);
+				MarkerSlot->SetSize(FVector2D(MinimapEnemyMarkerSize));
+			}
+		}
+		++VisibleMarkerCount;
+	}
+
+	for (int32 Index = VisibleMarkerCount; Index < EnemyMarkerPool.Num(); ++Index)
+	{
+		if (IsValid(EnemyMarkerPool[Index]))
+		{
+			EnemyMarkerPool[Index]->SetVisibility(ESlateVisibility::Collapsed);
+		}
+	}
 }
 
 void UGP_PlayerHUDWidget::RefreshMinimapPlayerArrowRotation()
