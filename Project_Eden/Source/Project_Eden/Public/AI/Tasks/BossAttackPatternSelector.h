@@ -25,6 +25,11 @@ struct PROJECT_EDEN_API FGPBossAttackPatternRanges
 	static constexpr float CrystalLaserMaxRange = 2200.0f;
 	static constexpr float CrystalPrismMinRange = 500.0f;
 	static constexpr float CrystalPrismMaxRange = 1800.0f;
+	static constexpr float DarkKnightMeleeReach = 420.0f;
+	static constexpr float DarkKnightChargeMinRange = 900.0f;
+	static constexpr float DarkKnightChargeMaxRange = 1800.0f;
+	static constexpr float DarkKnightDarkWaveMaxRange = 2200.0f;
+	static constexpr float DarkKnightGroundCrackMaxRange = 1800.0f;
 
 	static bool IsWithinReach(float DistanceToTarget, float AttackReach);
 	static bool IsWithinBullPatternRange(float DistanceToTarget);
@@ -68,6 +73,21 @@ struct FGPBossAttackPatternContext
 	int32 WingCoreBreakTarget = 3;
 	float TimeSinceLastLaser = 999.0f;
 	float TimeSinceLastPrism = 999.0f;
+	bool bIsDarkArmorKnight = false;
+	bool bIsGuarding = false;
+	bool bCanParry = false;
+	bool bGuardBroken = false;
+	bool bCanUseDarkKnightBasic = false;
+	bool bCanUseDarkKnightHeavy = false;
+	bool bCanUseDarkKnightSweep = false;
+	bool bCanUseDarkKnightGuard = false;
+	bool bCanUseDarkKnightCharge = false;
+	bool bCanUseDarkWave = false;
+	bool bCanUseGroundCrack = false;
+	float GuardGauge = 100.0f;
+	float MaxGuardGauge = 100.0f;
+	float PreferredMeleeRange = 350.0f;
+	FName LastHitDirection = TEXT("Front");
 };
 
 // Shared deterministic selector used by the BT task and automation tests.

@@ -134,6 +134,67 @@ TArray<FGPBossAttackPatternCandidate> FGPBossAttackPatternSelector::BuildCandida
 		return Candidates;
 	}
 
+	if (Context.bIsDarkArmorKnight)
+	{
+		if (Context.bGuardBroken)
+		{
+			AddCandidate(Candidates, GPTags::Ability::Boss::DarkKnight::Groggy, 5.0f, TEXT("DarkKnightGroggy"));
+			return Candidates;
+		}
+		if (Context.bIsGuarding)
+		{
+			// Guard/parry windows are state-owned reward tests; do not overlap another attack ability.
+			return Candidates;
+		}
+
+		const float GuardRatio = Context.MaxGuardGauge > KINDA_SMALL_NUMBER
+			? FMath::Clamp(Context.GuardGauge / Context.MaxGuardGauge, 0.0f, 1.0f)
+			: 0.0f;
+		const float PhasePressure = FMath::Clamp(static_cast<float>(BossPhase - 1) * 0.22f, 0.0f, 0.45f);
+		const bool bInMeleeRange = DistanceToTarget <= FGPBossAttackPatternRanges::DarkKnightMeleeReach;
+		const bool bInChargeRange = DistanceToTarget >= FGPBossAttackPatternRanges::DarkKnightChargeMinRange
+			&& DistanceToTarget <= FGPBossAttackPatternRanges::DarkKnightChargeMaxRange;
+
+		if (Context.bCanUseDarkKnightCharge && bInChargeRange)
+		{
+			AddCandidate(Candidates, GPTags::Ability::Boss::DarkKnight::Charge, 1.15f + PhasePressure, TEXT("DarkKnightCharge"));
+		}
+		if (Context.bCanUseDarkWave && DistanceToTarget <= FGPBossAttackPatternRanges::DarkKnightDarkWaveMaxRange)
+		{
+			const float RangeBonus = DistanceToTarget > FGPBossAttackPatternRanges::DarkKnightMeleeReach ? 0.35f : 0.0f;
+			AddCandidate(Candidates, GPTags::Ability::Boss::DarkKnight::DarkWave, 0.72f + RangeBonus + PhasePressure, TEXT("DarkWave"));
+		}
+		if (Context.bCanUseGroundCrack && DistanceToTarget <= FGPBossAttackPatternRanges::DarkKnightGroundCrackMaxRange)
+		{
+			AddCandidate(Candidates, GPTags::Ability::Boss::DarkKnight::GroundCrack, 0.62f + PhasePressure + (HealthRatio <= 0.6f ? 0.3f : 0.0f), TEXT("GroundCrack"));
+		}
+		if (Context.bCanUseDarkKnightGuard && DistanceToTarget <= 520.0f)
+		{
+			const float FrontPressure = Context.LastHitDirection == TEXT("Front") ? 0.2f : 0.0f;
+			AddCandidate(Candidates, GPTags::Ability::Boss::DarkKnight::Guard, 0.68f + GuardRatio * 0.2f + FrontPressure, TEXT("DarkGuard"));
+		}
+		if (Context.bCanUseDarkKnightHeavy && bInMeleeRange)
+		{
+			AddCandidate(Candidates, GPTags::Ability::Boss::DarkKnight::Heavy, 0.78f + PhasePressure + (HealthRatio <= 0.6f ? 0.15f : 0.0f), TEXT("DarkHeavy"));
+		}
+		if (Context.bCanUseDarkKnightSweep && bInMeleeRange)
+		{
+			const float FlankPressure = Context.LastHitDirection == TEXT("Front") ? 0.0f : 0.28f;
+			AddCandidate(Candidates, GPTags::Ability::Boss::DarkKnight::Sweep, 0.64f + PhasePressure + FlankPressure, TEXT("DarkSweep"));
+		}
+		if (Context.bCanUseDarkKnightBasic && bInMeleeRange)
+		{
+			const float MeleeFit = 1.0f - FMath::Clamp(FMath::Abs(DistanceToTarget - Context.PreferredMeleeRange) / FMath::Max(100.0f, Context.PreferredMeleeRange), 0.0f, 1.0f);
+			AddCandidate(Candidates, GPTags::Ability::Boss::DarkKnight::Basic, 0.58f + MeleeFit * 0.35f + PhasePressure, TEXT("DarkBasic"));
+		}
+
+		Candidates.Sort([](const FGPBossAttackPatternCandidate& Left, const FGPBossAttackPatternCandidate& Right)
+		{
+			return Left.Score > Right.Score;
+		});
+		return Candidates;
+	}
+
 	if (ChainBreakCount >= ChainBreakTarget)
 	{
 		AddCandidate(Candidates, GPTags::Ability::Enemy::Utility_MatadorGroggy, 5.0f, TEXT("MatadorGroggy"));

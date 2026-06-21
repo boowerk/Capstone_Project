@@ -43,4 +43,14 @@ namespace EnemyBlackboardKeys
 	const FName CrystalPrismActor(TEXT("CrystalPrismActor"));
 	const FName bCanUseLaserPattern(TEXT("bCanUseLaserPattern"));
 	const FName bCanUsePrismPattern(TEXT("bCanUsePrismPattern"));
+	const FName GuardGauge(TEXT("GuardGauge"));
+	const FName MaxGuardGauge(TEXT("MaxGuardGauge"));
+	const FName bIsGuarding(TEXT("bIsGuarding"));
+	const FName bCanParry(TEXT("bCanParry"));
+	const FName bGuardBroken(TEXT("bGuardBroken"));
+	const FName bShouldCharge(TEXT("bShouldCharge"));
+	const FName bCanUseGroundCrack(TEXT("bCanUseGroundCrack"));
+	const FName bCanUseDarkWave(TEXT("bCanUseDarkWave"));
+	const FName LastHitDirection(TEXT("LastHitDirection"));
+	const FName PreferredMeleeRange(TEXT("PreferredMeleeRange"));
 }

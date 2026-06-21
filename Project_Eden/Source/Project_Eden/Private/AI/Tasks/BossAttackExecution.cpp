@@ -9,9 +9,12 @@
 #include "BehaviorTree/BlackboardComponent.h"
 #include "Characters/GP_CrystalSeraphBossCharacter.h"
 #include "Characters/GP_CrystalSeraphStateComponent.h"
+#include "Characters/GP_DarkArmorKnightBossCharacter.h"
+#include "Characters/GP_DarkArmorKnightStateComponent.h"
 #include "Characters/GP_EnemyCharacter.h"
 #include "Characters/GP_MatadorBossStateComponent.h"
 #include "Engine/World.h"
+#include "GameplayTags/GP_Tags.h"
 
 namespace BossAttackExecution
 {
@@ -94,7 +97,8 @@ namespace BossAttackExecution
 
 		// Boss state components are authoritative even if a Blueprint forgot to mirror the boss flag.
 		return IsValid(ControlledPawn->FindComponentByClass<UGP_MatadorBossStateComponent>())
-			|| IsValid(ControlledPawn->FindComponentByClass<UGP_CrystalSeraphStateComponent>());
+			|| IsValid(ControlledPawn->FindComponentByClass<UGP_CrystalSeraphStateComponent>())
+			|| IsValid(ControlledPawn->FindComponentByClass<UGP_DarkArmorKnightStateComponent>());
 	}
 
 	FGPBossAttackPatternContext BuildPatternContext(
@@ -184,6 +188,36 @@ namespace BossAttackExecution
 				|| CrystalSeraphBoss->ShouldTeleportForCrystalSeraph(Context.DistanceToTarget);
 		}
 
+		if (const UGP_DarkArmorKnightStateComponent* DarkKnightState = IsValid(ControlledPawn)
+			? ControlledPawn->FindComponentByClass<UGP_DarkArmorKnightStateComponent>()
+			: nullptr)
+		{
+			Context.bIsDarkArmorKnight = true;
+			Context.bIsGroggy = DarkKnightState->IsGroggy();
+			Context.bIsGuarding = DarkKnightState->IsGuarding();
+			Context.bCanParry = DarkKnightState->IsParryWindowOpen();
+			Context.bGuardBroken = DarkKnightState->IsGuardBroken();
+			Context.GuardGauge = DarkKnightState->GetGuardGauge();
+			Context.MaxGuardGauge = DarkKnightState->GetMaxGuardGauge();
+			Context.LastHitDirection = DarkKnightState->GetLastHitDirectionName();
+			Context.bSuppressGenericBossAttacks = true;
+		}
+
+		if (const AGP_DarkArmorKnightBossCharacter* DarkKnightBoss = Cast<AGP_DarkArmorKnightBossCharacter>(ControlledPawn))
+		{
+			const bool bCadenceReady = DarkKnightBoss->CanStartDarkKnightPattern();
+			Context.BossPhase = DarkKnightBoss->GetDarkKnightPhase();
+			Context.PreferredMeleeRange = DarkKnightBoss->GetPreferredMeleeRange();
+			Context.PreferredRange = Context.PreferredMeleeRange;
+			Context.bCanUseDarkKnightBasic = bCadenceReady && DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::Basic);
+			Context.bCanUseDarkKnightHeavy = bCadenceReady && DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::Heavy);
+			Context.bCanUseDarkKnightSweep = bCadenceReady && DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::Sweep);
+			Context.bCanUseDarkKnightGuard = bCadenceReady && DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::Guard);
+			Context.bCanUseDarkKnightCharge = bCadenceReady && DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::Charge);
+			Context.bCanUseDarkWave = bCadenceReady && DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::DarkWave);
+			Context.bCanUseGroundCrack = bCadenceReady && DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::GroundCrack);
+		}
+
 		return Context;
 	}
 
@@ -212,7 +246,8 @@ namespace BossAttackExecution
 
 			if (TryActivateAbilityByTag(ASC, Candidate.AbilityTag))
 			{
-				if (Cast<AGP_CrystalSeraphBossCharacter>(ControlledPawn) != nullptr
+				if ((Cast<AGP_CrystalSeraphBossCharacter>(ControlledPawn) != nullptr
+						|| Cast<AGP_DarkArmorKnightBossCharacter>(ControlledPawn) != nullptr)
 					&& HasBlackboardKey(BlackboardComponent, EnemyBlackboardKeys::bCanAttack))
 				{
 					// Leave the common BT Attack branch immediately; the tactics service will reopen it after the cadence expires.
