@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-06-19T08:18:31+09:00
+updated: 2026-06-21T15:10:00+09:00
 status: active
 tags:
   - memoc
@@ -49,5 +49,6 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 - Superseded by `93ac0b15`: crossing `ReturnHomeDistance` starts anchor return even with an active target. A visible player can re-engage after the enemy returns inside 75% of the outer distance, preventing boundary oscillation.
 - Minimap FollowTarget alone owns periodic capture; FullMap capture is event-driven. Use orthographic FinalColorLDR for UMG-safe opaque alpha, then exclude lighting, shadows, translucent/particle VFX, decals, and debug overlays for 2D readability.
 - Never let SceneCapture write into the minimap texture currently sampled by UMG. Capture into a back buffer, wait for its RHI fence, then promote it; hide the followed player because the HUD arrow already represents it.
+- Promote a minimap capture only after its GPU fence write was issued, pending GPU writes reached zero, and `Poll()` succeeded. A render-command fence alone is insufficient; while incomplete, preserve both the displayed front buffer and pending capture back buffer.
 - Crystal Seraph reflection is the three-stage break mechanic. The third reflection enters groggy and falls; only the first player hit after landing starts the recovery delay, while Boss_Common remains paused.
 - Keep Boss_Common assets shared, but enforce air/leash safety natively: flying vector MoveTo bypasses ground pathfinding while preserving altitude, Patrol yields when ReturnHome is active, and Crystal Seraph tactical teleports stay inside the anchor margin.
