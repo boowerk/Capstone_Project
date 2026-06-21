@@ -6,6 +6,7 @@
 
 class USphereComponent;
 class UGameplayEffect;
+class UGP_VisualCueComponent;
 class UStaticMeshComponent;
 
 UCLASS(Blueprintable)
@@ -30,11 +31,17 @@ protected:
 	void BP_OnExploded();
 
 private:
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastPlayExplosionVFX(const FVector& ExplosionLocation);
+
 	void Explode();
 
 private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USceneComponent> SceneRoot;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph|VFX", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UGP_VisualCueComponent> VisualCueComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USphereComponent> DamageArea;

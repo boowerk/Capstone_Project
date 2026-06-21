@@ -6,6 +6,7 @@
 
 class AGP_CrystalSeraphBossCharacter;
 class AGP_SeraphLaserActor;
+class UGP_VisualCueComponent;
 class USphereComponent;
 class UStaticMeshComponent;
 
@@ -37,8 +38,14 @@ protected:
 	void BP_OnLaserReflected(AGP_SeraphLaserActor* LaserActor, const FVector& ReflectedDirection);
 
 private:
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastPlayReflectionVFX(const FVector& ReflectionLocation, const FRotator& ReflectionRotation);
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USceneComponent> SceneRoot;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph|VFX", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UGP_VisualCueComponent> VisualCueComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UStaticMeshComponent> PrismMesh;

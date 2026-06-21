@@ -6,6 +6,7 @@
 
 class USphereComponent;
 class UStaticMeshComponent;
+class UGP_VisualCueComponent;
 
 UCLASS(Blueprintable)
 class PROJECT_EDEN_API AGP_CrystalShardProjectile : public AGP_Projectile
@@ -14,11 +15,18 @@ class PROJECT_EDEN_API AGP_CrystalShardProjectile : public AGP_Projectile
 
 public:
 	AGP_CrystalShardProjectile();
+	virtual void BeginPlay() override;
 
 protected:
 	virtual void OnProjectileOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult) override;
 
 private:
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastPlayShardImpactVFX(const FVector& ImpactLocation, const FRotator& ImpactRotation);
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph|VFX", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UGP_VisualCueComponent> VisualCueComponent;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USphereComponent> ShardCollision;
 
