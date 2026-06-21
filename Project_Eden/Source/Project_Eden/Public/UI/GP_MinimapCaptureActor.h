@@ -18,6 +18,7 @@ enum class EGPMinimapCaptureMode : uint8
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FGPMinimapCaptureRenderTargetChanged, UTextureRenderTarget2D*, RenderTarget);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FGPMinimapMapCaptureReady);
 
 UCLASS(Blueprintable)
 class PROJECT_EDEN_API AGP_MinimapCaptureActor : public AActor
@@ -57,8 +58,20 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Minimap")
 	UTextureRenderTarget2D* GetMinimapRenderTarget() const { return RenderTarget; }
 
+	UFUNCTION(BlueprintPure, Category = "Minimap")
+	bool WorldToMapUV(const FVector& WorldLocation, FVector2D& OutMapUV) const;
+
+	UFUNCTION(BlueprintPure, Category = "Minimap")
+	bool IsFullMapCaptureReady() const { return bFullMapCaptureReady; }
+
+	UFUNCTION(BlueprintPure, Category = "Minimap")
+	float GetCapturedMapOrthoWidth() const { return CapturedMapOrthoWidth; }
+
 	UPROPERTY(BlueprintAssignable, Category = "Minimap")
 	FGPMinimapCaptureRenderTargetChanged OnRenderTargetChanged;
+
+	UPROPERTY(BlueprintAssignable, Category = "Minimap")
+	FGPMinimapMapCaptureReady OnMapCaptureReady;
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Minimap")
@@ -88,20 +101,11 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Minimap|Capture", meta = (ClampMin = "0.0"))
 	float BoundsPadding = 500.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Minimap|Capture", meta = (ClampMin = "0.02"))
-	float FollowCaptureInterval = 0.2f;
-
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Minimap|Capture")
 	bool bRegisterWithSubsystem = true;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Minimap|Capture")
-	bool bStartFollowingPlayer = true;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Minimap|Capture")
-	bool bRotateCaptureWithTarget = false;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Minimap|Capture")
-	EGPMinimapCaptureMode CaptureMode = EGPMinimapCaptureMode::FollowTarget;
+	EGPMinimapCaptureMode CaptureMode = EGPMinimapCaptureMode::FullMap;
 
 private:
 	friend class FMinimapCaptureStabilityTest;
@@ -126,8 +130,10 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UTextureRenderTarget2D> CaptureBackBuffer;
 
-	float FollowCaptureAccumulator = 0.0f;
 	FVector InitialGroundCenter = FVector::ZeroVector;
+	FVector CapturedMapCenter = FVector::ZeroVector;
+	float CapturedMapOrthoWidth = 0.0f;
+	float CapturedMapYaw = 0.0f;
 	// Capture and display-copy fences keep the HUD on its last complete frame throughout the transfer.
 	TSharedPtr<FGPMinimapCaptureGPUFence, ESPMode::ThreadSafe> CaptureCompletionFence;
 #if WITH_DEV_AUTOMATION_TESTS
@@ -136,4 +142,6 @@ private:
 	EFrameTransferState FrameTransferState = EFrameTransferState::Idle;
 	bool bHasInitialGroundCenter = false;
 	bool bCaptureInitialized = false;
+	bool bFullMapCapturePending = false;
+	bool bFullMapCaptureReady = false;
 };

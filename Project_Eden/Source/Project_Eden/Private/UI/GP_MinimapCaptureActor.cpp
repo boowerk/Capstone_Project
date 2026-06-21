@@ -4,7 +4,9 @@
 #include "Components/SceneComponent.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
 #include "Kismet/GameplayStatics.h"
+#include "PCGComponent.h"
 #include "RHI.h"
 #include "RHICommandList.h"
 #include "RHIUtilities.h"
@@ -112,45 +114,13 @@ void AGP_MinimapCaptureActor::BeginPlay()
 		}
 	}
 
-	if (bStartFollowingPlayer)
-	{
-		SetFollowTarget(ResolveDefaultFollowTarget());
-		CaptureAroundTarget(FollowTargetActor);
-	}
-	else
-	{
-		CaptureFullMap(DefaultBoundsActor);
-	}
+	// PCG owns the one-shot capture timing; BeginPlay only prepares the stable HUD texture.
 }
 
 void AGP_MinimapCaptureActor::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	AdvanceFrameTransfer();
-
-	// Full-map capture is event-driven. Ticking it used the elevated camera as the next ground center and added CaptureHeight every interval.
-	if (CaptureMode != EGPMinimapCaptureMode::FollowTarget)
-	{
-		return;
-	}
-
-	if (!IsValid(FollowTargetActor))
-	{
-		SetFollowTarget(ResolveDefaultFollowTarget());
-		if (!IsValid(FollowTargetActor))
-		{
-			return;
-		}
-	}
-
-	FollowCaptureAccumulator += DeltaSeconds;
-	if (FollowCaptureAccumulator < FollowCaptureInterval)
-	{
-		return;
-	}
-
-	FollowCaptureAccumulator = 0.0f;
-	CaptureForCurrentMode();
 }
 
 void AGP_MinimapCaptureActor::InitializeCapture()
@@ -192,6 +162,8 @@ void AGP_MinimapCaptureActor::CaptureFullMap(AActor* BoundsActor)
 	InitializeCapture();
 
 	CaptureMode = EGPMinimapCaptureMode::FullMap;
+	bFullMapCaptureReady = false;
+	bFullMapCapturePending = true;
 	if (IsValid(BoundsActor))
 	{
 		DefaultBoundsActor = BoundsActor;
@@ -211,7 +183,11 @@ void AGP_MinimapCaptureActor::CaptureFullMap(AActor* BoundsActor)
 	}
 
 	// 전체 지도는 북쪽 고정 캡처를 유지해 플레이어 화살표 회전과 기준축이 안정적으로 맞습니다.
-	ApplyTopDownTransform(CaptureCenter, DesiredOrthoWidth, 0.0f);
+	// Store the exact camera mapping so HUD UV conversion uses the same center, width, and yaw as this capture.
+	CapturedMapCenter = CaptureCenter;
+	CapturedMapOrthoWidth = DesiredOrthoWidth;
+	CapturedMapYaw = 0.0f;
+	ApplyTopDownTransform(CaptureCenter, DesiredOrthoWidth, CapturedMapYaw);
 	RequestCapture();
 }
 
@@ -240,6 +216,7 @@ void AGP_MinimapCaptureActor::SetFollowTarget(AActor* TargetActor)
 void AGP_MinimapCaptureActor::RequestCapture()
 {
 	InitializeCapture();
+	SetActorTickEnabled(true);
 	AdvanceFrameTransfer();
 
 	if (FrameTransferState != EFrameTransferState::Idle || !SceneCapture || !IsValid(CaptureBackBuffer))
@@ -247,6 +224,8 @@ void AGP_MinimapCaptureActor::RequestCapture()
 		return;
 	}
 
+	// Reactivate only for an explicit capture request; the component sleeps after the one-shot GPU copy completes.
+	SceneCapture->Activate();
 	SceneCapture->TextureTarget = CaptureBackBuffer;
 	SceneCapture->CaptureScene();
 	// The GPU fence is written after CaptureScene; keep the existing front buffer if the fence cannot be armed.
@@ -258,13 +237,45 @@ void AGP_MinimapCaptureActor::RequestCapture()
 
 FBox AGP_MinimapCaptureActor::ResolveBounds(AActor* BoundsActor) const
 {
-	if (!IsValid(BoundsActor))
+	if (IsValid(BoundsActor))
 	{
-		return FBox(ForceInit);
+		return BoundsActor->GetComponentsBoundingBox(true);
 	}
 
 	// PCG 결과를 예측하지 않고, 현재 월드에 실제 배치된 BoundsActor의 컴포넌트 범위를 사용합니다.
-	return BoundsActor->GetComponentsBoundingBox(true);
+	FBox GeneratedBounds(ForceInit);
+	if (UWorld* World = GetWorld())
+	{
+		for (TActorIterator<AActor> It(World); It; ++It)
+		{
+			if (It->FindComponentByClass<UPCGComponent>())
+			{
+				// Generated ISM components live on PCG owners, so their runtime bounds define the map footprint.
+				GeneratedBounds += It->GetComponentsBoundingBox(true);
+			}
+		}
+	}
+
+	return GeneratedBounds;
+}
+
+bool AGP_MinimapCaptureActor::WorldToMapUV(const FVector& WorldLocation, FVector2D& OutMapUV) const
+{
+	if (CapturedMapOrthoWidth <= KINDA_SMALL_NUMBER)
+	{
+		OutMapUV = FVector2D(0.5f, 0.5f);
+		return false;
+	}
+
+	const FRotator CaptureRotation(-90.0f, CapturedMapYaw, 0.0f);
+	const FVector ViewRight = CaptureRotation.RotateVector(FVector::RightVector);
+	const FVector ViewUp = CaptureRotation.RotateVector(FVector::UpVector);
+	const FVector Delta = WorldLocation - CapturedMapCenter;
+
+	// U grows along camera-right while texture V grows opposite camera-up.
+	OutMapUV.X = 0.5f + (FVector::DotProduct(Delta, ViewRight) / CapturedMapOrthoWidth);
+	OutMapUV.Y = 0.5f - (FVector::DotProduct(Delta, ViewUp) / CapturedMapOrthoWidth);
+	return true;
 }
 
 AActor* AGP_MinimapCaptureActor::ResolveDefaultFollowTarget() const
@@ -370,6 +381,20 @@ void AGP_MinimapCaptureActor::AdvanceFrameTransfer()
 	// The HUD remains bound to the same front RenderTarget object, so no Slate brush rebind is required here.
 	FrameTransferState = EFrameTransferState::Idle;
 	CaptureCompletionFence->Reset();
+
+	if (bFullMapCapturePending)
+	{
+		bFullMapCapturePending = false;
+		bFullMapCaptureReady = true;
+		if (SceneCapture)
+		{
+			// No scene rendering is needed after PCG's completed map reaches the stable display texture.
+			SceneCapture->Deactivate();
+			SceneCapture->SetComponentTickEnabled(false);
+		}
+		OnMapCaptureReady.Broadcast();
+		SetActorTickEnabled(false);
+	}
 }
 
 bool AGP_MinimapCaptureActor::QueueCapturedFrameToDisplay()
@@ -445,8 +470,8 @@ void AGP_MinimapCaptureActor::CaptureForCurrentMode()
 
 	if (CaptureMode == EGPMinimapCaptureMode::FollowTarget && IsValid(FollowTargetActor))
 	{
-		const float CaptureYaw = bRotateCaptureWithTarget ? FollowTargetActor->GetActorRotation().Yaw : 0.0f;
-		ApplyTopDownTransform(FollowTargetActor->GetActorLocation(), FollowOrthoWidth, CaptureYaw);
+		// Legacy manual follow requests remain callable, but no periodic SceneCapture tick is scheduled.
+		ApplyTopDownTransform(FollowTargetActor->GetActorLocation(), FollowOrthoWidth, 0.0f);
 		RequestCapture();
 		return;
 	}
@@ -456,8 +481,7 @@ void AGP_MinimapCaptureActor::CaptureForCurrentMode()
 		SetFollowTarget(ResolveDefaultFollowTarget());
 		if (IsValid(FollowTargetActor))
 		{
-			const float CaptureYaw = bRotateCaptureWithTarget ? FollowTargetActor->GetActorRotation().Yaw : 0.0f;
-			ApplyTopDownTransform(FollowTargetActor->GetActorLocation(), FollowOrthoWidth, CaptureYaw);
+			ApplyTopDownTransform(FollowTargetActor->GetActorLocation(), FollowOrthoWidth, 0.0f);
 			RequestCapture();
 			return;
 		}
