@@ -130,10 +130,13 @@ bool FCrystalSeraphPrismClusterTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Prism pattern lays three crystals"), PrismActors.Num(), 3);
 	for (int32 LeftIndex = 0; LeftIndex < PrismActors.Num(); ++LeftIndex)
 	{
+		const AGP_CrystalPrismActor* PrismActor = Cast<AGP_CrystalPrismActor>(PrismActors[LeftIndex]);
 		const UStaticMeshComponent* PrismMesh = PrismActors[LeftIndex]->FindComponentByClass<UStaticMeshComponent>();
 		const USphereComponent* PrismCollision = PrismActors[LeftIndex]->FindComponentByClass<USphereComponent>();
 		TestTrue(TEXT("Crystal visual is larger than the previous prototype"), IsValid(PrismMesh) && PrismMesh->GetRelativeScale3D().X >= 2.0f);
 		TestTrue(TEXT("Crystal reflection collision matches its larger visual"), IsValid(PrismCollision) && PrismCollision->GetUnscaledSphereRadius() >= 150.0f);
+		TestTrue(TEXT("Crystal remains upright after ring placement"), IsValid(PrismActor) && FMath::IsNearlyZero(PrismActor->GetActorRotation().Pitch) && FMath::IsNearlyZero(PrismActor->GetActorRotation().Roll));
+		TestTrue(TEXT("Persistent aura stays smaller than the crystal prototype"), IsValid(PrismActor) && PrismActor->GetPrismAuraScale().GetMax() < 1.0f);
 
 		for (int32 RightIndex = LeftIndex + 1; RightIndex < PrismActors.Num(); ++RightIndex)
 		{
