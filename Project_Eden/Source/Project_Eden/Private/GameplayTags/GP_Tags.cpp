@@ -224,6 +224,11 @@ namespace GPTags
         {
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Trail_Magic, "GameplayCue.Ability.Trail.Magic", "Ability magic trail VFX cue");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Burst_Magic, "GameplayCue.Ability.Burst.Magic", "Ability magic burst VFX cue");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Cast_Magic, "GameplayCue.Ability.Cast.Magic", "Ability magic cast VFX cue");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Active_Magic, "GameplayCue.Ability.Active.Magic", "Ability persistent magic VFX cue");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Impact_Magic, "GameplayCue.Ability.Impact.Magic", "Ability magic impact VFX cue");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Telegraph_Magic, "GameplayCue.Ability.Telegraph.Magic", "Ability magic telegraph VFX cue");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Reflect_Magic, "GameplayCue.Ability.Reflect.Magic", "Ability magic reflection VFX cue");
         }
     }
 
