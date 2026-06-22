@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-06-23T07:43:00+09:00
+updated: 2026-06-23T07:59:00+09:00
 status: active
 tags:
   - memoc
@@ -11,12 +11,12 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-06-23T07:43:00+09:00
+Last synced: 2026-06-23T07:59:00+09:00
 
 ## Current Status
 
 - `/Game/Maps/MainMap/L_LandscapeMap` now contains a completed Landscape Sculpt terrain pass (`58c9391e`, `086dadc5`): broad western and central/eastern highlands, northern peaks, coastal ridges, cliff-like mesas, playable flattened zones, a west/central separating valley, internal low routes, erosion detail, and a lower southern bay. It intentionally remains material-, water-, road-, and foliage-free for later environment passes.
-- Dark Armor Knight is a native GAS boss prototype using shared `BT_BossCommon`/`BB_BossCommon`. `BP_DarkArmorKnight` uses `SK_KnightBoss`; dedicated GAS abilities/actors cover Basic, Heavy, Sweep, Guard, Counter, Charge, DarkWave, GroundCrack, and Groggy. The replicated charge coordinator now auto-plays `/Game/Niagara/Vefects/Easy_Impact_Frames/VFX/Extras/Particles/NS_Extra_Lightning_Example_VFX` at the boss transform, waits the existing 0.9s telegraph, then starts the root-motion charge. Editor build and charge VFX automation pass; PIE timing/scale remain.
+- Dark Armor Knight is a native GAS boss prototype using shared `BT_BossCommon`/`BB_BossCommon`. Its charge coordinator uses reusable `UGP_BossTelegraphVFXComponent`, which defaults to `NS_Extra_Lightning_Example_VFX`, uniform scale 1.35, and 0.9s lead time before root-motion charge. Designers can add `Boss Telegraph VFX` to any BP and edit Niagara System Asset, Auto Activate, Uniform Visual Scale, and Telegraph Duration; it is not automatically connected to other boss patterns. Editor build and charge VFX automation pass.
 - Minimap is now a one-shot PCG map pipeline (`a88bfee6`, `b3652834`, `e6806c69`): after PCG reports ready and stays idle for three polls, one orthographic full-map frame is captured from runtime PCG bounds, GPU-copied to the stable HUD RenderTarget, then SceneCapture and actor tick are disabled. `M_UI_Minimap_StaticMap` pans/zooms that fixed texture from C++ world-to-UV mapping; the player arrow and pooled `T_UI_Minimap_Point_Red` enemy Images remain separate UMG widgets.
 - Enemy leash uses anchor hysteresis: crossing `ReturnHomeDistance` starts return even with a target; after returning inside 75% of that distance, a visible player interrupts return and reopens combat.
 - Basic melee, ranged, and flying enemies inherit a native screen-space `WorldHealthBarComponent` from `AGP_EnemyCharacter`. It uses `WBP_EnemyHealthBar`, tracks GAS Health/MaxHealth, stays visible at full health, and hides on death; bosses keep the dedicated HUD bar.

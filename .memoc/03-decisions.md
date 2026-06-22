@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-06-23T07:43:00+09:00
+updated: 2026-06-23T07:59:00+09:00
 status: active
 tags:
   - memoc
@@ -57,7 +57,7 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 ### 2026-06-23
 - Ground Hands floor placement traces only WorldStatic geometry, never pawns. Keep the skeletal hand hidden for the entire decal warning and reveal it when rise begins; the native box remains the sole hit authority.
 - Production boss danger ranges use floor decals rather than `DrawDebug` geometry. Sans Sweep uses one parameterized fan decal whose radius and angle mirror the real forward-arc hit calculation.
-- Dark Knight charge telegraph VFX lives on the replicated charge coordinator as an auto-activated Niagara component. Reuse the existing telegraph delay so all clients see the lightning before server-authoritative charge activation.
+- Boss telegraph Niagara presentation is reusable through editor-addable `UGP_BossTelegraphVFXComponent`; asset, auto activation, uniform scale, and lead time remain designer settings. Dark Knight Charge uses it, but do not auto-wire it into other patterns.
 - Supersede periodic FollowTarget minimap capture with one post-PCG full-map capture. Keep the resulting RenderTarget fixed, disable SceneCapture after its fenced GPU copy, and move pan/zoom plus player/enemy marker presentation into C++/UMG.
 
 ### 2026-06-22
