@@ -26,6 +26,7 @@
 #include "NavigationSystem.h"
 #include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
+#include "VFX/GP_BossTelegraphVFXComponent.h"
 
 AGP_CrystalSeraphBossCharacter::AGP_CrystalSeraphBossCharacter()
 {
@@ -33,6 +34,10 @@ AGP_CrystalSeraphBossCharacter::AGP_CrystalSeraphBossCharacter()
 	BossDisplayName = NSLOCTEXT("GPCrystalSeraphBoss", "BossDisplayName", "Crystal Seraph");
 
 	CrystalSeraphStateComponent = CreateDefaultSubobject<UGP_CrystalSeraphStateComponent>(TEXT("CrystalSeraphStateComponent"));
+	// Pattern abilities explicitly start this component, so spawning the boss never fires a stray cue.
+	BossTelegraphVFXComponent = CreateDefaultSubobject<UGP_BossTelegraphVFXComponent>(TEXT("BossTelegraphVFXComponent"));
+	BossTelegraphVFXComponent->SetupAttachment(GetRootComponent());
+	BossTelegraphVFXComponent->SetAutoActivate(false);
 	CrystalPrismActorClass = AGP_CrystalPrismActor::StaticClass();
 	SeraphLaserActorClass = AGP_SeraphLaserActor::StaticClass();
 	WingCoreHitActorClass = AGP_WingCoreHitActor::StaticClass();
