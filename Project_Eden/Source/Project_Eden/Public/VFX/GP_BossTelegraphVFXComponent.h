@@ -19,6 +19,19 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Boss|Telegraph")
 	void StopTelegraph();
 
+	/** Plays the configured Niagara cue only when the designer-facing toggle is enabled and returns its lead time. */
+	UFUNCTION(BlueprintCallable, Category = "Boss|Telegraph")
+	float PlayEnabledTelegraph();
+
+	UFUNCTION(BlueprintPure, Category = "Boss|Telegraph")
+	bool IsTelegraphVFXEnabled() const { return bTelegraphVFXEnabled; }
+
+	UFUNCTION(BlueprintCallable, Category = "Boss|Telegraph")
+	void SetTelegraphVFXEnabled(bool bEnabled) { bTelegraphVFXEnabled = bEnabled; }
+
+	UFUNCTION(BlueprintPure, Category = "Boss|Telegraph")
+	float GetEnabledTelegraphDuration() const { return bTelegraphVFXEnabled ? GetTelegraphDuration() : 0.0f; }
+
 	UFUNCTION(BlueprintPure, Category = "Boss|Telegraph")
 	float GetTelegraphDuration() const { return TelegraphDuration; }
 
@@ -37,6 +50,15 @@ protected:
 
 private:
 	void ApplyPresentationSettings();
+	void PlayTelegraphLocal();
+
+	/** Boss actors already replicate, so the inherited component can fan the cue out to every relevant client. */
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastPlayTelegraph();
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Boss|Telegraph",
+		meta = (AllowPrivateAccess = "true", DisplayName = "Telegraph VFX On/Off"))
+	bool bTelegraphVFXEnabled = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Boss|Telegraph",
 		meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "s"))

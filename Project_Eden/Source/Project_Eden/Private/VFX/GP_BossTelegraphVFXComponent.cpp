@@ -1,11 +1,14 @@
 #include "VFX/GP_BossTelegraphVFXComponent.h"
 
+#include "GameFramework/Actor.h"
 #include "NiagaraSystem.h"
 #include "UObject/ConstructorHelpers.h"
 
 UGP_BossTelegraphVFXComponent::UGP_BossTelegraphVFXComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
+	// Native boss-owned instances use a designer toggle; replication lets the server start the same cue for all clients.
+	SetIsReplicatedByDefault(true);
 	SetAutoActivate(true);
 
 	// Supply the requested lightning as a reusable default while keeping System Asset editable per Blueprint instance.
@@ -20,6 +23,37 @@ UGP_BossTelegraphVFXComponent::UGP_BossTelegraphVFXComponent()
 }
 
 void UGP_BossTelegraphVFXComponent::PlayTelegraph()
+{
+	PlayTelegraphLocal();
+}
+
+float UGP_BossTelegraphVFXComponent::PlayEnabledTelegraph()
+{
+	if (!bTelegraphVFXEnabled)
+	{
+		return 0.0f;
+	}
+
+	AActor* OwnerActor = GetOwner();
+	if (IsValid(OwnerActor) && OwnerActor->HasAuthority())
+	{
+		MulticastPlayTelegraph();
+	}
+	else
+	{
+		// Editor previews and non-networked component instances still need an immediate local path.
+		PlayTelegraphLocal();
+	}
+
+	return FMath::Max(0.0f, TelegraphDuration);
+}
+
+void UGP_BossTelegraphVFXComponent::MulticastPlayTelegraph_Implementation()
+{
+	PlayTelegraphLocal();
+}
+
+void UGP_BossTelegraphVFXComponent::PlayTelegraphLocal()
 {
 	if (!GetAsset() && IsValid(DefaultTelegraphSystem))
 	{
