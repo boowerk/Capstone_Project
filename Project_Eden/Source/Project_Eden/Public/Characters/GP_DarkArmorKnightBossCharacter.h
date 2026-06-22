@@ -25,7 +25,7 @@ public:
 	UGP_DarkArmorKnightStateComponent* GetDarkKnightStateComponent() const { return DarkKnightStateComponent; }
 
 	UFUNCTION(BlueprintPure, Category = "Boss|Dark Knight|VFX")
-	UGP_BossTelegraphVFXComponent* GetBossTelegraphVFXComponent() const { return BossTelegraphVFXComponent; }
+	UGP_BossTelegraphVFXComponent* GetBossTelegraphVFXComponent() const;
 
 	UFUNCTION(BlueprintPure, Category = "Boss|Dark Knight")
 	int32 GetDarkKnightPhase() const;
@@ -97,10 +97,6 @@ private:
 private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Dark Knight", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UGP_DarkArmorKnightStateComponent> DarkKnightStateComponent;
-
-	/** Inherited by the boss Blueprint so designers can select the Niagara cue and toggle it without graph code. */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Dark Knight|VFX", meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UGP_BossTelegraphVFXComponent> BossTelegraphVFXComponent;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Dark Knight|Actors", meta = (AllowPrivateAccess = "true"))
 	TSubclassOf<AGP_DarkWaveProjectile> DarkWaveProjectileClass;

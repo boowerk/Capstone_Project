@@ -25,6 +25,8 @@ AGP_DarkKnightChargeActor::AGP_DarkKnightChargeActor()
 	// Reusable designer component exposes its Niagara asset, scale, auto-activation, and lead time in Blueprint Details.
 	ChargeTelegraphVFXComponent = CreateDefaultSubobject<UGP_BossTelegraphVFXComponent>(TEXT("ChargeTelegraphVFXComponent"));
 	ChargeTelegraphVFXComponent->SetupAttachment(SceneRoot);
+	// The legacy charge coordinator intentionally auto-plays its own cue; boss-level components remain opt-in.
+	ChargeTelegraphVFXComponent->SetTelegraphVFXEnabled(true);
 
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMeshFinder(TEXT("/Engine/BasicShapes/Cube.Cube"));
 	if (CubeMeshFinder.Succeeded())

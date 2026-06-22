@@ -43,6 +43,7 @@ public:
 
 protected:
 	virtual void OnRegister() override;
+	virtual void Activate(bool bReset = false) override;
 
 #if WITH_EDITOR
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
@@ -71,4 +72,7 @@ private:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Telegraph",
 		meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UNiagaraSystem> DefaultTelegraphSystem;
+
+	// Internal guard lets explicit calls bypass the toggle while automatic activation still respects it.
+	bool bExplicitActivationInProgress = false;
 };

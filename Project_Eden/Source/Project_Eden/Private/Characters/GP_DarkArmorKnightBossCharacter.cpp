@@ -36,10 +36,6 @@ AGP_DarkArmorKnightBossCharacter::AGP_DarkArmorKnightBossCharacter()
 	BossDisplayName = NSLOCTEXT("GPDarkArmorKnightBoss", "BossDisplayName", "Dark Armor Knight");
 
 	DarkKnightStateComponent = CreateDefaultSubobject<UGP_DarkArmorKnightStateComponent>(TEXT("DarkKnightStateComponent"));
-	// Boss Blueprints inherit this inactive component and opt in through Telegraph VFX On/Off.
-	BossTelegraphVFXComponent = CreateDefaultSubobject<UGP_BossTelegraphVFXComponent>(TEXT("BossTelegraphVFXComponent"));
-	BossTelegraphVFXComponent->SetupAttachment(GetRootComponent());
-	BossTelegraphVFXComponent->SetAutoActivate(false);
 	DarkWaveProjectileClass = AGP_DarkWaveProjectile::StaticClass();
 	GroundCrackActorClass = AGP_DarkKnightGroundCrackActor::StaticClass();
 	ChargeActorClass = AGP_DarkKnightChargeActor::StaticClass();
@@ -127,6 +123,12 @@ void AGP_DarkArmorKnightBossCharacter::EndPlay(const EEndPlayReason::Type EndPla
 	}
 	PatternTimerHandles.Reset();
 	Super::EndPlay(EndPlayReason);
+}
+
+UGP_BossTelegraphVFXComponent* AGP_DarkArmorKnightBossCharacter::GetBossTelegraphVFXComponent() const
+{
+	// BP_DarkArmorKnight already owns the designer-added component, so reuse it instead of creating a duplicate native node.
+	return FindComponentByClass<UGP_BossTelegraphVFXComponent>();
 }
 
 int32 AGP_DarkArmorKnightBossCharacter::GetDarkKnightPhase() const
@@ -396,8 +398,9 @@ bool AGP_DarkArmorKnightBossCharacter::StartPatternWithWindup(FGameplayTag Patte
 	}
 
 	// Groggy is a state reaction, not an authored attack, so it deliberately bypasses the optional VFX lead-in.
-	const float TelegraphDelay = PatternTag != GPTags::Ability::Boss::DarkKnight::Groggy && IsValid(BossTelegraphVFXComponent)
-		? BossTelegraphVFXComponent->PlayEnabledTelegraph()
+	UGP_BossTelegraphVFXComponent* TelegraphComponent = GetBossTelegraphVFXComponent();
+	const float TelegraphDelay = PatternTag != GPTags::Ability::Boss::DarkKnight::Groggy && IsValid(TelegraphComponent)
+		? TelegraphComponent->PlayEnabledTelegraph()
 		: 0.0f;
 	const float WindupDelay = bWindupStarted ? FMath::Max(0.0f, PreAttackDuration) : 0.0f;
 	const float ExecutionDelay = FMath::Max(WindupDelay, TelegraphDelay);

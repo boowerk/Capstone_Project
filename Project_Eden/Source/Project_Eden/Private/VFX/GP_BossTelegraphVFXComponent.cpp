@@ -60,7 +60,9 @@ void UGP_BossTelegraphVFXComponent::PlayTelegraphLocal()
 		SetAsset(DefaultTelegraphSystem);
 	}
 	ApplyPresentationSettings();
+	bExplicitActivationInProgress = true;
 	Activate(true);
+	bExplicitActivationInProgress = false;
 }
 
 void UGP_BossTelegraphVFXComponent::StopTelegraph()
@@ -77,6 +79,18 @@ void UGP_BossTelegraphVFXComponent::OnRegister()
 	}
 	Super::OnRegister();
 	ApplyPresentationSettings();
+}
+
+void UGP_BossTelegraphVFXComponent::Activate(bool bReset)
+{
+	if (!bTelegraphVFXEnabled && !bExplicitActivationInProgress)
+	{
+		// Telegraph VFX On/Off remains authoritative when an older Blueprint serialized Auto Activate as true.
+		DeactivateImmediate();
+		return;
+	}
+
+	Super::Activate(bReset);
 }
 
 #if WITH_EDITOR
