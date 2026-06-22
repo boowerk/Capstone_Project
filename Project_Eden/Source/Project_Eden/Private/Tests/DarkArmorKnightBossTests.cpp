@@ -153,6 +153,7 @@ bool FDarkArmorKnightChargeTelegraphVFXTest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("Charge telegraph component loads the lightning system"), TelegraphSystem);
 	if (IsValid(TelegraphVFX))
 	{
+		TestTrue(TEXT("Legacy charge telegraph explicitly opts into automatic playback"), TelegraphVFX->IsTelegraphVFXEnabled());
 		TestTrue(TEXT("Charge lightning auto-activates when the coordinator spawns"), TelegraphVFX->bAutoActivate);
 		TestEqual(TEXT("Charge lightning uses the enlarged reusable scale"), TelegraphVFX->GetUniformVisualScale(), 1.35f);
 		TestEqual(TEXT("Charge waits for the component telegraph duration"), TelegraphVFX->GetTelegraphDuration(), 0.9f);
