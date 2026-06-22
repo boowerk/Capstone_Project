@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-06-23T04:54:00+09:00
+updated: 2026-06-23T05:13:00+09:00
 status: active
 tags:
   - memoc
@@ -11,7 +11,7 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-06-23T04:54:00+09:00
+Last synced: 2026-06-23T05:13:00+09:00
 
 ## Dark Armor Knight Boss Handoff
 
@@ -54,6 +54,7 @@ Last synced: 2026-06-23T04:54:00+09:00
 - Commits `72ed5c6c`, `d7cc3dc4`, and `7a25612b` replace the primitive hand with `/Game/Meshes/PLAZA_DE_TOROS/ActorMesh/SK_RightHand`, remove legacy static-mesh placeholders, and preserve the independent box hit settings. The previously stale editor DLL was fully relinked; `ProjectEden.AI.Boss.GroundHands.UsesRightHandMesh` passes.
 - Commits `8763987f`, `23bbe52d`, and `dfb4ea20` add presentation-only Scale/Offset/Rotation controls, create `/Game/Characters/EnemyCharacter/Boss/BP_Boss_Sans/BP_BossGroundHandActor` at scale 0.35, and route the GAS ability through it. The BP can be tuned in Class Defaults; collision remains native and unchanged. Editor build and both `ProjectEden.AI.Boss.GroundHands` tests pass.
 - Commits `4ba556b5`, `9174e93a`, and `6f31e9a4` keep the center hand's floor trace from hitting the player capsule, preserve every warning decal, and hide each hand mesh until its rise begins. The scale test now permits later BP art tuning while requiring a positive reduced scale. Editor build and both GroundHands tests pass.
+- Commits `797ba8c7`, `c3c0f458`, and `13707ad9` replace Sans Sweep debug lines with `/Game/Effects/M_BossSweepTelegraph_Decal`, a dynamic red fan decal matching the attack radius/angle. Editor build and `ProjectEden.AI.Boss.Sweep.UsesFloorDecal` pass; PIE-check forward orientation and projection across sloped ground.
 - Full `Project_EdenEditor Win64 Development` build and `ProjectEden.AI.Boss.PatternSelector.SansGroundHands` passed. PIE still needs visual timing, decal projection, hit collision, damage, and vertical launch/fall verification.
 - The broader `ScoreCases` test still has an unrelated existing Matador expectation mismatch (Cape expected, Rapier selected); the Sans-specific test is isolated and green.
 
@@ -190,6 +191,7 @@ _None yet._
 ## Not Verified
 
 - 2026-06-23 Sans Ground Hands decal/visibility fixes are built and automated coverage passes; PIE-check all three decals per wave and confirm each hand appears only as its rise begins.
+- 2026-06-23 Sans Sweep fan decal is built and automated coverage passes; PIE-check that the fan points forward and visually matches the 165-degree damage arc on uneven terrain.
 - 2026-06-17 basic enemy templates: C++ build succeeded and BP templates were created, but PIE runtime behavior still needs checking for common BT chase/attack transitions, ranged hit distance, and flying movement/pathing.
 - 2026-06-17 UE Python commandlet created the Basic enemy BP assets successfully but returned failure because existing `Content/Maps/DemoMap/TestMap.umap` is unloadable (`Invalid value for PACKAGE_FILE_TAG`).
 - 2026-06-14 generic boss Attack task routing: `Project_EdenEditor Win64 Development` build succeeded, but PIE still needs checking. Expected log from a stale generic Attack node is `[BossAI] Generic attack task routed through boss pattern selector...`.

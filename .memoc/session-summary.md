@@ -2,20 +2,20 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-06-23T04:54:00+09:00
+updated: 2026-06-23T05:13:00+09:00
 status: active
 ---
 # Session Summary
 
 ## Status
-- Ground Hands center-floor trace now ignores the player by querying WorldStatic only; its second decal stays on the real floor.
-- Each hand mesh is hidden for the full warning and revealed on the first rise frame.
-- BP visual tuning remains supported; hit-box position, timing, damage, and launch are unchanged.
+- Sans Sweep warning now uses `/Game/Effects/M_BossSweepTelegraph_Decal`, not debug lines.
+- The dynamic red fan mirrors the real attack radius and angle, projects onto WorldStatic, and retains the 0.85s warning timing.
+- Ground Hands warning and hit behavior remain unchanged.
 
 ## Verified
 - `Project_EdenEditor Win64 Development` passed.
-- Both `ProjectEden.AI.Boss.GroundHands` tests passed.
+- `ProjectEden.AI.Boss.Sweep.UsesFloorDecal` passed.
 
 ## Resume
-- PIE-check all three decals and reveal timing on uneven terrain.
+- PIE-check fan orientation and slope projection. No editor assignment is required.
 - Preserve user changes in `DefaultEditor.ini`, `L_MainMap.umap`, and `WBP_PlayerHUDWidget.uasset`.
