@@ -2,20 +2,20 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-06-23T04:04:00+09:00
+updated: 2026-06-23T04:39:00+09:00
 status: active
 ---
 # Session Summary
 
 ## Status
-- Sans Ground Hands presents `/Game/Meshes/PLAZA_DE_TOROS/ActorMesh/SK_RightHand`; the actual asset/object name is `SK_RightHand`, not `SK_RightMesh`.
-- The old editor DLL caused the apparent failed swap. Full editor relink now succeeds.
-- Regression test also preserves the independent box location, extent, disabled-until-rise state, and Pawn overlap response (`7a25612b`).
+- Sans Ground Hands now spawns `/Game/Characters/EnemyCharacter/Boss/BP_Boss_Sans/BP_BossGroundHandActor`.
+- BP defaults `Hand Visual Scale` to `0.35`; Scale, Offset, and Rotation are editable under `Boss > Ground Hands > Visual`.
+- Native box collision, damage, launch, timing, and motion are unchanged.
 
 ## Verified
-- `Project_EdenEditor Win64 Development` build passed.
-- `ProjectEden.AI.Boss.GroundHands.UsesRightHandMesh` passed.
+- `Project_EdenEditor Win64 Development` passed.
+- `ProjectEden.AI.Boss.GroundHands.UsesRightHandMesh` and `UsesVisualBlueprint` passed.
 
 ## Resume
-- PIE-check visual orientation/scale and emergence. No editor assignment is required.
+- Open the BP, adjust Class Defaults, compile/save, then PIE-check alignment.
 - Preserve user changes in `DefaultEditor.ini`, `L_MainMap.umap`, and `WBP_PlayerHUDWidget.uasset`.

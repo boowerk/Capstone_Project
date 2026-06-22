@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-06-23T04:04:00+09:00
+updated: 2026-06-23T04:39:00+09:00
 status: active
 tags:
   - memoc
@@ -11,7 +11,7 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-06-23T04:04:00+09:00
+Last synced: 2026-06-23T04:39:00+09:00
 
 ## Dark Armor Knight Boss Handoff
 
@@ -52,6 +52,7 @@ Last synced: 2026-06-23T04:04:00+09:00
 - Commit `e080f16c` updates `UGP_BossSummonAdds` to spawn `Basic/BP_BasicEnemy_Melee`; full editor build passed and startup logs showed no class-finder failure for the new path.
 - Commits `f4e75d83` and `8a7fbc60` add the native strike actor plus `Attack_BossGroundHands` GAS ability/selector/default grant. Defaults are 3 hands per wave, 3 waves, 0.22s hand stagger, 1.55s wave interval, 0.75s red decal warning, and 8s ability cooldown.
 - Commits `72ed5c6c`, `d7cc3dc4`, and `7a25612b` replace the primitive hand with `/Game/Meshes/PLAZA_DE_TOROS/ActorMesh/SK_RightHand`, remove legacy static-mesh placeholders, and preserve the independent box hit settings. The previously stale editor DLL was fully relinked; `ProjectEden.AI.Boss.GroundHands.UsesRightHandMesh` passes.
+- Commits `8763987f`, `23bbe52d`, and `dfb4ea20` add presentation-only Scale/Offset/Rotation controls, create `/Game/Characters/EnemyCharacter/Boss/BP_Boss_Sans/BP_BossGroundHandActor` at scale 0.35, and route the GAS ability through it. The BP can be tuned in Class Defaults; collision remains native and unchanged. Editor build and both `ProjectEden.AI.Boss.GroundHands` tests pass.
 - Full `Project_EdenEditor Win64 Development` build and `ProjectEden.AI.Boss.PatternSelector.SansGroundHands` passed. PIE still needs visual timing, decal projection, hit collision, damage, and vertical launch/fall verification.
 - The broader `ScoreCases` test still has an unrelated existing Matador expectation mismatch (Cape expected, Rapier selected); the Sans-specific test is isolated and green.
 
@@ -187,7 +188,7 @@ _None yet._
 
 ## Not Verified
 
-- 2026-06-23 Sans Ground Hands mesh swap is built and automated coverage passes; PIE-check only reference-pose orientation, scale, floor emergence, and visible box-hit alignment.
+- 2026-06-23 Sans Ground Hands visual BP is built and automated coverage passes; PIE-check the 0.35 starting scale, reference-pose orientation, floor emergence, and visible box-hit alignment.
 - 2026-06-17 basic enemy templates: C++ build succeeded and BP templates were created, but PIE runtime behavior still needs checking for common BT chase/attack transitions, ranged hit distance, and flying movement/pathing.
 - 2026-06-17 UE Python commandlet created the Basic enemy BP assets successfully but returned failure because existing `Content/Maps/DemoMap/TestMap.umap` is unloadable (`Invalid value for PACKAGE_FILE_TAG`).
 - 2026-06-14 generic boss Attack task routing: `Project_EdenEditor Win64 Development` build succeeded, but PIE still needs checking. Expected log from a stale generic Attack node is `[BossAI] Generic attack task routed through boss pattern selector...`.
