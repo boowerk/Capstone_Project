@@ -4,6 +4,8 @@
 #include "Characters/GP_DarkArmorKnightBossCharacter.h"
 #include "Components/StaticMeshComponent.h"
 #include "GameplayEffect.h"
+#include "NiagaraComponent.h"
+#include "NiagaraSystem.h"
 #include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
 
@@ -21,10 +23,22 @@ AGP_DarkKnightChargeActor::AGP_DarkKnightChargeActor()
 	TelegraphMesh->SetRelativeLocation(FVector(800.0f, 0.0f, 12.0f));
 	TelegraphMesh->SetRelativeScale3D(FVector(16.0f, 3.6f, 0.04f));
 
+	// The replicated charge actor starts at the boss transform, so every client receives the same lightning tell.
+	ChargeTelegraphVFXComponent = CreateDefaultSubobject<UNiagaraComponent>(TEXT("ChargeTelegraphVFXComponent"));
+	ChargeTelegraphVFXComponent->SetupAttachment(SceneRoot);
+	ChargeTelegraphVFXComponent->SetAutoActivate(true);
+
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMeshFinder(TEXT("/Engine/BasicShapes/Cube.Cube"));
 	if (CubeMeshFinder.Succeeded())
 	{
 		TelegraphMesh->SetStaticMesh(CubeMeshFinder.Object);
+	}
+
+	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> ChargeTelegraphVFXFinder(
+		TEXT("/Game/Niagara/Vefects/Easy_Impact_Frames/VFX/Extras/Particles/NS_Extra_Lightning_Example_VFX.NS_Extra_Lightning_Example_VFX"));
+	if (ChargeTelegraphVFXFinder.Succeeded())
+	{
+		ChargeTelegraphVFXComponent->SetAsset(ChargeTelegraphVFXFinder.Object);
 	}
 
 	static ConstructorHelpers::FClassFinder<UGameplayEffect> DamageEffectFinder(TEXT("/Game/GAS_Pattern/AbilitySystem/GameplayEffects/Damage/GE_PrimaryDamage"));
@@ -55,6 +69,7 @@ void AGP_DarkKnightChargeActor::InitializeCharge(AGP_DarkArmorKnightBossCharacte
 	SetActorLocation(Boss->GetActorLocation());
 	SetActorRotation(ChargeDirection.Rotation());
 	Boss->SetActorRotation(ChargeDirection.Rotation());
+	// Lightning lands during the existing telegraph delay; StartCharge remains gated by TelegraphDuration below.
 	BP_OnChargeTelegraphStarted();
 
 	if (UWorld* World = GetWorld())

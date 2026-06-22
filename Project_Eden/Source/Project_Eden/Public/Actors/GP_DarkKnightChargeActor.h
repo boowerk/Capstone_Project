@@ -6,6 +6,7 @@
 
 class AGP_DarkArmorKnightBossCharacter;
 class UGameplayEffect;
+class UNiagaraComponent;
 class USphereComponent;
 class UStaticMeshComponent;
 
@@ -41,6 +42,9 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Dark Knight", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UStaticMeshComponent> TelegraphMesh;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Dark Knight|VFX", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UNiagaraComponent> ChargeTelegraphVFXComponent;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Dark Knight", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "s"))
 	float TelegraphDuration = 0.9f;
