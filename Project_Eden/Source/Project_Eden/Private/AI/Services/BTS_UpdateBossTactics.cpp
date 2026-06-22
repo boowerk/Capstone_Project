@@ -239,7 +239,10 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 	const int32 ChainBreakCount = IsValid(MatadorStateComponent) ? MatadorStateComponent->GetChainBreakCount() : 0;
 	const int32 ChainBreakTarget = IsValid(MatadorStateComponent) ? MatadorStateComponent->GetChainBreakTarget() : 3;
 	const bool bMatadorGroggy = IsValid(MatadorStateComponent) && MatadorStateComponent->IsGroggy();
-	const bool bBullPatternActive = IsValid(MatadorStateComponent) && IsValid(MatadorStateComponent->GetActiveBullActor());
+	// The Matador reports both a live bull and a bull reserved behind the optional VFX lead-in.
+	const bool bBullPatternActive = IsValid(MatadorBoss)
+		? MatadorBoss->IsBullPatternActive()
+		: (IsValid(MatadorStateComponent) && IsValid(MatadorStateComponent->GetActiveBullActor()));
 	const float MatadorPreferredHoverHeight = IsValid(MatadorBoss) ? MatadorBoss->GetPreferredHoverHeight() : PreferredHoverHeight;
 	const float MatadorPreferredAirRange = IsValid(MatadorBoss) ? MatadorBoss->GetPreferredAirRange() : PreferredAirRange;
 	const bool bIsMatadorBoss = IsValid(MatadorBoss);

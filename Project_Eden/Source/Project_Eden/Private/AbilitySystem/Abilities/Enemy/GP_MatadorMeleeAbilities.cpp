@@ -8,6 +8,7 @@
 #include "BehaviorTree/BlackboardComponent.h"
 #include "Characters/GP_EnemyCharacter.h"
 #include "Characters/GP_MatadorBossStateComponent.h"
+#include "Characters/GP_MatadorMageBossCharacter.h"
 #include "Actors/GP_MatadorBossDecoyActor.h"
 #include "Components/MeshComponent.h"
 #include "DrawDebugHelpers.h"
@@ -19,6 +20,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Utils/GP_BlueprintLibrary.h"
+#include "VFX/GP_BossTelegraphVFXComponent.h"
 
 namespace GPMatadorMelee
 {
@@ -165,11 +167,14 @@ bool UGP_MatadorMeleeAbilityBase::CheckCooldown(
 	}
 
 	const AActor* AvatarActor = ActorInfo ? ActorInfo->AvatarActor.Get() : nullptr;
+	const AGP_MatadorMageBossCharacter* MatadorBoss = Cast<AGP_MatadorMageBossCharacter>(AvatarActor);
 	const UGP_MatadorBossStateComponent* MatadorStateComponent = IsValid(AvatarActor)
 		? AvatarActor->FindComponentByClass<UGP_MatadorBossStateComponent>()
 		: nullptr;
-	if (IsValid(MatadorStateComponent) && IsValid(MatadorStateComponent->GetActiveBullActor()))
+	if ((IsValid(MatadorBoss) && MatadorBoss->IsBullPatternActive())
+		|| (!IsValid(MatadorBoss) && IsValid(MatadorStateComponent) && IsValid(MatadorStateComponent->GetActiveBullActor())))
 	{
+		// Treat the pre-spawn VFX delay as active combat state for melee cooldown gating.
 		if (OptionalRelevantTags)
 		{
 			OptionalRelevantTags->AddTag(GPTags::Ability::Enemy::Utility_MatadorBullPattern);
@@ -470,6 +475,33 @@ void UGP_MatadorRapierThrustAbility::ActivateAbility(
 		return;
 	}
 
+	StopAIMovement(AvatarActor);
+	AGP_MatadorMageBossCharacter* MatadorBoss = Cast<AGP_MatadorMageBossCharacter>(AvatarActor);
+	const float TelegraphDelay = IsValid(MatadorBoss) && IsValid(MatadorBoss->GetBossTelegraphVFXComponent())
+		? MatadorBoss->GetBossTelegraphVFXComponent()->PlayEnabledTelegraph()
+		: 0.0f;
+	if (TelegraphDelay > KINDA_SMALL_NUMBER)
+	{
+		// The existing aim phase starts only after the optional boss-level Niagara cue has completed.
+		if (UWorld* World = GetWorld())
+		{
+			World->GetTimerManager().SetTimer(PrimaryTimerHandle, this, &ThisClass::BeginRapierPattern, TelegraphDelay, false);
+			return;
+		}
+	}
+
+	BeginRapierPattern();
+}
+
+void UGP_MatadorRapierThrustAbility::BeginRapierPattern()
+{
+	AActor* AvatarActor = ResolvePatternActor(GetAvatarActorFromActorInfo());
+	if (!IsValid(AvatarActor))
+	{
+		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+		return;
+	}
+
 	PlayConfiguredMontage();
 	AimElapsedTime = 0.0f;
 	LockedThrustDirection = AvatarActor->GetActorForwardVector().GetSafeNormal2D();
@@ -682,6 +714,33 @@ void UGP_MatadorCapeGustAbility::ActivateAbility(
 	if (!IsValid(AvatarActor))
 	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+		return;
+	}
+
+	StopAIMovement(AvatarActor);
+	AGP_MatadorMageBossCharacter* MatadorBoss = Cast<AGP_MatadorMageBossCharacter>(AvatarActor);
+	const float TelegraphDelay = IsValid(MatadorBoss) && IsValid(MatadorBoss->GetBossTelegraphVFXComponent())
+		? MatadorBoss->GetBossTelegraphVFXComponent()->PlayEnabledTelegraph()
+		: 0.0f;
+	if (TelegraphDelay > KINDA_SMALL_NUMBER)
+	{
+		// Cape preparation remains unchanged, but it begins after the optional shared cue.
+		if (UWorld* World = GetWorld())
+		{
+			World->GetTimerManager().SetTimer(PrimaryTimerHandle, this, &ThisClass::BeginCapePattern, TelegraphDelay, false);
+			return;
+		}
+	}
+
+	BeginCapePattern();
+}
+
+void UGP_MatadorCapeGustAbility::BeginCapePattern()
+{
+	AActor* AvatarActor = ResolvePatternActor(GetAvatarActorFromActorInfo());
+	if (!IsValid(AvatarActor))
+	{
+		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 		return;
 	}
 

@@ -20,6 +20,7 @@
 #include "NavigationSystem.h"
 #include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
+#include "VFX/GP_BossTelegraphVFXComponent.h"
 
 AGP_MatadorMageBossCharacter::AGP_MatadorMageBossCharacter()
 {
@@ -28,6 +29,10 @@ AGP_MatadorMageBossCharacter::AGP_MatadorMageBossCharacter()
 	BossDisplayName = NSLOCTEXT("GPMatadorMageBoss", "BossDisplayName", "Matador Mage");
 
 	MatadorStateComponent = CreateDefaultSubobject<UGP_MatadorBossStateComponent>(TEXT("MatadorStateComponent"));
+	// The component stays dormant until an attack path explicitly honors the designer toggle.
+	BossTelegraphVFXComponent = CreateDefaultSubobject<UGP_BossTelegraphVFXComponent>(TEXT("BossTelegraphVFXComponent"));
+	BossTelegraphVFXComponent->SetupAttachment(GetRootComponent());
+	BossTelegraphVFXComponent->SetAutoActivate(false);
 
 	DecoyActorClass = AGP_MatadorBossDecoyActor::StaticClass();
 	ChainEffectActorClass = AGP_ChainEffectActor::StaticClass();
@@ -116,7 +121,10 @@ void AGP_MatadorMageBossCharacter::EndPlay(const EEndPlayReason::Type EndPlayRea
 		World->GetTimerManager().ClearTimer(GroggyRecoveryTimerHandle);
 		World->GetTimerManager().ClearTimer(GroggyDecoyTeleportTimerHandle);
 		World->GetTimerManager().ClearTimer(FallbackPatternTimerHandle);
+		World->GetTimerManager().ClearTimer(BullTelegraphTimerHandle);
 	}
+	bBullPatternPending = false;
+	PendingBullPatternTarget.Reset();
 
 	Super::EndPlay(EndPlayReason);
 }
@@ -277,7 +285,38 @@ AGP_BullChargeActor* AGP_MatadorMageBossCharacter::SpawnBullPattern(AActor* Patt
 
 bool AGP_MatadorMageBossCharacter::RequestStartBullPattern(AActor* PatternTargetActor)
 {
-	return IsValid(SpawnBullPattern(PatternTargetActor));
+	if (!HasAuthority() || bBullPatternPending || IsBullPatternActive()
+		|| !IsValid(MatadorStateComponent) || MatadorStateComponent->IsGroggy())
+	{
+		return false;
+	}
+
+	const float TelegraphDelay = IsValid(BossTelegraphVFXComponent)
+		? BossTelegraphVFXComponent->PlayEnabledTelegraph()
+		: 0.0f;
+	if (TelegraphDelay <= KINDA_SMALL_NUMBER)
+	{
+		return IsValid(SpawnBullPattern(PatternTargetActor));
+	}
+
+	// Reserve the bull pattern while the cue plays so BT and fallback requests cannot queue duplicate bulls.
+	bBullPatternPending = true;
+	PendingBullPatternTarget = ResolvePatternTarget(PatternTargetActor);
+	GetWorldTimerManager().SetTimer(
+		BullTelegraphTimerHandle,
+		this,
+		&ThisClass::ExecutePendingBullPattern,
+		TelegraphDelay,
+		false);
+	return true;
+}
+
+void AGP_MatadorMageBossCharacter::ExecutePendingBullPattern()
+{
+	AActor* TargetActor = PendingBullPatternTarget.Get();
+	bBullPatternPending = false;
+	PendingBullPatternTarget.Reset();
+	SpawnBullPattern(TargetActor);
 }
 
 void AGP_MatadorMageBossCharacter::RequestEnterGroggy()
@@ -298,7 +337,8 @@ void AGP_MatadorMageBossCharacter::RequestRecoverFromGroggy()
 
 bool AGP_MatadorMageBossCharacter::IsBullPatternActive() const
 {
-	return IsValid(MatadorStateComponent) && IsValid(MatadorStateComponent->GetActiveBullActor());
+	return bBullPatternPending
+		|| (IsValid(MatadorStateComponent) && IsValid(MatadorStateComponent->GetActiveBullActor()));
 }
 
 bool AGP_MatadorMageBossCharacter::ShouldTeleportForMatador(float DistanceToTarget) const
@@ -323,6 +363,10 @@ void AGP_MatadorMageBossCharacter::HandleMatadorGroggyChanged(bool bNewGroggy)
 
 	if (bNewGroggy)
 	{
+		// Groggy interrupts any attack still waiting behind its boss-level telegraph.
+		GetWorldTimerManager().ClearTimer(BullTelegraphTimerHandle);
+		bBullPatternPending = false;
+		PendingBullPatternTarget.Reset();
 		bHasPendingGroggyDecoyTeleportLocation = false;
 		if (bTeleportToDecoyOnGroggy)
 		{

@@ -115,6 +115,7 @@ protected:
 	void BP_OnRapierThrust(AActor* AvatarActor, FVector LockedDirection);
 
 private:
+	void BeginRapierPattern();
 	void TickAim();
 	void LockDirection();
 	void PerformThrust();
@@ -182,6 +183,7 @@ protected:
 	void BP_OnCapeGustBurst(AActor* AvatarActor, FVector LockedDirection, int32 InBurstIndex, int32 InBurstCount);
 
 private:
+	void BeginCapePattern();
 	void TickPrepare();
 	void LockDirectionAndStartBursts();
 	void PerformGustBurst();

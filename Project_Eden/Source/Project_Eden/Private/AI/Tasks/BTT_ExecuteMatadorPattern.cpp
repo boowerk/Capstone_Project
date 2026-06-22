@@ -56,8 +56,9 @@ EBTNodeResult::Type UBTT_ExecuteMatadorPattern::ExecuteTask(UBehaviorTreeCompone
 		return EBTNodeResult::Failed;
 	}
 
-	if (IsValid(MatadorStateComponent->GetActiveBullActor()))
+	if (MatadorBoss->IsBullPatternActive())
 	{
+		// A telegraphed-but-not-yet-spawned bull is already reserved and must block duplicate BT requests.
 		return bSucceedWhenBullAlreadyActive ? EBTNodeResult::Succeeded : EBTNodeResult::Failed;
 	}
 
