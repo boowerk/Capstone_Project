@@ -281,11 +281,14 @@ void AGP_BossGroundHandActor::SnapToFloor()
 	const FVector CurrentLocation = GetActorLocation();
 	FHitResult FloorHit;
 	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(BossGroundHandFloorTrace), false, GetOwner());
-	if (World->LineTraceSingleByChannel(
+	FCollisionObjectQueryParams FloorObjectQuery;
+	// The center strike overlaps the target pawn, so only static level geometry may establish the decal floor.
+	FloorObjectQuery.AddObjectTypesToQuery(ECC_WorldStatic);
+	if (World->LineTraceSingleByObjectType(
 		FloorHit,
 		CurrentLocation + FVector(0.0f, 0.0f, FloorTraceUpDistance),
 		CurrentLocation - FVector(0.0f, 0.0f, FloorTraceDownDistance),
-		ECC_Visibility,
+		FloorObjectQuery,
 		QueryParams))
 	{
 		SetActorLocation(FloorHit.ImpactPoint + FVector(0.0f, 0.0f, 3.0f));
