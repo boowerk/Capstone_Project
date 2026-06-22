@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-06-19T08:31:17+09:00
+updated: 2026-06-22T01:40:00+09:00
 status: active
 tags:
   - memoc
@@ -11,7 +11,34 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-06-19T08:31:17+09:00
+Last synced: 2026-06-22T01:40:00+09:00
+
+## Dark Armor Knight Boss Handoff
+
+- Commits `4abb1dc1`, `85c40d78`, `0d0da2aa`, and `1c837936` implement the plan as native GAS/state/AI layers and create `/Game/Characters/EnemyCharacter/Boss/BP_Boss_DarkArmorKnight/BP_DarkArmorKnight` with `SK_KnightBoss`.
+- Full editor build plus `ProjectEden.AI.Boss.PatternSelector.DarkArmorKnight` and `ProjectEden.Combat.DarkArmorKnight.GuardLifecycle` pass. Commandlet still reports the unrelated corrupt `Content/Maps/DemoMap/TestMap.umap` and missing Fab fence meshes.
+- Editor work: place `BP_DarkArmorKnight`; assign/tune its Anim Class and mesh/capsule transform for `SK_KnightBoss`. For final art, create BP children of DarkWave/GroundCrack/Charge actors, replace their primitive component meshes/materials/VFX, then assign those classes on the boss. Optional Dark Knight Blackboard mirror keys are not required for runtime truth.
+
+## Minimap Handoff
+
+- Commits `a88bfee6`, `b3652834`, and `e6806c69` replace runtime follow capture with one full-map capture after PCG becomes idle. The stable texture is panned/zoomed by `M_UI_Minimap_StaticMap`; player arrow and pooled red enemy markers are separate UMG widgets. Assign `/Game/UI/HUD/Minimap/Materials/M_UI_Minimap_StaticMap` to `WBP_PlayerHUDWidget.MinimapMapMaterial`, then PIE-check map orientation, coverage, zoom, and markers. Editor build and real D3D12 offscreen `ProjectEden.UI.Minimap.CaptureStability` passed with no material compile warning.
+- Commits `42b72f57` and `19340f27` remove periodic RenderTarget swapping/rebinding. UMG keeps one stable display target while SceneCapture remains isolated on a back buffer; completed captures are GPU-copied only after the capture fence, and the pipeline remains blocked until the copy fence completes. Editor build plus NullRHI and D3D12 offscreen `ProjectEden.UI.Minimap.CaptureStability` passed. No editor setup is required; PIE-check repeated attack Niagara visually.
+- Commits `23aedf2b` and `0bfa780f` replace render-command-only promotion with an `FRHIGPUFence` completion gate. The old front buffer remains bound until the capture fence write is issued, pending writes drain, and `Poll()` succeeds. Editor build, NullRHI automation, and real D3D12 offscreen `ProjectEden.UI.Minimap.CaptureStability` passed; PIE-check attack Niagara visually.
+- Commits `d64bc60c` and `88d85765` prevent attack-time flicker with front/back render targets, RHI-fence promotion, and player exclusion. Build and `ProjectEden.UI.Minimap.CaptureStability` passed; PIE-check repeated attacks with production VFX. No editor setup is required.
+- Commits `2641dbab`, `c46e718f`, and tests fix FullMap Z accumulation, preserve Follow mode, stop brush reflow, and use flat opaque FinalColorLDR. BaseColor was rejected because its alpha can make direct UMG display transparent. Build and `ProjectEden.UI.Minimap.CaptureStability` passed; PIE-check final contrast.
+
+## Enemy Leash Handoff
+
+- Commits `93ac0b15` and `177bc9ad` finalize anchor leash behavior: crossing the outer distance starts return, and a visible player re-engages inside the default 75% inner boundary. Editor build and `ProjectEden.AI.Enemy.LeashPolicy` passed; PIE-check actual BT movement at both boundaries.
+
+## Enemy Health Bar Handoff
+
+- Commits `6c668c6b` and `130afeb2` attach `WBP_EnemyHealthBar` to the shared enemy parent at Z=135, keep it visible at full health, bind GAS Health/MaxHealth, hide it for bosses/dead enemies, and add a passing defaults test. Editor build passed; PIE visual placement still needs checking on differently sized meshes.
+
+## Enemy Death Handoff
+
+- Commits `4783ba61` and `a0ae0cb4` implement shared HP-zero death for melee, ranged, flying, and boss children of `AGP_EnemyCharacter`. Editor build and `ProjectEden.Combat.EnemyDeath.Lifecycle` passed.
+- PIE-check representative enemy/Boss assets for lethal damage and the 2-second default despawn. No editor assignment is required; later animation work should implement `BP_OnDeathStarted` and tune `DeathDespawnDelay`.
 
 ## FurnaceWalker Handoff
 
@@ -34,6 +61,11 @@ Last synced: 2026-06-19T08:31:17+09:00
 
 ## Crystal Seraph Boss Handoff
 
+- Commits `c8aac963` and `3dd2fb6b` restore zero pitch/roll prism placement and reduce editable `PrismAuraScale` from 1.25 to 0.55. All changed translation units compile, but final DLL link and test execution are pending because the open Unreal Editor holds `UnrealEditor-Project_Eden.dll`; close the editor and rebuild.
+- Commits `50569b35`, `5fab4c1f`, and `7ed563c2` share the player visual-cue resolver with actor-owned presentation and add default Niagara to prism, shard, laser, and sanctuary patterns. Full build and all `ProjectEden.Combat.CrystalSeraph` tests pass. No required editor assignment; PIE-check asset scale/orientation and override each actor's `VisualCueComponent.VisualCues` in BP if art tuning is needed.
+- Commits `d79c7f35` and `b12a5dd5` enlarge the prototype prism and spawn three non-overlapping crystals on a 650cm target-centered ring. Editor build, PrismCluster, and existing GroggyLifecycle tests pass; PIE-check visual spacing and tune `PrismVisualScale` / `PrismRingRadius` only if needed.
+- Commits `a70a62cd` and `416d16f5` fix the logged teleport-to-leash-to-Patrol loop without editing BT assets. Tactical teleports clamp inside the anchor margin, the Patrol EQS task yields to ReturnHome, and flying vector moves use direct altitude-preserving paths. Build and PatrolRecovery/GroggyLifecycle/selector tests pass; PIE-check that Patrol fallback logs no longer spam.
+- Commits `7a94b1ac` and `8dfa6c98` route each reflected laser into one break stage; the third causes a gravity fall. Falling hits do not count, the first grounded player hit starts `GroggyDuration` (final phase: `FinalPhaseGroggyDuration`), and Boss_Common resumes on return to hover. Build plus lifecycle/selector tests pass; PIE-check presentation and tune only those durations if desired.
 - Commits `1c9cd768`, `759988f2`, and `e9616312` throttle pattern starts, restore prism/laser rotation, and force `BT_BossCommon`/`BB_BossCommon`. Editor build and the Crystal Seraph selector automation test passed.
 - PIE still needs runtime confirmation that attacks are at least 2.5s apart and the shared patrol/chase/reposition branches behave acceptably with `MOVE_Flying`.
 - Native prototype is complete and builds: use `AGP_CrystalSeraphBossCharacter` as the C++ parent for a BP child. The constructor assigns `/Game/Characters/MaskMan/SK_MaskMan` as the requested prototype mesh.

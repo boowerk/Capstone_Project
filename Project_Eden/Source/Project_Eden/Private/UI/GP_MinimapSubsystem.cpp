@@ -3,8 +3,7 @@
 #include "Engine/TextureRenderTarget2D.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
-#include "GameFramework/Pawn.h"
-#include "Kismet/GameplayStatics.h"
+#include "PCGComponent.h"
 #include "TimerManager.h"
 #include "UI/GP_MinimapCaptureActor.h"
 
@@ -13,6 +12,10 @@ void UGP_MinimapSubsystem::Deinitialize()
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(DelayedCaptureTimerHandle);
+	}
+	if (ActiveCaptureActor.IsValid())
+	{
+		ActiveCaptureActor->OnMapCaptureReady.RemoveDynamic(this, &ThisClass::HandleMapCaptureReady);
 	}
 
 	ActiveCaptureActor.Reset();
@@ -27,6 +30,7 @@ void UGP_MinimapSubsystem::RegisterCaptureActor(AGP_MinimapCaptureActor* Capture
 	}
 
 	ActiveCaptureActor = CaptureActor;
+	CaptureActor->OnMapCaptureReady.AddUniqueDynamic(this, &ThisClass::HandleMapCaptureReady);
 	BroadcastCurrentRenderTarget();
 }
 
@@ -39,7 +43,6 @@ void UGP_MinimapSubsystem::CaptureFullMap(AActor* BoundsActor)
 	}
 
 	CaptureActor->CaptureFullMap(BoundsActor);
-	BroadcastCurrentRenderTarget();
 }
 
 void UGP_MinimapSubsystem::NotifyPcgLayoutReady(float CaptureDelay)
@@ -51,10 +54,15 @@ void UGP_MinimapSubsystem::NotifyPcgLayoutReady(float CaptureDelay)
 	}
 
 	World->GetTimerManager().ClearTimer(DelayedCaptureTimerHandle);
+	if (bPcgLayoutCaptureRequested)
+	{
+		return;
+	}
+	bPcgLayoutCaptureRequested = true;
 
 	if (CaptureDelay <= 0.0f)
 	{
-		CaptureFullMap(nullptr);
+		CapturePcgLayoutOnce();
 		return;
 	}
 
@@ -65,12 +73,67 @@ void UGP_MinimapSubsystem::NotifyPcgLayoutReady(float CaptureDelay)
 		{
 			if (WeakSubsystem.IsValid())
 			{
-				// PCG 스폰이 한 프레임 이상 늦게 반영될 수 있어 지연 후 현재 월드를 다시 캡처합니다.
-				WeakSubsystem->CaptureFullMap(nullptr);
+				// Delay lets asynchronous PCG instances finish registering before the single full-map capture.
+				WeakSubsystem->CapturePcgLayoutOnce();
 			}
 		},
 		CaptureDelay,
 		false);
+}
+
+void UGP_MinimapSubsystem::CapturePcgLayoutOnce()
+{
+	const bool bPcgStillGenerating = ArePcgComponentsStillGenerating();
+	ConsecutivePcgIdlePolls = bPcgStillGenerating ? 0 : ConsecutivePcgIdlePolls + 1;
+	if (bPcgStillGenerating || ConsecutivePcgIdlePolls < 3)
+	{
+		if (UWorld* World = GetWorld())
+		{
+			TWeakObjectPtr<UGP_MinimapSubsystem> WeakSubsystem(this);
+			World->GetTimerManager().SetTimer(
+				DelayedCaptureTimerHandle,
+				[WeakSubsystem]()
+				{
+					if (WeakSubsystem.IsValid())
+					{
+						WeakSubsystem->CapturePcgLayoutOnce();
+					}
+				},
+				0.1f,
+				false);
+		}
+		// Requiring three quiet polls avoids capturing in the short gap before deferred PCG tasks begin.
+		return;
+	}
+
+	if (AGP_MinimapCaptureActor* CaptureActor = ResolveCaptureActor())
+	{
+		CaptureActor->CaptureFullMap(nullptr);
+	}
+}
+
+bool UGP_MinimapSubsystem::ArePcgComponentsStillGenerating() const
+{
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return false;
+	}
+
+	for (TActorIterator<AActor> It(World); It; ++It)
+	{
+		TInlineComponentArray<UPCGComponent*> PcgComponents(*It);
+		for (const UPCGComponent* PcgComponent : PcgComponents)
+		{
+			if (IsValid(PcgComponent) && PcgComponent->IsGenerating())
+			{
+				// Poll only during startup so capture occurs after every active PCG task has finished.
+				return true;
+			}
+		}
+	}
+
+	return false;
 }
 
 AGP_MinimapCaptureActor* UGP_MinimapSubsystem::GetActiveCaptureActor()
@@ -86,6 +149,27 @@ UTextureRenderTarget2D* UGP_MinimapSubsystem::GetMinimapRenderTarget()
 	}
 
 	return nullptr;
+}
+
+bool UGP_MinimapSubsystem::WorldToMapUV(const FVector& WorldLocation, FVector2D& OutMapUV)
+{
+	if (AGP_MinimapCaptureActor* CaptureActor = ResolveCaptureActor())
+	{
+		return CaptureActor->WorldToMapUV(WorldLocation, OutMapUV);
+	}
+
+	OutMapUV = FVector2D(0.5f, 0.5f);
+	return false;
+}
+
+bool UGP_MinimapSubsystem::IsMinimapReady()
+{
+	if (AGP_MinimapCaptureActor* CaptureActor = ResolveCaptureActor())
+	{
+		return CaptureActor->IsFullMapCaptureReady();
+	}
+
+	return false;
 }
 
 AGP_MinimapCaptureActor* UGP_MinimapSubsystem::ResolveCaptureActor()
@@ -104,6 +188,7 @@ AGP_MinimapCaptureActor* UGP_MinimapSubsystem::ResolveCaptureActor()
 	for (TActorIterator<AGP_MinimapCaptureActor> It(World); It; ++It)
 	{
 		ActiveCaptureActor = *It;
+		It->OnMapCaptureReady.AddUniqueDynamic(this, &ThisClass::HandleMapCaptureReady);
 		BroadcastCurrentRenderTarget();
 		return *It;
 	}
@@ -136,16 +221,8 @@ AGP_MinimapCaptureActor* UGP_MinimapSubsystem::SpawnDefaultCaptureActor()
 
 	// Fallback spawn keeps the minimap alive even when the level forgot to place a capture actor.
 	ActiveCaptureActor = CaptureActor;
+	CaptureActor->OnMapCaptureReady.AddUniqueDynamic(this, &ThisClass::HandleMapCaptureReady);
 	CaptureActor->InitializeCapture();
-	if (APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(World, 0))
-	{
-		CaptureActor->CaptureAroundTarget(PlayerPawn);
-	}
-	else
-	{
-		CaptureActor->RequestCapture();
-	}
-
 	BroadcastCurrentRenderTarget();
 	return CaptureActor;
 }
@@ -156,4 +233,10 @@ void UGP_MinimapSubsystem::BroadcastCurrentRenderTarget()
 	{
 		OnRenderTargetChanged.Broadcast(ActiveCaptureActor->GetMinimapRenderTarget());
 	}
+}
+
+void UGP_MinimapSubsystem::HandleMapCaptureReady()
+{
+	// The render-target object stays stable; this event only announces completed one-shot PCG pixels.
+	OnMinimapReady.Broadcast();
 }

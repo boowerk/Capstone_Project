@@ -8,6 +8,7 @@ class AGP_MinimapCaptureActor;
 class UTextureRenderTarget2D;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FGPMinimapRenderTargetChanged, UTextureRenderTarget2D*, RenderTarget);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FGPMinimapReady);
 
 UCLASS()
 class PROJECT_EDEN_API UGP_MinimapSubsystem : public UWorldSubsystem
@@ -32,14 +33,30 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Minimap")
 	UTextureRenderTarget2D* GetMinimapRenderTarget();
 
+	UFUNCTION(BlueprintPure, Category = "Minimap")
+	bool WorldToMapUV(const FVector& WorldLocation, FVector2D& OutMapUV);
+
+	UFUNCTION(BlueprintPure, Category = "Minimap")
+	bool IsMinimapReady();
+
 	UPROPERTY(BlueprintAssignable, Category = "Minimap")
 	FGPMinimapRenderTargetChanged OnRenderTargetChanged;
+
+	UPROPERTY(BlueprintAssignable, Category = "Minimap")
+	FGPMinimapReady OnMinimapReady;
 
 private:
 	AGP_MinimapCaptureActor* ResolveCaptureActor();
 	AGP_MinimapCaptureActor* SpawnDefaultCaptureActor();
+	void CapturePcgLayoutOnce();
+	bool ArePcgComponentsStillGenerating() const;
 	void BroadcastCurrentRenderTarget();
+
+	UFUNCTION()
+	void HandleMapCaptureReady();
 
 	TWeakObjectPtr<AGP_MinimapCaptureActor> ActiveCaptureActor;
 	FTimerHandle DelayedCaptureTimerHandle;
+	bool bPcgLayoutCaptureRequested = false;
+	int32 ConsecutivePcgIdlePolls = 0;
 };

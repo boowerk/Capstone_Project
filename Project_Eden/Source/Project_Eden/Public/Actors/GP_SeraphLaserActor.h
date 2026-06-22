@@ -7,6 +7,7 @@
 class AGP_CrystalSeraphBossCharacter;
 class UBoxComponent;
 class UGameplayEffect;
+class UGP_VisualCueComponent;
 class UStaticMeshComponent;
 
 UCLASS(Blueprintable)
@@ -40,6 +41,9 @@ protected:
 	void BP_OnLaserReflected(const FVector& ReflectionOrigin, const FVector& ReflectedDirection);
 
 private:
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastPlayReflectedVFX(const FVector& ReflectionOrigin, const FRotator& ReflectionRotation);
+
 	void ActivateLaser();
 	void FinishLaser();
 	void ApplyLaserDamageTick();
@@ -50,6 +54,9 @@ private:
 private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USceneComponent> SceneRoot;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph|VFX", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UGP_VisualCueComponent> VisualCueComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UBoxComponent> DamageBox;

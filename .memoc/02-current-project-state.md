@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-06-19T08:31:17+09:00
+updated: 2026-06-22T01:40:00+09:00
 status: active
 tags:
   - memoc
@@ -11,10 +11,16 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-06-19T08:31:17+09:00
+Last synced: 2026-06-22T01:40:00+09:00
 
 ## Current Status
 
+- Dark Armor Knight is a native GAS boss prototype using shared `BT_BossCommon`/`BB_BossCommon`. `BP_DarkArmorKnight` uses `SK_KnightBoss`; its component owns replicated guard gauge, directional mitigation, parry/counter, guard break, groggy/recovery, and phase rules. Dedicated GAS abilities/actors cover Basic, Heavy, Sweep, Guard, Counter, Charge, DarkWave, GroundCrack, and Groggy. Charge/crack/wave placeholders use replaceable Engine basic shapes. Editor build and both DarkKnight selector/lifecycle automation tests pass; PIE presentation and AnimBP setup remain.
+- Minimap is now a one-shot PCG map pipeline (`a88bfee6`, `b3652834`, `e6806c69`): after PCG reports ready and stays idle for three polls, one orthographic full-map frame is captured from runtime PCG bounds, GPU-copied to the stable HUD RenderTarget, then SceneCapture and actor tick are disabled. `M_UI_Minimap_StaticMap` pans/zooms that fixed texture from C++ world-to-UV mapping; the player arrow and pooled `T_UI_Minimap_Point_Red` enemy Images remain separate UMG widgets.
+- Enemy leash uses anchor hysteresis: crossing `ReturnHomeDistance` starts return even with a target; after returning inside 75% of that distance, a visible player interrupts return and reopens combat.
+- Basic melee, ranged, and flying enemies inherit a native screen-space `WorldHealthBarComponent` from `AGP_EnemyCharacter`. It uses `WBP_EnemyHealthBar`, tracks GAS Health/MaxHealth, stays visible at full health, and hides on death; bosses keep the dedicated HUD bar.
+- All enemy archetypes share `AGP_EnemyCharacter` death handling: zero Health activates the server-only Death Ability, persists the Death GAS tag, stops AI/movement/collision, and schedules despawn.
+- Death presentation is animation-free; Blueprint children may later use `BP_OnDeathStarted` or `OnEnemyDeathStarted` without changing gameplay rules.
 - FurnaceWalker enemy foundation created: `/Game/Characters/EnemyCharacter/Monsters/FurnaceWalker/BP_FurnaceWalker` inherits `BP_BasicEnemy_Melee`, keeps common AI/GAS melee setup, and now uses `/Game/Meshes/Monsters/FurnaceWalker/furnacewalker`. `RTG_FurnaceWalker` maps UEFN mannequin source to the FurnaceWalker IK rig. User added retargeted Idle/Jog, six attack, hit-react, and death sequences under `/Game/Characters/EnemyCharacter/Monsters/FurnaceWalker/Animations`. `/Game/Characters/EnemyCharacter/Monsters/FurnaceWalker/ABP_FurnaceWalker` is assigned to the child mesh and compiled: EventGraph calculates owner velocity magnitude into `Speed`; AnimGraph chooses Idle/Jog through a full-body `DefaultSlot`. `/Game/Characters/EnemyCharacter/Monsters/FurnaceWalker/AM_FW_Attack` remains `PDA_FW_AnimationSet.PrimaryAttackMontage` fallback, while six attack montages (`AM_FW_Zombie_Smashing_R/L`, `AM_FW_Zombie_Punching_R/L`, `AM_FW_Mutant_Punch_R/L`) are registered in `LightAttackMontages`. Each source attack sequence has `UGP_AnimNotify_SendGameplayEvent` for `GPTags.Event.Enemy.AttackHit` at common 45% timing and `GPTags.Event.Enemy.ActionEnd` near montage end. `GP_EnemyAttack` now chooses opposite-side L/R random first, avoids immediate repeats as fallback, listens for Enemy `ActionEnd`, and still ends on montage completion if the notify is missing. Pending: rebuild from correct engine/UBT path, then PIE-check locomotion, random attack selection, hit timing, ActionEnd release, and capsule/mesh offset.
 - DragonSkull Control Rig setup is now in place for `/Game/Meshes/Monsters/DragonSkull/CR_DeagonBone_SimpleJaw`; `CR_DeagonBone` is not currently present after user refresh/reimport. Controls are `global_ctrl > root_ctrl > body_offset_ctrl > head_ctrl`, with `jaw_upper_ctrl` and `jaw_lower_ctrl` under `head_ctrl`. After asset normalization, stale offsets were rebuilt by placing controls from current skeleton bone initial transforms first, then parenting with maintain-global. Forward Solve drives translation/rotation only, not scale. Verified control positions match `root`, `Head`, `jaw_upper`, and `jaw_lower`, all controls scale `1`.
 - `AGP_LevelBuildAnimator` now exists as a native runtime arena-construction prototype. It collects actors tagged `PLAZA_DE_TOROS`, stores their final transforms, generates underground/spiral/twisted start transforms, then builds them back with smooth per-piece interpolation. Ordering supports height-then-distance, height-then-random, distance-then-height, and random. Blueprint events expose build start/piece start/piece finish/finish hooks for Mirror Dimension VFX/audio polish. UHT passed; full compile is still blocked while Live Coding is active.
@@ -30,7 +36,8 @@ Last synced: 2026-06-19T08:31:17+09:00
 - `UBTT_ExecuteBossAttack` no longer reports success when GAS pattern activation fails. Granted-but-blocked/cooldowned boss pattern candidates are logged, the next scored candidate is attempted, and the BT task fails only when no candidate can activate.
 - Crystal Seraph native boss prototype is implemented from `CrystalSeraphBoss_Plan.md`: `AGP_CrystalSeraphBossCharacter` uses requested `/Game/Characters/MaskMan/SK_MaskMan` as the prototype skeletal mesh, owns `UGP_CrystalSeraphStateComponent`, grants native Crystal Seraph pattern abilities, and exposes BlueprintCallable requests for prism, laser, shard, sanctuary, wing-core exposure, groggy, and recover.
 - Crystal Seraph now enforces shared `BT_BossCommon`/`BB_BossCommon` in its native constructor and `OnConstruction`, retaining boss patrol, chase, and reposition flow. GAS activation atomically reserves a 2.5s shared attack cadence (groggy bypasses it), successful attacks immediately leave the Attack branch, and prism/laser readiness uses last-use cooldown timestamps instead of narrow world-time windows. Editor build and `ProjectEden.AI.Boss.PatternSelector.CrystalSeraph` passed; PIE patrol/chase validation remains.
-- Crystal Seraph pattern actors exist in C++: `AGP_CrystalPrismActor`, `AGP_SeraphLaserActor`, `AGP_WingCoreHitActor`, `AGP_CrystalShardProjectile`, and `AGP_CrystalSanctuaryMarkerActor`. They use basic engine shapes as prototype visuals and expose BP events for polished VFX.
+- Crystal Seraph pattern actors exist in C++: `AGP_CrystalPrismActor`, `AGP_SeraphLaserActor`, `AGP_WingCoreHitActor`, `AGP_CrystalShardProjectile`, and `AGP_CrystalSanctuaryMarkerActor`. Prism spawns three upright crystals around the target; its visual scale is `2.1/2.1/2.9`, reflection radius 150cm, and persistent aura scale `0.55`. Engine-shape visuals and BP hooks remain replaceable.
+- Crystal Seraph presentation uses the same `FGP_SkillVisualCueEntry` specificity rule as player SkillData through `UGP_VisualCueComponent`: prism aura/reflection, shard active/impact, laser telegraph/active/reflection, and sanctuary telegraph/explosion use editable Free Magic Niagara defaults. Persistent cues are actor-owned; hit/explosion/reflection cues multicast after server authority decisions.
 - Boss AI/GAS integration now has Crystal Seraph native tags, optional Blackboard keys, selector scoring, BT service/task mirroring, and damage-state multipliers: guarded `0.15`, wing-core exposed `0.5`, groggy `1.0`.
 - Minimap terrain capture is resilient to missing level setup: `UGP_MinimapSubsystem` auto-spawns a transient `AGP_MinimapCaptureActor` when no placed capture actor exists, initializes the render target, and broadcasts it to HUD listeners.
 - `AGP_MinimapCaptureActor` now renders scene primitives from a top-down capture, lazily reacquires the player pawn follow target, and updates capture around the player so terrain can appear in the HUD minimap.
@@ -191,6 +198,9 @@ Last synced: 2026-05-23T00:00:00
 
 ## Open Tasks
 
+- PIE-check Crystal Seraph before/after target acquisition and after tactical teleports; `[Patrol] Fallback move location selected` must not spam and `[Leash] Return home finished` must remain reachable.
+- PIE-check Crystal Seraph's visible fall, grounded hit gate, and return-to-hover timing; tune `GroggyDuration` / `FinalPhaseGroggyDuration` on the boss Blueprint if needed.
+- PIE-check that repeated player attacks no longer blank the minimap under real VFX/render load; build and `ProjectEden.UI.Minimap.CaptureStability` pass.
 - Verify runtime behavior in PIE for source motion, visible state transitions, and retarget fidelity with Blueprint trajectory preferred at runtime.
 - Connect `CHT_MM_MaskMan_Root` as the active chooser source for `UGP_CharacterAnimInstance` and validate `Idle / TurnInPlace / Run / Sprint / InAir`.
 - Keep manual enum/MM branching only as a temporary fallback until the new chooser fully replaces it.
@@ -198,6 +208,13 @@ Last synced: 2026-05-23T00:00:00
 
 ## Completed Tasks
 
+- Stopped Crystal Seraph's infinite Patrol loop by clamping tactical teleports inside the anchor leash, yielding Patrol to ReturnHome, and using direct altitude-preserving movement for flying vector goals (`a70a62cd`, `416d16f5`).
+- Restored Crystal Seraph's reflected-laser groggy lifecycle: three reflections cause a physical fall, a post-landing player hit arms delayed recovery, and Boss_Common pauses until recovery (`7a94b1ac`, `8dfa6c98`).
+- Prevented attack-time minimap flicker by separating the displayed render target from the SceneCapture back buffer and promoting it only after an RHI render fence completes (`d64bc60c`, `88d85765`).
+- Fixed minimap capture-height accumulation/HUD brush reflow and added stability coverage (`2641dbab`, `a0a1a7d8`).
+- Added the common enemy leash state machine, then refined it to anchor return with stable re-engagement hysteresis (`aa0522f5`, `971d8f29`, `93ac0b15`, `177bc9ad`).
+- Added and verified shared overhead health bars for regular enemies (`6c668c6b`, `130afeb2`).
+- Added and verified the shared GAS enemy death pipeline and replicated/idempotent corpse lifecycle (`4783ba61`, `a0ae0cb4`).
 - Created `Diagonal_Path_Curvature_Analysis.md` containing diagnostic details on the forward-to-diagonal trajectory angularity.
 - Resolved missing declaration `GetActiveMovementSpeedProfile` in `GP_PlayerCharacter.h`, fixing multiple C++ compilation errors and verified successful build.
 - Resolved missing include `#include "GameplayTags/GP_Tags.h"` in `GP_BaseCharacter.cpp`, fixing compiler errors (C2653/C2065 for GPTags element variables) and verified clean compile of Project C++.

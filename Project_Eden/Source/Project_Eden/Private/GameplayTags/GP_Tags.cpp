@@ -89,6 +89,19 @@ namespace GPTags
                 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Groggy, "GPTags.Ability.Boss.CrystalSeraph.Groggy", "크리스탈 세라프 그로기 진입 패턴");
                 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Teleport, "GPTags.Ability.Boss.CrystalSeraph.Teleport", "크리스탈 세라프 공중 전투 위치 재배치");
             }
+            namespace DarkKnight
+            {
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(Basic, "GPTags.Ability.Boss.DarkKnight.Basic", "흑갑 기사 기본 검격");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(Heavy, "GPTags.Ability.Boss.DarkKnight.Heavy", "흑갑 기사 내려찍기");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(Sweep, "GPTags.Ability.Boss.DarkKnight.Sweep", "흑갑 기사 회전 베기");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(Guard, "GPTags.Ability.Boss.DarkKnight.Guard", "흑갑 기사 방어 자세");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(Parry, "GPTags.Ability.Boss.DarkKnight.Parry", "흑갑 기사 패링 판정");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(Counter, "GPTags.Ability.Boss.DarkKnight.Counter", "흑갑 기사 패링 반격");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(Charge, "GPTags.Ability.Boss.DarkKnight.Charge", "흑갑 기사 철갑 돌진");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(DarkWave, "GPTags.Ability.Boss.DarkKnight.DarkWave", "흑갑 기사 칠흑 검풍");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(GroundCrack, "GPTags.Ability.Boss.DarkKnight.GroundCrack", "흑갑 기사 지면 균열");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(Groggy, "GPTags.Ability.Boss.DarkKnight.Groggy", "흑갑 기사 방어 붕괴 그로기");
+            }
         }
     }
     
@@ -144,6 +157,9 @@ namespace GPTags
                 UE_DEFINE_GAMEPLAY_TAG_COMMENT(CrystalGuarded, "GPTags.State.Status.Enemy.CrystalGuarded", "크리스탈 세라프 기본 피해 감쇠 상태");
                 UE_DEFINE_GAMEPLAY_TAG_COMMENT(WingCoreExposed, "GPTags.State.Status.Enemy.WingCoreExposed", "크리스탈 세라프 날개 코어 노출 상태");
                 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Groggy, "GPTags.State.Status.Enemy.Groggy", "적 그로기 상태");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(DarkGuarded, "GPTags.State.Status.Enemy.DarkGuarded", "흑갑 기사 방향 방어 상태");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(ParryWindow, "GPTags.State.Status.Enemy.ParryWindow", "흑갑 기사 패링 판정 상태");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(GuardBroken, "GPTags.State.Status.Enemy.GuardBroken", "흑갑 기사 방어 게이지 붕괴 상태");
             }
         }
         namespace Movement
@@ -208,6 +224,11 @@ namespace GPTags
         {
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Trail_Magic, "GameplayCue.Ability.Trail.Magic", "Ability magic trail VFX cue");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Burst_Magic, "GameplayCue.Ability.Burst.Magic", "Ability magic burst VFX cue");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Cast_Magic, "GameplayCue.Ability.Cast.Magic", "Ability magic cast VFX cue");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Active_Magic, "GameplayCue.Ability.Active.Magic", "Ability persistent magic VFX cue");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Impact_Magic, "GameplayCue.Ability.Impact.Magic", "Ability magic impact VFX cue");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Telegraph_Magic, "GameplayCue.Ability.Telegraph.Magic", "Ability magic telegraph VFX cue");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Reflect_Magic, "GameplayCue.Ability.Reflect.Magic", "Ability magic reflection VFX cue");
         }
     }
 

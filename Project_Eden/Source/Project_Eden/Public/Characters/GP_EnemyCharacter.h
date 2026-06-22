@@ -12,11 +12,16 @@ class UBehaviorTree;
 class UBlackboardData;
 class UEnemyAIRangeVisualizationComponent;
 class UEnemyArchetypeData;
+class UGP_EnemyDeathAbility;
+class UGP_WidgetComponent;
 class UPDA_EnemyAnimationSet;
+class AGP_EnemyCharacter;
 class AGP_PlayerState;
 struct FDataTableRowHandle;
 struct FEnemyArchetypeTuning;
 struct FEnemyLLMEvaluation;
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnEnemyDeathStarted, AGP_EnemyCharacter*, Enemy, AActor*, InstigatorActor);
 
 UENUM(BlueprintType)
 enum class EGPEnemyCombatArchetype : uint8
@@ -33,6 +38,7 @@ class PROJECT_EDEN_API AGP_EnemyCharacter : public AGP_BaseCharacter
 
 public:
 	AGP_EnemyCharacter();
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 	virtual UAttributeSet* GetAttributeSet() const override;
 	virtual void UpdateAnimationSet() override;
@@ -71,6 +77,19 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "AI|Combat")
 	FGameplayTag GetDefaultAttackAbilityTag() const { return DefaultAttackAbilityTag; }
+
+	UFUNCTION(BlueprintPure, Category = "Enemy|Death")
+	bool IsDead() const { return bIsDead; }
+
+	UFUNCTION(BlueprintPure, Category = "Enemy|UI")
+	UGP_WidgetComponent* GetWorldHealthBarComponent() const { return WorldHealthBarComponent; }
+
+	// Public authority entry point also supports scripted kills while zero-health deaths arrive through AttributeSet.
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Enemy|Death")
+	void RequestDeath(AActor* InstigatorActor);
+
+	UPROPERTY(BlueprintAssignable, Category = "Enemy|Death")
+	FOnEnemyDeathStarted OnEnemyDeathStarted;
 
 	UFUNCTION(BlueprintPure, Category = "AI")
 	UBehaviorTree* GetBehaviorTreeAssetOverride() const { return BehaviorTreeAssetOverride; }
@@ -169,12 +188,32 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|Abilities", meta = (EditCondition = "bGrantDefaultEnemyAttackAbility"))
 	FGameplayTag DefaultAttackAbilityTag;
 
+	// Every enemy receives one tag-addressable death ability unless StartupAbilities already supplies a custom replacement.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|Abilities")
+	bool bGrantDefaultEnemyDeathAbility = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|Abilities", meta = (EditCondition = "bGrantDefaultEnemyDeathAbility"))
+	TSubclassOf<UGameplayAbility> DefaultEnemyDeathAbilityClass;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Progression", meta = (ClampMin = "0.0"))
 	float XPReward = 25.0f;
 
+	// Regular enemies show this bar automatically; bosses keep using the dedicated HUD boss bar.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|UI")
+	bool bShowWorldHealthBar = true;
+
+	// No death montage is played yet; the actor remains visible in its current pose until this delay expires.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|Death", meta = (ClampMin = "0.0", Units = "s"))
+	float DeathDespawnDelay = 2.0f;
+
 	virtual void HandlePostDamageTaken(AActor* InstigatorActor, float DamageAmount, FGameplayTag ElementTag) override;
 
+	UFUNCTION(BlueprintImplementableEvent, Category = "Enemy|Death")
+	void BP_OnDeathStarted(AActor* InstigatorActor);
+
 private:
+	friend class UGP_EnemyDeathAbility;
+
 #if WITH_EDITORONLY_DATA
 	UPROPERTY(VisibleAnywhere, Category = "AI|Debug", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UEnemyAIRangeVisualizationComponent> AIRangeVisualizer;
@@ -186,14 +225,37 @@ private:
 	UPROPERTY()
 	TObjectPtr<UAttributeSet> AttributeSet;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Enemy|UI", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UGP_WidgetComponent> WorldHealthBarComponent;
+
 	FVector BehaviorAnchorLocation = FVector::ZeroVector;
 	bool bHasBehaviorAnchorLocation = false;
 	bool bXPRewardGranted = false;
+	bool bDeathRequested = false;
+
+	UPROPERTY(ReplicatedUsing = OnRep_IsDead)
+	bool bIsDead = false;
+
+	UPROPERTY(Replicated)
+	TObjectPtr<AActor> DeathInstigatorActor;
+
+	bool bDeathStateApplied = false;
 
 	const FEnemyArchetypeTuning* ResolveEnemyArchetypeTuning() const;
 	int32 ResolvePersonalitySeed() const;
 	void GiveDefaultEnemyAttackAbility();
+	void GiveDefaultEnemyDeathAbility();
 	void GiveDefaultBossPatternAbilities();
+
+	UFUNCTION()
+	void HandleOutOfHealth(AActor* InstigatorActor, AActor* TargetActor);
+
+	UFUNCTION()
+	void OnRep_IsDead();
+
+	void EnterDeathStateFromAbility();
+	void ApplyDeathState();
+	void RefreshWorldHealthBarVisibility();
 	void RefreshAIRangeVisualizers();
 	void GrantXPRewardToInstigator(AActor* InstigatorActor);
 	AGP_PlayerState* ResolveInstigatorPlayerState(AActor* InstigatorActor) const;

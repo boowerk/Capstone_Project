@@ -8,6 +8,7 @@
 #include "GameFramework/Pawn.h"
 #include "Player/GP_PlayerState.h"
 #include "Utils/GP_BlueprintLibrary.h"
+#include "VFX/GP_VisualCueResolver.h"
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 
 UGP_SkillBase::UGP_SkillBase()
@@ -368,32 +369,8 @@ UNiagaraSystem* UGP_SkillBase::GetSkillNiagaraSystem(const UGP_SkillData* SkillD
 		return nullptr;
 	}
 
-	UNiagaraSystem* BestNiagaraSystem = nullptr;
-	int32 BestScore = INDEX_NONE;
-
-	for (const FGP_SkillVisualCueEntry& Entry : SkillData->VisualCues)
-	{
-		if (Entry.VisualType != EGP_SkillVisualType::Niagara || !Entry.NiagaraSystem)
-		{
-			continue;
-		}
-
-		const bool bCueMatches = !Entry.CueTag.IsValid() || (CueTag.IsValid() && Entry.CueTag.MatchesTagExact(CueTag));
-		const bool bElementMatches = !Entry.ElementTag.IsValid() || (ElementTag.IsValid() && Entry.ElementTag.MatchesTagExact(ElementTag));
-		if (!bCueMatches || !bElementMatches)
-		{
-			continue;
-		}
-
-		const int32 Score = (Entry.CueTag.IsValid() ? 2 : 0) + (Entry.ElementTag.IsValid() ? 1 : 0);
-		if (Score > BestScore)
-		{
-			BestScore = Score;
-			BestNiagaraSystem = Entry.NiagaraSystem;
-		}
-	}
-
-	return BestNiagaraSystem;
+	// Player skills and actor-owned boss patterns now share the same cue/element specificity rule.
+	return GPVisualCueResolver::ResolveNiagara(SkillData->VisualCues, ElementTag, CueTag);
 }
 
 UNiagaraSystem* UGP_SkillBase::GetProjectileVisualSystem(const UGP_SkillData* SkillData, FGameplayTag ElementTag) const

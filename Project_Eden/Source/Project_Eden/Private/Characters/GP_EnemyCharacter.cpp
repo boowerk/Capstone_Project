@@ -1,9 +1,11 @@
 #include "Characters/GP_EnemyCharacter.h"
 
 #include "AI/Controllers/EnemyAIController.h"
+#include "AIController.h"
 #include "AI/Data/EnemyArchetypeData.h"
 #include "AI/Data/EnemyLLMEvaluation.h"
 #include "AI/Debug/EnemyAIRangeVisualizationComponent.h"
+#include "BrainComponent.h"
 #include "AbilitySystem/Abilities/Enemy/GP_BossAreaAttack.h"
 #include "AbilitySystem/Abilities/Enemy/GP_BossBasicAttack.h"
 #include "AbilitySystem/Abilities/Enemy/GP_BossGroundHandsAttack.h"
@@ -11,15 +13,22 @@
 #include "AbilitySystem/Abilities/Enemy/GP_BossSummonAdds.h"
 #include "AbilitySystem/Abilities/Enemy/GP_BossSweepAttack.h"
 #include "AbilitySystem/Abilities/Enemy/GP_EnemyAttack.h"
+#include "AbilitySystem/Abilities/Enemy/GP_EnemyDeathAbility.h"
 #include "AbilitySystem/GP_AbilitySystemComponent.h"
 #include "AbilitySystem/GP_AttributeSet.h"
-#include "Animation/PDA_EnemyAnimationSet.h"
 #include "Animation/AnimInstance.h"
+#include "Animation/PDA_EnemyAnimationSet.h"
+#include "Components/CapsuleComponent.h"
 #include "Engine/DataTable.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/Pawn.h"
 #include "GameplayTags/GP_Tags.h"
+#include "Net/UnrealNetwork.h"
 #include "Player/GP_PlayerState.h"
+#include "UI/GP_AttributeWidget.h"
+#include "UI/GP_WidgetComponent.h"
+#include "UObject/ConstructorHelpers.h"
 
 AGP_EnemyCharacter::AGP_EnemyCharacter()
 {
@@ -33,6 +42,24 @@ AGP_EnemyCharacter::AGP_EnemyCharacter()
 
 	DefaultEnemyAttackAbilityClass = UGP_EnemyAttack::StaticClass();
 	DefaultAttackAbilityTag = GPTags::Ability::Enemy::Attack_Melee;
+	DefaultEnemyDeathAbilityClass = UGP_EnemyDeathAbility::StaticClass();
+
+	WorldHealthBarComponent = CreateDefaultSubobject<UGP_WidgetComponent>(TEXT("WorldHealthBarComponent"));
+	WorldHealthBarComponent->SetupAttachment(GetRootComponent());
+	WorldHealthBarComponent->SetRelativeLocation(FVector(0.0f, 0.0f, 135.0f));
+	WorldHealthBarComponent->SetWidgetSpace(EWidgetSpace::Screen);
+	WorldHealthBarComponent->SetDrawAtDesiredSize(true);
+	WorldHealthBarComponent->SetPivot(FVector2D(0.5f, 1.0f));
+	WorldHealthBarComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	WorldHealthBarComponent->SetGenerateOverlapEvents(false);
+	WorldHealthBarComponent->SetCastShadow(false);
+
+	// Existing Blueprint enemies receive the shared health bar asset through their native parent automatically.
+	static ConstructorHelpers::FClassFinder<UGP_AttributeWidget> EnemyHealthBarFinder(TEXT("/Game/UI/WBP_EnemyHealthBar"));
+	if (EnemyHealthBarFinder.Succeeded())
+	{
+		WorldHealthBarComponent->SetWidgetClass(EnemyHealthBarFinder.Class);
+	}
 
 	// 적은 배치/스폰 시 공용 AIController를 자동 점유해 BT/Blackboard 초기화를 컨트롤러에 위임한다.
 	AIControllerClass = AEnemyAIController::StaticClass();
@@ -90,6 +117,8 @@ void AGP_EnemyCharacter::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
 
+	RefreshWorldHealthBarVisibility();
+
 	// Keep editor range rings in sync when designers move the anchor or change range values.
 	RefreshAIRangeVisualizers();
 }
@@ -120,6 +149,7 @@ FText AGP_EnemyCharacter::GetBossDisplayName() const
 void AGP_EnemyCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+	RefreshWorldHealthBarVisibility();
 
 	if (IsValid(EnemyAnimationSet))
 	{
@@ -137,6 +167,11 @@ void AGP_EnemyCharacter::BeginPlay()
 
 	GetAbilitySystemComponent()->InitAbilityActorInfo(this, this);
 	OnASCInitialized.Broadcast(GetAbilitySystemComponent(), GetAttributeSet());
+	if (UGP_AttributeSet* EnemyAttributeSet = Cast<UGP_AttributeSet>(GetAttributeSet()))
+	{
+		// AttributeSet publishes the terminal health event; the enemy translates it into a GAS death request.
+		EnemyAttributeSet->OnOutOfHealth.AddUniqueDynamic(this, &ThisClass::HandleOutOfHealth);
+	}
 
 	if (!HasAuthority())
 	{
@@ -144,6 +179,7 @@ void AGP_EnemyCharacter::BeginPlay()
 	}
 
 	GiveStartupAbilities();
+	GiveDefaultEnemyDeathAbility();
 	GiveDefaultEnemyAttackAbility();
 	if (bIsBossEnemy && bGrantDefaultBossPatternAbilities)
 	{
@@ -237,6 +273,35 @@ void AGP_EnemyCharacter::GiveDefaultEnemyAttackAbility()
 	}
 }
 
+void AGP_EnemyCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(AGP_EnemyCharacter, bIsDead);
+	DOREPLIFETIME(AGP_EnemyCharacter, DeathInstigatorActor);
+}
+
+void AGP_EnemyCharacter::GiveDefaultEnemyDeathAbility()
+{
+	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+	if (!bGrantDefaultEnemyDeathAbility || !IsValid(ASC) || !DefaultEnemyDeathAbilityClass)
+	{
+		return;
+	}
+
+	for (const FGameplayAbilitySpec& AbilitySpec : ASC->GetActivatableAbilities())
+	{
+		if (IsValid(AbilitySpec.Ability)
+			&& AbilitySpec.Ability->GetAssetTags().HasTagExact(GPTags::Ability::Enemy::Death))
+		{
+			// A tag-compatible StartupAbility is the extension point for a future animated death ability.
+			return;
+		}
+	}
+
+	ASC->GiveAbility(FGameplayAbilitySpec(DefaultEnemyDeathAbilityClass));
+}
+
 void AGP_EnemyCharacter::HandlePostDamageTaken(AActor* InstigatorActor, float DamageAmount, FGameplayTag ElementTag)
 {
 	Super::HandlePostDamageTaken(InstigatorActor, DamageAmount, ElementTag);
@@ -249,6 +314,126 @@ void AGP_EnemyCharacter::HandlePostDamageTaken(AActor* InstigatorActor, float Da
 
 	bXPRewardGranted = true;
 	GrantXPRewardToInstigator(InstigatorActor);
+}
+
+void AGP_EnemyCharacter::HandleOutOfHealth(AActor* InstigatorActor, AActor* TargetActor)
+{
+	if (TargetActor != this || !HasAuthority())
+	{
+		return;
+	}
+
+	RequestDeath(InstigatorActor);
+}
+
+void AGP_EnemyCharacter::RequestDeath(AActor* InstigatorActor)
+{
+	if (!HasAuthority() || bIsDead || bDeathRequested)
+	{
+		return;
+	}
+
+	bDeathRequested = true;
+	DeathInstigatorActor = InstigatorActor;
+	UGP_AbilitySystemComponent* ASC = Cast<UGP_AbilitySystemComponent>(GetAbilitySystemComponent());
+	const bool bDeathAbilityStarted = IsValid(ASC)
+		&& ASC->TryActivateAbilityByTag(GPTags::Ability::Enemy::Death);
+	if (!bDeathAbilityStarted)
+	{
+		// Death is a mandatory invariant, so a missing/misconfigured custom ability cannot leave a zero-health enemy alive.
+		UE_LOG(LogTemp, Warning, TEXT("[EnemyDeath] Death ability failed; applying native fallback. Enemy=%s"), *GetNameSafe(this));
+		EnterDeathStateFromAbility();
+	}
+}
+
+void AGP_EnemyCharacter::EnterDeathStateFromAbility()
+{
+	if (!HasAuthority() || bIsDead)
+	{
+		return;
+	}
+
+	bIsDead = true;
+	bDeathRequested = true;
+	if (UAbilitySystemComponent* ASC = GetAbilitySystemComponent())
+	{
+		// The persistent loose tag remains after the short death ability ends and identifies the terminal state to GAS queries.
+		ASC->AddLooseGameplayTag(GPTags::Ability::Enemy::Death);
+	}
+
+	ApplyDeathState();
+	ForceNetUpdate();
+}
+
+void AGP_EnemyCharacter::OnRep_IsDead()
+{
+	if (bIsDead)
+	{
+		ApplyDeathState();
+	}
+}
+
+void AGP_EnemyCharacter::ApplyDeathState()
+{
+	if (bDeathStateApplied)
+	{
+		return;
+	}
+
+	bDeathStateApplied = true;
+	RefreshWorldHealthBarVisibility();
+	SetCanBeDamaged(false);
+	SetActorTickEnabled(false);
+	SetActorEnableCollision(false);
+
+	if (UCapsuleComponent* EnemyCapsule = GetCapsuleComponent())
+	{
+		EnemyCapsule->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
+
+	if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
+	{
+		MovementComponent->StopMovementImmediately();
+		MovementComponent->DisableMovement();
+	}
+
+	// Notify presentation before scheduling destruction so a zero-delay setup can still react safely.
+	OnEnemyDeathStarted.Broadcast(this, DeathInstigatorActor);
+	BP_OnDeathStarted(DeathInstigatorActor);
+
+	if (HasAuthority())
+	{
+		if (AAIController* AIController = Cast<AAIController>(GetController()))
+		{
+			AIController->StopMovement();
+			if (UBrainComponent* BrainComponent = AIController->GetBrainComponent())
+			{
+				// Stop the Behavior Tree before detaching so no task can enqueue another attack during the corpse delay.
+				BrainComponent->StopLogic(TEXT("Enemy health reached zero"));
+			}
+		}
+
+		DetachFromControllerPendingDestroy();
+		if (DeathDespawnDelay <= KINDA_SMALL_NUMBER)
+		{
+			Destroy();
+		}
+		else
+		{
+			SetLifeSpan(DeathDespawnDelay);
+		}
+	}
+}
+
+void AGP_EnemyCharacter::RefreshWorldHealthBarVisibility()
+{
+	if (!IsValid(WorldHealthBarComponent))
+	{
+		return;
+	}
+
+	// Bosses already have a dedicated HUD bar, while dead enemies must not leave an orphaned screen-space bar.
+	WorldHealthBarComponent->SetVisibility(bShowWorldHealthBar && !bIsBossEnemy && !bIsDead, true);
 }
 
 void AGP_EnemyCharacter::GrantXPRewardToInstigator(AActor* InstigatorActor)

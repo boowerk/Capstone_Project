@@ -94,6 +94,20 @@ namespace GPTags
 				UE_DECLARE_GAMEPLAY_TAG_EXTERN(Groggy);
 				UE_DECLARE_GAMEPLAY_TAG_EXTERN(Teleport);
 			}
+			namespace DarkKnight
+			{
+				// Dedicated tags keep Dark Armor Knight selection inside the shared GAS boss executor.
+				UE_DECLARE_GAMEPLAY_TAG_EXTERN(Basic);
+				UE_DECLARE_GAMEPLAY_TAG_EXTERN(Heavy);
+				UE_DECLARE_GAMEPLAY_TAG_EXTERN(Sweep);
+				UE_DECLARE_GAMEPLAY_TAG_EXTERN(Guard);
+				UE_DECLARE_GAMEPLAY_TAG_EXTERN(Parry);
+				UE_DECLARE_GAMEPLAY_TAG_EXTERN(Counter);
+				UE_DECLARE_GAMEPLAY_TAG_EXTERN(Charge);
+				UE_DECLARE_GAMEPLAY_TAG_EXTERN(DarkWave);
+				UE_DECLARE_GAMEPLAY_TAG_EXTERN(GroundCrack);
+				UE_DECLARE_GAMEPLAY_TAG_EXTERN(Groggy);
+			}
 		}
 	}
 	
@@ -148,6 +162,9 @@ namespace GPTags
 				UE_DECLARE_GAMEPLAY_TAG_EXTERN(CrystalGuarded); // Crystal Seraph guarded damage reduction state
 				UE_DECLARE_GAMEPLAY_TAG_EXTERN(WingCoreExposed); // Crystal Seraph partial vulnerability window
 				UE_DECLARE_GAMEPLAY_TAG_EXTERN(Groggy);         // Groggy removes guarded damage reduction
+				UE_DECLARE_GAMEPLAY_TAG_EXTERN(DarkGuarded);    // Dark Armor Knight directional guard
+				UE_DECLARE_GAMEPLAY_TAG_EXTERN(ParryWindow);    // Dark Armor Knight active parry window
+				UE_DECLARE_GAMEPLAY_TAG_EXTERN(GuardBroken);    // Dark Armor Knight guard depleted
 			}
 		}
 		namespace Movement
@@ -213,6 +230,11 @@ namespace GPTags
 		{
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Trail_Magic);
 			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Burst_Magic);
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Cast_Magic);
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Active_Magic);
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Impact_Magic);
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Telegraph_Magic);
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(Reflect_Magic);
 		}
 	}
 

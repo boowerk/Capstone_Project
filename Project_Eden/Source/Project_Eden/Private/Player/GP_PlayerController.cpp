@@ -162,7 +162,7 @@ void AGP_PlayerController::Tick(float DeltaSeconds)
 	{
 		// Controller tick keeps minimap updates alive even if the widget native tick is disabled.
 		HUDWidget->RefreshMinimapBackgroundFromSubsystem();
-		HUDWidget->RefreshMinimapPlayerArrowRotation();
+		HUDWidget->RefreshMinimapPresentation(DeltaSeconds);
 	}
 
 	BossRefreshAccumulator += DeltaSeconds;

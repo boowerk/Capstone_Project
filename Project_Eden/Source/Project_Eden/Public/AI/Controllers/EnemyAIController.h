@@ -13,6 +13,7 @@ class UAISenseConfig_Sight;
 class UBehaviorTree;
 class UBlackboardComponent;
 class UBlackboardData;
+class FCrystalSeraphPatrolRecoveryTest;
 
 UCLASS()
 class PROJECT_EDEN_API AEnemyAIController : public AAIController
@@ -21,6 +22,7 @@ class PROJECT_EDEN_API AEnemyAIController : public AAIController
 
 public:
 	AEnemyAIController();
+	virtual FPathFollowingRequestResult MoveTo(const FAIMoveRequest& MoveRequest, FNavPathSharedPtr* OutPath = nullptr) override;
 
 	// Applies high-level LLM/archetype tuning values to Blackboard; tactical bools are owned by BT services.
 	bool SubmitEnemyEvaluation(const FEnemyLLMEvaluation& InEvaluation, bool bForceImmediate = false);
@@ -34,6 +36,7 @@ public:
 
 	// BT services can ask perception to rescore targets after a leash state or tactical state change.
 	void RequestTargetActorReevaluation();
+	bool HasCurrentlyPerceivedTargetCandidate() const;
 
 	// Boss tactics services use this to open deterministic pattern windows while validating runtime evaluation changes.
 	bool IsBossRuntimeEvaluationTestCycleActive() const;
@@ -157,4 +160,10 @@ protected:
 	float LastEnemyEvaluationApplyTime = -1000.0f;
 	FEnemyLLMEvaluation PendingEnemyEvaluation;
 	FEnemyLLMEvaluation LastAppliedEnemyEvaluation;
+
+private:
+	friend class FCrystalSeraphPatrolRecoveryTest;
+
+	static bool ShouldUseDirectFlyingMove(const APawn* ControlledPawn, const FAIMoveRequest& MoveRequest);
+	static FVector ResolveDirectFlyingGoal(const APawn* ControlledPawn, const FAIMoveRequest& MoveRequest);
 };

@@ -4,6 +4,7 @@
 #include "AI/Data/EnemyBlackboardKeys.h"
 #include "AI/Data/EnemyLLMEvaluation.h"
 #include "AI/Debug/EnemyAIDebugUtils.h"
+#include "AI/Services/EnemyLeashPolicy.h"
 #include "AI/Tasks/BossAttackPatternSelector.h"
 #include "AI/Tasks/EnemyBTTaskCommon.h"
 #include "AIController.h"
@@ -192,17 +193,30 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 		&& EnemyAIController->IsLeashReturnHomeActive()
 		&& AIController->GetMoveStatus() != EPathFollowingStatus::Moving
 		&& DistanceFromHome <= FailSafeReturnHomeAcceptanceRadius;
-	bool bShouldReturnHome = bEnableLeashReturnHome
-		&& IsValid(EnemyAIController)
-		&& EnemyAIController->IsLeashReturnHomeActive()
-		&& DistanceFromHome > EffectiveReturnHomeAcceptanceRadius
-		&& !bReturnMoveStoppedNearHome;
-
-	if (bEnableLeashReturnHome && IsValid(EnemyAIController) && IsValid(TargetActor) && DistanceFromHome > EffectiveMaxChaseDistanceFromHome)
+	FEnemyLeashObservation LeashObservation;
+	LeashObservation.bEnabled = bEnableLeashReturnHome && IsValid(EnemyAIController);
+	LeashObservation.bCurrentlyReturningHome = IsValid(EnemyAIController) && EnemyAIController->IsLeashReturnHomeActive();
+	LeashObservation.bHasVisibleTarget = IsValid(EnemyAIController) && EnemyAIController->HasCurrentlyPerceivedTargetCandidate();
+	LeashObservation.bReturnMoveStoppedNearHome = bReturnMoveStoppedNearHome;
+	LeashObservation.DistanceFromHome = DistanceFromHome;
+	LeashObservation.MaxChaseDistanceFromHome = EffectiveMaxChaseDistanceFromHome;
+	LeashObservation.ReengageDistanceFromHome = FMath::Max(
+		EffectiveReturnHomeAcceptanceRadius,
+		EffectiveMaxChaseDistanceFromHome * FMath::Clamp(ReturnHomeReengageDistanceRatio, 0.0f, 1.0f));
+	LeashObservation.ReturnHomeAcceptanceRadius = EffectiveReturnHomeAcceptanceRadius;
+	const bool bShouldReturnHome = EnemyLeashPolicy::ShouldReturnHome(LeashObservation);
+	const bool bReengagingDuringReturn = LeashObservation.bCurrentlyReturningHome
+		&& !bShouldReturnHome
+		&& LeashObservation.bHasVisibleTarget
+		&& DistanceFromHome > EffectiveReturnHomeAcceptanceRadius;
+	if (bReengagingDuringReturn)
 	{
-		// Enemy Character range settings define the actual leash distance used by this service.
-		// The leash is an AI rule, but movement remains a Behavior Tree MoveTo driven by MoveToLocation.
-		bShouldReturnHome = true;
+		UE_LOG(
+			LogEnemyAI,
+			Log,
+			TEXT("[Leash] Visible target re-engaged inside anchor hysteresis: DistFromHome=%.0f Pawn=%s"),
+			DistanceFromHome,
+			*EnemyAIDebugUtils::DescribeActor(ControlledPawn));
 	}
 
 	if (IsValid(EnemyAIController))

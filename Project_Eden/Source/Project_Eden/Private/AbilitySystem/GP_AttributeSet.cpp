@@ -45,6 +45,25 @@ void UGP_AttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallbac
 	}
 
 	UAbilitySystemComponent* TargetASC = GetOwningAbilitySystemComponent();
+	auto TryBroadcastOutOfHealth = [this, TargetASC, &Data]()
+	{
+		if (GetHealth() > KINDA_SMALL_NUMBER)
+		{
+			// A future revive can open a new death transition without duplicating the current one.
+			bOutOfHealthEventSent = false;
+			return;
+		}
+
+		if (bOutOfHealthEventSent)
+		{
+			return;
+		}
+
+		bOutOfHealthEventSent = true;
+		AActor* TargetActor = IsValid(TargetASC) ? TargetASC->GetAvatarActor() : GetOwningActor();
+		AActor* InstigatorActor = Data.EffectSpec.GetContext().GetOriginalInstigator();
+		OnOutOfHealth.Broadcast(InstigatorActor, TargetActor);
+	};
 
 	if (Data.EvaluatedData.Attribute == GetDamageAttribute())
 	{
@@ -102,7 +121,13 @@ void UGP_AttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallbac
 
 			// 4. UI 및 데미지 처리를 위한 델리게이트 방송 (기존 유지)
 			OnDamageTaken.Broadcast(InstigatorActor, TargetActor, LocalDamageDone, ElementTag);
+			TryBroadcastOutOfHealth();
 		}
+	}
+	else if (Data.EvaluatedData.Attribute == GetHealthAttribute())
+	{
+		// Direct Health gameplay effects use the same terminal event as meta Damage effects.
+		TryBroadcastOutOfHealth();
 	}
 
 	// 신규 기능: 강인도 데미지 처리
