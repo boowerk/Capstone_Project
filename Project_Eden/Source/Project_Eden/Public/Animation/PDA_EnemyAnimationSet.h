@@ -37,6 +37,13 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Combat")
 	TArray<TObjectPtr<UAnimMontage>> LightAttackMontages;
 
+	/**
+	 * Optional lower-body root-motion clips paired by index with LightAttackMontages.
+	 * Leave an entry empty when that attack should remain in-place.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Combat|Root Motion")
+	TArray<TObjectPtr<UAnimSequence>> LowerBodyRootMotionSequences;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Combat")
 	TArray<TObjectPtr<UAnimMontage>> HitMontages;
 

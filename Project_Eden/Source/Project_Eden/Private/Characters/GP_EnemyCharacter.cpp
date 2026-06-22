@@ -14,6 +14,7 @@
 #include "AbilitySystem/GP_AbilitySystemComponent.h"
 #include "AbilitySystem/GP_AttributeSet.h"
 #include "Animation/PDA_EnemyAnimationSet.h"
+#include "Animation/AnimInstance.h"
 #include "Engine/DataTable.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/Pawn.h"
@@ -119,6 +120,15 @@ FText AGP_EnemyCharacter::GetBossDisplayName() const
 void AGP_EnemyCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+
+	if (IsValid(EnemyAnimationSet))
+	{
+		if (UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance())
+		{
+			// Enemy attack movement is authored in lower-body montage root motion.
+			AnimInstance->SetRootMotionMode(ERootMotionMode::RootMotionFromMontagesOnly);
+		}
+	}
 
 	if (!IsValid(GetAbilitySystemComponent()))
 	{
