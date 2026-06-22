@@ -2,7 +2,7 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-06-23T08:39:35+09:00
+updated: 2026-06-23T08:45:06+09:00
 status: active
 ---
 # Session Summary
@@ -10,7 +10,7 @@ status: active
 ## Status
 - Non-Sans boss attack boundaries now honor `Boss Telegraph VFX`.
 - Crystal/Matador inherit it; Dark Knight reuses its BP component; Sans has none.
-- Disabled adds no delay; enabled multicasts Niagara, waits Telegraph Duration, then starts the existing GAS pattern.
+- Enabled cues wait Telegraph Duration; Dark charge avoids replaying its internal cue.
 
 ## Editor
 - Select `Boss Telegraph VFX`, assign System Asset, tune duration/scale, and enable `Telegraph VFX On/Off`.

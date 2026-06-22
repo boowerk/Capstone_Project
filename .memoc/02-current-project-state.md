@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-06-23T08:39:35+09:00
+updated: 2026-06-23T08:45:06+09:00
 status: active
 tags:
   - memoc
@@ -11,12 +11,12 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-06-23T08:39:35+09:00
+Last synced: 2026-06-23T08:45:06+09:00
 
 ## Current Status
 
 - `/Game/Maps/MainMap/L_LandscapeMap` now contains a completed Landscape Sculpt terrain pass (`58c9391e`, `086dadc5`): broad western and central/eastern highlands, northern peaks, coastal ridges, cliff-like mesas, playable flattened zones, a west/central separating valley, internal low routes, erosion detail, and a lower southern bay. It intentionally remains material-, water-, road-, and foliage-free for later environment passes.
-- `UGP_BossTelegraphVFXComponent` now owns an editable `Telegraph VFX On/Off` bool in addition to Niagara asset, uniform scale, and lead time. Crystal Seraph and Matador inherit one inactive native component; Dark Armor Knight reuses its existing BP-added component to avoid duplication; Sans remains excluded. When enabled, damaging GAS patterns play the configured cue and wait for its duration before existing pattern startup. Groggy/teleport utilities bypass it, Matador reserves delayed bull state, and the cue multicasts from authority. Editor build plus `ProjectEden.Combat.Boss.TelegraphVFXConfiguration` and the legacy charge test pass.
+- `UGP_BossTelegraphVFXComponent` now owns an editable `Telegraph VFX On/Off` bool in addition to Niagara asset, uniform scale, and lead time. Crystal Seraph and Matador inherit one inactive native component; Dark Armor Knight reuses its existing BP-added component to avoid duplication; Sans remains excluded. When enabled, damaging GAS patterns play the configured cue and wait for its duration before existing pattern startup. Groggy/teleport utilities bypass it, Matador reserves delayed bull state, and the cue multicasts from authority. Dark Knight charge skips its coordinator cue/delay when the boss cue already ran, preventing duplicate warnings. Editor build plus `ProjectEden.Combat.Boss.TelegraphVFXConfiguration` and the legacy charge test pass.
 - Minimap is now a one-shot PCG map pipeline (`a88bfee6`, `b3652834`, `e6806c69`): after PCG reports ready and stays idle for three polls, one orthographic full-map frame is captured from runtime PCG bounds, GPU-copied to the stable HUD RenderTarget, then SceneCapture and actor tick are disabled. `M_UI_Minimap_StaticMap` pans/zooms that fixed texture from C++ world-to-UV mapping; the player arrow and pooled `T_UI_Minimap_Point_Red` enemy Images remain separate UMG widgets.
 - Enemy leash uses anchor hysteresis: crossing `ReturnHomeDistance` starts return even with a target; after returning inside 75% of that distance, a visible player interrupts return and reopens combat.
 - Basic melee, ranged, and flying enemies inherit a native screen-space `WorldHealthBarComponent` from `AGP_EnemyCharacter`. It uses `WBP_EnemyHealthBar`, tracks GAS Health/MaxHealth, stays visible at full health, and hides on death; bosses keep the dedicated HUD bar.
