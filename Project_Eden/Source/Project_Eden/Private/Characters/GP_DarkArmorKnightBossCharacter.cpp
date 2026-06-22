@@ -25,6 +25,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
+#include "VFX/GP_BossTelegraphVFXComponent.h"
 
 AGP_DarkArmorKnightBossCharacter::AGP_DarkArmorKnightBossCharacter()
 {
@@ -35,6 +36,10 @@ AGP_DarkArmorKnightBossCharacter::AGP_DarkArmorKnightBossCharacter()
 	BossDisplayName = NSLOCTEXT("GPDarkArmorKnightBoss", "BossDisplayName", "Dark Armor Knight");
 
 	DarkKnightStateComponent = CreateDefaultSubobject<UGP_DarkArmorKnightStateComponent>(TEXT("DarkKnightStateComponent"));
+	// Boss Blueprints inherit this inactive component and opt in through Telegraph VFX On/Off.
+	BossTelegraphVFXComponent = CreateDefaultSubobject<UGP_BossTelegraphVFXComponent>(TEXT("BossTelegraphVFXComponent"));
+	BossTelegraphVFXComponent->SetupAttachment(GetRootComponent());
+	BossTelegraphVFXComponent->SetAutoActivate(false);
 	DarkWaveProjectileClass = AGP_DarkWaveProjectile::StaticClass();
 	GroundCrackActorClass = AGP_DarkKnightGroundCrackActor::StaticClass();
 	ChargeActorClass = AGP_DarkKnightChargeActor::StaticClass();
@@ -379,7 +384,24 @@ bool AGP_DarkArmorKnightBossCharacter::StartPatternWithWindup(FGameplayTag Patte
 	TargetActor = ResolvePatternTarget(TargetActor);
 	const bool bUsesWindup = PatternTag != GPTags::Ability::Boss::DarkKnight::Charge
 		&& PatternTag != GPTags::Ability::Boss::DarkKnight::Groggy;
-	if (!bUsesWindup || !IsValid(PreAttackMontage))
+	bool bWindupStarted = false;
+	if (bUsesWindup && IsValid(PreAttackMontage))
+	{
+		UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
+		if (!IsValid(AnimInstance) || AnimInstance->Montage_Play(PreAttackMontage, 1.0f) <= 0.0f)
+		{
+			return false;
+		}
+		bWindupStarted = true;
+	}
+
+	// Groggy is a state reaction, not an authored attack, so it deliberately bypasses the optional VFX lead-in.
+	const float TelegraphDelay = PatternTag != GPTags::Ability::Boss::DarkKnight::Groggy && IsValid(BossTelegraphVFXComponent)
+		? BossTelegraphVFXComponent->PlayEnabledTelegraph()
+		: 0.0f;
+	const float WindupDelay = bWindupStarted ? FMath::Max(0.0f, PreAttackDuration) : 0.0f;
+	const float ExecutionDelay = FMath::Max(WindupDelay, TelegraphDelay);
+	if (ExecutionDelay <= KINDA_SMALL_NUMBER)
 	{
 		const bool bExecuted = ExecutePatternNow(PatternTag, TargetActor);
 		if (bExecuted && PatternTag != GPTags::Ability::Boss::DarkKnight::Charge)
@@ -389,12 +411,6 @@ bool AGP_DarkArmorKnightBossCharacter::StartPatternWithWindup(FGameplayTag Patte
 		return bExecuted;
 	}
 
-	UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
-	if (!IsValid(AnimInstance) || AnimInstance->Montage_Play(PreAttackMontage, 1.0f) <= 0.0f)
-	{
-		return false;
-	}
-
 	FTimerHandle& Handle = PatternTimerHandles.AddDefaulted_GetRef();
 	GetWorldTimerManager().SetTimer(Handle, [WeakThis = TWeakObjectPtr<AGP_DarkArmorKnightBossCharacter>(this), WeakTarget = TWeakObjectPtr<AActor>(TargetActor), PatternTag]()
 	{
@@ -402,11 +418,12 @@ bool AGP_DarkArmorKnightBossCharacter::StartPatternWithWindup(FGameplayTag Patte
 		{
 			return;
 		}
-		if (WeakThis->ExecutePatternNow(PatternTag, WeakTarget.Get()))
+		if (WeakThis->ExecutePatternNow(PatternTag, WeakTarget.Get())
+			&& PatternTag != GPTags::Ability::Boss::DarkKnight::Charge)
 		{
 			WeakThis->PlayPatternMontage(PatternTag);
 		}
-	}, PreAttackDuration, false);
+	}, ExecutionDelay, false);
 	return true;
 }
 
