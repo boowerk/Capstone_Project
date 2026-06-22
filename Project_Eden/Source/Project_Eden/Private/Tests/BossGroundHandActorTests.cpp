@@ -84,7 +84,10 @@ bool FBossGroundHandUsesVisualBlueprintTest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("Ground Hands visual Blueprint has valid defaults"), VisualDefaults);
 	if (IsValid(VisualDefaults))
 	{
-		TestEqual(TEXT("Ground Hands visual Blueprint starts at a reduced scale"), VisualDefaults->GetHandVisualScale(), 0.35f);
+		// Designers may keep tuning the BP, so preserve the reduced-size contract instead of pinning one art value.
+		TestTrue(
+			TEXT("Ground Hands visual Blueprint keeps a reduced positive scale"),
+			VisualDefaults->GetHandVisualScale() > 0.0f && VisualDefaults->GetHandVisualScale() < 1.0f);
 	}
 
 	return true;
