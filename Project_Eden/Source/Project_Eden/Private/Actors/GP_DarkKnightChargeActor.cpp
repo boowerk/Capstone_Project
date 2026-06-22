@@ -71,6 +71,25 @@ void AGP_DarkKnightChargeActor::Tick(float DeltaSeconds)
 		return;
 	}
 
+	if (bUseMontageRootMotion)
+	{
+		ChargeElapsed += DeltaSeconds;
+		SetActorLocation(Boss->GetActorLocation());
+		if (IsValid(Target) && FVector::Dist2D(Boss->GetActorLocation(), Target->GetActorLocation()) <= HitRadius)
+		{
+			TArray<AActor*> Targets { Target };
+			GPBossCombatUtils::ApplyDamage(Boss, Targets, DamageEffectClass, AttackPowerDamageCoefficient, 0.0f, false, GPTags::Damage::Element::Brute);
+			FinishCharge(true);
+			return;
+		}
+
+		if (ChargeElapsed >= RootMotionChargeDuration)
+		{
+			FinishCharge(false);
+		}
+		return;
+	}
+
 	const float Step = FMath::Min(FMath::Max(0.0f, ChargeSpeed) * DeltaSeconds, MaxChargeDistance - DistanceTravelled);
 	FHitResult MoveHit;
 	Boss->AddActorWorldOffset(ChargeDirection * Step, true, &MoveHit);
@@ -108,7 +127,9 @@ void AGP_DarkKnightChargeActor::StartCharge()
 		return;
 	}
 	bChargeActive = true;
+	ChargeElapsed = 0.0f;
 	TelegraphMesh->SetVisibility(false, true);
+	Boss->PlayPatternMontage(GPTags::Ability::Boss::DarkKnight::Charge);
 	SetActorTickEnabled(true);
 	BP_OnChargeStarted();
 }

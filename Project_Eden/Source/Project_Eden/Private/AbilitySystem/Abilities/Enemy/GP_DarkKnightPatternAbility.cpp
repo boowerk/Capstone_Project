@@ -70,7 +70,7 @@ void UGP_DarkKnightPatternAbility::ActivateAbility(
 	const bool bStarted = bCadenceReserved
 		&& HasAuthority(&ActivationInfo)
 		&& IsValid(Boss)
-		&& ExecuteDarkKnightPattern(Boss, ResolvePatternTarget(TriggerEventData));
+		&& Boss->StartPatternWithWindup(GetPatternTag(), ResolvePatternTarget(TriggerEventData));
 
 	UE_LOG(LogEnemyAI, Log, TEXT("[BossAI] Dark Knight pattern requested. Ability=%s Boss=%s Started=%d"),
 		*GetNameSafe(this), *EnemyAIDebugUtils::DescribeActor(Boss), bStarted ? 1 : 0);
