@@ -1,6 +1,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "AI/Tasks/BossAttackPatternSelector.h"
+#include "Actors/GP_DarkKnightChargeActor.h"
 #include "Actors/GP_DarkKnightGroundCrackActor.h"
 #include "Actors/GP_DarkWaveProjectile.h"
 #include "Characters/GP_DarkArmorKnightBossCharacter.h"
@@ -10,6 +11,8 @@
 #include "Engine/World.h"
 #include "GameplayTags/GP_Tags.h"
 #include "Misc/AutomationTest.h"
+#include "NiagaraComponent.h"
+#include "NiagaraSystem.h"
 
 namespace DarkArmorKnightBossTests
 {
@@ -127,6 +130,37 @@ bool FDarkArmorKnightGuardLifecycleTest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("Ground crack has a replaceable primitive mesh"), IsValid(Crack) ? Crack->FindComponentByClass<UStaticMeshComponent>() : nullptr);
 
 	TestWorld->DestroyWorld(false);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FDarkArmorKnightChargeTelegraphVFXTest,
+	"ProjectEden.Combat.DarkArmorKnight.ChargeTelegraphVFX",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FDarkArmorKnightChargeTelegraphVFXTest::RunTest(const FString& Parameters)
+{
+	// Keep the lightning warning on the replicated charge coordinator instead of server-only spawned presentation.
+	const AGP_DarkKnightChargeActor* ChargeDefaults = GetDefault<AGP_DarkKnightChargeActor>();
+	const UNiagaraComponent* TelegraphVFX = IsValid(ChargeDefaults)
+		? ChargeDefaults->FindComponentByClass<UNiagaraComponent>()
+		: nullptr;
+	const UNiagaraSystem* TelegraphSystem = IsValid(TelegraphVFX) ? TelegraphVFX->GetAsset() : nullptr;
+
+	TestNotNull(TEXT("Charge actor owns a Niagara telegraph component"), TelegraphVFX);
+	TestNotNull(TEXT("Charge telegraph component loads the lightning system"), TelegraphSystem);
+	if (IsValid(TelegraphVFX))
+	{
+		TestTrue(TEXT("Charge lightning auto-activates when the coordinator spawns"), TelegraphVFX->bAutoActivate);
+	}
+	if (IsValid(TelegraphSystem))
+	{
+		TestEqual(
+			TEXT("Charge uses the requested lightning telegraph asset"),
+			TelegraphSystem->GetPathName(),
+			FString(TEXT("/Game/Niagara/Vefects/Easy_Impact_Frames/VFX/Extras/Particles/NS_Extra_Lightning_Example_VFX.NS_Extra_Lightning_Example_VFX")));
+	}
+
 	return true;
 }
 
