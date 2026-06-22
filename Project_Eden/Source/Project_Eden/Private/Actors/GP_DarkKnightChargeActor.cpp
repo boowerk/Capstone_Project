@@ -4,10 +4,9 @@
 #include "Characters/GP_DarkArmorKnightBossCharacter.h"
 #include "Components/StaticMeshComponent.h"
 #include "GameplayEffect.h"
-#include "NiagaraComponent.h"
-#include "NiagaraSystem.h"
 #include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
+#include "VFX/GP_BossTelegraphVFXComponent.h"
 
 AGP_DarkKnightChargeActor::AGP_DarkKnightChargeActor()
 {
@@ -23,22 +22,14 @@ AGP_DarkKnightChargeActor::AGP_DarkKnightChargeActor()
 	TelegraphMesh->SetRelativeLocation(FVector(800.0f, 0.0f, 12.0f));
 	TelegraphMesh->SetRelativeScale3D(FVector(16.0f, 3.6f, 0.04f));
 
-	// The replicated charge actor starts at the boss transform, so every client receives the same lightning tell.
-	ChargeTelegraphVFXComponent = CreateDefaultSubobject<UNiagaraComponent>(TEXT("ChargeTelegraphVFXComponent"));
+	// Reusable designer component exposes its Niagara asset, scale, auto-activation, and lead time in Blueprint Details.
+	ChargeTelegraphVFXComponent = CreateDefaultSubobject<UGP_BossTelegraphVFXComponent>(TEXT("ChargeTelegraphVFXComponent"));
 	ChargeTelegraphVFXComponent->SetupAttachment(SceneRoot);
-	ChargeTelegraphVFXComponent->SetAutoActivate(true);
 
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMeshFinder(TEXT("/Engine/BasicShapes/Cube.Cube"));
 	if (CubeMeshFinder.Succeeded())
 	{
 		TelegraphMesh->SetStaticMesh(CubeMeshFinder.Object);
-	}
-
-	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> ChargeTelegraphVFXFinder(
-		TEXT("/Game/Niagara/Vefects/Easy_Impact_Frames/VFX/Extras/Particles/NS_Extra_Lightning_Example_VFX.NS_Extra_Lightning_Example_VFX"));
-	if (ChargeTelegraphVFXFinder.Succeeded())
-	{
-		ChargeTelegraphVFXComponent->SetAsset(ChargeTelegraphVFXFinder.Object);
 	}
 
 	static ConstructorHelpers::FClassFinder<UGameplayEffect> DamageEffectFinder(TEXT("/Game/GAS_Pattern/AbilitySystem/GameplayEffects/Damage/GE_PrimaryDamage"));
@@ -74,7 +65,15 @@ void AGP_DarkKnightChargeActor::InitializeCharge(AGP_DarkArmorKnightBossCharacte
 
 	if (UWorld* World = GetWorld())
 	{
-		World->GetTimerManager().SetTimer(TelegraphTimerHandle, this, &ThisClass::StartCharge, FMath::Max(0.01f, TelegraphDuration), false);
+		const float TelegraphDuration = IsValid(ChargeTelegraphVFXComponent)
+			? ChargeTelegraphVFXComponent->GetTelegraphDuration()
+			: 0.9f;
+		World->GetTimerManager().SetTimer(
+			TelegraphTimerHandle,
+			this,
+			&ThisClass::StartCharge,
+			FMath::Max(0.01f, TelegraphDuration),
+			false);
 	}
 }
 
