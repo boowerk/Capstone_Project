@@ -4,6 +4,7 @@
 #include "Characters/GP_DarkArmorKnightBossCharacter.h"
 #include "Components/StaticMeshComponent.h"
 #include "GameplayEffect.h"
+#include "Net/UnrealNetwork.h"
 #include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
 #include "VFX/GP_BossTelegraphVFXComponent.h"
@@ -62,7 +63,18 @@ void AGP_DarkKnightChargeActor::InitializeCharge(AGP_DarkArmorKnightBossCharacte
 	SetActorLocation(Boss->GetActorLocation());
 	SetActorRotation(ChargeDirection.Rotation());
 	Boss->SetActorRotation(ChargeDirection.Rotation());
-	// Lightning lands during the existing telegraph delay; StartCharge remains gated by TelegraphDuration below.
+	bSkipInternalTelegraph = IsValid(Boss->GetBossTelegraphVFXComponent())
+		&& Boss->GetBossTelegraphVFXComponent()->IsTelegraphVFXEnabled();
+	if (bSkipInternalTelegraph)
+	{
+		// The boss-level cue already consumed its lead time before this coordinator was spawned.
+		OnRep_SkipInternalTelegraph();
+		ForceNetUpdate();
+		StartCharge();
+		return;
+	}
+
+	// With the boss-level toggle disabled, preserve the original coordinator-owned warning and delay.
 	BP_OnChargeTelegraphStarted();
 
 	if (UWorld* World = GetWorld())
@@ -76,6 +88,22 @@ void AGP_DarkKnightChargeActor::InitializeCharge(AGP_DarkArmorKnightBossCharacte
 			&ThisClass::StartCharge,
 			FMath::Max(0.01f, TelegraphDuration),
 			false);
+	}
+}
+
+void AGP_DarkKnightChargeActor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME_CONDITION(AGP_DarkKnightChargeActor, bSkipInternalTelegraph, COND_InitialOnly);
+}
+
+void AGP_DarkKnightChargeActor::OnRep_SkipInternalTelegraph()
+{
+	if (bSkipInternalTelegraph && IsValid(ChargeTelegraphVFXComponent))
+	{
+		// Clients may auto-register the component before initial actor state arrives, so suppress it on replication too.
+		ChargeTelegraphVFXComponent->StopTelegraph();
+		ChargeTelegraphVFXComponent->SetVisibility(false, true);
 	}
 }
 
