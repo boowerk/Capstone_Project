@@ -11,8 +11,8 @@
 #include "Engine/World.h"
 #include "GameplayTags/GP_Tags.h"
 #include "Misc/AutomationTest.h"
-#include "NiagaraComponent.h"
 #include "NiagaraSystem.h"
+#include "VFX/GP_BossTelegraphVFXComponent.h"
 
 namespace DarkArmorKnightBossTests
 {
@@ -142,16 +142,20 @@ bool FDarkArmorKnightChargeTelegraphVFXTest::RunTest(const FString& Parameters)
 {
 	// Keep the lightning warning on the replicated charge coordinator instead of server-only spawned presentation.
 	const AGP_DarkKnightChargeActor* ChargeDefaults = GetDefault<AGP_DarkKnightChargeActor>();
-	const UNiagaraComponent* TelegraphVFX = IsValid(ChargeDefaults)
-		? ChargeDefaults->FindComponentByClass<UNiagaraComponent>()
+	const UGP_BossTelegraphVFXComponent* TelegraphVFX = IsValid(ChargeDefaults)
+		? ChargeDefaults->FindComponentByClass<UGP_BossTelegraphVFXComponent>()
 		: nullptr;
-	const UNiagaraSystem* TelegraphSystem = IsValid(TelegraphVFX) ? TelegraphVFX->GetAsset() : nullptr;
+	const UNiagaraSystem* TelegraphSystem = IsValid(TelegraphVFX)
+		? TelegraphVFX->GetDefaultTelegraphSystem()
+		: nullptr;
 
 	TestNotNull(TEXT("Charge actor owns a Niagara telegraph component"), TelegraphVFX);
 	TestNotNull(TEXT("Charge telegraph component loads the lightning system"), TelegraphSystem);
 	if (IsValid(TelegraphVFX))
 	{
 		TestTrue(TEXT("Charge lightning auto-activates when the coordinator spawns"), TelegraphVFX->bAutoActivate);
+		TestEqual(TEXT("Charge lightning uses the enlarged reusable scale"), TelegraphVFX->GetUniformVisualScale(), 1.35f);
+		TestEqual(TEXT("Charge waits for the component telegraph duration"), TelegraphVFX->GetTelegraphDuration(), 0.9f);
 	}
 	if (IsValid(TelegraphSystem))
 	{
