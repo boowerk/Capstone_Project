@@ -2,20 +2,20 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-06-23T07:59:00+09:00
+updated: 2026-06-23T08:39:35+09:00
 status: active
 ---
 # Session Summary
 
 ## Status
-- Added editor-spawnable `Boss Telegraph VFX` component.
-- Defaults: requested lightning asset, scale 1.35, lead time 0.9s, auto activate.
-- Dark Knight Charge uses it; no other boss patterns were modified.
+- Non-Sans boss attack boundaries now honor `Boss Telegraph VFX`.
+- Crystal/Matador inherit it; Dark Knight reuses its BP component; Sans has none.
+- Disabled adds no delay; enabled multicasts Niagara, waits Telegraph Duration, then starts the existing GAS pattern.
 
 ## Editor
-- In a boss BP: Add Component → `Boss Telegraph VFX`.
-- Edit Niagara System Asset, Auto Activate, Uniform Visual Scale, and Telegraph Duration.
+- Select `Boss Telegraph VFX`, assign System Asset, tune duration/scale, and enable `Telegraph VFX On/Off`.
+- PIE-check timing/placement; groggy and Crystal teleport intentionally bypass it.
 
 ## Verified
-- Editor build and `ProjectEden.Combat.DarkArmorKnight.ChargeTelegraphVFX` passed.
+- Editor build and telegraph configuration + legacy charge automation pass.
 - Preserve user changes in `DefaultEditor.ini`, `L_MainMap.umap`, and `WBP_PlayerHUDWidget.uasset`.
