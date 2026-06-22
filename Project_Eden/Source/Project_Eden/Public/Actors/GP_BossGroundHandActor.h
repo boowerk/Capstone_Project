@@ -40,8 +40,13 @@ class PROJECT_EDEN_API AGP_BossGroundHandActor : public AActor
 public:
 	AGP_BossGroundHandActor();
 
+	virtual void OnConstruction(const FTransform& Transform) override;
+
 	// Starts the warning-to-rise sequence after the ability has positioned this actor near the player.
 	void InitializeGroundHand(float InTelegraphDuration);
+
+	// Exposes the presentation-only scale for automation and designer-facing Blueprint validation.
+	float GetHandVisualScale() const { return HandVisualScale; }
 
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
@@ -61,6 +66,7 @@ private:
 	void UpdatePatternVisuals(float ElapsedSeconds);
 	void SnapToFloor();
 	void ApplyDamageAndLaunch(AActor* TargetActor);
+	void ApplyHandVisualSettings();
 
 private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Ground Hands", meta = (AllowPrivateAccess = "true"))
@@ -78,6 +84,18 @@ private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Ground Hands", meta = (AllowPrivateAccess = "true"))
 	// The final hand presentation is isolated from the box collision so its physics asset cannot change gameplay hits.
 	TObjectPtr<USkeletalMeshComponent> HandMesh;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Ground Hands|Visual",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.01", UIMin = "0.05", UIMax = "2.0"))
+	float HandVisualScale = 1.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Ground Hands|Visual",
+		meta = (AllowPrivateAccess = "true", Units = "cm"))
+	FVector HandVisualOffset = FVector::ZeroVector;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Ground Hands|Visual",
+		meta = (AllowPrivateAccess = "true"))
+	FRotator HandVisualRotation = FRotator::ZeroRotator;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Boss|Ground Hands|Telegraph")
 	TObjectPtr<UMaterialInterface> WarningDecalMaterial;

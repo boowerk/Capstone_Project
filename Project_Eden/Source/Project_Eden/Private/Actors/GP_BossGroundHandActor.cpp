@@ -69,10 +69,19 @@ AGP_BossGroundHandActor::AGP_BossGroundHandActor()
 	}
 }
 
+void AGP_BossGroundHandActor::OnConstruction(const FTransform& Transform)
+{
+	Super::OnConstruction(Transform);
+
+	// Blueprint children tune only the skeletal presentation; HandCollision remains an unchanged sibling component.
+	ApplyHandVisualSettings();
+}
+
 void AGP_BossGroundHandActor::BeginPlay()
 {
 	Super::BeginPlay();
 
+	ApplyHandVisualSettings();
 	HandCollision->OnComponentBeginOverlap.AddDynamic(this, &ThisClass::OnHandOverlap);
 	WarningDecal->DecalSize = FVector(120.0f, WarningRadius, WarningRadius);
 	if (WarningDecalMaterial)
@@ -86,6 +95,19 @@ void AGP_BossGroundHandActor::BeginPlay()
 	{
 		ApplyPatternStart();
 	}
+}
+
+void AGP_BossGroundHandActor::ApplyHandVisualSettings()
+{
+	if (!IsValid(HandMesh))
+	{
+		return;
+	}
+
+	// Uniform scaling avoids distorting the imported hand while offset and rotation stay available for art alignment.
+	HandMesh->SetRelativeScale3D(FVector(FMath::Max(0.01f, HandVisualScale)));
+	HandMesh->SetRelativeLocation(HandVisualOffset);
+	HandMesh->SetRelativeRotation(HandVisualRotation);
 }
 
 void AGP_BossGroundHandActor::InitializeGroundHand(float InTelegraphDuration)
