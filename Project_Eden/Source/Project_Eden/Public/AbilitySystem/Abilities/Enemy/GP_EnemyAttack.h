@@ -6,6 +6,7 @@
 #include "GP_EnemyAttack.generated.h"
 
 class UGameplayEffect;
+class UAnimMontage;
 struct FGameplayEventData;
 
 UCLASS()
@@ -30,6 +31,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS|Skill|Mechanics")
 	FGameplayTag AttackEventTag;
 
+	// Animation notifies can send this event when a montage has reached its actionable end.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS|Skill|Mechanics")
+	FGameplayTag ActionEndEventTag;
+
 	// Generic enemies use event timing by default; boss abilities can override their own timing in derived classes.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS|Skill|Mechanics")
 	bool bUseGameplayEventForHitTiming = true;
@@ -45,5 +50,17 @@ private:
 	UFUNCTION()
 	void OnAttackEventReceived(FGameplayEventData Payload);
 
+	UFUNCTION()
+	void OnActionEndEventReceived(FGameplayEventData Payload);
+
+	void FinishAttackAbility(bool bWasCancelled);
+
 	bool bHasAppliedAttackHit = false;
+	bool bHasFinishedAttackAbility = false;
+
+	// Per-actor ability instance state. Prevents the same configured attack montage repeating twice in a row.
+	TObjectPtr<UAnimMontage> LastSelectedAttackMontage = nullptr;
+
+	// -1 = left, 1 = right, 0 = unknown. Used to prefer left/right alternation for named attack montages.
+	int8 LastSelectedAttackSide = 0;
 };

@@ -10,10 +10,13 @@
 #include "BehaviorTree/BlackboardComponent.h"
 #include "Characters/GP_CrystalSeraphBossCharacter.h"
 #include "Characters/GP_CrystalSeraphStateComponent.h"
+#include "Characters/GP_DarkArmorKnightBossCharacter.h"
+#include "Characters/GP_DarkArmorKnightStateComponent.h"
 #include "Characters/GP_MatadorBossStateComponent.h"
 #include "Characters/GP_MatadorMageBossCharacter.h"
 #include "GameFramework/Actor.h"
 #include "GameFramework/Pawn.h"
+#include "GameplayTags/GP_Tags.h"
 
 namespace BTS_UpdateBossTactics_Internal
 {
@@ -87,6 +90,14 @@ namespace BTS_UpdateBossTactics_Internal
 	{
 		const float SafeDistance = FMath::Max(0.0f, Distance);
 		return SafeDistance >= FMath::Max(0.0f, MinRange) && SafeDistance <= FMath::Max(MinRange, MaxRange);
+	}
+
+	void SetOptionalBlackboardName(UBlackboardComponent* BlackboardComponent, const FName& KeyName, FName Value)
+	{
+		if (HasBlackboardKey(BlackboardComponent, KeyName))
+		{
+			BlackboardComponent->SetValueAsName(KeyName, Value);
+		}
 	}
 
 	FTacticalStateSnapshot CaptureTacticalState(const UBlackboardComponent* BlackboardComponent)
@@ -307,6 +318,52 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 		&& bCrystalPatternIntervalReady
 		&& DistanceToTarget <= FMath::Max(0.0f, CrystalShardMaxRange);
 
+	UGP_DarkArmorKnightStateComponent* DarkKnightStateComponent = IsValid(ControlledPawn)
+		? ControlledPawn->FindComponentByClass<UGP_DarkArmorKnightStateComponent>()
+		: nullptr;
+	const AGP_DarkArmorKnightBossCharacter* DarkKnightBoss = Cast<AGP_DarkArmorKnightBossCharacter>(ControlledPawn);
+	const bool bIsDarkKnightBoss = IsValid(DarkKnightBoss);
+	const bool bDarkKnightGroggy = IsValid(DarkKnightStateComponent) && DarkKnightStateComponent->IsGroggy();
+	const bool bDarkKnightGuarding = IsValid(DarkKnightStateComponent) && DarkKnightStateComponent->IsGuarding();
+	const bool bDarkKnightGuardBroken = IsValid(DarkKnightStateComponent) && DarkKnightStateComponent->IsGuardBroken();
+	if (bIsDarkKnightBoss)
+	{
+		// Dark Knight changes phases through its own 60/25 percent rules, so the common 66/33 transition signal must not block a pattern tick.
+		bShouldPhaseTransition = false;
+	}
+	if (IsValid(DarkKnightStateComponent))
+	{
+		// The state component is authoritative; Blackboard phase remains only a readable BT mirror.
+		DarkKnightStateComponent->SetCombatPhase(IsValid(DarkKnightBoss) ? DarkKnightBoss->GetDarkKnightPhase() : BossPhase);
+	}
+	const bool bDarkKnightCadenceReady = bIsDarkKnightBoss && DarkKnightBoss->CanStartDarkKnightPattern();
+	const bool bDarkKnightMeleeReady = bDarkKnightCadenceReady
+		&& DistanceToTarget <= FGPBossAttackPatternRanges::DarkKnightMeleeReach
+		&& (DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::Basic)
+			|| DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::Heavy)
+			|| DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::Sweep));
+	const bool bDarkKnightGuardReady = bDarkKnightCadenceReady
+		&& DistanceToTarget <= 520.0f
+		&& DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::Guard);
+	const bool bDarkKnightChargeReady = bDarkKnightCadenceReady
+		&& DistanceToTarget >= DarkKnightBoss->GetChargeMinRange()
+		&& DistanceToTarget <= FGPBossAttackPatternRanges::DarkKnightChargeMaxRange
+		&& DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::Charge);
+	const bool bDarkKnightWaveReady = bDarkKnightCadenceReady
+		&& DistanceToTarget <= DarkKnightBoss->GetDarkWaveMaxRange()
+		&& DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::DarkWave);
+	const bool bDarkKnightCrackReady = bDarkKnightCadenceReady
+		&& DistanceToTarget <= DarkKnightBoss->GetGroundCrackMaxRange()
+		&& DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::GroundCrack);
+	const bool bCanUseDarkKnightPattern = bIsDarkKnightBoss
+		&& bHasTarget
+		&& !bReturningHome
+		&& !bShouldPhaseTransition
+		&& !bDarkKnightGroggy
+		&& !bDarkKnightGuarding
+		&& bHasLineOfSight
+		&& (bDarkKnightGuardBroken || bDarkKnightMeleeReady || bDarkKnightGuardReady || bDarkKnightChargeReady || bDarkKnightWaveReady || bDarkKnightCrackReady);
+
 	if (bMatadorGroggy)
 	{
 		// Groggy makes the boss vulnerable; suppress normal attack requests until the state component recovers it.
@@ -370,6 +427,16 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 
 	}
 
+	if (bIsDarkKnightBoss)
+	{
+		// Dedicated Dark Knight tags own every attack; never leak Sans/common patterns into this boss.
+		bCanUseHeavyAttack = false;
+		bCanUseAreaAttack = false;
+		bCanUseSweepAttack = false;
+		bCanSummonAdds = false;
+		bShouldPhaseTransition = false;
+	}
+
 	if (!bMatadorGroggy && !bCrystalSeraphGroggy && IsValid(EnemyAIController) && EnemyAIController->IsBossRuntimeEvaluationTestCycleActive() && bHasTarget && !bReturningHome && bHasLineOfSight)
 	{
 		const bool bModePrefersHold = EnemyMode == FEnemyLLMEvaluationParser::ToBlackboardName(EEnemyMode::Hold);
@@ -391,6 +458,7 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 		|| bCanUseCrystalPrismPattern
 		|| bCanUseCrystalTeleportPattern
 		|| bCanUseCrystalBasicPattern
+		|| bCanUseDarkKnightPattern
 		|| bCanSummonAdds
 		|| bCanUseAreaAttack
 		|| bCanUseSweepAttack
@@ -411,7 +479,7 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldReposition, false);
 		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldChase, false);
 	}
-	else if (bMatadorGroggy || bCrystalSeraphGroggy || (bIsCrystalSeraphBoss && bWingCoreExposed))
+	else if (bMatadorGroggy || bCrystalSeraphGroggy || bDarkKnightGroggy || bDarkKnightGuarding || (bIsCrystalSeraphBoss && bWingCoreExposed))
 	{
 		// Vulnerability windows are stationary and must not fall through to the shared Chase branch.
 		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanAttack, false);
@@ -426,7 +494,7 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldRetreat, false);
 		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldChase, true);
 	}
-	else if (bIsMatadorBoss || bIsCrystalSeraphBoss)
+	else if (bIsMatadorBoss || bIsCrystalSeraphBoss || bIsDarkKnightBoss)
 	{
 		// Never inherit a stale generic attack request while a boss is returning home or already repositioning.
 		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanAttack, false);
@@ -438,7 +506,7 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBossSweepAttack, bCanUseSweepAttack);
 	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanSummonAdds, bCanSummonAdds);
 	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardInt(BlackboardComponent, EnemyBlackboardKeys::ChainBreakCount, ChainBreakCount);
-	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bIsGroggy, bMatadorGroggy || bCrystalSeraphGroggy);
+	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bIsGroggy, bMatadorGroggy || bCrystalSeraphGroggy || bDarkKnightGroggy);
 	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseBullPattern, bCanUseBullPattern);
 	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bBullPatternActive, bBullPatternActive);
 	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardObject(BlackboardComponent, EnemyBlackboardKeys::DecoyActor, IsValid(MatadorStateComponent) ? MatadorStateComponent->GetDecoyActor() : nullptr);
@@ -453,4 +521,14 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardObject(BlackboardComponent, EnemyBlackboardKeys::CrystalPrismActor, IsValid(CrystalSeraphStateComponent) ? CrystalSeraphStateComponent->GetCrystalPrismActor() : nullptr);
 	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseLaserPattern, bCanUseCrystalLaserPattern);
 	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUsePrismPattern, bCanUseCrystalPrismPattern);
+	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardFloat(BlackboardComponent, EnemyBlackboardKeys::GuardGauge, IsValid(DarkKnightStateComponent) ? DarkKnightStateComponent->GetGuardGauge() : 0.0f);
+	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardFloat(BlackboardComponent, EnemyBlackboardKeys::MaxGuardGauge, IsValid(DarkKnightStateComponent) ? DarkKnightStateComponent->GetMaxGuardGauge() : 0.0f);
+	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bIsGuarding, bDarkKnightGuarding);
+	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanParry, IsValid(DarkKnightStateComponent) && DarkKnightStateComponent->IsParryWindowOpen());
+	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bGuardBroken, bDarkKnightGuardBroken);
+	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldCharge, bDarkKnightChargeReady);
+	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseGroundCrack, bDarkKnightCrackReady);
+	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseDarkWave, bDarkKnightWaveReady);
+	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardName(BlackboardComponent, EnemyBlackboardKeys::LastHitDirection, IsValid(DarkKnightStateComponent) ? DarkKnightStateComponent->GetLastHitDirectionName() : NAME_None);
+	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardFloat(BlackboardComponent, EnemyBlackboardKeys::PreferredMeleeRange, IsValid(DarkKnightBoss) ? DarkKnightBoss->GetPreferredMeleeRange() : 350.0f);
 }

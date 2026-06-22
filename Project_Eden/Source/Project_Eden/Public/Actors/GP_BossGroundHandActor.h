@@ -9,8 +9,7 @@ class UDecalComponent;
 class UGameplayEffect;
 class UMaterialInterface;
 class USceneComponent;
-class UStaticMesh;
-class UStaticMeshComponent;
+class USkeletalMeshComponent;
 
 USTRUCT()
 struct FGPBossGroundHandPatternSpec
@@ -62,7 +61,6 @@ private:
 	void UpdatePatternVisuals(float ElapsedSeconds);
 	void SnapToFloor();
 	void ApplyDamageAndLaunch(AActor* TargetActor);
-	void ConfigureMeshComponent(UStaticMeshComponent* MeshComponent, UStaticMesh* MeshAsset) const;
 
 private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Ground Hands", meta = (AllowPrivateAccess = "true"))
@@ -78,13 +76,8 @@ private:
 	TObjectPtr<UBoxComponent> HandCollision;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Ground Hands", meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UStaticMeshComponent> PalmMesh;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Ground Hands", meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UStaticMeshComponent> WristMesh;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Ground Hands", meta = (AllowPrivateAccess = "true"))
-	TArray<TObjectPtr<UStaticMeshComponent>> FingerMeshes;
+	// The final hand presentation is isolated from the box collision so its physics asset cannot change gameplay hits.
+	TObjectPtr<USkeletalMeshComponent> HandMesh;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Boss|Ground Hands|Telegraph")
 	TObjectPtr<UMaterialInterface> WarningDecalMaterial;

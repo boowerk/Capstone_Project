@@ -45,6 +45,15 @@ EBTNodeResult::Type UBTT_RunEnemyPositioningEQSQuery::ExecuteTask(UBehaviorTreeC
 		return EBTNodeResult::Failed;
 	}
 
+	const bool bShouldReturnHome = BlackboardComponent->GetKeyID(EnemyBlackboardKeys::bShouldReturnHome) != FBlackboard::InvalidKey
+		&& BlackboardComponent->GetValueAsBool(EnemyBlackboardKeys::bShouldReturnHome);
+	if (ShouldYieldToReturnHome(bShouldReturnHome))
+	{
+		// Patrol is the first no-target branch in Boss_Common; fail it explicitly so the selector can reach ReturnHome.
+		UE_LOG(LogEnemyAI, Verbose, TEXT("[Patrol] Yielding to ReturnHome: Pawn=%s"), *EnemyAIDebugUtils::DescribeActor(ControlledPawn));
+		return EBTNodeResult::Failed;
+	}
+
 	if (!IsValid(QueryTemplate))
 	{
 		if (TrySetNavigationFallbackLocation(BlackboardComponent, ControlledPawn))
@@ -168,6 +177,17 @@ FName UBTT_RunEnemyPositioningEQSQuery::GetMoveLocationKeyName() const
 	return MoveLocationKey.SelectedKeyName != NAME_None
 		? MoveLocationKey.SelectedKeyName
 		: EnemyBlackboardKeys::MoveToLocation;
+}
+
+bool UBTT_RunEnemyPositioningEQSQuery::IsPatrolQuery() const
+{
+	// Keep this native guard tied to the query role without requiring a risky binary BT asset rewrite.
+	return IsValid(QueryTemplate) && QueryTemplate->GetName().Contains(TEXT("Patrol"), ESearchCase::IgnoreCase);
+}
+
+bool UBTT_RunEnemyPositioningEQSQuery::ShouldYieldToReturnHome(bool bShouldReturnHome) const
+{
+	return bShouldReturnHome && IsPatrolQuery();
 }
 
 bool UBTT_RunEnemyPositioningEQSQuery::TrySetNavigationFallbackLocation(UBlackboardComponent* BlackboardComponent, const APawn* ControlledPawn) const

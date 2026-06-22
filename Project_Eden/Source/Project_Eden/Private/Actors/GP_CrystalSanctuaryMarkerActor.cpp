@@ -6,8 +6,10 @@
 #include "GameFramework/Pawn.h"
 #include "GameplayEffect.h"
 #include "GameplayTags/GP_Tags.h"
+#include "NiagaraSystem.h"
 #include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
+#include "VFX/GP_VisualCueComponent.h"
 
 AGP_CrystalSanctuaryMarkerActor::AGP_CrystalSanctuaryMarkerActor()
 {
@@ -16,6 +18,7 @@ AGP_CrystalSanctuaryMarkerActor::AGP_CrystalSanctuaryMarkerActor()
 
 	SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("SceneRoot"));
 	SetRootComponent(SceneRoot);
+	VisualCueComponent = CreateDefaultSubobject<UGP_VisualCueComponent>(TEXT("VisualCueComponent"));
 
 	DamageArea = CreateDefaultSubobject<USphereComponent>(TEXT("DamageArea"));
 	DamageArea->SetupAttachment(SceneRoot);
@@ -40,6 +43,17 @@ AGP_CrystalSanctuaryMarkerActor::AGP_CrystalSanctuaryMarkerActor()
 	{
 		DamageEffectClass = DamageEffectFinder.Class;
 	}
+
+	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> TelegraphVFXFinder(TEXT("/Game/Imported_VFX/Free_Magic/VFX_Niagara/NS_Free_Magic_Circle2.NS_Free_Magic_Circle2"));
+	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> ImpactVFXFinder(TEXT("/Game/Imported_VFX/Free_Magic/VFX_Niagara/NS_Free_Magic_Area2.NS_Free_Magic_Area2"));
+	if (TelegraphVFXFinder.Succeeded())
+	{
+		VisualCueComponent->AddNiagaraCue(GPTags::GameplayCue::Ability::Telegraph_Magic, TelegraphVFXFinder.Object);
+	}
+	if (ImpactVFXFinder.Succeeded())
+	{
+		VisualCueComponent->AddNiagaraCue(GPTags::GameplayCue::Ability::Impact_Magic, ImpactVFXFinder.Object);
+	}
 }
 
 void AGP_CrystalSanctuaryMarkerActor::BeginPlay()
@@ -47,6 +61,7 @@ void AGP_CrystalSanctuaryMarkerActor::BeginPlay()
 	Super::BeginPlay();
 
 	DamageArea->SetSphereRadius(FMath::Max(0.0f, MarkerRadius));
+	VisualCueComponent->ActivatePersistentCue(GPTags::GameplayCue::Ability::Telegraph_Magic, MarkerMesh, FVector::ZeroVector, FRotator::ZeroRotator, FVector(2.2f));
 	BP_OnTelegraphStarted();
 
 	if (UWorld* World = GetWorld())
@@ -74,6 +89,7 @@ void AGP_CrystalSanctuaryMarkerActor::InitializeSanctuaryMarker(AActor* InBossOw
 
 void AGP_CrystalSanctuaryMarkerActor::Explode()
 {
+	VisualCueComponent->DeactivatePersistentCue(GPTags::GameplayCue::Ability::Telegraph_Magic);
 	if (HasAuthority())
 	{
 		TArray<AActor*> OverlappingActors;
@@ -87,8 +103,17 @@ void AGP_CrystalSanctuaryMarkerActor::Explode()
 			0.0f,
 			0.0f,
 			true);
+		MulticastPlayExplosionVFX(GetActorLocation());
 	}
 
 	BP_OnExploded();
 	Destroy();
+}
+
+void AGP_CrystalSanctuaryMarkerActor::MulticastPlayExplosionVFX_Implementation(const FVector& ExplosionLocation)
+{
+	if (IsValid(VisualCueComponent))
+	{
+		VisualCueComponent->PlayOneShotAtLocation(GPTags::GameplayCue::Ability::Impact_Magic, ExplosionLocation, FRotator::ZeroRotator, FVector(2.0f));
+	}
 }

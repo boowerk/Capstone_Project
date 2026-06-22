@@ -6,6 +6,7 @@
 
 class AGP_CrystalSeraphBossCharacter;
 class AGP_SeraphLaserActor;
+class UGP_VisualCueComponent;
 class USphereComponent;
 class UStaticMeshComponent;
 
@@ -32,13 +33,22 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Boss|Crystal Seraph")
 	float GetCollisionRadius() const;
 
+	UFUNCTION(BlueprintPure, Category = "Boss|Crystal Seraph|VFX")
+	FVector GetPrismAuraScale() const { return PrismAuraScale; }
+
 protected:
 	UFUNCTION(BlueprintImplementableEvent, Category = "Boss|Crystal Seraph")
 	void BP_OnLaserReflected(AGP_SeraphLaserActor* LaserActor, const FVector& ReflectedDirection);
 
 private:
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastPlayReflectionVFX(const FVector& ReflectionLocation, const FRotator& ReflectionRotation);
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USceneComponent> SceneRoot;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph|VFX", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UGP_VisualCueComponent> VisualCueComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UStaticMeshComponent> PrismMesh;
@@ -53,7 +63,15 @@ private:
 	float ReflectionAngleDegrees = 120.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "cm"))
-	float CollisionRadius = 120.0f;
+	float CollisionRadius = 150.0f;
+
+	// Keep the prototype crystal readable while allowing a Blueprint child to replace or retune its visual footprint.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph", meta = (AllowPrivateAccess = "true"))
+	FVector PrismVisualScale = FVector(2.1f, 2.1f, 2.9f);
+
+	// Aura scale is independent from the enlarged mesh so designers can keep the persistent effect close to the crystal.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph|VFX", meta = (AllowPrivateAccess = "true"))
+	FVector PrismAuraScale = FVector(0.55f);
 
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Boss|Crystal Seraph", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<AGP_CrystalSeraphBossCharacter> BossOwner;

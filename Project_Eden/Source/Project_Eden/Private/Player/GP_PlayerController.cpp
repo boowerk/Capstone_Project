@@ -242,7 +242,7 @@ void AGP_PlayerController::Tick(float DeltaSeconds)
 	{
 		// Controller tick keeps minimap updates alive even if the widget native tick is disabled.
 		HUDWidget->RefreshMinimapBackgroundFromSubsystem();
-		HUDWidget->RefreshMinimapPlayerArrowRotation();
+		HUDWidget->RefreshMinimapPresentation(DeltaSeconds);
 		// Retry skill-slot binding until the PlayerState is ready (no-ops once bound).
 		HUDWidget->EnsureSkillSlotsBound();
 	}

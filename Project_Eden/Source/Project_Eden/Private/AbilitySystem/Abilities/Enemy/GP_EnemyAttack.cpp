@@ -3,7 +3,8 @@
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
 #include "Animation/PDA_CharacterAnimationSet.h"
-#include "Characters/GP_BaseCharacter.h"
+#include "Animation/PDA_EnemyAnimationSet.h"
+#include "Characters/GP_EnemyCharacter.h"
 #include "GameFramework/Pawn.h"
 #include "GameplayEffect.h"
 #include "GameplayTags/GP_Tags.h"
@@ -11,18 +12,111 @@
 
 namespace GP_EnemyAttack_Internal
 {
-	UAnimMontage* ResolvePrimaryAttackMontage(AActor* AvatarActor, UAnimMontage* ConfiguredMontage)
+	int8 ResolveMontageSide(const UAnimMontage* Montage)
+	{
+		const FString MontageName = GetNameSafe(Montage);
+		if (MontageName.EndsWith(TEXT("_L")))
+		{
+			return -1;
+		}
+		if (MontageName.EndsWith(TEXT("_R")))
+		{
+			return 1;
+		}
+		return 0;
+	}
+
+	UAnimMontage* ResolveAttackMontage(
+		AActor* AvatarActor,
+		UAnimMontage* ConfiguredMontage,
+		TObjectPtr<UAnimMontage>& LastSelectedAttackMontage,
+		int8& LastSelectedAttackSide)
 	{
 		if (IsValid(ConfiguredMontage))
 		{
 			return ConfiguredMontage;
 		}
 
-		const AGP_BaseCharacter* BaseCharacter = Cast<AGP_BaseCharacter>(AvatarActor);
-		const UPDA_CharacterAnimationSet* AnimationSet = IsValid(BaseCharacter) ? BaseCharacter->AnimationSet : nullptr;
+		const AGP_EnemyCharacter* EnemyCharacter = Cast<AGP_EnemyCharacter>(AvatarActor);
+		if (!IsValid(EnemyCharacter))
+		{
+			return nullptr;
+		}
 
-		// Enemy basic attacks follow the same data-asset animation path as player attacks when a set is assigned.
-		return IsValid(AnimationSet) ? AnimationSet->PrimaryAttackMontage.Get() : nullptr;
+		TArray<UAnimMontage*> Candidates;
+		if (const UPDA_EnemyAnimationSet* EnemyAnimationSet = EnemyCharacter->GetEnemyAnimationSet())
+		{
+			for (UAnimMontage* Montage : EnemyAnimationSet->LightAttackMontages)
+			{
+				if (IsValid(Montage))
+				{
+					Candidates.Add(Montage);
+				}
+			}
+
+			if (Candidates.IsEmpty())
+			{
+				return EnemyAnimationSet->PrimaryAttackMontage.Get();
+			}
+		}
+		else
+		{
+			// Keep existing bosses operational while their animation data is migrated incrementally.
+			const UPDA_CharacterAnimationSet* LegacyAnimationSet = EnemyCharacter->AnimationSet;
+			if (!IsValid(LegacyAnimationSet))
+			{
+				return nullptr;
+			}
+
+			for (UAnimMontage* Montage : LegacyAnimationSet->LightAttackMontages)
+			{
+				if (IsValid(Montage))
+				{
+					Candidates.Add(Montage);
+				}
+			}
+
+			if (Candidates.IsEmpty())
+			{
+				return LegacyAnimationSet->PrimaryAttackMontage.Get();
+			}
+		}
+
+		if (Candidates.Num() == 1)
+		{
+			LastSelectedAttackMontage = Candidates[0];
+			LastSelectedAttackSide = ResolveMontageSide(Candidates[0]);
+			return Candidates[0];
+		}
+
+		TArray<UAnimMontage*> OppositeSideCandidates;
+		if (LastSelectedAttackSide != 0)
+		{
+			for (UAnimMontage* Montage : Candidates)
+			{
+				if (ResolveMontageSide(Montage) == -LastSelectedAttackSide)
+				{
+					OppositeSideCandidates.Add(Montage);
+				}
+			}
+		}
+
+		TArray<UAnimMontage*> NonRepeatingCandidates;
+		for (UAnimMontage* Montage : Candidates)
+		{
+			if (Montage != LastSelectedAttackMontage)
+			{
+				NonRepeatingCandidates.Add(Montage);
+			}
+		}
+
+		const TArray<UAnimMontage*>& SelectionPool = !OppositeSideCandidates.IsEmpty()
+			? OppositeSideCandidates
+			: (NonRepeatingCandidates.IsEmpty() ? Candidates : NonRepeatingCandidates);
+		UAnimMontage* SelectedMontage = SelectionPool[FMath::RandHelper(SelectionPool.Num())];
+		LastSelectedAttackMontage = SelectedMontage;
+		LastSelectedAttackSide = ResolveMontageSide(SelectedMontage);
+		return SelectedMontage;
 	}
 }
 
@@ -34,6 +128,7 @@ UGP_EnemyAttack::UGP_EnemyAttack()
 	SetAssetTags(AbilityAssetTags);
 
 	AttackEventTag = GPTags::Event::Enemy::AttackHit;
+	ActionEndEventTag = GPTags::Event::Enemy::ActionEnd;
 
 	// 부모 클래스 수치 기본값 설정
 	AttackRadius = 120.0f;
@@ -59,6 +154,7 @@ void UGP_EnemyAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 	}
 
 	bHasAppliedAttackHit = false;
+	bHasFinishedAttackAbility = false;
 
 	AActor* AvatarActor = GetAvatarActorFromActorInfo();
 	if (!IsValid(AvatarActor))
@@ -77,7 +173,11 @@ void UGP_EnemyAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 	}
 
 	// 부모의 SkillMontage 변수를 공격 몽타주로 사용
-	UAnimMontage* MontageToPlay = GP_EnemyAttack_Internal::ResolvePrimaryAttackMontage(AvatarActor, SkillMontage);
+	UAnimMontage* MontageToPlay = GP_EnemyAttack_Internal::ResolveAttackMontage(
+		AvatarActor,
+		SkillMontage,
+		LastSelectedAttackMontage,
+		LastSelectedAttackSide);
 
 	if (MontageToPlay)
 	{
@@ -89,6 +189,17 @@ void UGP_EnemyAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 			{
 				WaitEventTask->EventReceived.AddDynamic(this, &ThisClass::OnAttackEventReceived);
 				WaitEventTask->ReadyForActivation();
+			}
+		}
+
+		if (ActionEndEventTag.IsValid())
+		{
+			UAbilityTask_WaitGameplayEvent* WaitActionEndTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(
+				this, ActionEndEventTag, nullptr, true, true);
+			if (WaitActionEndTask)
+			{
+				WaitActionEndTask->EventReceived.AddDynamic(this, &ThisClass::OnActionEndEventReceived);
+				WaitActionEndTask->ReadyForActivation();
 			}
 		}
 
@@ -119,18 +230,35 @@ void UGP_EnemyAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 
 void UGP_EnemyAttack::OnMontageCompleted()
 {
+	FinishAttackAbility(false);
+}
+
+void UGP_EnemyAttack::OnAttackEventReceived(FGameplayEventData Payload)
+{
+	PerformAttackHit();
+}
+
+void UGP_EnemyAttack::OnActionEndEventReceived(FGameplayEventData Payload)
+{
+	FinishAttackAbility(false);
+}
+
+void UGP_EnemyAttack::FinishAttackAbility(bool bWasCancelled)
+{
+	if (bHasFinishedAttackAbility)
+	{
+		return;
+	}
+
+	bHasFinishedAttackAbility = true;
+
 	// 이벤트 노티파이를 빠뜨린 경우에도 최소한의 공격 판정은 보장
 	if (!bHasAppliedAttackHit)
 	{
 		PerformAttackHit();
 	}
 
-	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
-}
-
-void UGP_EnemyAttack::OnAttackEventReceived(FGameplayEventData Payload)
-{
-	PerformAttackHit();
+	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, bWasCancelled);
 }
 
 void UGP_EnemyAttack::PerformAttackHit()

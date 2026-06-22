@@ -17,6 +17,11 @@ class PROJECT_EDEN_API UGP_WidgetComponent : public UWidgetComponent
 {
 	GENERATED_BODY()
 public:
+	UGP_WidgetComponent();
+
+	// Tests and owning actors can verify the GAS contract without exposing the editable map itself.
+	bool TracksAttributePair(const FGameplayAttribute& Attribute, const FGameplayAttribute& MaxAttribute) const;
+
 protected:
 	virtual void BeginPlay() override;
 

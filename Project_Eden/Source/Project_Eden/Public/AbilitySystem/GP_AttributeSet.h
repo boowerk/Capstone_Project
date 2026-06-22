@@ -14,6 +14,7 @@ GAMEPLAYATTRIBUTE_VALUE_SETTER(PropertyName) \
 GAMEPLAYATTRIBUTE_VALUE_INITTER(PropertyName)
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(FOnDamageTaken, AActor*, Instigator, AActor*, Target, float, DamageAmount, FGameplayTag, ElementTag);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnOutOfHealth, AActor*, Instigator, AActor*, Target);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FAttributesInitialized);
 
 UCLASS()
@@ -32,6 +33,10 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category = "GAS|Events")
 	FOnDamageTaken OnDamageTaken;
+
+	// Health reaching zero is a separate domain event so death does not depend on one specific damage implementation.
+	UPROPERTY(BlueprintAssignable, Category = "GAS|Events")
+	FOnOutOfHealth OnOutOfHealth;
 	
 	UPROPERTY(ReplicatedUsing = OnRep_AttributesInitialized)
 	bool bAttributesInitialized = false;
@@ -175,4 +180,5 @@ public:
 
 private:
 	void ClampAttributeValue(const FGameplayAttribute& Attribute, float& NewValue) const;
+	bool bOutOfHealthEventSent = false;
 };

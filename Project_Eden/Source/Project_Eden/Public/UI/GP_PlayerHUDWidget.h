@@ -11,6 +11,10 @@ class UProgressBar;
 class UWidget;
 class UImage;
 class UTextureRenderTarget2D;
+class UTexture2D;
+class UMaterialInterface;
+class UMaterialInstanceDynamic;
+class UCanvasPanel;
 class UAbilitySystemComponent;
 class UGP_AttributeSet;
 class UGP_MinimapSubsystem;
@@ -68,6 +72,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "EldenRing HUD|Minimap")
 	void RefreshMinimapBackgroundFromSubsystem();
 
+	UFUNCTION(BlueprintCallable, Category = "EldenRing HUD|Minimap")
+	void RefreshMinimapPresentation(float DeltaSeconds = 0.0f);
+
 	// Call after BindToASC to wire up the two equipped-skill slot widgets.
 	UFUNCTION(BlueprintCallable, Category = "EldenRing HUD|Skill")
 	void BindSkillSlots(AGP_PlayerState* PS);
@@ -94,6 +101,10 @@ private:
 	void BindToMinimapSubsystem();
 	UImage* ResolveMinimapBackgroundImage() const;
 	UWidget* ResolveMinimapPlayerArrowWidget() const;
+	void EnsureMinimapMaterial(UTextureRenderTarget2D* InRenderTarget);
+	void RefreshMinimapMapUV();
+	bool EnsureMinimapMarkerLayer();
+	void RefreshEnemyMinimapMarkers(float DeltaSeconds);
 	void BindAttributeWidgetToASC(UAbilitySystemComponent* InASC, UGP_AttributeWidget* Widget, UGP_AttributeSet* AttributeSet, TArray<FGPAttributeDelegateBinding>& DelegateHandles);
 	void RemoveAttributeDelegateHandles(TWeakObjectPtr<UAbilitySystemComponent>& BoundASC, TArray<FGPAttributeDelegateBinding>& DelegateHandles);
 	void EnsureBossHealthAttributes(UGP_AttributeWidget* Widget) const;
@@ -160,6 +171,26 @@ private:
 	UPROPERTY(BlueprintReadOnly, Category = "HUD|Skill", meta = (BindWidgetOptional, AllowPrivateAccess = "true"))
 	TObjectPtr<UGP_SkillSlotHUDWidget> SkillSlot2;
 
+	// UI material samples the one-shot full-map texture and pans/zooms it around the player's world-space UV.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EldenRing HUD|Minimap", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UMaterialInterface> MinimapMapMaterial;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EldenRing HUD|Minimap", meta = (AllowPrivateAccess = "true", ClampMin = "1.0", ClampMax = "12.0"))
+	float MinimapZoom = 3.0f;
+
+	// Enemy markers are regular UMG Images, intentionally separate from the captured map texture.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EldenRing HUD|Minimap", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UTexture2D> MinimapEnemyMarkerTexture;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EldenRing HUD|Minimap", meta = (AllowPrivateAccess = "true", ClampMin = "2.0", ClampMax = "64.0"))
+	float MinimapEnemyMarkerSize = 10.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EldenRing HUD|Minimap", meta = (AllowPrivateAccess = "true", ClampMin = "0.02", ClampMax = "1.0"))
+	float MinimapEnemyRefreshInterval = 0.1f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EldenRing HUD|Minimap", meta = (AllowPrivateAccess = "true", ClampMin = "0.1", ClampMax = "0.5"))
+	float MinimapMarkerVisibleRadius = 0.47f;
+
 	TWeakObjectPtr<UAbilitySystemComponent> BoundPlayerASC;
 	TWeakObjectPtr<UAbilitySystemComponent> BoundBossASC;
 	TWeakObjectPtr<AGP_PlayerState> BoundSkillPlayerState;
@@ -169,4 +200,13 @@ private:
 	float CachedMinimapPlayerArrowAngle = 0.0f;
 	TWeakObjectPtr<UGP_MinimapSubsystem> BoundMinimapSubsystem;
 	TWeakObjectPtr<UTextureRenderTarget2D> BoundMinimapRenderTarget;
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> MinimapMaterialInstance;
+	UPROPERTY(Transient)
+	TObjectPtr<UCanvasPanel> MinimapMarkerCanvas;
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UImage>> EnemyMarkerPool;
+	FVector2D CachedPlayerMapUV = FVector2D(-1.0f, -1.0f);
+	float CachedMinimapZoom = -1.0f;
+	float EnemyMarkerRefreshAccumulator = 0.0f;
 };

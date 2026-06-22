@@ -9,8 +9,10 @@
 #include "GameplayEffect.h"
 #include "GameplayTags/GP_Tags.h"
 #include "Kismet/GameplayStatics.h"
+#include "NiagaraSystem.h"
 #include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
+#include "VFX/GP_VisualCueComponent.h"
 
 AGP_SeraphLaserActor::AGP_SeraphLaserActor()
 {
@@ -19,6 +21,7 @@ AGP_SeraphLaserActor::AGP_SeraphLaserActor()
 
 	SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("SceneRoot"));
 	SetRootComponent(SceneRoot);
+	VisualCueComponent = CreateDefaultSubobject<UGP_VisualCueComponent>(TEXT("VisualCueComponent"));
 
 	DamageBox = CreateDefaultSubobject<UBoxComponent>(TEXT("DamageBox"));
 	DamageBox->SetupAttachment(SceneRoot);
@@ -41,6 +44,22 @@ AGP_SeraphLaserActor::AGP_SeraphLaserActor()
 	{
 		DamageEffectClass = DamageEffectFinder.Class;
 	}
+
+	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> TelegraphVFXFinder(TEXT("/Game/Imported_VFX/Free_Magic/VFX_Niagara/NS_Free_Magic_Attack_Line.NS_Free_Magic_Attack_Line"));
+	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> ActiveVFXFinder(TEXT("/Game/Imported_VFX/Free_Magic/VFX_Niagara/NS_Free_Magic_Attack_Line_Brute.NS_Free_Magic_Attack_Line_Brute"));
+	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> ReflectVFXFinder(TEXT("/Game/Imported_VFX/Free_Magic/VFX_Niagara/NS_Free_Magic_Hit2.NS_Free_Magic_Hit2"));
+	if (TelegraphVFXFinder.Succeeded())
+	{
+		VisualCueComponent->AddNiagaraCue(GPTags::GameplayCue::Ability::Telegraph_Magic, TelegraphVFXFinder.Object);
+	}
+	if (ActiveVFXFinder.Succeeded())
+	{
+		VisualCueComponent->AddNiagaraCue(GPTags::GameplayCue::Ability::Active_Magic, ActiveVFXFinder.Object);
+	}
+	if (ReflectVFXFinder.Succeeded())
+	{
+		VisualCueComponent->AddNiagaraCue(GPTags::GameplayCue::Ability::Reflect_Magic, ReflectVFXFinder.Object);
+	}
 }
 
 void AGP_SeraphLaserActor::BeginPlay()
@@ -48,6 +67,7 @@ void AGP_SeraphLaserActor::BeginPlay()
 	Super::BeginPlay();
 
 	UpdateLaserShape();
+	VisualCueComponent->ActivatePersistentCue(GPTags::GameplayCue::Ability::Telegraph_Magic, DamageBox);
 	BP_OnLaserTelegraphStarted();
 
 	if (UWorld* World = GetWorld())
@@ -90,6 +110,8 @@ void AGP_SeraphLaserActor::InitializeLaser(AGP_CrystalSeraphBossCharacter* InBos
 void AGP_SeraphLaserActor::ActivateLaser()
 {
 	bLaserActive = true;
+	VisualCueComponent->DeactivatePersistentCue(GPTags::GameplayCue::Ability::Telegraph_Magic);
+	VisualCueComponent->ActivatePersistentCue(GPTags::GameplayCue::Ability::Active_Magic, DamageBox);
 	DamageBox->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 	BP_OnLaserActivated();
 	TryReflectFromPrism();
@@ -183,8 +205,17 @@ bool AGP_SeraphLaserActor::TryReflectFromPrism()
 
 	const FVector ReflectedDirection = BestPrism->ResolveReflectedDirection(LaserDirection);
 	SpawnReflectedSegment(BestPrism->GetActorLocation(), ReflectedDirection);
+	MulticastPlayReflectedVFX(BestPrism->GetActorLocation(), ReflectedDirection.Rotation());
 	BP_OnLaserReflected(BestPrism->GetActorLocation(), ReflectedDirection);
 	return true;
+}
+
+void AGP_SeraphLaserActor::MulticastPlayReflectedVFX_Implementation(const FVector& ReflectionOrigin, const FRotator& ReflectionRotation)
+{
+	if (IsValid(VisualCueComponent))
+	{
+		VisualCueComponent->PlayOneShotAtLocation(GPTags::GameplayCue::Ability::Reflect_Magic, ReflectionOrigin, ReflectionRotation, FVector(1.35f));
+	}
 }
 
 void AGP_SeraphLaserActor::SpawnReflectedSegment(const FVector& ReflectionOrigin, const FVector& ReflectedDirection)

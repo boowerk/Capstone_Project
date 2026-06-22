@@ -7,6 +7,8 @@
 class USceneCaptureComponent2D;
 class USceneComponent;
 class UTextureRenderTarget2D;
+class FGPMinimapCaptureGPUFence;
+class FMinimapCaptureStabilityTest;
 
 UENUM(BlueprintType)
 enum class EGPMinimapCaptureMode : uint8
@@ -16,14 +18,24 @@ enum class EGPMinimapCaptureMode : uint8
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FGPMinimapCaptureRenderTargetChanged, UTextureRenderTarget2D*, RenderTarget);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FGPMinimapMapCaptureReady);
 
 UCLASS(Blueprintable)
 class PROJECT_EDEN_API AGP_MinimapCaptureActor : public AActor
 {
 	GENERATED_BODY()
 
+private:
+	enum class EFrameTransferState : uint8
+	{
+		Idle,
+		WaitingForCapture,
+		WaitingForDisplayCopy
+	};
+
 public:
 	AGP_MinimapCaptureActor();
+	virtual ~AGP_MinimapCaptureActor() override;
 
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
@@ -46,8 +58,20 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Minimap")
 	UTextureRenderTarget2D* GetMinimapRenderTarget() const { return RenderTarget; }
 
+	UFUNCTION(BlueprintPure, Category = "Minimap")
+	bool WorldToMapUV(const FVector& WorldLocation, FVector2D& OutMapUV) const;
+
+	UFUNCTION(BlueprintPure, Category = "Minimap")
+	bool IsFullMapCaptureReady() const { return bFullMapCaptureReady; }
+
+	UFUNCTION(BlueprintPure, Category = "Minimap")
+	float GetCapturedMapOrthoWidth() const { return CapturedMapOrthoWidth; }
+
 	UPROPERTY(BlueprintAssignable, Category = "Minimap")
 	FGPMinimapCaptureRenderTargetChanged OnRenderTargetChanged;
+
+	UPROPERTY(BlueprintAssignable, Category = "Minimap")
+	FGPMinimapMapCaptureReady OnMapCaptureReady;
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Minimap")
@@ -77,30 +101,47 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Minimap|Capture", meta = (ClampMin = "0.0"))
 	float BoundsPadding = 500.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Minimap|Capture", meta = (ClampMin = "0.02"))
-	float FollowCaptureInterval = 0.2f;
-
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Minimap|Capture")
 	bool bRegisterWithSubsystem = true;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Minimap|Capture")
-	bool bStartFollowingPlayer = true;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Minimap|Capture")
-	bool bRotateCaptureWithTarget = false;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Minimap|Capture")
-	EGPMinimapCaptureMode CaptureMode = EGPMinimapCaptureMode::FollowTarget;
+	EGPMinimapCaptureMode CaptureMode = EGPMinimapCaptureMode::FullMap;
 
 private:
+	friend class FMinimapCaptureStabilityTest;
+
 	FBox ResolveBounds(AActor* BoundsActor) const;
 	AActor* ResolveDefaultFollowTarget() const;
+	FVector ResolveFallbackFullMapCenter();
+	void CacheInitialGroundCenter();
+	void ConfigureFlat2DCapture();
+	UTextureRenderTarget2D* CreateTransientRenderTarget(const FName ObjectName);
+	bool IsTransferGPUFenceComplete() const;
+	bool HasTransferGPUFence() const;
+	bool QueueCapturedFrameToDisplay();
+	void AdvanceFrameTransfer();
 	void ApplyTopDownTransform(const FVector& Center, float OrthoWidth, float Yaw);
 	void CaptureForCurrentMode();
 
 	UPROPERTY(Transient)
 	TObjectPtr<AActor> FollowTargetActor;
 
-	float FollowCaptureAccumulator = 0.0f;
+	// SceneCapture writes only to this back buffer; RenderTarget remains stable for UMG until promotion.
+	UPROPERTY(Transient)
+	TObjectPtr<UTextureRenderTarget2D> CaptureBackBuffer;
+
+	FVector InitialGroundCenter = FVector::ZeroVector;
+	FVector CapturedMapCenter = FVector::ZeroVector;
+	float CapturedMapOrthoWidth = 0.0f;
+	float CapturedMapYaw = 0.0f;
+	// Capture and display-copy fences keep the HUD on its last complete frame throughout the transfer.
+	TSharedPtr<FGPMinimapCaptureGPUFence, ESPMode::ThreadSafe> CaptureCompletionFence;
+#if WITH_DEV_AUTOMATION_TESTS
+	TOptional<bool> CaptureGPUFenceCompletionOverride;
+#endif
+	EFrameTransferState FrameTransferState = EFrameTransferState::Idle;
+	bool bHasInitialGroundCenter = false;
 	bool bCaptureInitialized = false;
+	bool bFullMapCapturePending = false;
+	bool bFullMapCaptureReady = false;
 };

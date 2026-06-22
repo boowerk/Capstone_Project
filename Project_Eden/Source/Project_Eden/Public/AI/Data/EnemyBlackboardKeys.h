@@ -49,4 +49,15 @@ namespace EnemyBlackboardKeys
 	PROJECT_EDEN_API extern const FName CrystalPrismActor;
 	PROJECT_EDEN_API extern const FName bCanUseLaserPattern;
 	PROJECT_EDEN_API extern const FName bCanUsePrismPattern;
+	// Dark Armor Knight keys are optional mirrors; the replicated state component remains authoritative.
+	PROJECT_EDEN_API extern const FName GuardGauge;
+	PROJECT_EDEN_API extern const FName MaxGuardGauge;
+	PROJECT_EDEN_API extern const FName bIsGuarding;
+	PROJECT_EDEN_API extern const FName bCanParry;
+	PROJECT_EDEN_API extern const FName bGuardBroken;
+	PROJECT_EDEN_API extern const FName bShouldCharge;
+	PROJECT_EDEN_API extern const FName bCanUseGroundCrack;
+	PROJECT_EDEN_API extern const FName bCanUseDarkWave;
+	PROJECT_EDEN_API extern const FName LastHitDirection;
+	PROJECT_EDEN_API extern const FName PreferredMeleeRange;
 }

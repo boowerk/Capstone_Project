@@ -14,10 +14,14 @@
 #include "BehaviorTree/BehaviorTree.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "BehaviorTree/BlackboardData.h"
+#include "BrainComponent.h"
 #include "Characters/GP_CrystalSeraphStateComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/Controller.h"
+#include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerState.h"
 #include "Kismet/GameplayStatics.h"
 #include "NavigationSystem.h"
 #include "TimerManager.h"
@@ -157,16 +161,39 @@ AActor* AGP_CrystalSeraphBossCharacter::RequestSpawnCrystalPrism(AActor* Pattern
 	}
 
 	AActor* TargetActor = ResolvePatternTarget(PatternTargetActor);
-	const FVector SpawnLocation = ResolvePrismSpawnLocation(TargetActor);
-	const FRotator SpawnRotation = FRotator::ZeroRotator;
-	AActor* PrismActor = SpawnConfiguredActor(CrystalPrismActorClass, SpawnLocation, SpawnRotation, TEXT("CrystalPrism"));
-	if (AGP_CrystalPrismActor* CrystalPrismActor = Cast<AGP_CrystalPrismActor>(PrismActor))
+	AActor* PrimaryPrismActor = nullptr;
+	const int32 SafePrismCount = FMath::Clamp(PrismSpawnCount, 1, 8);
+	for (int32 PrismIndex = 0; PrismIndex < SafePrismCount; ++PrismIndex)
 	{
-		CrystalPrismActor->InitializePrism(this);
+		const FVector SpawnLocation = ResolvePrismSpawnLocation(TargetActor, PrismIndex, SafePrismCount);
+		// Crystals remain vertically aligned; aiming at the airborne boss previously introduced an unwanted pitch tilt.
+		const FRotator SpawnRotation = FRotator::ZeroRotator;
+		AActor* PrismActor = SpawnConfiguredActor(
+			CrystalPrismActorClass,
+			SpawnLocation,
+			SpawnRotation,
+			FName(*FString::Printf(TEXT("CrystalPrism_%d"), PrismIndex + 1)));
+		if (!IsValid(PrismActor))
+		{
+			continue;
+		}
+
+		if (AGP_CrystalPrismActor* CrystalPrismActor = Cast<AGP_CrystalPrismActor>(PrismActor))
+		{
+			CrystalPrismActor->InitializePrism(this);
+		}
+		if (!IsValid(PrimaryPrismActor))
+		{
+			// The state component keeps one representative; laser collision already evaluates every prism actor in the world.
+			PrimaryPrismActor = PrismActor;
+		}
 	}
-	CrystalSeraphStateComponent->RegisterCrystalPrismActor(PrismActor);
-	LastPrismPatternTime = GetWorld() ? GetWorld()->GetTimeSeconds() : LastPrismPatternTime;
-	return PrismActor;
+	CrystalSeraphStateComponent->RegisterCrystalPrismActor(PrimaryPrismActor);
+	if (IsValid(PrimaryPrismActor))
+	{
+		LastPrismPatternTime = GetWorld() ? GetWorld()->GetTimeSeconds() : LastPrismPatternTime;
+	}
+	return PrimaryPrismActor;
 }
 
 bool AGP_CrystalSeraphBossCharacter::RequestStartLaserPattern(AActor* PatternTargetActor)
@@ -284,7 +311,7 @@ void AGP_CrystalSeraphBossCharacter::RequestExposeWingCore(float ExposureDuratio
 
 void AGP_CrystalSeraphBossCharacter::RequestWingCoreBreak()
 {
-	if (!HasAuthority() || !IsValid(CrystalSeraphStateComponent))
+	if (!HasAuthority() || !IsValid(CrystalSeraphStateComponent) || CrystalSeraphStateComponent->IsGroggy())
 	{
 		return;
 	}
@@ -312,11 +339,16 @@ void AGP_CrystalSeraphBossCharacter::RequestEnterGroggy()
 
 void AGP_CrystalSeraphBossCharacter::RequestRecoverFromGroggy()
 {
-	if (!HasAuthority() || !IsValid(CrystalSeraphStateComponent))
+	if (!HasAuthority() || IsDead() || !IsValid(CrystalSeraphStateComponent) || !CrystalSeraphStateComponent->IsGroggy())
 	{
 		return;
 	}
 
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(GroggyRecoveryTimerHandle);
+	}
+	bGroggyRecoveryScheduled = false;
 	CrystalSeraphStateComponent->RecoverFromGroggy();
 	MoveToHoverLocation();
 }
@@ -355,10 +387,11 @@ bool AGP_CrystalSeraphBossCharacter::RequestTeleportToPreferredCombatPosition(AA
 	++TacticalTeleportSequence;
 
 	const FVector TargetLocation = TargetActor->GetActorLocation();
-	const FVector Destination(
+	const FVector DesiredDestination(
 		TargetLocation.X + HorizontalAway.X * GetPreferredAirRange(),
 		TargetLocation.Y + HorizontalAway.Y * GetPreferredAirRange(),
 		TargetLocation.Z + GetPreferredHoverHeight());
+	const FVector Destination = ConstrainTacticalDestinationToAnchor(DesiredDestination);
 	const FRotator FacingRotation = (TargetLocation - Destination).Rotation();
 
 	if (AAIController* AIController = Cast<AAIController>(GetController()))
@@ -369,10 +402,11 @@ bool AGP_CrystalSeraphBossCharacter::RequestTeleportToPreferredCombatPosition(AA
 	SetActorLocationAndRotation(Destination, FRotator(0.0f, FacingRotation.Yaw, 0.0f), false, nullptr, ETeleportType::TeleportPhysics);
 	LastTacticalTeleportTime = WorldTimeSeconds;
 
-	UE_LOG(LogTemp, Log, TEXT("[CrystalSeraph] Tactical teleport: Boss=%s Target=%s Destination=%s"),
+	UE_LOG(LogTemp, Log, TEXT("[CrystalSeraph] Tactical teleport: Boss=%s Target=%s Destination=%s AnchorClamped=%d"),
 		*GetNameSafe(this),
 		*GetNameSafe(TargetActor),
-		*Destination.ToCompactString());
+		*Destination.ToCompactString(),
+		Destination.Equals(DesiredDestination, 1.0f) ? 0 : 1);
 	return true;
 }
 
@@ -386,7 +420,30 @@ void AGP_CrystalSeraphBossCharacter::HandlePostDamageTaken(AActor* InstigatorAct
 {
 	Super::HandlePostDamageTaken(InstigatorActor, DamageAmount, ElementTag);
 
-	if (!HasAuthority() || !IsValid(CrystalSeraphStateComponent) || !CrystalSeraphStateComponent->IsWingCoreExposed())
+	if (!HasAuthority() || !IsValid(CrystalSeraphStateComponent))
+	{
+		return;
+	}
+
+	if (IsDead())
+	{
+		if (UWorld* World = GetWorld())
+		{
+			// A lethal groggy hit cancels recovery so the shared death lifecycle remains terminal.
+			World->GetTimerManager().ClearTimer(GroggyRecoveryTimerHandle);
+		}
+		bGroggyRecoveryScheduled = false;
+		return;
+	}
+
+	if (CrystalSeraphStateComponent->IsGroggy())
+	{
+		// The vulnerability window begins only after the grounded boss takes a real player hit.
+		ScheduleGroggyRecoveryAfterPlayerHit(InstigatorActor, DamageAmount);
+		return;
+	}
+
+	if (!CrystalSeraphStateComponent->IsWingCoreExposed())
 	{
 		return;
 	}
@@ -412,24 +469,30 @@ void AGP_CrystalSeraphBossCharacter::HandleCrystalSeraphGroggyChanged(bool bNewG
 	{
 		World->GetTimerManager().ClearTimer(GroggyRecoveryTimerHandle);
 	}
+	bGroggyRecoveryScheduled = false;
 
 	if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
 	{
 		MovementComponent->GravityScale = bNewGroggy ? 1.0f : 0.0f;
-		MovementComponent->SetMovementMode(bNewGroggy ? MOVE_Walking : MOVE_Flying);
+		MovementComponent->DefaultLandMovementMode = bNewGroggy ? MOVE_Walking : MOVE_Flying;
+		// Entering Falling preserves the visible drop instead of teleporting the boss directly to the floor.
+		MovementComponent->SetMovementMode(bNewGroggy ? MOVE_Falling : MOVE_Flying);
 	}
 
-	if (bNewGroggy)
+	if (AAIController* AIController = Cast<AAIController>(GetController()))
 	{
-		SetActorLocation(ResolveGroundGroggyLocation(), false, nullptr, ETeleportType::TeleportPhysics);
-		if (UWorld* World = GetWorld())
+		AIController->StopMovement();
+		if (UBrainComponent* BrainComponent = AIController->GetBrainComponent())
 		{
-			World->GetTimerManager().SetTimer(
-				GroggyRecoveryTimerHandle,
-				this,
-				&ThisClass::RequestRecoverFromGroggy,
-				ResolveCurrentGroggyDuration(),
-				false);
+			if (bNewGroggy)
+			{
+				// Pause Boss_Common while gravity and the grounded vulnerability window own the boss.
+				BrainComponent->PauseLogic(TEXT("Crystal Seraph groggy"));
+			}
+			else
+			{
+				BrainComponent->ResumeLogic(TEXT("Crystal Seraph recovered"));
+			}
 		}
 	}
 }
@@ -511,7 +574,7 @@ AActor* AGP_CrystalSeraphBossCharacter::ResolvePatternTarget(AActor* ExplicitTar
 	return UGameplayStatics::GetPlayerPawn(this, 0);
 }
 
-FVector AGP_CrystalSeraphBossCharacter::ResolvePrismSpawnLocation(AActor* TargetActor) const
+FVector AGP_CrystalSeraphBossCharacter::ResolvePrismSpawnLocation(AActor* TargetActor, int32 PrismIndex, int32 TotalPrismCount) const
 {
 	const FVector TargetLocation = IsValid(TargetActor) ? TargetActor->GetActorLocation() : GetActorLocation() + GetActorForwardVector() * PreferredAirRange;
 	FVector Right = GetActorRightVector().GetSafeNormal2D();
@@ -520,8 +583,12 @@ FVector AGP_CrystalSeraphBossCharacter::ResolvePrismSpawnLocation(AActor* Target
 		Right = FVector::RightVector;
 	}
 
-	const float SideSign = FMath::RandBool() ? 1.0f : -1.0f;
-	FVector DesiredLocation = TargetLocation + Right * SideSign * FMath::RandRange(500.0f, 800.0f);
+	const int32 SafeCount = FMath::Max(1, TotalPrismCount);
+	const float AngleStep = 360.0f / static_cast<float>(SafeCount);
+	const float AngleDegrees = AngleStep * static_cast<float>(FMath::Clamp(PrismIndex, 0, SafeCount - 1));
+	const FVector RadialDirection = Right.RotateAngleAxis(AngleDegrees, FVector::UpVector).GetSafeNormal2D();
+	// Even ring spacing prevents three enlarged crystals from obscuring one another around the player.
+	FVector DesiredLocation = TargetLocation + RadialDirection * FMath::Max(200.0f, PrismRingRadius);
 
 	if (UNavigationSystemV1* NavigationSystem = UNavigationSystemV1::GetCurrent(GetWorld()))
 	{
@@ -541,25 +608,33 @@ FVector AGP_CrystalSeraphBossCharacter::ResolvePrismSpawnLocation(AActor* Target
 	return DesiredLocation;
 }
 
-FVector AGP_CrystalSeraphBossCharacter::ResolveGroundGroggyLocation() const
-{
-	const FVector TraceStart = GetActorLocation();
-	const FVector TraceEnd = TraceStart - FVector(0.0f, 0.0f, 5000.0f);
-	FHitResult GroundHit;
-	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(CrystalSeraphGroggyGround), false, this);
-	if (GetWorld() && GetWorld()->LineTraceSingleByChannel(GroundHit, TraceStart, TraceEnd, ECC_WorldStatic, QueryParams))
-	{
-		return GroundHit.ImpactPoint + FVector(0.0f, 0.0f, 96.0f);
-	}
-
-	return GetActorLocation() - FVector(0.0f, 0.0f, PreferredHoverHeight);
-}
-
 FVector AGP_CrystalSeraphBossCharacter::ResolveHoverLocation() const
 {
 	AActor* TargetActor = ResolvePatternTarget(nullptr);
 	const FVector BaseLocation = IsValid(TargetActor) ? TargetActor->GetActorLocation() : GetActorLocation();
 	return FVector(GetActorLocation().X, GetActorLocation().Y, BaseLocation.Z + PreferredHoverHeight);
+}
+
+FVector AGP_CrystalSeraphBossCharacter::ConstrainTacticalDestinationToAnchor(const FVector& DesiredDestination) const
+{
+	const FVector AnchorLocation = GetBehaviorAnchorLocation();
+	const float SafeRadius = FMath::Max(
+		0.0f,
+		GetReturnHomeDistance() - FMath::Max(GetReturnHomeAcceptanceRadius(), TacticalTeleportAnchorBuffer));
+	FVector HorizontalOffset = DesiredDestination - AnchorLocation;
+	HorizontalOffset.Z = 0.0f;
+
+	if (HorizontalOffset.SizeSquared2D() <= FMath::Square(SafeRadius))
+	{
+		return DesiredDestination;
+	}
+
+	// Tactical movement must not trigger the shared leash that immediately clears the current combat target.
+	const FVector ClampedHorizontalOffset = HorizontalOffset.GetSafeNormal2D() * SafeRadius;
+	return FVector(
+		AnchorLocation.X + ClampedHorizontalOffset.X,
+		AnchorLocation.Y + ClampedHorizontalOffset.Y,
+		DesiredDestination.Z);
 }
 
 float AGP_CrystalSeraphBossCharacter::ResolveBossMaxHealth() const
@@ -574,6 +649,71 @@ float AGP_CrystalSeraphBossCharacter::ResolveCurrentGroggyDuration() const
 	const float MaxHealth = ResolveBossMaxHealth();
 	const float HealthRatio = IsValid(GPAttributeSet) ? GPAttributeSet->GetHealth() / MaxHealth : 1.0f;
 	return HealthRatio <= FinalPhaseHealthRatio ? FinalPhaseGroggyDuration : GroggyDuration;
+}
+
+bool AGP_CrystalSeraphBossCharacter::IsPlayerDamageInstigator(const AActor* InstigatorActor) const
+{
+	if (!IsValid(InstigatorActor))
+	{
+		return false;
+	}
+
+	if (const APawn* InstigatorPawn = Cast<APawn>(InstigatorActor))
+	{
+		return InstigatorPawn->IsPlayerControlled();
+	}
+
+	if (const AController* InstigatorController = Cast<AController>(InstigatorActor))
+	{
+		return InstigatorController->IsPlayerController();
+	}
+
+	if (Cast<APlayerState>(InstigatorActor) != nullptr)
+	{
+		return true;
+	}
+
+	// Projectile and area actors preserve the player's controller through their instigator chain.
+	const AController* InstigatorController = InstigatorActor->GetInstigatorController();
+	return IsValid(InstigatorController) && InstigatorController->IsPlayerController();
+}
+
+void AGP_CrystalSeraphBossCharacter::ScheduleGroggyRecoveryAfterPlayerHit(AActor* InstigatorActor, float DamageAmount)
+{
+	if (bGroggyRecoveryScheduled || DamageAmount <= 0.0f || !IsPlayerDamageInstigator(InstigatorActor))
+	{
+		return;
+	}
+
+	const UCharacterMovementComponent* MovementComponent = GetCharacterMovement();
+	if (!IsValid(MovementComponent) || !MovementComponent->IsMovingOnGround())
+	{
+		// A hit during the fall must not consume the required post-landing player hit.
+		return;
+	}
+
+	bGroggyRecoveryScheduled = true;
+	const float RecoveryDelay = ResolveCurrentGroggyDuration();
+	UE_LOG(LogTemp, Log, TEXT("[CrystalSeraph] Grounded player hit armed recovery. Boss=%s Delay=%.2f"),
+		*GetNameSafe(this),
+		RecoveryDelay);
+
+	if (RecoveryDelay <= 0.0f)
+	{
+		RequestRecoverFromGroggy();
+		return;
+	}
+
+	if (UWorld* World = GetWorld())
+	{
+		// One-shot scheduling prevents repeated combo hits from postponing or accelerating the recovery.
+		World->GetTimerManager().SetTimer(
+			GroggyRecoveryTimerHandle,
+			this,
+			&ThisClass::RequestRecoverFromGroggy,
+			RecoveryDelay,
+			false);
+	}
 }
 
 void AGP_CrystalSeraphBossCharacter::MoveToHoverLocation()

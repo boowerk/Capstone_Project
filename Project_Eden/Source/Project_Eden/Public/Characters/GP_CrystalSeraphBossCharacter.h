@@ -7,6 +7,7 @@
 
 class UGameplayAbility;
 class UGP_CrystalSeraphStateComponent;
+class FCrystalSeraphGroggyLifecycleTest;
 
 UCLASS(Blueprintable)
 class PROJECT_EDEN_API AGP_CrystalSeraphBossCharacter : public AGP_EnemyCharacter
@@ -70,6 +71,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Boss|Crystal Seraph")
 	bool CanStartCrystalSeraphPattern() const;
 
+	UFUNCTION(BlueprintPure, Category = "Boss|Crystal Seraph")
+	bool IsGroggyRecoveryScheduled() const { return bGroggyRecoveryScheduled; }
+
 	// Reserves the shared attack cadence before a GAS pattern executes so back-to-back BT tasks cannot pass the same check.
 	bool TryStartCrystalSeraphPattern();
 
@@ -80,6 +84,8 @@ protected:
 	virtual void HandlePostDamageTaken(AActor* InstigatorActor, float DamageAmount, FGameplayTag ElementTag) override;
 
 private:
+	friend class FCrystalSeraphGroggyLifecycleTest;
+
 	UFUNCTION()
 	void HandleCrystalSeraphGroggyChanged(bool bNewGroggy);
 
@@ -88,11 +94,13 @@ private:
 
 	void GrantCrystalSeraphPatternAbilities();
 	AActor* ResolvePatternTarget(AActor* ExplicitTargetActor) const;
-	FVector ResolvePrismSpawnLocation(AActor* TargetActor) const;
-	FVector ResolveGroundGroggyLocation() const;
+	FVector ResolvePrismSpawnLocation(AActor* TargetActor, int32 PrismIndex, int32 TotalPrismCount) const;
 	FVector ResolveHoverLocation() const;
+	FVector ConstrainTacticalDestinationToAnchor(const FVector& DesiredDestination) const;
 	float ResolveBossMaxHealth() const;
 	float ResolveCurrentGroggyDuration() const;
+	bool IsPlayerDamageInstigator(const AActor* InstigatorActor) const;
+	void ScheduleGroggyRecoveryAfterPlayerHit(AActor* InstigatorActor, float DamageAmount);
 	void MoveToHoverLocation();
 	AActor* SpawnConfiguredActor(TSubclassOf<AActor> ActorClass, const FVector& Location, const FRotator& Rotation, FName DebugName);
 
@@ -151,11 +159,20 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph|Air", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "s"))
 	float TacticalTeleportCooldown = 1.0f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph|Air", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "cm"))
+	float TacticalTeleportAnchorBuffer = 300.0f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph|Combat", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "s"))
 	float MinimumPatternInterval = 2.5f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph|Prism", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "s"))
 	float PrismPatternCooldown = 16.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph|Prism", meta = (AllowPrivateAccess = "true", ClampMin = "1", ClampMax = "8"))
+	int32 PrismSpawnCount = 3;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph|Prism", meta = (AllowPrivateAccess = "true", ClampMin = "200.0", Units = "cm"))
+	float PrismRingRadius = 650.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph|Laser", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "s"))
 	float LaserPatternCooldown = 10.0f;
@@ -184,4 +201,5 @@ private:
 	float LastTacticalTeleportTime = -BIG_NUMBER;
 	int32 TacticalTeleportSequence = 0;
 	FTimerHandle GroggyRecoveryTimerHandle;
+	bool bGroggyRecoveryScheduled = false;
 };

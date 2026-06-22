@@ -8,6 +8,18 @@
 #include "Engine/Engine.h"
 #include "GeometryCollection/GeometryCollectionParticlesData.h"
 
+UGP_WidgetComponent::UGP_WidgetComponent()
+{
+	// Enemy world-space bars use the shared GAS Health contract unless a component adds more attribute pairs.
+	AttributeMap.Add(UGP_AttributeSet::GetHealthAttribute(), UGP_AttributeSet::GetMaxHealthAttribute());
+}
+
+bool UGP_WidgetComponent::TracksAttributePair(const FGameplayAttribute& Attribute, const FGameplayAttribute& MaxAttribute) const
+{
+	const FGameplayAttribute* ConfiguredMaxAttribute = AttributeMap.Find(Attribute);
+	return ConfiguredMaxAttribute != nullptr && *ConfiguredMaxAttribute == MaxAttribute;
+}
+
 void UGP_WidgetComponent::BeginPlay()
 {
 	Super::BeginPlay();
