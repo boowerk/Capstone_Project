@@ -9,7 +9,7 @@ class UGameplayEffect;
 class USphereComponent;
 class UStaticMeshComponent;
 
-/** Server-owned coordinator moves the boss itself so the visible body and charge hit volume stay aligned. */
+/** Server-owned charge coordinator. Root-motion charge keeps body movement and dash animation synchronized. */
 UCLASS(Blueprintable)
 class PROJECT_EDEN_API AGP_DarkKnightChargeActor : public AActor
 {
@@ -48,6 +48,12 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Dark Knight", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "cm/s"))
 	float ChargeSpeed = 2200.0f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Dark Knight|Root Motion", meta = (AllowPrivateAccess = "true"))
+	bool bUseMontageRootMotion = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Dark Knight|Root Motion", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "s"))
+	float RootMotionChargeDuration = 1.57f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Dark Knight", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "cm"))
 	float MaxChargeDistance = 1600.0f;
 
@@ -68,6 +74,7 @@ private:
 
 	FVector ChargeDirection = FVector::ForwardVector;
 	float DistanceTravelled = 0.0f;
+	float ChargeElapsed = 0.0f;
 	FTimerHandle TelegraphTimerHandle;
 	bool bChargeActive = false;
 	bool bFinished = false;

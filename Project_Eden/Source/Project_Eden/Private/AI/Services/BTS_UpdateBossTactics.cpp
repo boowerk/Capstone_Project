@@ -340,11 +340,7 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 	const bool bDarkKnightMeleeReady = bDarkKnightCadenceReady
 		&& DistanceToTarget <= FGPBossAttackPatternRanges::DarkKnightMeleeReach
 		&& (DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::Basic)
-			|| DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::Heavy)
-			|| DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::Sweep));
-	const bool bDarkKnightGuardReady = bDarkKnightCadenceReady
-		&& DistanceToTarget <= 520.0f
-		&& DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::Guard);
+			|| DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::Heavy));
 	const bool bDarkKnightChargeReady = bDarkKnightCadenceReady
 		&& DistanceToTarget >= DarkKnightBoss->GetChargeMinRange()
 		&& DistanceToTarget <= FGPBossAttackPatternRanges::DarkKnightChargeMaxRange
@@ -360,9 +356,8 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 		&& !bReturningHome
 		&& !bShouldPhaseTransition
 		&& !bDarkKnightGroggy
-		&& !bDarkKnightGuarding
 		&& bHasLineOfSight
-		&& (bDarkKnightGuardBroken || bDarkKnightMeleeReady || bDarkKnightGuardReady || bDarkKnightChargeReady || bDarkKnightWaveReady || bDarkKnightCrackReady);
+		&& (bDarkKnightGuardBroken || bDarkKnightMeleeReady || bDarkKnightChargeReady || bDarkKnightWaveReady || bDarkKnightCrackReady);
 
 	if (bMatadorGroggy)
 	{
@@ -479,7 +474,7 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldReposition, false);
 		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldChase, false);
 	}
-	else if (bMatadorGroggy || bCrystalSeraphGroggy || bDarkKnightGroggy || bDarkKnightGuarding || (bIsCrystalSeraphBoss && bWingCoreExposed))
+	else if (bMatadorGroggy || bCrystalSeraphGroggy || bDarkKnightGroggy || (bIsCrystalSeraphBoss && bWingCoreExposed))
 	{
 		// Vulnerability windows are stationary and must not fall through to the shared Chase branch.
 		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanAttack, false);

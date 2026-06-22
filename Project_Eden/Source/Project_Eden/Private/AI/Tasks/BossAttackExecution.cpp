@@ -211,8 +211,8 @@ namespace BossAttackExecution
 			Context.PreferredRange = Context.PreferredMeleeRange;
 			Context.bCanUseDarkKnightBasic = bCadenceReady && DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::Basic);
 			Context.bCanUseDarkKnightHeavy = bCadenceReady && DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::Heavy);
-			Context.bCanUseDarkKnightSweep = bCadenceReady && DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::Sweep);
-			Context.bCanUseDarkKnightGuard = bCadenceReady && DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::Guard);
+			// Sweep is no longer a selectable Dark Knight pattern; Ability_RMB is reserved as an animation wind-up.
+			Context.bCanUseDarkKnightSweep = false;
 			Context.bCanUseDarkKnightCharge = bCadenceReady && DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::Charge);
 			Context.bCanUseDarkWave = bCadenceReady && DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::DarkWave);
 			Context.bCanUseGroundCrack = bCadenceReady && DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::GroundCrack);

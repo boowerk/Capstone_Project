@@ -9,6 +9,7 @@ class AGP_DarkKnightGroundCrackActor;
 class AGP_DarkWaveProjectile;
 class UGameplayAbility;
 class UGameplayEffect;
+class UAnimMontage;
 class UGP_DarkArmorKnightStateComponent;
 
 UCLASS(Blueprintable)
@@ -49,6 +50,12 @@ public:
 	bool ExecuteGroundCrack(AActor* TargetActor);
 	bool ExecuteEnterGroggy();
 
+	/** Plays the shared ready stance before a single authored attack. */
+	bool StartPatternWithWindup(FGameplayTag PatternTag, AActor* TargetActor);
+
+	/** Plays the authored montage for a successfully-started boss pattern. */
+	bool PlayPatternMontage(FGameplayTag PatternTag);
+
 	void HandleChargeFinished(bool bHitTarget, AActor* TargetActor);
 
 	UFUNCTION(BlueprintPure, Category = "Boss|Dark Knight")
@@ -78,6 +85,7 @@ private:
 	float ResolvePatternCooldown(const FGameplayTag& PatternTag) const;
 	void SpawnDarkWaveVolley(AActor* TargetActor, int32 ProjectileCount);
 	void SpawnGroundCracks(AActor* TargetActor);
+	bool ExecutePatternNow(FGameplayTag PatternTag, AActor* TargetActor);
 
 	UFUNCTION()
 	void HandleGroggyChanged(bool bNewGroggy);
@@ -100,6 +108,17 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Dark Knight|Abilities", meta = (AllowPrivateAccess = "true"))
 	TArray<TSubclassOf<UGameplayAbility>> DarkKnightAbilityClasses;
+
+	/** Keyed by GPTags::Ability::Boss::DarkKnight::* so Blueprint children can swap visuals without changing pattern logic. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Dark Knight|Animation", meta = (AllowPrivateAccess = "true"))
+	TMap<FGameplayTag, TObjectPtr<UAnimMontage>> PatternMontages;
+
+	/** Shared pre-attack stance; actual strike montage starts after this readable cue. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Dark Knight|Animation", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UAnimMontage> PreAttackMontage;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Dark Knight|Animation", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "s"))
+	float PreAttackDuration = 1.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Dark Knight|Combat", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "cm"))
 	float PreferredMeleeRange = 350.0f;

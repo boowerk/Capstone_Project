@@ -16,6 +16,7 @@
 #include "AbilitySystem/Abilities/Enemy/GP_EnemyDeathAbility.h"
 #include "AbilitySystem/GP_AbilitySystemComponent.h"
 #include "AbilitySystem/GP_AttributeSet.h"
+#include "Animation/AnimInstance.h"
 #include "Animation/PDA_EnemyAnimationSet.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/DataTable.h"
@@ -149,6 +150,15 @@ void AGP_EnemyCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 	RefreshWorldHealthBarVisibility();
+
+	if (IsValid(EnemyAnimationSet))
+	{
+		if (UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance())
+		{
+			// Enemy attack movement is authored in lower-body montage root motion.
+			AnimInstance->SetRootMotionMode(ERootMotionMode::RootMotionFromMontagesOnly);
+		}
+	}
 
 	if (!IsValid(GetAbilitySystemComponent()))
 	{
