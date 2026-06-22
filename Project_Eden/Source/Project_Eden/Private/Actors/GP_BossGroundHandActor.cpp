@@ -4,7 +4,8 @@
 #include "AbilitySystemComponent.h"
 #include "Components/BoxComponent.h"
 #include "Components/DecalComponent.h"
-#include "Components/StaticMeshComponent.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Engine/SkeletalMesh.h"
 #include "GameFramework/Character.h"
 #include "GameplayEffect.h"
 #include "GameplayTags/GP_Tags.h"
@@ -40,44 +41,17 @@ AGP_BossGroundHandActor::AGP_BossGroundHandActor()
 	HandCollision->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
 	HandCollision->SetGenerateOverlapEvents(true);
 
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMeshFinder(TEXT("/Engine/BasicShapes/Cube.Cube"));
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> CylinderMeshFinder(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
-	UStaticMesh* CubeMesh = CubeMeshFinder.Succeeded() ? CubeMeshFinder.Object.Get() : nullptr;
-	UStaticMesh* CylinderMesh = CylinderMeshFinder.Succeeded() ? CylinderMeshFinder.Object.Get() : CubeMesh;
-
-	// Assemble a readable placeholder hand from engine primitives until the final hand asset is available.
-	PalmMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("PalmMesh"));
-	PalmMesh->SetupAttachment(HandVisualRoot);
-	PalmMesh->SetRelativeLocation(FVector(0.0f, 0.0f, 35.0f));
-	PalmMesh->SetRelativeScale3D(FVector(0.7f, 0.5f, 0.8f));
-	ConfigureMeshComponent(PalmMesh, CubeMesh);
-
-	WristMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("WristMesh"));
-	WristMesh->SetupAttachment(HandVisualRoot);
-	WristMesh->SetRelativeLocation(FVector(0.0f, 0.0f, -55.0f));
-	WristMesh->SetRelativeScale3D(FVector(0.28f, 0.28f, 1.0f));
-	ConfigureMeshComponent(WristMesh, CylinderMesh);
-
-	const float FingerYLocations[] = {-30.0f, -10.0f, 10.0f, 30.0f};
-	const float FingerLengthScales[] = {0.58f, 0.72f, 0.68f, 0.52f};
-	for (int32 FingerIndex = 0; FingerIndex < 4; ++FingerIndex)
+	// Use the imported right-hand skeletal asset in its reference pose; gameplay collision remains on HandCollision.
+	HandMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("HandMesh"));
+	HandMesh->SetupAttachment(HandVisualRoot);
+	HandMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	HandMesh->SetGenerateOverlapEvents(false);
+	static ConstructorHelpers::FObjectFinder<USkeletalMesh> HandMeshFinder(
+		TEXT("/Game/Meshes/PLAZA_DE_TOROS/ActorMesh/SK_RightHand.SK_RightHand"));
+	if (HandMeshFinder.Succeeded())
 	{
-		UStaticMeshComponent* FingerMesh = CreateDefaultSubobject<UStaticMeshComponent>(
-			*FString::Printf(TEXT("FingerMesh%d"), FingerIndex));
-		FingerMesh->SetupAttachment(HandVisualRoot);
-		FingerMesh->SetRelativeLocation(FVector(0.0f, FingerYLocations[FingerIndex], 112.0f));
-		FingerMesh->SetRelativeScale3D(FVector(0.11f, 0.11f, FingerLengthScales[FingerIndex]));
-		ConfigureMeshComponent(FingerMesh, CylinderMesh);
-		FingerMeshes.Add(FingerMesh);
+		HandMesh->SetSkeletalMeshAsset(HandMeshFinder.Object);
 	}
-
-	UStaticMeshComponent* ThumbMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ThumbMesh"));
-	ThumbMesh->SetupAttachment(HandVisualRoot);
-	ThumbMesh->SetRelativeLocation(FVector(0.0f, -55.0f, 48.0f));
-	ThumbMesh->SetRelativeRotation(FRotator(0.0f, 0.0f, 48.0f));
-	ThumbMesh->SetRelativeScale3D(FVector(0.13f, 0.13f, 0.5f));
-	ConfigureMeshComponent(ThumbMesh, CylinderMesh);
-	FingerMeshes.Add(ThumbMesh);
 
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> DecalMaterialFinder(
 		TEXT("/Engine/EngineMaterials/DefaultDeferredDecalMaterial.DefaultDeferredDecalMaterial"));
@@ -95,10 +69,21 @@ AGP_BossGroundHandActor::AGP_BossGroundHandActor()
 	}
 }
 
+void AGP_BossGroundHandActor::OnConstruction(const FTransform& Transform)
+{
+	Super::OnConstruction(Transform);
+
+	// Blueprint children tune only the skeletal presentation; HandCollision remains an unchanged sibling component.
+	ApplyHandVisualSettings();
+}
+
 void AGP_BossGroundHandActor::BeginPlay()
 {
 	Super::BeginPlay();
 
+	ApplyHandVisualSettings();
+	// Runtime starts with only the warning decal visible; the BP viewport remains available for mesh tuning.
+	HandMesh->SetHiddenInGame(true, true);
 	HandCollision->OnComponentBeginOverlap.AddDynamic(this, &ThisClass::OnHandOverlap);
 	WarningDecal->DecalSize = FVector(120.0f, WarningRadius, WarningRadius);
 	if (WarningDecalMaterial)
@@ -112,6 +97,19 @@ void AGP_BossGroundHandActor::BeginPlay()
 	{
 		ApplyPatternStart();
 	}
+}
+
+void AGP_BossGroundHandActor::ApplyHandVisualSettings()
+{
+	if (!IsValid(HandMesh))
+	{
+		return;
+	}
+
+	// Uniform scaling avoids distorting the imported hand while offset and rotation stay available for art alignment.
+	HandMesh->SetRelativeScale3D(FVector(FMath::Max(0.01f, HandVisualScale)));
+	HandMesh->SetRelativeLocation(HandVisualOffset);
+	HandMesh->SetRelativeRotation(HandVisualRotation);
 }
 
 void AGP_BossGroundHandActor::InitializeGroundHand(float InTelegraphDuration)
@@ -173,6 +171,7 @@ void AGP_BossGroundHandActor::ApplyPatternStart()
 	HitActors.Reset();
 	HandCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	HandVisualRoot->SetRelativeLocation(FVector(0.0f, 0.0f, -HiddenDepth));
+	HandMesh->SetHiddenInGame(true, true);
 	WarningDecal->SetVisibility(true);
 }
 
@@ -186,11 +185,14 @@ void AGP_BossGroundHandActor::UpdatePatternVisuals(float ElapsedSeconds)
 	if (ElapsedSeconds < TelegraphEnd)
 	{
 		WarningDecal->SetVisibility(true);
+		HandMesh->SetHiddenInGame(true, true);
 		HandVisualRoot->SetRelativeLocation(FVector(0.0f, 0.0f, -HiddenDepth));
 		return;
 	}
 
 	WarningDecal->SetVisibility(false);
+	// Reveal on the first rise frame so no part of a large skeletal mesh leaks through during the warning.
+	HandMesh->SetHiddenInGame(false, true);
 	if (!bCollisionActive)
 	{
 		bCollisionActive = true;
@@ -215,6 +217,7 @@ void AGP_BossGroundHandActor::UpdatePatternVisuals(float ElapsedSeconds)
 	else
 	{
 		HandCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		HandMesh->SetHiddenInGame(true, true);
 		HandVisualRoot->SetRelativeLocation(FVector(0.0f, 0.0f, -HiddenDepth));
 		bPatternStarted = false;
 		return;
@@ -285,25 +288,16 @@ void AGP_BossGroundHandActor::SnapToFloor()
 	const FVector CurrentLocation = GetActorLocation();
 	FHitResult FloorHit;
 	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(BossGroundHandFloorTrace), false, GetOwner());
-	if (World->LineTraceSingleByChannel(
+	FCollisionObjectQueryParams FloorObjectQuery;
+	// The center strike overlaps the target pawn, so only static level geometry may establish the decal floor.
+	FloorObjectQuery.AddObjectTypesToQuery(ECC_WorldStatic);
+	if (World->LineTraceSingleByObjectType(
 		FloorHit,
 		CurrentLocation + FVector(0.0f, 0.0f, FloorTraceUpDistance),
 		CurrentLocation - FVector(0.0f, 0.0f, FloorTraceDownDistance),
-		ECC_Visibility,
+		FloorObjectQuery,
 		QueryParams))
 	{
 		SetActorLocation(FloorHit.ImpactPoint + FVector(0.0f, 0.0f, 3.0f));
 	}
-}
-
-void AGP_BossGroundHandActor::ConfigureMeshComponent(UStaticMeshComponent* MeshComponent, UStaticMesh* MeshAsset) const
-{
-	if (!MeshComponent)
-	{
-		return;
-	}
-
-	MeshComponent->SetStaticMesh(MeshAsset);
-	MeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	MeshComponent->SetGenerateOverlapEvents(false);
 }
