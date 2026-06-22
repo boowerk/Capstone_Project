@@ -186,6 +186,7 @@ _None yet._
 
 ## Not Verified
 
+- 2026-06-23 Sans Ground Hands mesh swap: changed units and the asset-path regression test compiled, but the open Unreal Editor held `UnrealEditor-Project_Eden.dll`, blocking final link/test execution. Close the editor, rebuild, run `ProjectEden.AI.Boss.GroundHands.UsesRightHandMesh`, then PIE-check reference-pose orientation, scale, floor emergence, and box-hit alignment.
 - 2026-06-17 basic enemy templates: C++ build succeeded and BP templates were created, but PIE runtime behavior still needs checking for common BT chase/attack transitions, ranged hit distance, and flying movement/pathing.
 - 2026-06-17 UE Python commandlet created the Basic enemy BP assets successfully but returned failure because existing `Content/Maps/DemoMap/TestMap.umap` is unloadable (`Invalid value for PACKAGE_FILE_TAG`).
 - 2026-06-14 generic boss Attack task routing: `Project_EdenEditor Win64 Development` build succeeded, but PIE still needs checking. Expected log from a stale generic Attack node is `[BossAI] Generic attack task routed through boss pattern selector...`.
