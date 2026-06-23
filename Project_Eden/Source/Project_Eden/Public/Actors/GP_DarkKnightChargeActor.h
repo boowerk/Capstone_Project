@@ -6,10 +6,11 @@
 
 class AGP_DarkArmorKnightBossCharacter;
 class UGameplayEffect;
+class UGP_BossTelegraphVFXComponent;
 class USphereComponent;
 class UStaticMeshComponent;
 
-/** Server-owned coordinator moves the boss itself so the visible body and charge hit volume stay aligned. */
+/** Server-owned charge coordinator. Root-motion charge keeps body movement and dash animation synchronized. */
 UCLASS(Blueprintable)
 class PROJECT_EDEN_API AGP_DarkKnightChargeActor : public AActor
 {
@@ -19,6 +20,7 @@ public:
 	AGP_DarkKnightChargeActor();
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	void InitializeCharge(AGP_DarkArmorKnightBossCharacter* InBoss, AActor* InTarget);
 
@@ -36,17 +38,26 @@ private:
 	void StartCharge();
 	void FinishCharge(bool bHitTarget);
 
+	UFUNCTION()
+	void OnRep_SkipInternalTelegraph();
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Dark Knight", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USceneComponent> SceneRoot;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Dark Knight", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UStaticMeshComponent> TelegraphMesh;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Dark Knight", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "s"))
-	float TelegraphDuration = 0.9f;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Dark Knight|VFX", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UGP_BossTelegraphVFXComponent> ChargeTelegraphVFXComponent;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Dark Knight", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "cm/s"))
 	float ChargeSpeed = 2200.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Dark Knight|Root Motion", meta = (AllowPrivateAccess = "true"))
+	bool bUseMontageRootMotion = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Dark Knight|Root Motion", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "s"))
+	float RootMotionChargeDuration = 1.57f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Dark Knight", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "cm"))
 	float MaxChargeDistance = 1600.0f;
@@ -68,7 +79,13 @@ private:
 
 	FVector ChargeDirection = FVector::ForwardVector;
 	float DistanceTravelled = 0.0f;
+	float ChargeElapsed = 0.0f;
 	FTimerHandle TelegraphTimerHandle;
+
+	/** Initial-only handoff prevents the coordinator from replaying a cue already completed on the boss component. */
+	UPROPERTY(ReplicatedUsing = OnRep_SkipInternalTelegraph)
+	bool bSkipInternalTelegraph = false;
+
 	bool bChargeActive = false;
 	bool bFinished = false;
 };

@@ -13,6 +13,8 @@
 #include "BehaviorTree/BlackboardData.h"
 #include "BrainComponent.h"
 #include "Characters/GP_DarkArmorKnightStateComponent.h"
+#include "Animation/AnimInstance.h"
+#include "Animation/AnimMontage.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "EngineUtils.h"
 #include "GameFramework/Character.h"
@@ -23,6 +25,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
+#include "VFX/GP_BossTelegraphVFXComponent.h"
 
 AGP_DarkArmorKnightBossCharacter::AGP_DarkArmorKnightBossCharacter()
 {
@@ -33,17 +36,28 @@ AGP_DarkArmorKnightBossCharacter::AGP_DarkArmorKnightBossCharacter()
 	BossDisplayName = NSLOCTEXT("GPDarkArmorKnightBoss", "BossDisplayName", "Dark Armor Knight");
 
 	DarkKnightStateComponent = CreateDefaultSubobject<UGP_DarkArmorKnightStateComponent>(TEXT("DarkKnightStateComponent"));
+	// Prefill every authored Dark Knight attack so Blueprint defaults expose one checkbox per pattern.
+	TelegraphVFXPatterns.Add(GPTags::Ability::Boss::DarkKnight::Basic, false);
+	TelegraphVFXPatterns.Add(GPTags::Ability::Boss::DarkKnight::Heavy, false);
+	TelegraphVFXPatterns.Add(GPTags::Ability::Boss::DarkKnight::Sweep, false);
+	TelegraphVFXPatterns.Add(GPTags::Ability::Boss::DarkKnight::Guard, false);
+	TelegraphVFXPatterns.Add(GPTags::Ability::Boss::DarkKnight::Counter, false);
+	TelegraphVFXPatterns.Add(GPTags::Ability::Boss::DarkKnight::Charge, false);
+	TelegraphVFXPatterns.Add(GPTags::Ability::Boss::DarkKnight::DarkWave, false);
+	TelegraphVFXPatterns.Add(GPTags::Ability::Boss::DarkKnight::GroundCrack, false);
 	DarkWaveProjectileClass = AGP_DarkWaveProjectile::StaticClass();
 	GroundCrackActorClass = AGP_DarkKnightGroundCrackActor::StaticClass();
 	ChargeActorClass = AGP_DarkKnightChargeActor::StaticClass();
+	static ConstructorHelpers::FObjectFinder<UAnimMontage> PreAttackMontageFinder(TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_DarkArmorKnight/Animations/AM_DK_Windup.AM_DK_Windup"));
+	if (PreAttackMontageFinder.Succeeded())
+	{
+		PreAttackMontage = PreAttackMontageFinder.Object;
+	}
 
 	DarkKnightAbilityClasses =
 	{
 		UGP_DarkKnightBasicAbility::StaticClass(),
 		UGP_DarkKnightHeavyAbility::StaticClass(),
-		UGP_DarkKnightSweepAbility::StaticClass(),
-		UGP_DarkKnightGuardAbility::StaticClass(),
-		UGP_DarkKnightCounterAbility::StaticClass(),
 		UGP_DarkKnightChargeAbility::StaticClass(),
 		UGP_DarkKnightDarkWaveAbility::StaticClass(),
 		UGP_DarkKnightGroundCrackAbility::StaticClass(),
@@ -120,6 +134,27 @@ void AGP_DarkArmorKnightBossCharacter::EndPlay(const EEndPlayReason::Type EndPla
 	Super::EndPlay(EndPlayReason);
 }
 
+UGP_BossTelegraphVFXComponent* AGP_DarkArmorKnightBossCharacter::GetBossTelegraphVFXComponent() const
+{
+	// BP_DarkArmorKnight already owns the designer-added component, so reuse it instead of creating a duplicate native node.
+	return FindComponentByClass<UGP_BossTelegraphVFXComponent>();
+}
+
+bool AGP_DarkArmorKnightBossCharacter::IsBossTelegraphEnabledForPattern(FGameplayTag PatternTag) const
+{
+	const UGP_BossTelegraphVFXComponent* TelegraphComponent = GetBossTelegraphVFXComponent();
+	return IsValid(TelegraphComponent)
+		&& TelegraphComponent->IsPatternTelegraphEnabled(PatternTag, TelegraphVFXPatterns);
+}
+
+float AGP_DarkArmorKnightBossCharacter::PlayBossTelegraphForPattern(FGameplayTag PatternTag)
+{
+	UGP_BossTelegraphVFXComponent* TelegraphComponent = GetBossTelegraphVFXComponent();
+	return IsValid(TelegraphComponent)
+		? TelegraphComponent->PlayPatternTelegraph(PatternTag, TelegraphVFXPatterns)
+		: 0.0f;
+}
+
 int32 AGP_DarkArmorKnightBossCharacter::GetDarkKnightPhase() const
 {
 	const UGP_AttributeSet* Attributes = Cast<UGP_AttributeSet>(GetAttributeSet());
@@ -191,7 +226,9 @@ bool AGP_DarkArmorKnightBossCharacter::ExecuteBasicAttack(AActor* TargetActor)
 	}
 	SetActorRotation((TargetActor->GetActorLocation() - GetActorLocation()).Rotation());
 	RecordPatternUse(GPTags::Ability::Boss::DarkKnight::Basic);
-	const int32 HitCount = GetDarkKnightPhase() >= 2 ? 3 : 2;
+	// One authored slash needs one readable wind-up. Phase two adds only one
+	// follow-up instead of dealing three invisible hits during the same montage.
+	const int32 HitCount = GetDarkKnightPhase() >= 2 ? 2 : 1;
 	for (int32 Index = 0; Index < HitCount; ++Index)
 	{
 		FTimerHandle& Handle = PatternTimerHandles.AddDefaulted_GetRef();
@@ -202,7 +239,7 @@ bool AGP_DarkArmorKnightBossCharacter::ExecuteBasicAttack(AActor* TargetActor)
 			{
 				WeakThis->ApplyConeDamage(WeakThis->BasicAttackRange, 40.0f, Coefficient);
 			}
-		}, 0.25f * Index + 0.1f, false);
+		}, 0.55f + 0.32f * Index, false);
 	}
 	return true;
 }
@@ -244,7 +281,7 @@ bool AGP_DarkArmorKnightBossCharacter::ExecuteSweepAttack(AActor* TargetActor)
 			// A 180-degree half-angle produces the full circular sweep described by the melee pressure pattern.
 			WeakThis->ApplyConeDamage(420.0f, 180.0f, 1.1f, 250.0f);
 		}
-	}, 0.6f, false);
+	}, 1.05f, false);
 	return true;
 }
 
@@ -318,12 +355,24 @@ bool AGP_DarkArmorKnightBossCharacter::ExecuteChargeAttack(AActor* TargetActor)
 bool AGP_DarkArmorKnightBossCharacter::ExecuteDarkWave(AActor* TargetActor)
 {
 	TargetActor = ResolvePatternTarget(TargetActor);
-	if (!HasAuthority() || !IsValid(TargetActor) || !*DarkWaveProjectileClass)
+	if (!HasAuthority() || !IsValid(TargetActor))
 	{
 		return false;
 	}
+	SetActorRotation((TargetActor->GetActorLocation() - GetActorLocation()).Rotation());
 	RecordPatternUse(GPTags::Ability::Boss::DarkKnight::DarkWave);
-	SpawnDarkWaveVolley(TargetActor, GetDarkKnightPhase() >= 3 ? 3 : 1);
+	const int32 SlashCount = GetDarkKnightPhase() >= 3 ? 2 : 1;
+	for (int32 Index = 0; Index < SlashCount; ++Index)
+	{
+		FTimerHandle& Handle = PatternTimerHandles.AddDefaulted_GetRef();
+		GetWorldTimerManager().SetTimer(Handle, [WeakThis = TWeakObjectPtr<AGP_DarkArmorKnightBossCharacter>(this)]()
+		{
+			if (WeakThis.IsValid() && !WeakThis->IsDead())
+			{
+				WeakThis->ApplyConeDamage(520.0f, 60.0f, 1.35f, 325.0f);
+			}
+		}, 0.78f + Index * 0.30f, false);
+	}
 	return true;
 }
 
@@ -335,7 +384,14 @@ bool AGP_DarkArmorKnightBossCharacter::ExecuteGroundCrack(AActor* TargetActor)
 		return false;
 	}
 	RecordPatternUse(GPTags::Ability::Boss::DarkKnight::GroundCrack);
-	SpawnGroundCracks(TargetActor);
+	FTimerHandle& Handle = PatternTimerHandles.AddDefaulted_GetRef();
+	GetWorldTimerManager().SetTimer(Handle, [WeakThis = TWeakObjectPtr<AGP_DarkArmorKnightBossCharacter>(this), WeakTarget = TWeakObjectPtr<AActor>(TargetActor)]()
+	{
+		if (WeakThis.IsValid() && !WeakThis->IsDead() && WeakTarget.IsValid())
+		{
+			WeakThis->SpawnGroundCracks(WeakTarget.Get());
+		}
+	}, 1.05f, false);
 	return true;
 }
 
@@ -349,8 +405,85 @@ bool AGP_DarkArmorKnightBossCharacter::ExecuteEnterGroggy()
 	return true;
 }
 
+bool AGP_DarkArmorKnightBossCharacter::StartPatternWithWindup(FGameplayTag PatternTag, AActor* TargetActor)
+{
+	TargetActor = ResolvePatternTarget(TargetActor);
+	const bool bUsesWindup = PatternTag != GPTags::Ability::Boss::DarkKnight::Charge
+		&& PatternTag != GPTags::Ability::Boss::DarkKnight::Groggy;
+	bool bWindupStarted = false;
+	if (bUsesWindup && IsValid(PreAttackMontage))
+	{
+		UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
+		if (!IsValid(AnimInstance) || AnimInstance->Montage_Play(PreAttackMontage, 1.0f) <= 0.0f)
+		{
+			return false;
+		}
+		bWindupStarted = true;
+	}
+
+	// Groggy is a state reaction, not an authored attack, so it deliberately bypasses the optional VFX lead-in.
+	const float TelegraphDelay = PlayBossTelegraphForPattern(PatternTag);
+	const float WindupDelay = bWindupStarted ? FMath::Max(0.0f, PreAttackDuration) : 0.0f;
+	const float ExecutionDelay = FMath::Max(WindupDelay, TelegraphDelay);
+	if (ExecutionDelay <= KINDA_SMALL_NUMBER)
+	{
+		const bool bExecuted = ExecutePatternNow(PatternTag, TargetActor);
+		if (bExecuted && PatternTag != GPTags::Ability::Boss::DarkKnight::Charge)
+		{
+			PlayPatternMontage(PatternTag);
+		}
+		return bExecuted;
+	}
+
+	FTimerHandle& Handle = PatternTimerHandles.AddDefaulted_GetRef();
+	GetWorldTimerManager().SetTimer(Handle, [WeakThis = TWeakObjectPtr<AGP_DarkArmorKnightBossCharacter>(this), WeakTarget = TWeakObjectPtr<AActor>(TargetActor), PatternTag]()
+	{
+		if (!WeakThis.IsValid() || WeakThis->IsDead())
+		{
+			return;
+		}
+		if (WeakThis->ExecutePatternNow(PatternTag, WeakTarget.Get())
+			&& PatternTag != GPTags::Ability::Boss::DarkKnight::Charge)
+		{
+			WeakThis->PlayPatternMontage(PatternTag);
+		}
+	}, ExecutionDelay, false);
+	return true;
+}
+
+bool AGP_DarkArmorKnightBossCharacter::ExecutePatternNow(FGameplayTag PatternTag, AActor* TargetActor)
+{
+	if (PatternTag == GPTags::Ability::Boss::DarkKnight::Basic) return ExecuteBasicAttack(TargetActor);
+	if (PatternTag == GPTags::Ability::Boss::DarkKnight::Heavy) return ExecuteHeavyAttack(TargetActor);
+	if (PatternTag == GPTags::Ability::Boss::DarkKnight::Charge) return ExecuteChargeAttack(TargetActor);
+	if (PatternTag == GPTags::Ability::Boss::DarkKnight::DarkWave) return ExecuteDarkWave(TargetActor);
+	if (PatternTag == GPTags::Ability::Boss::DarkKnight::GroundCrack) return ExecuteGroundCrack(TargetActor);
+	if (PatternTag == GPTags::Ability::Boss::DarkKnight::Groggy) return ExecuteEnterGroggy();
+	return false;
+}
+
+bool AGP_DarkArmorKnightBossCharacter::PlayPatternMontage(FGameplayTag PatternTag)
+{
+	const TObjectPtr<UAnimMontage>* Montage = PatternMontages.Find(PatternTag);
+	UAnimMontage* MontageToPlay = Montage ? Montage->Get() : nullptr;
+	// Dark Wave is delivered with the authored sword slash, not the old cast pose.
+	if (PatternTag == GPTags::Ability::Boss::DarkKnight::DarkWave)
+	{
+		MontageToPlay = LoadObject<UAnimMontage>(nullptr, TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_DarkArmorKnight/Animations/AM_DK_DarkSlash.AM_DK_DarkSlash"));
+	}
+	UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
+	if (!IsValid(MontageToPlay) || !IsValid(AnimInstance))
+	{
+		return false;
+	}
+
+	return AnimInstance->Montage_Play(MontageToPlay, 1.0f) > 0.0f;
+}
+
 void AGP_DarkArmorKnightBossCharacter::HandleChargeFinished(bool bHitTarget, AActor* TargetActor)
 {
+	(void)bHitTarget;
+
 	if (!HasAuthority() || !IsValid(TargetActor))
 	{
 		return;
@@ -358,7 +491,7 @@ void AGP_DarkArmorKnightBossCharacter::HandleChargeFinished(bool bHitTarget, AAc
 
 	const FGameplayTag FollowUpTag = GetDarkKnightPhase() >= 3
 		? GPTags::Ability::Boss::DarkKnight::GroundCrack
-		: (bHitTarget && GetDarkKnightPhase() >= 2 ? GPTags::Ability::Boss::DarkKnight::Sweep : FGameplayTag());
+		: FGameplayTag();
 	if (!FollowUpTag.IsValid())
 	{
 		return;

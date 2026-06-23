@@ -13,6 +13,7 @@
 #include "Characters/GP_DarkArmorKnightStateComponent.h"
 #include "Characters/GP_EnemyCharacter.h"
 #include "Characters/GP_MatadorBossStateComponent.h"
+#include "Characters/GP_MatadorMageBossCharacter.h"
 #include "Engine/World.h"
 #include "GameplayTags/GP_Tags.h"
 
@@ -156,7 +157,11 @@ namespace BossAttackExecution
 			Context.ChainBreakCount = MatadorStateComponent->GetChainBreakCount();
 			Context.ChainBreakTarget = MatadorStateComponent->GetChainBreakTarget();
 			Context.bIsGroggy = MatadorStateComponent->IsGroggy();
-			Context.bBullPatternActive = IsValid(MatadorStateComponent->GetActiveBullActor());
+			const AGP_MatadorMageBossCharacter* MatadorBoss = Cast<AGP_MatadorMageBossCharacter>(ControlledPawn);
+			// A queued telegraph is part of the active pattern window even before the bull actor exists.
+			Context.bBullPatternActive = IsValid(MatadorBoss)
+				? MatadorBoss->IsBullPatternActive()
+				: IsValid(MatadorStateComponent->GetActiveBullActor());
 			Context.bSuppressGenericBossAttacks = true;
 		}
 
@@ -211,8 +216,8 @@ namespace BossAttackExecution
 			Context.PreferredRange = Context.PreferredMeleeRange;
 			Context.bCanUseDarkKnightBasic = bCadenceReady && DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::Basic);
 			Context.bCanUseDarkKnightHeavy = bCadenceReady && DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::Heavy);
-			Context.bCanUseDarkKnightSweep = bCadenceReady && DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::Sweep);
-			Context.bCanUseDarkKnightGuard = bCadenceReady && DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::Guard);
+			// Sweep is no longer a selectable Dark Knight pattern; Ability_RMB is reserved as an animation wind-up.
+			Context.bCanUseDarkKnightSweep = false;
 			Context.bCanUseDarkKnightCharge = bCadenceReady && DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::Charge);
 			Context.bCanUseDarkWave = bCadenceReady && DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::DarkWave);
 			Context.bCanUseGroundCrack = bCadenceReady && DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::GroundCrack);

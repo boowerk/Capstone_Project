@@ -2,9 +2,12 @@
 
 #include "Actors/GP_BossSweepTelegraphActor.h"
 
-#include "DrawDebugHelpers.h"
+#include "Components/DecalComponent.h"
 #include "Engine/World.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/MaterialInterface.h"
 #include "Net/UnrealNetwork.h"
+#include "UObject/ConstructorHelpers.h"
 
 AGP_BossSweepTelegraphActor::AGP_BossSweepTelegraphActor()
 {
@@ -14,6 +17,21 @@ AGP_BossSweepTelegraphActor::AGP_BossSweepTelegraphActor()
 
 	SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("SceneRoot"));
 	SetRootComponent(SceneRoot);
+
+	WarningDecal = CreateDefaultSubobject<UDecalComponent>(TEXT("WarningDecal"));
+	WarningDecal->SetupAttachment(SceneRoot);
+	// The material's UV-forward axis is local +Y, so -90 yaw aligns its fan with the owning boss's +X forward.
+	WarningDecal->SetRelativeRotation(FRotator(-90.0f, -90.0f, 0.0f));
+	WarningDecal->SetFadeScreenSize(0.001f);
+	WarningDecal->SetSortOrder(8);
+
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> DecalMaterialFinder(
+		TEXT("/Game/Effects/M_BossSweepTelegraph_Decal.M_BossSweepTelegraph_Decal"));
+	if (DecalMaterialFinder.Succeeded())
+	{
+		DefaultTelegraphMaterial = DecalMaterialFinder.Object;
+		WarningDecal->SetDecalMaterial(DefaultTelegraphMaterial);
+	}
 }
 
 void AGP_BossSweepTelegraphActor::BeginPlay()
@@ -21,16 +39,20 @@ void AGP_BossSweepTelegraphActor::BeginPlay()
 	Super::BeginPlay();
 
 	SnapToFloor();
+	WarningDecal->SetVisibility(false);
+	if (TelegraphSpec.bInitialized)
+	{
+		ApplyTelegraphSpec();
+	}
 }
 
 void AGP_BossSweepTelegraphActor::InitializeSweepTelegraph(float Radius, float ArcAngleDegrees, float LifeSeconds, FLinearColor TelegraphColor, UMaterialInterface* OverrideMaterial)
 {
-	// OverrideMaterial is intentionally ignored because this warning now uses debug range lines instead of mesh materials.
-	(void)OverrideMaterial;
 	TelegraphSpec.Radius = Radius;
 	TelegraphSpec.ArcAngleDegrees = ArcAngleDegrees;
 	TelegraphSpec.LifeSeconds = LifeSeconds;
 	TelegraphSpec.TelegraphColor = TelegraphColor;
+	TelegraphSpec.OverrideMaterial = OverrideMaterial;
 	TelegraphSpec.bInitialized = true;
 
 	ApplyTelegraphSpec();
@@ -64,57 +86,43 @@ void AGP_BossSweepTelegraphActor::ApplyTelegraphSpec()
 		return;
 	}
 
-	// Show the attack range with debug lines so the warning stays visible even when mesh materials fail to render.
-	DrawAttackRangePreview();
+	UpdateDecalPresentation();
 }
 
-void AGP_BossSweepTelegraphActor::DrawAttackRangePreview()
+void AGP_BossSweepTelegraphActor::UpdateDecalPresentation()
 {
-	UWorld* World = GetWorld();
-	if (!World)
+	SnapToFloor();
+
+	const float SafeRadius = FMath::Max(1.0f, TelegraphSpec.Radius);
+	const float HalfAngleDegrees = FMath::Clamp(TelegraphSpec.ArcAngleDegrees * 0.5f, 0.0f, 180.0f);
+	WarningDecal->DecalSize = FVector(FMath::Max(1.0f, ProjectionDepth), SafeRadius, SafeRadius);
+	WarningDecal->DecalColor = TelegraphSpec.TelegraphColor;
+
+	UMaterialInterface* MaterialToUse = TelegraphSpec.OverrideMaterial
+		? TelegraphSpec.OverrideMaterial.Get()
+		: DefaultTelegraphMaterial.Get();
+	if (!IsValid(MaterialToUse))
 	{
+		WarningDecal->SetVisibility(false);
 		return;
 	}
 
-	SnapToFloor();
-
-	const float SafeRadius = FMath::Max(0.0f, TelegraphSpec.Radius);
-	const float HalfAngleDegrees = FMath::Clamp(TelegraphSpec.ArcAngleDegrees * 0.5f, 0.0f, 180.0f);
-	const int32 SegmentCount = FMath::Max(8, ArcSegments);
-	const float LifeSeconds = FMath::Max(TelegraphSpec.LifeSeconds, 0.05f);
-	const FColor RangeColor = FColor::Red;
-	const float LineThickness = 8.0f;
-	const FVector Origin = GetActorLocation() + FVector(0.0f, 0.0f, 18.0f);
-	FVector ForwardVector = GetActorForwardVector().GetSafeNormal2D();
-	if (ForwardVector.IsNearlyZero())
+	// Every client creates its own MID because replicated material instances are not stable presentation state.
+	DynamicTelegraphMaterial = UMaterialInstanceDynamic::Create(MaterialToUse, this);
+	UMaterialInterface* ResolvedMaterial = DynamicTelegraphMaterial
+		? static_cast<UMaterialInterface*>(DynamicTelegraphMaterial.Get())
+		: MaterialToUse;
+	if (DynamicTelegraphMaterial)
 	{
-		ForwardVector = FVector::ForwardVector;
+		DynamicTelegraphMaterial->SetVectorParameterValue(
+			TEXT("TelegraphColor"),
+			FLinearColor(TelegraphSpec.TelegraphColor.R, TelegraphSpec.TelegraphColor.G, TelegraphSpec.TelegraphColor.B, 1.0f));
+		DynamicTelegraphMaterial->SetScalarParameterValue(TEXT("TelegraphOpacity"), TelegraphSpec.TelegraphColor.A);
+		DynamicTelegraphMaterial->SetScalarParameterValue(TEXT("HalfAngleCos"), FMath::Cos(FMath::DegreesToRadians(HalfAngleDegrees)));
 	}
 
-	DrawDebugSphere(World, Origin, 24.0f, 12, RangeColor, false, LifeSeconds, 0, LineThickness);
-
-	FVector PreviousArcPoint = FVector::ZeroVector;
-	for (int32 SegmentIndex = 0; SegmentIndex <= SegmentCount; ++SegmentIndex)
-	{
-		const float Alpha = static_cast<float>(SegmentIndex) / static_cast<float>(SegmentCount);
-		const float AngleDegrees = FMath::Lerp(-HalfAngleDegrees, HalfAngleDegrees, Alpha);
-		const FVector Direction = FRotator(0.0f, AngleDegrees, 0.0f).RotateVector(ForwardVector).GetSafeNormal();
-		const FVector ArcPoint = Origin + Direction * SafeRadius;
-
-		if (SegmentIndex > 0)
-		{
-			DrawDebugLine(World, PreviousArcPoint, ArcPoint, RangeColor, false, LifeSeconds, 0, LineThickness);
-		}
-
-		const bool bBoundaryLine = SegmentIndex == 0 || SegmentIndex == SegmentCount;
-		const bool bGuideLine = SegmentIndex % 6 == 0;
-		if (bBoundaryLine || bGuideLine)
-		{
-			DrawDebugLine(World, Origin, ArcPoint, RangeColor, false, LifeSeconds, 0, LineThickness);
-		}
-
-		PreviousArcPoint = ArcPoint;
-	}
+	WarningDecal->SetDecalMaterial(ResolvedMaterial);
+	WarningDecal->SetVisibility(true);
 }
 
 void AGP_BossSweepTelegraphActor::SnapToFloor()
@@ -131,7 +139,10 @@ void AGP_BossSweepTelegraphActor::SnapToFloor()
 
 	FHitResult HitResult;
 	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(BossSweepTelegraphFloorTrace), false, GetOwner());
-	if (World->LineTraceSingleByChannel(HitResult, TraceStart, TraceEnd, ECC_Visibility, QueryParams))
+	FCollisionObjectQueryParams FloorObjectQuery;
+	// Match Ground Hands by projecting only onto static level geometry, never characters or transient effects.
+	FloorObjectQuery.AddObjectTypesToQuery(ECC_WorldStatic);
+	if (World->LineTraceSingleByObjectType(HitResult, TraceStart, TraceEnd, FloorObjectQuery, QueryParams))
 	{
 		SetActorLocation(HitResult.ImpactPoint + FVector(0.0f, 0.0f, FloorOffset));
 		return;

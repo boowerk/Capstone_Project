@@ -4,6 +4,8 @@
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
 #include "Animation/PDA_CharacterAnimationSet.h"
 #include "Animation/PDA_EnemyAnimationSet.h"
+#include "Animation/AnimMontage.h"
+#include "Animation/AnimSequence.h"
 #include "Characters/GP_EnemyCharacter.h"
 #include "GameFramework/Pawn.h"
 #include "GameplayEffect.h"
@@ -118,6 +120,21 @@ namespace GP_EnemyAttack_Internal
 		LastSelectedAttackSide = ResolveMontageSide(SelectedMontage);
 		return SelectedMontage;
 	}
+
+	UAnimSequence* ResolveLowerBodyRootMotionSequence(AActor* AvatarActor, const UAnimMontage* SelectedAttackMontage)
+	{
+		const AGP_EnemyCharacter* EnemyCharacter = Cast<AGP_EnemyCharacter>(AvatarActor);
+		const UPDA_EnemyAnimationSet* AnimationSet = IsValid(EnemyCharacter) ? EnemyCharacter->GetEnemyAnimationSet() : nullptr;
+		if (!IsValid(AnimationSet) || !IsValid(SelectedAttackMontage))
+		{
+			return nullptr;
+		}
+
+		const int32 AttackIndex = AnimationSet->LightAttackMontages.IndexOfByKey(const_cast<UAnimMontage*>(SelectedAttackMontage));
+		return AnimationSet->LowerBodyRootMotionSequences.IsValidIndex(AttackIndex)
+			? AnimationSet->LowerBodyRootMotionSequences[AttackIndex].Get()
+			: nullptr;
+	}
 }
 
 UGP_EnemyAttack::UGP_EnemyAttack()
@@ -131,8 +148,8 @@ UGP_EnemyAttack::UGP_EnemyAttack()
 	ActionEndEventTag = GPTags::Event::Enemy::ActionEnd;
 
 	// 부모 클래스 수치 기본값 설정
-	AttackRadius = 120.0f;
-	ForwardOffset = 140.0f;
+	AttackRadius = 96.0f;
+	ForwardOffset = 112.0f;
 
 	static ConstructorHelpers::FClassFinder<UGameplayEffect> DamageEffectFinder(TEXT("/Game/GAS_Pattern/AbilitySystem/GameplayEffects/Damage/GE_PrimaryDamage"));
 	if (DamageEffectFinder.Succeeded())
@@ -181,6 +198,25 @@ void UGP_EnemyAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 
 	if (MontageToPlay)
 	{
+		if (UAnimSequence* LowerBodyRootMotionSequence = GP_EnemyAttack_Internal::ResolveLowerBodyRootMotionSequence(AvatarActor, MontageToPlay))
+		{
+			if (UAnimMontage* LowerBodyMontage = UAnimMontage::CreateSlotAnimationAsDynamicMontage(
+				LowerBodyRootMotionSequence,
+				TEXT("Enemy_LowerBody"),
+				0.1f,
+				0.2f,
+				1.0f,
+				1))
+			{
+				// The lower-body slot supplies authored root motion while DefaultSlot keeps the attack upper body.
+				if (UAbilityTask_PlayMontageAndWait* LowerBodyTask =
+					UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(this, NAME_None, LowerBodyMontage, 1.0f))
+				{
+					LowerBodyTask->ReadyForActivation();
+				}
+			}
+		}
+
 		if (bUseGameplayEventForHitTiming && AttackEventTag.IsValid())
 		{
 			UAbilityTask_WaitGameplayEvent* WaitEventTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(
