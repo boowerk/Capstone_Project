@@ -118,7 +118,7 @@ private:
 	TObjectPtr<UAnimMontage> PreAttackMontage;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Dark Knight|Animation", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "s"))
-	float PreAttackDuration = 1.0f;
+	float PreAttackDuration = 1.18f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Dark Knight|Combat", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "cm"))
 	float PreferredMeleeRange = 350.0f;

@@ -208,7 +208,7 @@ bool AGP_DarkArmorKnightBossCharacter::ExecuteBasicAttack(AActor* TargetActor)
 			{
 				WeakThis->ApplyConeDamage(WeakThis->BasicAttackRange, 40.0f, Coefficient);
 			}
-		}, 0.55f + 0.32f * Index, false);
+		}, 0.68f + 0.40f * Index, false);
 	}
 	return true;
 }
@@ -229,7 +229,7 @@ bool AGP_DarkArmorKnightBossCharacter::ExecuteHeavyAttack(AActor* TargetActor)
 		{
 			WeakThis->ApplyConeDamage(420.0f, 55.0f, 1.6f, 350.0f);
 		}
-	}, 1.1f, false);
+	}, 1.40f, false);
 	return true;
 }
 
@@ -340,7 +340,7 @@ bool AGP_DarkArmorKnightBossCharacter::ExecuteDarkWave(AActor* TargetActor)
 			{
 				WeakThis->ApplyConeDamage(520.0f, 60.0f, 1.35f, 325.0f);
 			}
-		}, 0.78f + Index * 0.30f, false);
+		}, 1.00f + Index * 0.38f, false);
 	}
 	return true;
 }
@@ -360,7 +360,7 @@ bool AGP_DarkArmorKnightBossCharacter::ExecuteGroundCrack(AActor* TargetActor)
 		{
 			WeakThis->SpawnGroundCracks(WeakTarget.Get());
 		}
-	}, 1.05f, false);
+	}, 1.30f, false);
 	return true;
 }
 
@@ -390,7 +390,7 @@ bool AGP_DarkArmorKnightBossCharacter::StartPatternWithWindup(FGameplayTag Patte
 	}
 
 	UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
-	if (!IsValid(AnimInstance) || AnimInstance->Montage_Play(PreAttackMontage, 1.0f) <= 0.0f)
+	if (!IsValid(AnimInstance) || AnimInstance->Montage_Play(PreAttackMontage, 0.85f) <= 0.0f)
 	{
 		return false;
 	}
@@ -436,7 +436,17 @@ bool AGP_DarkArmorKnightBossCharacter::PlayPatternMontage(FGameplayTag PatternTa
 		return false;
 	}
 
-	return AnimInstance->Montage_Play(MontageToPlay, 1.0f) > 0.0f;
+	float PlayRate = 0.80f;
+	if (PatternTag == GPTags::Ability::Boss::DarkKnight::Heavy)
+	{
+		PlayRate = 0.72f;
+	}
+	else if (PatternTag == GPTags::Ability::Boss::DarkKnight::Charge)
+	{
+		// Charge is root-motion authored; changing its rate changes travel distance/timing.
+		PlayRate = 1.0f;
+	}
+	return AnimInstance->Montage_Play(MontageToPlay, PlayRate) > 0.0f;
 }
 
 void AGP_DarkArmorKnightBossCharacter::HandleChargeFinished(bool bHitTarget, AActor* TargetActor)
