@@ -8,6 +8,7 @@
 #include "GameFramework/Pawn.h"
 #include "Player/GP_PlayerState.h"
 #include "Utils/GP_BlueprintLibrary.h"
+#include "VFX/GP_NiagaraParameterOverride.h"
 #include "VFX/GP_VisualCueResolver.h"
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 
@@ -237,6 +238,33 @@ int32 UGP_SkillBase::GetSkillAugmentProjectileCountBonus(const UGP_SkillData* Sk
 	return 0;
 }
 
+bool UGP_SkillBase::HasSkillAugmentInfiniteProjectilePierce(
+	const UGP_SkillData* SkillData,
+	const FGameplayAbilityActorInfo* ActorInfo) const
+{
+	if (!SkillData || !SkillData->SkillIdTag.IsValid())
+	{
+		return false;
+	}
+
+	const AActor* OwnerActor = ActorInfo ? ActorInfo->OwnerActor.Get() : nullptr;
+	if (const AGP_PlayerState* PlayerState = Cast<AGP_PlayerState>(OwnerActor))
+	{
+		return PlayerState->HasSkillAugmentInfiniteProjectilePierce(SkillData->SkillIdTag);
+	}
+
+	const APawn* AvatarPawn = ActorInfo ? Cast<APawn>(ActorInfo->AvatarActor.Get()) : nullptr;
+	if (AvatarPawn)
+	{
+		if (const AGP_PlayerState* PlayerState = AvatarPawn->GetPlayerState<AGP_PlayerState>())
+		{
+			return PlayerState->HasSkillAugmentInfiniteProjectilePierce(SkillData->SkillIdTag);
+		}
+	}
+
+	return false;
+}
+
 TSubclassOf<AActor> UGP_SkillBase::GetSkillAugmentImpactVisualActorOverride(const UGP_SkillData* SkillData) const
 {
 	if (!SkillData || !SkillData->SkillIdTag.IsValid())
@@ -275,6 +303,46 @@ UNiagaraSystem* UGP_SkillBase::GetSkillAugmentActiveVFXOverride(const UGP_SkillD
 	return AvatarPawn && AvatarPawn->GetPlayerState<AGP_PlayerState>()
 		? AvatarPawn->GetPlayerState<AGP_PlayerState>()->GetSkillAugmentActiveVFXOverride(SkillData->SkillIdTag)
 		: nullptr;
+}
+
+TArray<FGP_NiagaraParameterOverride> UGP_SkillBase::GetSkillAugmentNiagaraParameterOverrides(const UGP_SkillData* SkillData) const
+{
+	if (!SkillData || !SkillData->SkillIdTag.IsValid())
+	{
+		return {};
+	}
+
+	const FGameplayAbilityActorInfo* ActorInfo = GetCurrentActorInfo();
+	const AActor* OwnerActor = ActorInfo ? ActorInfo->OwnerActor.Get() : nullptr;
+	if (const AGP_PlayerState* GPPlayerState = Cast<AGP_PlayerState>(OwnerActor))
+	{
+		return GPPlayerState->GetSkillAugmentNiagaraParameterOverrides(SkillData->SkillIdTag);
+	}
+
+	const APawn* AvatarPawn = ActorInfo ? Cast<APawn>(ActorInfo->AvatarActor.Get()) : nullptr;
+	return AvatarPawn && AvatarPawn->GetPlayerState<AGP_PlayerState>()
+		? AvatarPawn->GetPlayerState<AGP_PlayerState>()->GetSkillAugmentNiagaraParameterOverrides(SkillData->SkillIdTag)
+		: TArray<FGP_NiagaraParameterOverride>();
+}
+
+FGP_SkillAugmentPeriodicAreaDamage UGP_SkillBase::GetSkillAugmentPeriodicAreaDamage(const UGP_SkillData* SkillData) const
+{
+	if (!SkillData || !SkillData->SkillIdTag.IsValid())
+	{
+		return {};
+	}
+
+	const FGameplayAbilityActorInfo* ActorInfo = GetCurrentActorInfo();
+	const AActor* OwnerActor = ActorInfo ? ActorInfo->OwnerActor.Get() : nullptr;
+	if (const AGP_PlayerState* GPPlayerState = Cast<AGP_PlayerState>(OwnerActor))
+	{
+		return GPPlayerState->GetSkillAugmentPeriodicAreaDamage(SkillData->SkillIdTag);
+	}
+
+	const APawn* AvatarPawn = ActorInfo ? Cast<APawn>(ActorInfo->AvatarActor.Get()) : nullptr;
+	return AvatarPawn && AvatarPawn->GetPlayerState<AGP_PlayerState>()
+		? AvatarPawn->GetPlayerState<AGP_PlayerState>()->GetSkillAugmentPeriodicAreaDamage(SkillData->SkillIdTag)
+		: FGP_SkillAugmentPeriodicAreaDamage();
 }
 
 TSubclassOf<AActor> UGP_SkillBase::GetSkillVisualActorClass(const UGP_SkillData* SkillData, TSubclassOf<AActor> FallbackVisualActorClass, FGameplayTag ElementTag, FGameplayTag CueTag) const
@@ -385,7 +453,7 @@ UNiagaraSystem* UGP_SkillBase::GetProjectileVisualSystem(const UGP_SkillData* Sk
 		return AugmentOverride;
 	}
 
-	if (UNiagaraSystem* NiagaraSystem = GetSkillNiagaraSystem(SkillData, ElementTag))
+	if (UNiagaraSystem* NiagaraSystem = GetSkillNiagaraSystem(SkillData, ElementTag, GPTags::Ability::Skill::Visual::Projectile))
 	{
 		return NiagaraSystem;
 	}
@@ -412,7 +480,13 @@ UNiagaraSystem* UGP_SkillBase::GetProjectileVisualSystem(const UGP_SkillData* Sk
 	return nullptr;
 }
 
-void UGP_SkillBase::SpawnVisualActor(AActor* InstigatorActor, TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation, float VisualScale) const
+void UGP_SkillBase::SpawnVisualActor(
+	AActor* InstigatorActor,
+	TSubclassOf<AActor> VisualActorClass,
+	const FVector& Location,
+	const FRotator& Rotation,
+	float VisualScale,
+	const TArray<FGP_NiagaraParameterOverride>& NiagaraParameterOverrides) const
 {
 	if (!IsValid(InstigatorActor) || !VisualActorClass || !InstigatorActor->GetWorld())
 	{
@@ -421,7 +495,12 @@ void UGP_SkillBase::SpawnVisualActor(AActor* InstigatorActor, TSubclassOf<AActor
 
 	if (AGP_BaseCharacter* BaseCharacter = Cast<AGP_BaseCharacter>(InstigatorActor))
 	{
-		BaseCharacter->ShowSkillVisualActor(VisualActorClass, Location, Rotation, VisualScale);
+		BaseCharacter->ShowSkillVisualActor(
+			VisualActorClass,
+			Location,
+			Rotation,
+			VisualScale,
+			NiagaraParameterOverrides);
 		return;
 	}
 

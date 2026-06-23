@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-06-23T09:13:22+09:00
+updated: 2026-06-23T15:25:12+09:00
 status: active
 tags:
   - memoc
@@ -11,10 +11,12 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-06-23T09:13:22+09:00
+Last synced: 2026-06-23T15:25:12+09:00
 
 ## Current Status
 
+- `/Game/Maps/MainMap/L_LandscapeMap` has 15 `BP_RegionSeed` actors normalized to labels/indices `RegionSeed_0` through `RegionSeed_14`; their X/Y positions now match the latest user-provided `SEEDS_WORLD` list. Existing Z heights were preserved. The placed `BP_RegionStateManager` override is `RegionCount=15` and `StateRT=/Game/RegionSystem/RenderTargets/RT_RegionState_15x1` (`15x1`). `L_GameMap` was not modified.
+- RegionState direction changed: treat state values as biome-type IDs rather than default/dead/corrupted gameplay status. Existing `AliveRegionState` / `DeadRegionState` naming in GameMode is legacy and should be renamed or replaced when this path is implemented.
 - `/Game/Maps/MainMap/L_LandscapeMap` now contains a completed Landscape Sculpt terrain pass (`58c9391e`, `086dadc5`): broad western and central/eastern highlands, northern peaks, coastal ridges, cliff-like mesas, playable flattened zones, a west/central separating valley, internal low routes, erosion detail, and a lower southern bay. It intentionally remains material-, water-, road-, and foliage-free for later environment passes.
 - `UGP_BossTelegraphVFXComponent` keeps the master `Telegraph VFX On/Off` bool, while each non-Sans boss exposes a BP-editable `Telegraph VFX Patterns` tag->bool map. Crystal Seraph and Matador inherit one inactive native component; Dark Armor Knight reuses its existing BP-added component; Sans remains excluded. Master On alone does nothing: only checked pattern tags play the configured Niagara and wait for `TelegraphDuration` before existing GAS startup. Groggy/teleport utilities bypass it, Matador reserves delayed bull state, and Dark Knight charge skips the coordinator cue/delay only when Charge itself is checked. Editor build plus `ProjectEden.Combat.Boss.TelegraphVFXConfiguration` and the legacy charge test pass.
 - Minimap is now a one-shot PCG map pipeline (`a88bfee6`, `b3652834`, `e6806c69`): after PCG reports ready and stays idle for three polls, one orthographic full-map frame is captured from runtime PCG bounds, GPU-copied to the stable HUD RenderTarget, then SceneCapture and actor tick are disabled. `M_UI_Minimap_StaticMap` pans/zooms that fixed texture from C++ world-to-UV mapping; the player arrow and pooled `T_UI_Minimap_Point_Red` enemy Images remain separate UMG widgets.
@@ -211,6 +213,8 @@ Last synced: 2026-05-23T00:00:00
 
 ## Completed Tasks
 
+- Merged `origin/main` into `feature/vfx-skills`; resolved C++ conflicts by combining both sides and kept the current branch `WBP_PlayerHUDWidget.uasset` LFS pointer to preserve skill HUD icon work.
+- Merged latest `origin/main` into `feature/vfx-skills`; resolved `.memoc` memory conflicts while code merged automatically.
 - Added boss target marker VFX: boss AI target acquisition/swap now routes through a reusable `Boss Target Marker VFX` component using `/Game/Niagara/Vefects/Render_Particles_On_Top/VFX/Particles/NS_Render_Particles_On_Top_Stroke_03`.
 - Stopped Crystal Seraph's infinite Patrol loop by clamping tactical teleports inside the anchor leash, yielding Patrol to ReturnHome, and using direct altitude-preserving movement for flying vector goals (`a70a62cd`, `416d16f5`).
 - Restored Crystal Seraph's reflected-laser groggy lifecycle: three reflections cause a physical fall, a post-landing player hit arms delayed recovery, and Boss_Common pauses until recovery (`7a94b1ac`, `8dfa6c98`).

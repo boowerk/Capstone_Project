@@ -2,8 +2,8 @@
 memoc: true
 type: worklog
 scope: project-memory
-created: 2026-06-01T10:10:35
-updated: 2026-06-01T10:10:35
+created: 2026-06-17T07:49:44
+updated: 2026-06-17T07:49:44
 status: active
 tags:
   - memoc
@@ -13,7 +13,7 @@ tags:
 
 Generated index of conflict-light per-actor work records.
 
-Last generated: 2026-06-01T10:10:35
+Last generated: 2026-06-17T07:49:44
 
 ## Layout
 

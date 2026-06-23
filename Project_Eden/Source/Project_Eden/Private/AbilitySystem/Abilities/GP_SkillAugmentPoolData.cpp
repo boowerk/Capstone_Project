@@ -35,10 +35,10 @@ TArray<UGP_SkillAugmentData*> UGP_SkillAugmentPoolData::PickRandomAugmentsExclud
 	return PickedAugments;
 }
 
-TArray<UGP_SkillAugmentData*> UGP_SkillAugmentPoolData::PickRandomAugmentsExcludingForElement(
+TArray<UGP_SkillAugmentData*> UGP_SkillAugmentPoolData::PickRandomAugmentsExcludingForSkills(
 	int32 Count,
 	const TArray<UGP_SkillAugmentData*>& ExcludedAugments,
-	FGameplayTag CurrentElementTag) const
+	FGameplayTagContainer AvailableSkillTags) const
 {
 	TArray<UGP_SkillAugmentData*> AvailableAugments;
 	AvailableAugments.Reserve(Augments.Num());
@@ -50,8 +50,7 @@ TArray<UGP_SkillAugmentData*> UGP_SkillAugmentPoolData::PickRandomAugmentsExclud
 			continue;
 		}
 
-		if (Augment->RequiredElementTag.IsValid()
-			&& !CurrentElementTag.MatchesTagExact(Augment->RequiredElementTag))
+		if (!Augment->TargetSkillTags.IsEmpty() && !Augment->TargetSkillTags.HasAnyExact(AvailableSkillTags))
 		{
 			continue;
 		}
@@ -71,4 +70,13 @@ TArray<UGP_SkillAugmentData*> UGP_SkillAugmentPoolData::PickRandomAugmentsExclud
 	}
 
 	return PickedAugments;
+}
+
+TArray<UGP_SkillAugmentData*> UGP_SkillAugmentPoolData::PickRandomAugmentsExcludingForElement(
+	int32 Count,
+	const TArray<UGP_SkillAugmentData*>& ExcludedAugments,
+	FGameplayTag CurrentElementTag) const
+{
+	(void)CurrentElementTag;
+	return PickRandomAugmentsExcluding(Count, ExcludedAugments);
 }

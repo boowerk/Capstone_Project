@@ -7,6 +7,7 @@
 #include "Engine/OverlapResult.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerController.h"
 #include "GameplayTags/GP_Tags.h"
 #include "Components/PrimitiveComponent.h"
 #include "TimerManager.h"
@@ -113,6 +114,34 @@ FGP_SkillTargetData UGP_TargetedSkillBase::GetCurrentTargetData(EGP_SkillConfirm
 		return TargetData;
 	}
 
+	if (SelectionMode == EGP_SkillSelectionMode::GroundPosition)
+	{
+		FVector CandidateLocation = TraceEnd;
+		if (const APawn* Pawn = Cast<APawn>(AvatarActor))
+		{
+			if (const APlayerController* PlayerController = Cast<APlayerController>(Pawn->GetController()))
+			{
+				FHitResult CursorHit;
+				if (PlayerController->GetHitResultUnderCursor(TargetTraceChannel, false, CursorHit))
+				{
+					CandidateLocation = CursorHit.ImpactPoint;
+				}
+			}
+		}
+
+		FVector ToCandidate = CandidateLocation - TargetData.Origin;
+		ToCandidate.Z = 0.0f;
+		if (ToCandidate.SizeSquared() > FMath::Square(MaxTargetRange))
+		{
+			ToCandidate = ToCandidate.GetSafeNormal() * MaxTargetRange;
+			CandidateLocation.X = TargetData.Origin.X + ToCandidate.X;
+			CandidateLocation.Y = TargetData.Origin.Y + ToCandidate.Y;
+		}
+
+		TargetData.bBlockingHit = ResolveGroundLocation(AvatarActor, CandidateLocation, TargetData.TargetLocation);
+		return TargetData;
+	}
+
 	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(GP_TargetedSkillTrace), false);
 	QueryParams.AddIgnoredActor(AvatarActor);
 
@@ -147,6 +176,73 @@ FGP_SkillTargetData UGP_TargetedSkillBase::GetCurrentTargetData(EGP_SkillConfirm
 	}
 
 	return TargetData;
+}
+
+bool UGP_TargetedSkillBase::ResolveGroundLocation(
+	const AActor* AvatarActor,
+	const FVector& CandidateLocation,
+	FVector& OutGroundLocation) const
+{
+	if (!IsValid(AvatarActor) || !AvatarActor->GetWorld())
+	{
+		return false;
+	}
+
+	const FVector TraceStart = CandidateLocation + FVector::UpVector * GroundTraceHeight;
+	const FVector TraceEnd = CandidateLocation - FVector::UpVector * GroundTraceDepth;
+
+	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(GP_TargetedSkillGroundTrace), false);
+	QueryParams.AddIgnoredActor(AvatarActor);
+
+	FCollisionObjectQueryParams ObjectQueryParams;
+	ObjectQueryParams.AddObjectTypesToQuery(ECC_WorldStatic);
+
+	FHitResult GroundHit;
+	if (!AvatarActor->GetWorld()->LineTraceSingleByObjectType(
+		GroundHit,
+		TraceStart,
+		TraceEnd,
+		ObjectQueryParams,
+		QueryParams))
+	{
+		OutGroundLocation = CandidateLocation;
+		return false;
+	}
+
+	OutGroundLocation = GroundHit.ImpactPoint;
+	return true;
+}
+
+FGP_SkillTargetData UGP_TargetedSkillBase::ValidateReceivedTargetData(const FGP_SkillTargetData& TargetData) const
+{
+	FGP_SkillTargetData ValidatedData = TargetData;
+	const AActor* AvatarActor = GetAvatarActorFromActorInfo();
+	if (!IsValid(AvatarActor))
+	{
+		ValidatedData.bBlockingHit = false;
+		return ValidatedData;
+	}
+
+	ValidatedData.Origin = AvatarActor->GetActorLocation();
+	FVector ToTarget = ValidatedData.TargetLocation - ValidatedData.Origin;
+	ToTarget.Z = 0.0f;
+	if (ToTarget.SizeSquared() > FMath::Square(MaxTargetRange))
+	{
+		ToTarget = ToTarget.GetSafeNormal() * MaxTargetRange;
+		ValidatedData.TargetLocation.X = ValidatedData.Origin.X + ToTarget.X;
+		ValidatedData.TargetLocation.Y = ValidatedData.Origin.Y + ToTarget.Y;
+	}
+
+	if (SelectionMode == EGP_SkillSelectionMode::GroundPosition)
+	{
+		ValidatedData.bBlockingHit = ResolveGroundLocation(
+			AvatarActor,
+			ValidatedData.TargetLocation,
+			ValidatedData.TargetLocation);
+	}
+
+	ValidatedData.AimDirection = (ValidatedData.TargetLocation - ValidatedData.Origin).GetSafeNormal();
+	return ValidatedData;
 }
 
 AActor* UGP_TargetedSkillBase::FindBestTargetActor(const AActor* AvatarActor, const FVector& TraceStart, const FVector& AimDirection) const
@@ -310,6 +406,17 @@ void UGP_TargetedSkillBase::BeginSelection()
 				AvatarActor->GetActorLocation(),
 				AvatarActor->GetActorRotation(),
 				SpawnParams);
+
+			if (IsValid(PreviewActor))
+			{
+				PreviewActorBaseScale = PreviewActor->GetActorScale3D();
+				const FBox PreviewBounds = PreviewActor->GetComponentsBoundingBox(true);
+				if (PreviewBounds.IsValid)
+				{
+					const FVector BoundsExtent = PreviewBounds.GetExtent();
+					PreviewActorBaseRadius = FMath::Max(BoundsExtent.X, BoundsExtent.Y);
+				}
+			}
 		}
 	}
 
@@ -332,6 +439,8 @@ void UGP_TargetedSkillBase::CleanupSelection()
 	}
 
 	PreviewActor = nullptr;
+	PreviewActorBaseScale = FVector::OneVector;
+	PreviewActorBaseRadius = 0.0f;
 	PrimaryConfirmTask = nullptr;
 	SecondaryConfirmTask = nullptr;
 	CancelTask = nullptr;
@@ -388,6 +497,9 @@ void UGP_TargetedSkillBase::AddSelectionLooseTags()
 	case EGP_SkillSelectionMode::TargetActor:
 		AddedLooseTags.AddTag(GPTags::State::Skill::TargetActor);
 		break;
+	case EGP_SkillSelectionMode::GroundPosition:
+		AddedLooseTags.AddTag(GPTags::State::Skill::GroundPosition);
+		break;
 	default:
 		break;
 	}
@@ -410,11 +522,19 @@ void UGP_TargetedSkillBase::RemoveSelectionLooseTags()
 void UGP_TargetedSkillBase::UpdatePreview()
 {
 	const FGP_SkillTargetData TargetData = GetCurrentTargetData();
-	const FRotator PreviewRotation = TargetData.AimDirection.Rotation();
+	const FRotator PreviewRotation = SelectionMode == EGP_SkillSelectionMode::GroundPosition
+		? FRotator::ZeroRotator
+		: TargetData.AimDirection.Rotation();
 
 	if (IsValid(PreviewActor))
 	{
 		PreviewActor->SetActorLocationAndRotation(TargetData.TargetLocation, PreviewRotation);
+		const float DesiredRadius = GetPreviewActorRadius();
+		if (DesiredRadius > 0.0f && PreviewActorBaseRadius > KINDA_SMALL_NUMBER)
+		{
+			const float RadiusScale = DesiredRadius / PreviewActorBaseRadius;
+			PreviewActor->SetActorScale3D(PreviewActorBaseScale * RadiusScale);
+		}
 	}
 
 	if (!bDrawSelectionDebug && !bDrawDebugs)
@@ -433,6 +553,11 @@ void UGP_TargetedSkillBase::UpdatePreview()
 	DrawDebugSphere(World, TargetData.TargetLocation, 20.0f, 12, DebugColor, false, PreviewUpdateInterval);
 }
 
+float UGP_TargetedSkillBase::GetPreviewActorRadius() const
+{
+	return 0.0f;
+}
+
 void UGP_TargetedSkillBase::ConfirmSelection(EGP_SkillConfirmType ConfirmType)
 {
 	if (!bSelectionActive)
@@ -441,6 +566,29 @@ void UGP_TargetedSkillBase::ConfirmSelection(EGP_SkillConfirmType ConfirmType)
 	}
 
 	FGP_SkillTargetData TargetData = GetCurrentTargetData(ConfirmType);
+	if (!TryCommitAndExecute(TargetData))
+	{
+		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+	}
+}
+
+void UGP_TargetedSkillBase::ConfirmSelectionFromPayload(
+	const FGameplayEventData& Payload,
+	EGP_SkillConfirmType ConfirmType)
+{
+	if (!bSelectionActive)
+	{
+		return;
+	}
+
+	FGP_SkillTargetData TargetData = GetCurrentTargetData(ConfirmType);
+	if (Payload.TargetData.Num() > 0 && Payload.TargetData.Get(0))
+	{
+		TargetData.TargetLocation = Payload.TargetData.Get(0)->GetEndPointTransform().GetLocation();
+		TargetData.bBlockingHit = true;
+		TargetData = ValidateReceivedTargetData(TargetData);
+	}
+
 	if (!TryCommitAndExecute(TargetData))
 	{
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
@@ -471,7 +619,8 @@ bool UGP_TargetedSkillBase::TryCommitAndExecute(const FGP_SkillTargetData& Targe
 
 	if (bEndAbilityAfterConfirmedExecute)
 	{
-		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+		const bool bReplicateEndAbility = HasAuthority(&CurrentActivationInfo);
+		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, bReplicateEndAbility, false);
 	}
 
 	return true;
@@ -479,12 +628,12 @@ bool UGP_TargetedSkillBase::TryCommitAndExecute(const FGP_SkillTargetData& Targe
 
 void UGP_TargetedSkillBase::OnPrimaryConfirm(FGameplayEventData Payload)
 {
-	ConfirmSelection(EGP_SkillConfirmType::Primary);
+	ConfirmSelectionFromPayload(Payload, EGP_SkillConfirmType::Primary);
 }
 
 void UGP_TargetedSkillBase::OnSecondaryConfirm(FGameplayEventData Payload)
 {
-	ConfirmSelection(EGP_SkillConfirmType::Secondary);
+	ConfirmSelectionFromPayload(Payload, EGP_SkillConfirmType::Secondary);
 }
 
 void UGP_TargetedSkillBase::OnCancelSelection(FGameplayEventData Payload)

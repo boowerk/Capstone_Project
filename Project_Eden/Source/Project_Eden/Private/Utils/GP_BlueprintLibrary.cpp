@@ -380,7 +380,7 @@ bool UGP_BlueprintLibrary::CanApplyCombatEffect(AActor* Instigator, AActor* Targ
 	return !(Instigator->IsA<AGP_EnemyCharacter>() && TargetActor->IsA<AGP_EnemyCharacter>());
 }
 
-void UGP_BlueprintLibrary::ApplyGameplayEffectToActors(AActor* Instigator, const TArray<AActor*>& TargetActors, TSubclassOf<UGameplayEffect> EffectClass, float EffectLevel, UGP_SkillData* SkillData)
+void UGP_BlueprintLibrary::ApplyGameplayEffectToActors(AActor* Instigator, const TArray<AActor*>& TargetActors, TSubclassOf<UGameplayEffect> EffectClass, float EffectLevel, UGP_SkillData* SkillData, float DamageScale)
 {
 	if (!IsValid(Instigator)) return;
 
@@ -424,7 +424,7 @@ void UGP_BlueprintLibrary::ApplyGameplayEffectToActors(AActor* Instigator, const
 
 				if (SkillData)
 				{
-					const float SkillDamageMultiplier = GetSkillAugmentDamageMultiplierFromActor(Instigator, SkillData);
+					const float SkillDamageMultiplier = GetSkillAugmentDamageMultiplierFromActor(Instigator, SkillData) * FMath::Max(0.0f, DamageScale);
 					SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Data::Base, SkillData->BaseDamage);
 					SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Data::BaseSpell, SkillData->BaseSpellDamage);
 					SpecHandle.Data->SetSetByCallerMagnitude(GPTags::Damage::Data::ToughnessBase, SkillData->ToughnessDamage);
@@ -441,11 +441,11 @@ void UGP_BlueprintLibrary::ApplyGameplayEffectToActors(AActor* Instigator, const
 	}
 }
 
-void UGP_BlueprintLibrary::ApplyGameplayEffectAndEventToActors(AActor* Instigator, const TArray<AActor*>& TargetActors, TSubclassOf<UGameplayEffect> EffectClass, FGameplayTag EventTag, float EffectLevel, UGP_SkillData* SkillData)
+void UGP_BlueprintLibrary::ApplyGameplayEffectAndEventToActors(AActor* Instigator, const TArray<AActor*>& TargetActors, TSubclassOf<UGameplayEffect> EffectClass, FGameplayTag EventTag, float EffectLevel, UGP_SkillData* SkillData, float DamageScale)
 {
 	if (EffectClass)
 	{
-		ApplyGameplayEffectToActors(Instigator, TargetActors, EffectClass, EffectLevel, SkillData);
+		ApplyGameplayEffectToActors(Instigator, TargetActors, EffectClass, EffectLevel, SkillData, DamageScale);
 	}
 
 	if (EventTag.IsValid())

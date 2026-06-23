@@ -10,6 +10,7 @@
 #include "Engine/Engine.h"
 #include "GameplayEffect.h"
 #include "GameplayTags/GP_Tags.h"
+#include "NiagaraComponent.h"
 #include "UObject/ConstructorHelpers.h"
 
 namespace
@@ -161,20 +162,30 @@ void AGP_BaseCharacter::MulticastShowDamageNumber_Implementation(int32 DamageAmo
 	SpawnDamageNumberActor(DamageAmount, Element);
 }
 
-void AGP_BaseCharacter::ShowSkillVisualActor(TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation, float VisualScale)
+void AGP_BaseCharacter::ShowSkillVisualActor(
+	TSubclassOf<AActor> VisualActorClass,
+	const FVector& Location,
+	const FRotator& Rotation,
+	float VisualScale,
+	const TArray<FGP_NiagaraParameterOverride>& NiagaraParameterOverrides)
 {
 	if (HasAuthority())
 	{
-		MulticastSpawnSkillVisualActor(VisualActorClass, Location, Rotation, VisualScale);
+		MulticastSpawnSkillVisualActor(VisualActorClass, Location, Rotation, VisualScale, NiagaraParameterOverrides);
 		return;
 	}
 
-	SpawnSkillVisualActor(VisualActorClass, Location, Rotation, VisualScale);
+	SpawnSkillVisualActor(VisualActorClass, Location, Rotation, VisualScale, NiagaraParameterOverrides);
 }
 
-void AGP_BaseCharacter::MulticastSpawnSkillVisualActor_Implementation(TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation, float VisualScale)
+void AGP_BaseCharacter::MulticastSpawnSkillVisualActor_Implementation(
+	TSubclassOf<AActor> VisualActorClass,
+	const FVector& Location,
+	const FRotator& Rotation,
+	float VisualScale,
+	const TArray<FGP_NiagaraParameterOverride>& NiagaraParameterOverrides)
 {
-	SpawnSkillVisualActor(VisualActorClass, Location, Rotation, VisualScale);
+	SpawnSkillVisualActor(VisualActorClass, Location, Rotation, VisualScale, NiagaraParameterOverrides);
 }
 
 void AGP_BaseCharacter::MulticastShowHealthDebug_Implementation(const FString& InstigatorName, float DamageAmount, float CurrentHealth, float MaxHealth, FGameplayTag ElementTag)
@@ -207,7 +218,12 @@ void AGP_BaseCharacter::SpawnDamageNumberActor(int32 DamageAmount, EWeaponElemen
 	DamageNumberActor->InitializeDamageNumber(DamageAmount, Element);
 }
 
-void AGP_BaseCharacter::SpawnSkillVisualActor(TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation, float VisualScale)
+void AGP_BaseCharacter::SpawnSkillVisualActor(
+	TSubclassOf<AActor> VisualActorClass,
+	const FVector& Location,
+	const FRotator& Rotation,
+	float VisualScale,
+	const TArray<FGP_NiagaraParameterOverride>& NiagaraParameterOverrides)
 {
 	if (!IsValid(GetWorld()) || !VisualActorClass)
 	{
@@ -229,6 +245,69 @@ void AGP_BaseCharacter::SpawnSkillVisualActor(TSubclassOf<AActor> VisualActorCla
 	if (IsValid(VisualActor))
 	{
 		VisualActor->SetActorScale3D(FVector(FMath::Max(VisualScale, 0.0f)));
+
+		if (!NiagaraParameterOverrides.IsEmpty())
+		{
+			TArray<UNiagaraComponent*> NiagaraComponents;
+			VisualActor->GetComponents(NiagaraComponents);
+
+			for (UNiagaraComponent* NiagaraComponent : NiagaraComponents)
+			{
+				if (!IsValid(NiagaraComponent))
+				{
+					continue;
+				}
+
+				NiagaraComponent->DestroyInstanceNotComponent();
+
+				for (const FGP_NiagaraParameterOverride& Override : NiagaraParameterOverrides)
+				{
+					if (Override.ParameterName.IsNone())
+					{
+						continue;
+					}
+
+					switch (Override.Type)
+					{
+					case EGP_NiagaraParameterType::Float:
+						NiagaraComponent->SetVariableFloat(Override.ParameterName, Override.FloatValue);
+						break;
+					case EGP_NiagaraParameterType::Integer:
+						NiagaraComponent->SetVariableInt(Override.ParameterName, Override.IntegerValue);
+						break;
+					case EGP_NiagaraParameterType::Boolean:
+						NiagaraComponent->SetVariableBool(Override.ParameterName, Override.BooleanValue);
+						break;
+					case EGP_NiagaraParameterType::Vector2D:
+						NiagaraComponent->SetVariableVec2(Override.ParameterName, Override.Vector2DValue);
+						break;
+					case EGP_NiagaraParameterType::Vector3:
+						NiagaraComponent->SetVariableVec3(Override.ParameterName, Override.Vector3Value);
+						break;
+					case EGP_NiagaraParameterType::Color:
+						NiagaraComponent->SetVariableLinearColor(Override.ParameterName, Override.ColorValue);
+						break;
+					default:
+						break;
+					}
+				}
+
+				NiagaraComponent->Activate(true);
+			}
+		}
+		else
+		{
+			TArray<UNiagaraComponent*> NiagaraComponents;
+			VisualActor->GetComponents(NiagaraComponents);
+
+			for (UNiagaraComponent* NiagaraComponent : NiagaraComponents)
+			{
+				if (IsValid(NiagaraComponent) && !NiagaraComponent->IsActive())
+				{
+					NiagaraComponent->Activate(true);
+				}
+			}
+		}
 	}
 }
 
