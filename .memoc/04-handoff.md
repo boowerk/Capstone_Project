@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-06-23T09:13:22+09:00
+updated: 2026-06-23T17:59:34+09:00
 status: active
 tags:
   - memoc
@@ -11,7 +11,12 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-06-23T09:13:22+09:00
+Last synced: 2026-06-23T17:59:34+09:00
+
+## Player Network Movement Handoff
+
+- Client/server movement jitter was likely caused by directional `MaxWalkSpeed` mismatch. `AGP_PlayerController::ResolveEffectiveMoveInput()` now uses replicated/local raw move input first so server and owning client choose the same forward/side/back/sprint speed; server acceleration remains only as a fallback before input RPC arrival.
+- `Project_EdenEditor Win64 Development` build passed. PIE-check with a separate server/client session for remaining camera shake; if any remains, inspect root-motion fallback actions next.
 
 ## Dark Armor Knight Boss Handoff
 

@@ -2,7 +2,7 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-06-23T15:25:12+09:00
+updated: 2026-06-23T17:59:34+09:00
 status: active
 created: 2026-06-22T17:59:08
 tags:
@@ -12,12 +12,12 @@ tags:
 # Session Summary
 
 ## Status
-- Fetched `origin/main` and merged it into `feature/vfx-skills`.
-- `origin/main` advanced to `24c60f5b` (`feat: add Fogarea and light effect`) before merge.
-- Merge conflicts were limited to `.memoc` files; project source files auto-merged.
+- Investigated client-only stutter/camera shake when connected to a running server.
+- Root cause was directional `MaxWalkSpeed` selection diverging: server preferred acceleration/controller-rotation reinterpretation while client used raw move input.
+- `AGP_PlayerController::ResolveEffectiveMoveInput()` now uses the same clamped raw input on both sides and keeps acceleration only as a first-frame server fallback.
 
 ## Verified
-- Conflict markers removed from `.memoc/02-current-project-state.md`, `.memoc/03-decisions.md`, and `.memoc/session-summary.md`.
+- `Project_EdenEditor Win64 Development` build succeeded.
 
 ## Handoff
-- Branch contains the merged `origin/main`; push `feature/vfx-skills` when ready.
+- PIE/client-server visual check still recommended for movement correction and camera shake.

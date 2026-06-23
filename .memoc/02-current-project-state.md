@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-06-23T15:25:12+09:00
+updated: 2026-06-23T17:59:34+09:00
 status: active
 tags:
   - memoc
@@ -11,10 +11,11 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-06-23T15:25:12+09:00
+Last synced: 2026-06-23T17:59:34+09:00
 
 ## Current Status
 
+- Client-server player movement now resolves directional speed from the same clamped raw move input before falling back to server acceleration. This prevents server/client `MaxWalkSpeed` disagreement from causing movement corrections and camera-lag shake during network play. Editor build passed; PIE network visual confirmation remains recommended.
 - `/Game/Maps/MainMap/L_LandscapeMap` has 15 `BP_RegionSeed` actors normalized to labels/indices `RegionSeed_0` through `RegionSeed_14`; their X/Y positions now match the latest user-provided `SEEDS_WORLD` list. Existing Z heights were preserved. The placed `BP_RegionStateManager` override is `RegionCount=15` and `StateRT=/Game/RegionSystem/RenderTargets/RT_RegionState_15x1` (`15x1`). `L_GameMap` was not modified.
 - RegionState direction changed: treat state values as biome-type IDs rather than default/dead/corrupted gameplay status. Existing `AliveRegionState` / `DeadRegionState` naming in GameMode is legacy and should be renamed or replaced when this path is implemented.
 - `/Game/Maps/MainMap/L_LandscapeMap` now contains a completed Landscape Sculpt terrain pass (`58c9391e`, `086dadc5`): broad western and central/eastern highlands, northern peaks, coastal ridges, cliff-like mesas, playable flattened zones, a west/central separating valley, internal low routes, erosion detail, and a lower southern bay. It intentionally remains material-, water-, road-, and foliage-free for later environment passes.

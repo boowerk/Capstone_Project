@@ -949,9 +949,17 @@ FVector2D AGP_PlayerController::ResolveEffectiveMoveInput(const AGP_PlayerCharac
 		return FVector2D::ZeroVector;
 	}
 
+	const FVector2D ClampedMoveInput = CurrentMoveInput.GetClampedToMaxSize(1.0f);
+	if (!ClampedMoveInput.IsNearlyZero())
+	{
+		// 네트워크 이동 보정이 튀지 않도록 서버와 클라이언트가 같은 원본 입력값으로 방향별 속도를 고릅니다.
+		return ClampedMoveInput;
+	}
+
 	const UCharacterMovementComponent* MoveComp = PlayerCharacter->GetCharacterMovement();
 	if (HasAuthority() && MoveComp)
 	{
+		// 서버가 입력 RPC를 아직 받지 못한 첫 프레임만 현재 가속도를 백업 경로로 사용합니다.
 		const FVector AccelerationDirection = MoveComp->GetCurrentAcceleration().GetSafeNormal2D();
 		if (!AccelerationDirection.IsNearlyZero())
 		{
@@ -964,7 +972,7 @@ FVector2D AGP_PlayerController::ResolveEffectiveMoveInput(const AGP_PlayerCharac
 		}
 	}
 
-	return CurrentMoveInput;
+	return FVector2D::ZeroVector;
 }
 
 void AGP_PlayerController::UpdateMovementSpeed(float DeltaSeconds)
