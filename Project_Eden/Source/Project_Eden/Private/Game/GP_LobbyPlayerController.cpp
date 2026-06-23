@@ -2,6 +2,7 @@
 
 #include "Blueprint/UserWidget.h"
 #include "Engine/World.h"
+#include "Game/GP_LobbyGameMode.h"
 #include "UI/GP_LobbyWidget.h"
 
 void AGP_LobbyPlayerController::BeginPlay()
@@ -44,5 +45,14 @@ void AGP_LobbyPlayerController::ClientShowLoading_Implementation()
 	if (IsValid(LobbyWidget))
 	{
 		LobbyWidget->ShowLoadingState();
+	}
+}
+
+void AGP_LobbyPlayerController::ServerForceStart_Implementation()
+{
+	UWorld* World = GetWorld();
+	if (AGP_LobbyGameMode* GM = World ? World->GetAuthGameMode<AGP_LobbyGameMode>() : nullptr)
+	{
+		GM->ForceStartGame();
 	}
 }

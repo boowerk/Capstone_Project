@@ -21,12 +21,17 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Lobby")
 	void CheckAllReady();
 
+	// Debug/solo: start the run immediately, ignoring player count and ready
+	// state. Server-authoritative; invoked via the lobby controller's exec.
+	UFUNCTION(BlueprintCallable, Category = "Lobby")
+	void ForceStartGame();
+
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Lobby")
 	int32 ExpectedPlayerCount = 3;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Lobby")
-	FString GameMapName = TEXT("DemoMap");
+	FString GameMapName = TEXT("DemoMap/ServerTest");
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "Lobby")
 	void OnAllPlayersReady();
