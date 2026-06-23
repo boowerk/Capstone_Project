@@ -8,6 +8,7 @@
 #include "Engine/World.h"
 #include "GameFramework/Pawn.h"
 #include "GameplayTags/GP_Tags.h"
+#include "UObject/ConstructorHelpers.h"
 
 UGP_BossGroundHandsAttack::UGP_BossGroundHandsAttack()
 {
@@ -18,7 +19,14 @@ UGP_BossGroundHandsAttack::UGP_BossGroundHandsAttack()
 	AbilityAssetTags.AddTag(GPTags::Ability::Enemy::Attack_BossGroundHands);
 	SetAssetTags(AbilityAssetTags);
 
+	// Prefer the thin visual Blueprint so designers can resize/reorient the hand without touching gameplay collision.
+	static ConstructorHelpers::FClassFinder<AGP_BossGroundHandActor> GroundHandBlueprintFinder(
+		TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_Sans/BP_BossGroundHandActor"));
 	GroundHandActorClass = AGP_BossGroundHandActor::StaticClass();
+	if (GroundHandBlueprintFinder.Succeeded())
+	{
+		GroundHandActorClass = GroundHandBlueprintFinder.Class;
+	}
 }
 
 bool UGP_BossGroundHandsAttack::CanActivateAbility(const FGameplayAbilitySpecHandle Handle,

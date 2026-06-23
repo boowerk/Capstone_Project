@@ -10,6 +10,7 @@ class AGP_DarkWaveProjectile;
 class UGameplayAbility;
 class UGameplayEffect;
 class UAnimMontage;
+class UGP_BossTelegraphVFXComponent;
 class UGP_DarkArmorKnightStateComponent;
 
 UCLASS(Blueprintable)
@@ -22,6 +23,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Boss|Dark Knight")
 	UGP_DarkArmorKnightStateComponent* GetDarkKnightStateComponent() const { return DarkKnightStateComponent; }
+
+	UFUNCTION(BlueprintPure, Category = "Boss|Dark Knight|VFX")
+	UGP_BossTelegraphVFXComponent* GetBossTelegraphVFXComponent() const;
 
 	UFUNCTION(BlueprintPure, Category = "Boss|Dark Knight")
 	int32 GetDarkKnightPhase() const;

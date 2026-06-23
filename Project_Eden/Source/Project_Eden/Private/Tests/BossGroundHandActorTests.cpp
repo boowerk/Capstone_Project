@@ -1,6 +1,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Actors/GP_BossGroundHandActor.h"
+#include "AbilitySystem/Abilities/Enemy/GP_BossGroundHandsAttack.h"
 
 #include "Components/BoxComponent.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -49,6 +50,44 @@ bool FBossGroundHandUsesRightHandMeshTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("Ground hand collision extent remains unchanged"), HandCollision->GetUnscaledBoxExtent(), FVector(55.0f, 62.0f, 110.0f));
 		TestEqual(TEXT("Ground hand collision starts disabled until the rise"), HandCollision->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
 		TestEqual(TEXT("Ground hand collision still overlaps pawns"), HandCollision->GetCollisionResponseToChannel(ECC_Pawn), ECR_Overlap);
+	}
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FBossGroundHandUsesVisualBlueprintTest,
+	"ProjectEden.AI.Boss.GroundHands.UsesVisualBlueprint",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBossGroundHandUsesVisualBlueprintTest::RunTest(const FString& Parameters)
+{
+	// Keep GAS routed through the designer-tunable BP while native code remains the collision and damage authority.
+	const UGP_BossGroundHandsAttack* Ability = GetDefault<UGP_BossGroundHandsAttack>();
+	TSubclassOf<AGP_BossGroundHandActor> GroundHandClass;
+	if (IsValid(Ability))
+	{
+		GroundHandClass = Ability->GetGroundHandActorClass();
+	}
+	const AGP_BossGroundHandActor* VisualDefaults = GroundHandClass
+		? GroundHandClass->GetDefaultObject<AGP_BossGroundHandActor>()
+		: nullptr;
+
+	TestNotNull(TEXT("Ground Hands ability resolves a presentation actor class"), GroundHandClass.Get());
+	if (GroundHandClass)
+	{
+		TestEqual(
+			TEXT("Ground Hands ability uses the Sans visual Blueprint"),
+			GroundHandClass->GetPathName(),
+			FString(TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_Sans/BP_BossGroundHandActor.BP_BossGroundHandActor_C")));
+	}
+	TestNotNull(TEXT("Ground Hands visual Blueprint has valid defaults"), VisualDefaults);
+	if (IsValid(VisualDefaults))
+	{
+		// Designers may keep tuning the BP, so preserve the reduced-size contract instead of pinning one art value.
+		TestTrue(
+			TEXT("Ground Hands visual Blueprint keeps a reduced positive scale"),
+			VisualDefaults->GetHandVisualScale() > 0.0f && VisualDefaults->GetHandVisualScale() < 1.0f);
 	}
 
 	return true;

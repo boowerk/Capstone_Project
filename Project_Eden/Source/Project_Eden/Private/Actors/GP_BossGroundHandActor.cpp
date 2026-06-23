@@ -69,10 +69,21 @@ AGP_BossGroundHandActor::AGP_BossGroundHandActor()
 	}
 }
 
+void AGP_BossGroundHandActor::OnConstruction(const FTransform& Transform)
+{
+	Super::OnConstruction(Transform);
+
+	// Blueprint children tune only the skeletal presentation; HandCollision remains an unchanged sibling component.
+	ApplyHandVisualSettings();
+}
+
 void AGP_BossGroundHandActor::BeginPlay()
 {
 	Super::BeginPlay();
 
+	ApplyHandVisualSettings();
+	// Runtime starts with only the warning decal visible; the BP viewport remains available for mesh tuning.
+	HandMesh->SetHiddenInGame(true, true);
 	HandCollision->OnComponentBeginOverlap.AddDynamic(this, &ThisClass::OnHandOverlap);
 	WarningDecal->DecalSize = FVector(120.0f, WarningRadius, WarningRadius);
 	if (WarningDecalMaterial)
@@ -86,6 +97,19 @@ void AGP_BossGroundHandActor::BeginPlay()
 	{
 		ApplyPatternStart();
 	}
+}
+
+void AGP_BossGroundHandActor::ApplyHandVisualSettings()
+{
+	if (!IsValid(HandMesh))
+	{
+		return;
+	}
+
+	// Uniform scaling avoids distorting the imported hand while offset and rotation stay available for art alignment.
+	HandMesh->SetRelativeScale3D(FVector(FMath::Max(0.01f, HandVisualScale)));
+	HandMesh->SetRelativeLocation(HandVisualOffset);
+	HandMesh->SetRelativeRotation(HandVisualRotation);
 }
 
 void AGP_BossGroundHandActor::InitializeGroundHand(float InTelegraphDuration)
@@ -147,6 +171,7 @@ void AGP_BossGroundHandActor::ApplyPatternStart()
 	HitActors.Reset();
 	HandCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	HandVisualRoot->SetRelativeLocation(FVector(0.0f, 0.0f, -HiddenDepth));
+	HandMesh->SetHiddenInGame(true, true);
 	WarningDecal->SetVisibility(true);
 }
 
@@ -160,11 +185,14 @@ void AGP_BossGroundHandActor::UpdatePatternVisuals(float ElapsedSeconds)
 	if (ElapsedSeconds < TelegraphEnd)
 	{
 		WarningDecal->SetVisibility(true);
+		HandMesh->SetHiddenInGame(true, true);
 		HandVisualRoot->SetRelativeLocation(FVector(0.0f, 0.0f, -HiddenDepth));
 		return;
 	}
 
 	WarningDecal->SetVisibility(false);
+	// Reveal on the first rise frame so no part of a large skeletal mesh leaks through during the warning.
+	HandMesh->SetHiddenInGame(false, true);
 	if (!bCollisionActive)
 	{
 		bCollisionActive = true;
@@ -189,6 +217,7 @@ void AGP_BossGroundHandActor::UpdatePatternVisuals(float ElapsedSeconds)
 	else
 	{
 		HandCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		HandMesh->SetHiddenInGame(true, true);
 		HandVisualRoot->SetRelativeLocation(FVector(0.0f, 0.0f, -HiddenDepth));
 		bPatternStarted = false;
 		return;
@@ -259,11 +288,14 @@ void AGP_BossGroundHandActor::SnapToFloor()
 	const FVector CurrentLocation = GetActorLocation();
 	FHitResult FloorHit;
 	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(BossGroundHandFloorTrace), false, GetOwner());
-	if (World->LineTraceSingleByChannel(
+	FCollisionObjectQueryParams FloorObjectQuery;
+	// The center strike overlaps the target pawn, so only static level geometry may establish the decal floor.
+	FloorObjectQuery.AddObjectTypesToQuery(ECC_WorldStatic);
+	if (World->LineTraceSingleByObjectType(
 		FloorHit,
 		CurrentLocation + FVector(0.0f, 0.0f, FloorTraceUpDistance),
 		CurrentLocation - FVector(0.0f, 0.0f, FloorTraceDownDistance),
-		ECC_Visibility,
+		FloorObjectQuery,
 		QueryParams))
 	{
 		SetActorLocation(FloorHit.ImpactPoint + FVector(0.0f, 0.0f, 3.0f));

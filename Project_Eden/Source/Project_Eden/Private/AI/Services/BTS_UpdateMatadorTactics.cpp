@@ -128,7 +128,8 @@ void UBTS_UpdateMatadorTactics::UpdateMatadorTactics(UBehaviorTreeComponent& Own
 	const bool bHasTarget = IsValid(TargetActor);
 	const bool bReturningHome = MatadorTactics::GetBool(BlackboardComponent, EnemyBlackboardKeys::bShouldReturnHome);
 	const bool bGroggy = MatadorStateComponent->IsGroggy();
-	const bool bBullActive = IsValid(MatadorStateComponent->GetActiveBullActor());
+	// Include the telegraph reservation so tactics do not reopen the bull branch before its delayed spawn.
+	const bool bBullActive = MatadorBoss->IsBullPatternActive();
 	const int32 ChainBreakCount = MatadorStateComponent->GetChainBreakCount();
 	const int32 ChainBreakTarget = MatadorStateComponent->GetChainBreakTarget();
 	const float DistanceToTarget = bHasTarget

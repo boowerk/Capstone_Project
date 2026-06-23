@@ -9,6 +9,7 @@ class AGP_BullChargeActor;
 class AGP_ChainEffectActor;
 class AGP_MatadorBossDecoyActor;
 class UGameplayAbility;
+class UGP_BossTelegraphVFXComponent;
 class UGP_MatadorBossStateComponent;
 
 UCLASS(Blueprintable)
@@ -21,6 +22,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Boss|Matador")
 	UGP_MatadorBossStateComponent* GetMatadorStateComponent() const { return MatadorStateComponent; }
+
+	UFUNCTION(BlueprintPure, Category = "Boss|Matador|VFX")
+	UGP_BossTelegraphVFXComponent* GetBossTelegraphVFXComponent() const { return BossTelegraphVFXComponent; }
 
 	UFUNCTION(BlueprintCallable, Category = "Boss|Matador")
 	AGP_MatadorBossDecoyActor* EnsureMatadorDecoy();
@@ -65,6 +69,7 @@ private:
 	void HandleMatadorGroggyChanged(bool bNewGroggy);
 
 	void GrantMatadorPatternAbilities();
+	void ExecutePendingBullPattern();
 	void HandleMatadorFallbackPatternTick();
 	void TeleportToPendingGroggyDecoyLocation();
 	void UpdateDecoyFollow(float DeltaSeconds);
@@ -77,6 +82,10 @@ private:
 private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Matador", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UGP_MatadorBossStateComponent> MatadorStateComponent;
+
+	/** Native inherited component exposes the shared Niagara cue and its opt-in bool on the Matador Blueprint. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Matador|VFX", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UGP_BossTelegraphVFXComponent> BossTelegraphVFXComponent;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Matador|Actors", meta = (AllowPrivateAccess = "true"))
 	TSubclassOf<AGP_MatadorBossDecoyActor> DecoyActorClass;
@@ -168,6 +177,9 @@ private:
 	FTimerHandle GroggyRecoveryTimerHandle;
 	FTimerHandle GroggyDecoyTeleportTimerHandle;
 	FTimerHandle FallbackPatternTimerHandle;
+	FTimerHandle BullTelegraphTimerHandle;
+	TWeakObjectPtr<AActor> PendingBullPatternTarget;
 	FVector PendingGroggyDecoyTeleportLocation = FVector::ZeroVector;
 	bool bHasPendingGroggyDecoyTeleportLocation = false;
+	bool bBullPatternPending = false;
 };

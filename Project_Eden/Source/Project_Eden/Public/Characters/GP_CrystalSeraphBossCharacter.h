@@ -6,6 +6,7 @@
 #include "GP_CrystalSeraphBossCharacter.generated.h"
 
 class UGameplayAbility;
+class UGP_BossTelegraphVFXComponent;
 class UGP_CrystalSeraphStateComponent;
 class FCrystalSeraphGroggyLifecycleTest;
 
@@ -19,6 +20,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Boss|Crystal Seraph")
 	UGP_CrystalSeraphStateComponent* GetCrystalSeraphStateComponent() const { return CrystalSeraphStateComponent; }
+
+	UFUNCTION(BlueprintPure, Category = "Boss|Crystal Seraph|VFX")
+	UGP_BossTelegraphVFXComponent* GetBossTelegraphVFXComponent() const { return BossTelegraphVFXComponent; }
 
 	UFUNCTION(BlueprintCallable, Category = "Boss|Crystal Seraph")
 	AActor* RequestSpawnCrystalPrism(AActor* PatternTargetActor);
@@ -107,6 +111,10 @@ private:
 private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UGP_CrystalSeraphStateComponent> CrystalSeraphStateComponent;
+
+	/** Inherited component keeps the per-boss Niagara selection and opt-in toggle in one Details panel. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph|VFX", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UGP_BossTelegraphVFXComponent> BossTelegraphVFXComponent;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Crystal Seraph|Actors", meta = (AllowPrivateAccess = "true"))
 	TSubclassOf<AActor> CrystalPrismActorClass;

@@ -3,6 +3,7 @@
 #include "AI/Debug/EnemyAIDebugUtils.h"
 #include "Characters/GP_CrystalSeraphBossCharacter.h"
 #include "GameplayTags/GP_Tags.h"
+#include "VFX/GP_BossTelegraphVFXComponent.h"
 
 UGP_CrystalSeraphPatternAbility::UGP_CrystalSeraphPatternAbility()
 {
@@ -46,10 +47,56 @@ void UGP_CrystalSeraphPatternAbility::ActivateAbility(
 	AGP_CrystalSeraphBossCharacter* CrystalSeraphBoss = Cast<AGP_CrystalSeraphBossCharacter>(GetAvatarActorFromActorInfo());
 	const bool bCadenceReserved = !UsesSharedPatternCadence()
 		|| (HasAuthority(&ActivationInfo) && IsValid(CrystalSeraphBoss) && CrystalSeraphBoss->TryStartCrystalSeraphPattern());
-	const bool bStarted = bCadenceReserved
-		&& HasAuthority(&ActivationInfo)
+	if (!bCadenceReserved || !HasAuthority(&ActivationInfo) || !IsValid(CrystalSeraphBoss))
+	{
+		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+		return;
+	}
+
+	PendingPatternTarget = ResolvePatternTarget(TriggerEventData);
+	const UGP_BossTelegraphVFXComponent* TelegraphComponent = CrystalSeraphBoss->GetBossTelegraphVFXComponent();
+	const float TelegraphDelay = UsesBossTelegraphVFX() && IsValid(TelegraphComponent)
+		? CrystalSeraphBoss->GetBossTelegraphVFXComponent()->PlayEnabledTelegraph()
+		: 0.0f;
+	if (TelegraphDelay > KINDA_SMALL_NUMBER)
+	{
+		// Keep the GAS ability alive until the visual lead-in completes, then execute the original pattern boundary.
+		if (UWorld* World = GetWorld())
+		{
+			World->GetTimerManager().SetTimer(
+				TelegraphTimerHandle,
+				this,
+				&ThisClass::ExecutePendingPattern,
+				TelegraphDelay,
+				false);
+			return;
+		}
+	}
+
+	ExecutePendingPattern();
+}
+
+void UGP_CrystalSeraphPatternAbility::EndAbility(
+	const FGameplayAbilitySpecHandle Handle,
+	const FGameplayAbilityActorInfo* ActorInfo,
+	const FGameplayAbilityActivationInfo ActivationInfo,
+	bool bReplicateEndAbility,
+	bool bWasCancelled)
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(TelegraphTimerHandle);
+	}
+	PendingPatternTarget.Reset();
+	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
+}
+
+void UGP_CrystalSeraphPatternAbility::ExecutePendingPattern()
+{
+	AGP_CrystalSeraphBossCharacter* CrystalSeraphBoss = Cast<AGP_CrystalSeraphBossCharacter>(GetAvatarActorFromActorInfo());
+	const bool bStarted = HasAuthority(&CurrentActivationInfo)
 		&& IsValid(CrystalSeraphBoss)
-		&& ExecuteCrystalSeraphPattern(CrystalSeraphBoss, TriggerEventData);
+		&& ExecuteCrystalSeraphPattern(CrystalSeraphBoss, PendingPatternTarget.Get());
 	UE_LOG(
 		LogEnemyAI,
 		Log,
@@ -58,10 +105,10 @@ void UGP_CrystalSeraphPatternAbility::ActivateAbility(
 		*EnemyAIDebugUtils::DescribeActor(CrystalSeraphBoss),
 		bStarted ? 1 : 0);
 
-	EndAbility(Handle, ActorInfo, ActivationInfo, true, !bStarted);
+	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, !bStarted);
 }
 
-bool UGP_CrystalSeraphPatternAbility::ExecuteCrystalSeraphPattern(AGP_CrystalSeraphBossCharacter* CrystalSeraphBoss, const FGameplayEventData* TriggerEventData)
+bool UGP_CrystalSeraphPatternAbility::ExecuteCrystalSeraphPattern(AGP_CrystalSeraphBossCharacter* CrystalSeraphBoss, AActor* PatternTargetActor)
 {
 	return false;
 }
@@ -78,9 +125,9 @@ UGP_CrystalSeraphShardAbility::UGP_CrystalSeraphShardAbility()
 	SetAssetTags(AbilityAssetTags);
 }
 
-bool UGP_CrystalSeraphShardAbility::ExecuteCrystalSeraphPattern(AGP_CrystalSeraphBossCharacter* CrystalSeraphBoss, const FGameplayEventData* TriggerEventData)
+bool UGP_CrystalSeraphShardAbility::ExecuteCrystalSeraphPattern(AGP_CrystalSeraphBossCharacter* CrystalSeraphBoss, AActor* PatternTargetActor)
 {
-	return IsValid(CrystalSeraphBoss) && CrystalSeraphBoss->RequestSpawnCrystalShardPattern(ResolvePatternTarget(TriggerEventData));
+	return IsValid(CrystalSeraphBoss) && CrystalSeraphBoss->RequestSpawnCrystalShardPattern(PatternTargetActor);
 }
 
 UGP_CrystalSeraphLaserAbility::UGP_CrystalSeraphLaserAbility()
@@ -90,9 +137,9 @@ UGP_CrystalSeraphLaserAbility::UGP_CrystalSeraphLaserAbility()
 	SetAssetTags(AbilityAssetTags);
 }
 
-bool UGP_CrystalSeraphLaserAbility::ExecuteCrystalSeraphPattern(AGP_CrystalSeraphBossCharacter* CrystalSeraphBoss, const FGameplayEventData* TriggerEventData)
+bool UGP_CrystalSeraphLaserAbility::ExecuteCrystalSeraphPattern(AGP_CrystalSeraphBossCharacter* CrystalSeraphBoss, AActor* PatternTargetActor)
 {
-	return IsValid(CrystalSeraphBoss) && CrystalSeraphBoss->RequestStartLaserPattern(ResolvePatternTarget(TriggerEventData));
+	return IsValid(CrystalSeraphBoss) && CrystalSeraphBoss->RequestStartLaserPattern(PatternTargetActor);
 }
 
 UGP_CrystalSeraphPrismAbility::UGP_CrystalSeraphPrismAbility()
@@ -102,9 +149,9 @@ UGP_CrystalSeraphPrismAbility::UGP_CrystalSeraphPrismAbility()
 	SetAssetTags(AbilityAssetTags);
 }
 
-bool UGP_CrystalSeraphPrismAbility::ExecuteCrystalSeraphPattern(AGP_CrystalSeraphBossCharacter* CrystalSeraphBoss, const FGameplayEventData* TriggerEventData)
+bool UGP_CrystalSeraphPrismAbility::ExecuteCrystalSeraphPattern(AGP_CrystalSeraphBossCharacter* CrystalSeraphBoss, AActor* PatternTargetActor)
 {
-	return IsValid(CrystalSeraphBoss) && IsValid(CrystalSeraphBoss->RequestSpawnCrystalPrism(ResolvePatternTarget(TriggerEventData)));
+	return IsValid(CrystalSeraphBoss) && IsValid(CrystalSeraphBoss->RequestSpawnCrystalPrism(PatternTargetActor));
 }
 
 UGP_CrystalSeraphAreaAbility::UGP_CrystalSeraphAreaAbility()
@@ -114,9 +161,9 @@ UGP_CrystalSeraphAreaAbility::UGP_CrystalSeraphAreaAbility()
 	SetAssetTags(AbilityAssetTags);
 }
 
-bool UGP_CrystalSeraphAreaAbility::ExecuteCrystalSeraphPattern(AGP_CrystalSeraphBossCharacter* CrystalSeraphBoss, const FGameplayEventData* TriggerEventData)
+bool UGP_CrystalSeraphAreaAbility::ExecuteCrystalSeraphPattern(AGP_CrystalSeraphBossCharacter* CrystalSeraphBoss, AActor* PatternTargetActor)
 {
-	return IsValid(CrystalSeraphBoss) && CrystalSeraphBoss->RequestStartAreaPattern(ResolvePatternTarget(TriggerEventData));
+	return IsValid(CrystalSeraphBoss) && CrystalSeraphBoss->RequestStartAreaPattern(PatternTargetActor);
 }
 
 UGP_CrystalSeraphGroggyAbility::UGP_CrystalSeraphGroggyAbility()
@@ -126,7 +173,7 @@ UGP_CrystalSeraphGroggyAbility::UGP_CrystalSeraphGroggyAbility()
 	SetAssetTags(AbilityAssetTags);
 }
 
-bool UGP_CrystalSeraphGroggyAbility::ExecuteCrystalSeraphPattern(AGP_CrystalSeraphBossCharacter* CrystalSeraphBoss, const FGameplayEventData* TriggerEventData)
+bool UGP_CrystalSeraphGroggyAbility::ExecuteCrystalSeraphPattern(AGP_CrystalSeraphBossCharacter* CrystalSeraphBoss, AActor* PatternTargetActor)
 {
 	if (!IsValid(CrystalSeraphBoss))
 	{
@@ -144,7 +191,7 @@ UGP_CrystalSeraphTeleportAbility::UGP_CrystalSeraphTeleportAbility()
 	SetAssetTags(AbilityAssetTags);
 }
 
-bool UGP_CrystalSeraphTeleportAbility::ExecuteCrystalSeraphPattern(AGP_CrystalSeraphBossCharacter* CrystalSeraphBoss, const FGameplayEventData* TriggerEventData)
+bool UGP_CrystalSeraphTeleportAbility::ExecuteCrystalSeraphPattern(AGP_CrystalSeraphBossCharacter* CrystalSeraphBoss, AActor* PatternTargetActor)
 {
-	return IsValid(CrystalSeraphBoss) && CrystalSeraphBoss->RequestTeleportToPreferredCombatPosition(ResolvePatternTarget(TriggerEventData));
+	return IsValid(CrystalSeraphBoss) && CrystalSeraphBoss->RequestTeleportToPreferredCombatPosition(PatternTargetActor);
 }

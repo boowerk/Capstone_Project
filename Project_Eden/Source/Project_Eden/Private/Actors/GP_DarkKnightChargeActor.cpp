@@ -4,8 +4,10 @@
 #include "Characters/GP_DarkArmorKnightBossCharacter.h"
 #include "Components/StaticMeshComponent.h"
 #include "GameplayEffect.h"
+#include "Net/UnrealNetwork.h"
 #include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
+#include "VFX/GP_BossTelegraphVFXComponent.h"
 
 AGP_DarkKnightChargeActor::AGP_DarkKnightChargeActor()
 {
@@ -20,6 +22,12 @@ AGP_DarkKnightChargeActor::AGP_DarkKnightChargeActor()
 	TelegraphMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	TelegraphMesh->SetRelativeLocation(FVector(800.0f, 0.0f, 12.0f));
 	TelegraphMesh->SetRelativeScale3D(FVector(16.0f, 3.6f, 0.04f));
+
+	// Reusable designer component exposes its Niagara asset, scale, auto-activation, and lead time in Blueprint Details.
+	ChargeTelegraphVFXComponent = CreateDefaultSubobject<UGP_BossTelegraphVFXComponent>(TEXT("ChargeTelegraphVFXComponent"));
+	ChargeTelegraphVFXComponent->SetupAttachment(SceneRoot);
+	// The legacy charge coordinator intentionally auto-plays its own cue; boss-level components remain opt-in.
+	ChargeTelegraphVFXComponent->SetTelegraphVFXEnabled(true);
 
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMeshFinder(TEXT("/Engine/BasicShapes/Cube.Cube"));
 	if (CubeMeshFinder.Succeeded())
@@ -55,11 +63,47 @@ void AGP_DarkKnightChargeActor::InitializeCharge(AGP_DarkArmorKnightBossCharacte
 	SetActorLocation(Boss->GetActorLocation());
 	SetActorRotation(ChargeDirection.Rotation());
 	Boss->SetActorRotation(ChargeDirection.Rotation());
+	bSkipInternalTelegraph = IsValid(Boss->GetBossTelegraphVFXComponent())
+		&& Boss->GetBossTelegraphVFXComponent()->IsTelegraphVFXEnabled();
+	if (bSkipInternalTelegraph)
+	{
+		// The boss-level cue already consumed its lead time before this coordinator was spawned.
+		OnRep_SkipInternalTelegraph();
+		ForceNetUpdate();
+		StartCharge();
+		return;
+	}
+
+	// With the boss-level toggle disabled, preserve the original coordinator-owned warning and delay.
 	BP_OnChargeTelegraphStarted();
 
 	if (UWorld* World = GetWorld())
 	{
-		World->GetTimerManager().SetTimer(TelegraphTimerHandle, this, &ThisClass::StartCharge, FMath::Max(0.01f, TelegraphDuration), false);
+		const float TelegraphDuration = IsValid(ChargeTelegraphVFXComponent)
+			? ChargeTelegraphVFXComponent->GetTelegraphDuration()
+			: 0.9f;
+		World->GetTimerManager().SetTimer(
+			TelegraphTimerHandle,
+			this,
+			&ThisClass::StartCharge,
+			FMath::Max(0.01f, TelegraphDuration),
+			false);
+	}
+}
+
+void AGP_DarkKnightChargeActor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME_CONDITION(AGP_DarkKnightChargeActor, bSkipInternalTelegraph, COND_InitialOnly);
+}
+
+void AGP_DarkKnightChargeActor::OnRep_SkipInternalTelegraph()
+{
+	if (bSkipInternalTelegraph && IsValid(ChargeTelegraphVFXComponent))
+	{
+		// Clients may auto-register the component before initial actor state arrives, so suppress it on replication too.
+		ChargeTelegraphVFXComponent->StopTelegraph();
+		ChargeTelegraphVFXComponent->SetVisibility(false, true);
 	}
 }
 

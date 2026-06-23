@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "AbilitySystem/Abilities/GP_GameplayAbility.h"
+#include "TimerManager.h"
 #include "GP_CrystalSeraphPatternAbility.generated.h"
 
 class AGP_CrystalSeraphBossCharacter;
@@ -29,9 +30,23 @@ public:
 		const FGameplayEventData* TriggerEventData) override;
 
 protected:
-	virtual bool ExecuteCrystalSeraphPattern(AGP_CrystalSeraphBossCharacter* CrystalSeraphBoss, const FGameplayEventData* TriggerEventData);
+	virtual void EndAbility(
+		const FGameplayAbilitySpecHandle Handle,
+		const FGameplayAbilityActorInfo* ActorInfo,
+		const FGameplayAbilityActivationInfo ActivationInfo,
+		bool bReplicateEndAbility,
+		bool bWasCancelled) override;
+
+	virtual bool ExecuteCrystalSeraphPattern(AGP_CrystalSeraphBossCharacter* CrystalSeraphBoss, AActor* PatternTargetActor);
 	virtual bool UsesSharedPatternCadence() const { return true; }
+	virtual bool UsesBossTelegraphVFX() const { return true; }
 	AActor* ResolvePatternTarget(const FGameplayEventData* TriggerEventData) const;
+
+private:
+	void ExecutePendingPattern();
+
+	FTimerHandle TelegraphTimerHandle;
+	TWeakObjectPtr<AActor> PendingPatternTarget;
 };
 
 UCLASS(Blueprintable)
@@ -43,7 +58,7 @@ public:
 	UGP_CrystalSeraphShardAbility();
 
 protected:
-	virtual bool ExecuteCrystalSeraphPattern(AGP_CrystalSeraphBossCharacter* CrystalSeraphBoss, const FGameplayEventData* TriggerEventData) override;
+	virtual bool ExecuteCrystalSeraphPattern(AGP_CrystalSeraphBossCharacter* CrystalSeraphBoss, AActor* PatternTargetActor) override;
 };
 
 UCLASS(Blueprintable)
@@ -55,7 +70,7 @@ public:
 	UGP_CrystalSeraphLaserAbility();
 
 protected:
-	virtual bool ExecuteCrystalSeraphPattern(AGP_CrystalSeraphBossCharacter* CrystalSeraphBoss, const FGameplayEventData* TriggerEventData) override;
+	virtual bool ExecuteCrystalSeraphPattern(AGP_CrystalSeraphBossCharacter* CrystalSeraphBoss, AActor* PatternTargetActor) override;
 };
 
 UCLASS(Blueprintable)
@@ -67,7 +82,7 @@ public:
 	UGP_CrystalSeraphPrismAbility();
 
 protected:
-	virtual bool ExecuteCrystalSeraphPattern(AGP_CrystalSeraphBossCharacter* CrystalSeraphBoss, const FGameplayEventData* TriggerEventData) override;
+	virtual bool ExecuteCrystalSeraphPattern(AGP_CrystalSeraphBossCharacter* CrystalSeraphBoss, AActor* PatternTargetActor) override;
 };
 
 UCLASS(Blueprintable)
@@ -79,7 +94,7 @@ public:
 	UGP_CrystalSeraphAreaAbility();
 
 protected:
-	virtual bool ExecuteCrystalSeraphPattern(AGP_CrystalSeraphBossCharacter* CrystalSeraphBoss, const FGameplayEventData* TriggerEventData) override;
+	virtual bool ExecuteCrystalSeraphPattern(AGP_CrystalSeraphBossCharacter* CrystalSeraphBoss, AActor* PatternTargetActor) override;
 };
 
 UCLASS(Blueprintable)
@@ -91,9 +106,10 @@ public:
 	UGP_CrystalSeraphGroggyAbility();
 
 protected:
-	virtual bool ExecuteCrystalSeraphPattern(AGP_CrystalSeraphBossCharacter* CrystalSeraphBoss, const FGameplayEventData* TriggerEventData) override;
+	virtual bool ExecuteCrystalSeraphPattern(AGP_CrystalSeraphBossCharacter* CrystalSeraphBoss, AActor* PatternTargetActor) override;
 	// Groggy is a state reaction and must interrupt immediately instead of waiting for the attack cadence.
 	virtual bool UsesSharedPatternCadence() const override { return false; }
+	virtual bool UsesBossTelegraphVFX() const override { return false; }
 };
 
 UCLASS(Blueprintable)
@@ -105,5 +121,7 @@ public:
 	UGP_CrystalSeraphTeleportAbility();
 
 protected:
-	virtual bool ExecuteCrystalSeraphPattern(AGP_CrystalSeraphBossCharacter* CrystalSeraphBoss, const FGameplayEventData* TriggerEventData) override;
+	virtual bool ExecuteCrystalSeraphPattern(AGP_CrystalSeraphBossCharacter* CrystalSeraphBoss, AActor* PatternTargetActor) override;
+	// Teleport is positioning utility rather than an attack pattern.
+	virtual bool UsesBossTelegraphVFX() const override { return false; }
 };

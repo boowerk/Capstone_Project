@@ -16,6 +16,9 @@ class PROJECT_EDEN_API UGP_BossGroundHandsAttack : public UGP_GameplayAbility
 public:
 	UGP_BossGroundHandsAttack();
 
+	// Reports the presentation class selected by the GAS pattern without exposing mutable ability state.
+	TSubclassOf<AGP_BossGroundHandActor> GetGroundHandActorClass() const { return GroundHandActorClass; }
+
 	virtual bool CanActivateAbility(
 		const FGameplayAbilitySpecHandle Handle,
 		const FGameplayAbilityActorInfo* ActorInfo,
