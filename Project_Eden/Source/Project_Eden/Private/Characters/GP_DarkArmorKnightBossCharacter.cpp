@@ -142,7 +142,13 @@ int32 AGP_DarkArmorKnightBossCharacter::GetDarkKnightPhase() const
 
 bool AGP_DarkArmorKnightBossCharacter::CanStartDarkKnightPattern() const
 {
-	return GetWorld() == nullptr || GetWorld()->GetTimeSeconds() - LastPatternStartTime >= FMath::Max(0.0f, MinimumPatternInterval);
+	if (GetWorld() == nullptr)
+	{
+		return true;
+	}
+	const float CurrentTime = GetWorld()->GetTimeSeconds();
+	return CurrentTime >= PatternLockEndTime
+		&& CurrentTime - LastPatternStartTime >= FMath::Max(0.0f, MinimumPatternInterval);
 }
 
 bool AGP_DarkArmorKnightBossCharacter::TryStartDarkKnightPattern()
@@ -215,7 +221,7 @@ bool AGP_DarkArmorKnightBossCharacter::ExecuteBasicAttack(AActor* TargetActor)
 			{
 				WeakThis->ApplyConeDamage(WeakThis->BasicAttackRange, 40.0f, Coefficient);
 			}
-		}, 0.68f + 0.40f * Index, false);
+		}, GetScaledAttackDelay(0.55f + 0.32f * Index, GPTags::Ability::Boss::DarkKnight::Basic), false);
 	}
 	return true;
 }
@@ -236,7 +242,7 @@ bool AGP_DarkArmorKnightBossCharacter::ExecuteHeavyAttack(AActor* TargetActor)
 		{
 			WeakThis->ApplyConeDamage(420.0f, 55.0f, 1.6f, 350.0f);
 		}
-	}, 1.40f, false);
+	}, GetScaledAttackDelay(1.0f, GPTags::Ability::Boss::DarkKnight::Heavy), false);
 	return true;
 }
 
@@ -347,7 +353,7 @@ bool AGP_DarkArmorKnightBossCharacter::ExecuteDarkWave(AActor* TargetActor)
 			{
 				WeakThis->ApplyConeDamage(520.0f, 60.0f, 1.35f, 325.0f);
 			}
-		}, 1.00f + Index * 0.38f, false);
+		}, GetScaledAttackDelay(0.80f + Index * 0.30f, GPTags::Ability::Boss::DarkKnight::DarkWave), false);
 	}
 	return true;
 }
@@ -367,7 +373,7 @@ bool AGP_DarkArmorKnightBossCharacter::ExecuteGroundCrack(AActor* TargetActor)
 		{
 			WeakThis->SpawnGroundCracks(WeakTarget.Get());
 		}
-	}, 1.30f, false);
+	}, GetScaledAttackDelay(1.04f, GPTags::Ability::Boss::DarkKnight::GroundCrack), false);
 	return true;
 }
 
@@ -390,7 +396,7 @@ bool AGP_DarkArmorKnightBossCharacter::StartPatternWithWindup(FGameplayTag Patte
 	if (bUsesWindup && IsValid(PreAttackMontage))
 	{
 		UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
-		if (!IsValid(AnimInstance) || AnimInstance->Montage_Play(PreAttackMontage, 1.0f) <= 0.0f)
+		if (!IsValid(AnimInstance) || AnimInstance->Montage_Play(PreAttackMontage, PreAttackPlayRate) <= 0.0f)
 		{
 			return false;
 		}
@@ -402,8 +408,15 @@ bool AGP_DarkArmorKnightBossCharacter::StartPatternWithWindup(FGameplayTag Patte
 	const float TelegraphDelay = PatternTag != GPTags::Ability::Boss::DarkKnight::Groggy && IsValid(TelegraphComponent)
 		? TelegraphComponent->PlayEnabledTelegraph()
 		: 0.0f;
-	const float WindupDelay = bWindupStarted ? FMath::Max(0.0f, PreAttackDuration) : 0.0f;
+	const float WindupDelay = bWindupStarted
+		? FMath::Max(0.0f, PreAttackBaseDuration) / FMath::Max(PreAttackPlayRate, 0.1f)
+		: 0.0f;
 	const float ExecutionDelay = FMath::Max(WindupDelay, TelegraphDelay);
+	if (UWorld* World = GetWorld())
+	{
+		// Do not let nearby-target AI selection interrupt the visible wind-up or the slowed strike.
+		PatternLockEndTime = World->GetTimeSeconds() + ExecutionDelay + GetPatternMontageDuration(PatternTag);
+	}
 	if (ExecutionDelay <= KINDA_SMALL_NUMBER)
 	{
 		const bool bExecuted = ExecutePatternNow(PatternTag, TargetActor);
@@ -414,11 +427,6 @@ bool AGP_DarkArmorKnightBossCharacter::StartPatternWithWindup(FGameplayTag Patte
 		return bExecuted;
 	}
 
-	UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
-	if (!IsValid(AnimInstance) || AnimInstance->Montage_Play(PreAttackMontage, 0.85f) <= 0.0f)
-	{
-		return false;
-	}
 	FTimerHandle& Handle = PatternTimerHandles.AddDefaulted_GetRef();
 	GetWorldTimerManager().SetTimer(Handle, [WeakThis = TWeakObjectPtr<AGP_DarkArmorKnightBossCharacter>(this), WeakTarget = TWeakObjectPtr<AActor>(TargetActor), PatternTag]()
 	{
@@ -446,6 +454,46 @@ bool AGP_DarkArmorKnightBossCharacter::ExecutePatternNow(FGameplayTag PatternTag
 	return false;
 }
 
+float AGP_DarkArmorKnightBossCharacter::GetPatternPlayRate(FGameplayTag PatternTag) const
+{
+	if (PatternTag == GPTags::Ability::Boss::DarkKnight::Charge)
+	{
+		return 1.0f; // Root-motion authored; rate changes travel timing.
+	}
+	if (PatternTag == GPTags::Ability::Boss::DarkKnight::Heavy)
+	{
+		return HeavyAttackPlayRate;
+	}
+	return AttackPlayRate;
+}
+
+float AGP_DarkArmorKnightBossCharacter::GetScaledAttackDelay(float AuthoredTime, FGameplayTag PatternTag) const
+{
+	return AuthoredTime / FMath::Max(GetPatternPlayRate(PatternTag), 0.1f);
+}
+
+float AGP_DarkArmorKnightBossCharacter::GetPatternMontageDuration(FGameplayTag PatternTag) const
+{
+	if (PatternTag == GPTags::Ability::Boss::DarkKnight::Groggy)
+	{
+		return 0.0f;
+	}
+
+	UAnimMontage* Montage = nullptr;
+	if (PatternTag == GPTags::Ability::Boss::DarkKnight::DarkWave)
+	{
+		Montage = LoadObject<UAnimMontage>(nullptr, TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_DarkArmorKnight/Animations/AM_DK_DarkSlash.AM_DK_DarkSlash"));
+	}
+	else if (const TObjectPtr<UAnimMontage>* FoundMontage = PatternMontages.Find(PatternTag))
+	{
+		Montage = FoundMontage->Get();
+	}
+
+	return IsValid(Montage)
+		? Montage->GetPlayLength() / FMath::Max(GetPatternPlayRate(PatternTag), 0.1f)
+		: 0.0f;
+}
+
 bool AGP_DarkArmorKnightBossCharacter::PlayPatternMontage(FGameplayTag PatternTag)
 {
 	const TObjectPtr<UAnimMontage>* Montage = PatternMontages.Find(PatternTag);
@@ -461,17 +509,7 @@ bool AGP_DarkArmorKnightBossCharacter::PlayPatternMontage(FGameplayTag PatternTa
 		return false;
 	}
 
-	float PlayRate = 0.80f;
-	if (PatternTag == GPTags::Ability::Boss::DarkKnight::Heavy)
-	{
-		PlayRate = 0.72f;
-	}
-	else if (PatternTag == GPTags::Ability::Boss::DarkKnight::Charge)
-	{
-		// Charge is root-motion authored; changing its rate changes travel distance/timing.
-		PlayRate = 1.0f;
-	}
-	return AnimInstance->Montage_Play(MontageToPlay, PlayRate) > 0.0f;
+	return AnimInstance->Montage_Play(MontageToPlay, GetPatternPlayRate(PatternTag)) > 0.0f;
 }
 
 void AGP_DarkArmorKnightBossCharacter::HandleChargeFinished(bool bHitTarget, AActor* TargetActor)
