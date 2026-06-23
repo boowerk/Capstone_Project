@@ -5,6 +5,7 @@
 #include "GP_BossTargetMarkerVFXComponent.generated.h"
 
 class UNiagaraSystem;
+class UNiagaraComponent;
 class USceneComponent;
 
 /** Boss-owned helper that marks the player currently selected by AI targeting. */
@@ -26,20 +27,37 @@ public:
 	bool IsTargetMarkerVFXEnabled() const { return bTargetMarkerVFXEnabled; }
 
 	UFUNCTION(BlueprintCallable, Category = "Boss|Target Marker")
-	void SetTargetMarkerVFXEnabled(bool bEnabled) { bTargetMarkerVFXEnabled = bEnabled; }
+	void SetTargetMarkerVFXEnabled(bool bEnabled);
 
 	UFUNCTION(BlueprintPure, Category = "Boss|Target Marker")
 	UNiagaraSystem* GetTargetMarkerSystem() const { return TargetMarkerSystem; }
 
+	UFUNCTION(BlueprintCallable, Category = "Boss|Target Marker")
+	void ClearTargetMarkers();
+
+	void HandleOwnerDeath();
+
 protected:
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
 	UFUNCTION(NetMulticast, Unreliable)
 	void MulticastPlayTargetMarker(AActor* TargetActor);
 
 private:
-	void PlayTargetMarkerLocal(AActor* TargetActor) const;
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastClearTargetMarkers();
+
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastHandleOwnerDeath();
+
+	void PlayTargetMarkerLocal(AActor* TargetActor);
 	USceneComponent* ResolveTargetAttachComponent(AActor* TargetActor) const;
 	bool HasTargetBodySocket(AActor* TargetActor) const;
 	FVector ResolveTargetBodyLocation(AActor* TargetActor) const;
+	bool IsOwnerAllowedToPlayMarkers() const;
+	void RegisterTargetMarkerComponent(UNiagaraComponent* MarkerComponent);
+	void ClearTargetMarkersLocal();
+	void PruneStaleTargetMarkers();
 
 	// Designers can disable the marker without removing the component from inherited boss Blueprints.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Boss|Target Marker",
@@ -63,4 +81,16 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Boss|Target Marker",
 		meta = (AllowPrivateAccess = "true", Units = "cm"))
 	FVector TargetBodyOffset = FVector::ZeroVector;
+
+	// Spawned markers are attached to the target player, so the boss must keep handles to clean them up on death.
+	UPROPERTY(Transient)
+	TArray<TWeakObjectPtr<UNiagaraComponent>> ActiveTargetMarkerComponents;
+
+	// Reliable death cleanup may arrive before an older unreliable play RPC, so block any late marker playback after death.
+	UPROPERTY(Transient)
+	bool bTargetMarkerPlaybackStoppedForOwnerDeath = false;
+
+#if WITH_DEV_AUTOMATION_TESTS
+	friend class FBossTargetMarkerVFXConfigurationTest;
+#endif
 };

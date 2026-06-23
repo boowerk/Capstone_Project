@@ -2,7 +2,7 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-06-24T00:13:20+09:00
+updated: 2026-06-24T00:45:00+09:00
 status: active
 created: 2026-06-22T17:59:08
 tags:
@@ -12,12 +12,11 @@ tags:
 # Session Summary
 
 ## Status
-- Minimap map material now uses a translucent circular opacity mask, keeping the captured map inside the brass ring.
-- Player minimap arrow now follows controller/view yaw by default, so camera-facing an enemy aligns the cursor more closely with the target marker.
+- Boss target marker VFX now tracks spawned player-attached Niagara components, clears them on boss death/EndPlay, and suppresses late target-marker play RPCs after death.
 
 ## Verified
 - `Project_EdenEditor Win64 Development` build succeeded.
-- `ProjectEden.UI.Minimap.CaptureStability` automation succeeded.
+- `ProjectEden.Combat.Boss.TargetMarkerVFXConfiguration` automation succeeded.
 
 ## Handoff
-- PIE-check ring fit and, if needed, tune `MinimapCircleMaskRadius` or `MinimapPlayerArrowAngleOffset` on `WBP_PlayerHUDWidget`.
+- PIE-check multiplayer boss death/target swap cases; the selected-target VFX should disappear when the boss dies and not reappear from delayed RPCs.
