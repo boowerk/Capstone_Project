@@ -11,7 +11,7 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-06-23T23:34:22+09:00
+Last synced: 2026-06-24T00:13:20+09:00
 
 ## Player Network Movement Handoff
 
@@ -28,6 +28,7 @@ Last synced: 2026-06-23T23:34:22+09:00
 
 ## Minimap Handoff
 
+- Latest fix makes the minimap visually circular and aligns the player cursor with camera-facing direction: `M_UI_Minimap_StaticMap` is now a translucent UI material with `CircleMaskRadius`, and `UGP_PlayerHUDWidget` defaults the arrow to controller/view yaw. Build and `ProjectEden.UI.Minimap.CaptureStability` pass. PIE-check the screenshots' cases; tune `MinimapCircleMaskRadius` or `MinimapPlayerArrowAngleOffset` on `WBP_PlayerHUDWidget` only if art alignment still needs minor adjustment.
 - Latest fix schedules a fallback one-shot capture when `UGP_MinimapSubsystem` first registers/resolves a capture actor, so missing `PcgControllerActor`/PCG-ready calls no longer leave the HUD on a blank generated RenderTarget. Explicit PCG-ready notifications are no longer ignored while the fallback is pending. `UGP_PlayerHUDWidget` now defaults `/Game/UI/HUD/Minimap/Materials/M_UI_Minimap_StaticMap` and resolves the production `MiniMapImage` name instead of relying on the old `MinimapBackgroundImage`. Build and `ProjectEden.UI.Minimap.CaptureStability` pass; PIE-check MainMap for final PCG coverage/orientation.
 - Commits `a88bfee6`, `b3652834`, and `e6806c69` replace runtime follow capture with one full-map capture after PCG becomes idle. The stable texture is panned/zoomed by `M_UI_Minimap_StaticMap`; player arrow and pooled red enemy markers are separate UMG widgets. Assign `/Game/UI/HUD/Minimap/Materials/M_UI_Minimap_StaticMap` to `WBP_PlayerHUDWidget.MinimapMapMaterial`, then PIE-check map orientation, coverage, zoom, and markers. Editor build and real D3D12 offscreen `ProjectEden.UI.Minimap.CaptureStability` passed with no material compile warning.
 - Commits `42b72f57` and `19340f27` remove periodic RenderTarget swapping/rebinding. UMG keeps one stable display target while SceneCapture remains isolated on a back buffer; completed captures are GPU-copied only after the capture fence, and the pipeline remains blocked until the copy fence completes. Editor build plus NullRHI and D3D12 offscreen `ProjectEden.UI.Minimap.CaptureStability` passed. No editor setup is required; PIE-check repeated attack Niagara visually.

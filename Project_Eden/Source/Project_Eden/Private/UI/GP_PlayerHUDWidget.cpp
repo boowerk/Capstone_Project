@@ -18,6 +18,7 @@
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerController.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "UObject/ConstructorHelpers.h"
@@ -168,6 +169,7 @@ void UGP_PlayerHUDWidget::EnsureMinimapMaterial(UTextureRenderTarget2D* InRender
 		// MapTexture never changes after initialization; only UV center and zoom are updated during play.
 		MinimapMaterialInstance->SetTextureParameterValue(TEXT("MapTexture"), InRenderTarget);
 		MinimapMaterialInstance->SetScalarParameterValue(TEXT("MapZoom"), MinimapZoom);
+		MinimapMaterialInstance->SetScalarParameterValue(TEXT("CircleMaskRadius"), MinimapCircleMaskRadius);
 		Brush.SetResourceObject(MinimapMaterialInstance);
 	}
 	else
@@ -200,6 +202,9 @@ void UGP_PlayerHUDWidget::RefreshMinimapMapUV()
 	{
 		return;
 	}
+
+	// Keep the circular mask tweak live so designers can tune the ring fit in BP without rebuilding the material.
+	MinimapMaterialInstance->SetScalarParameterValue(TEXT("CircleMaskRadius"), MinimapCircleMaskRadius);
 
 	if (PlayerMapUV.Equals(CachedPlayerMapUV, 0.0001f) && FMath::IsNearlyEqual(CachedMinimapZoom, MinimapZoom))
 	{
@@ -501,7 +506,16 @@ void UGP_PlayerHUDWidget::RefreshMinimapPlayerArrowRotation()
 	}
 
 	const float RotationSign = bInvertMinimapPlayerArrowRotation ? -1.0f : 1.0f;
-	const float DesiredAngle = FRotator::NormalizeAxis((OwningPawn->GetActorRotation().Yaw * RotationSign) + MinimapPlayerArrowAngleOffset);
+	float HeadingYaw = OwningPawn->GetActorRotation().Yaw;
+	if (bUseControlRotationForMinimapPlayerArrow)
+	{
+		if (const APlayerController* OwningPlayerController = GetOwningPlayer())
+		{
+			// In idle/camera-look states the pawn yaw can lag behind the player's view, so the minimap cursor follows view yaw.
+			HeadingYaw = OwningPlayerController->GetControlRotation().Yaw;
+		}
+	}
+	const float DesiredAngle = FRotator::NormalizeAxis((HeadingYaw * RotationSign) + MinimapPlayerArrowAngleOffset);
 
 	// 같은 각도를 반복해서 쓰지 않도록 캐시해 Slate transform 갱신 비용을 줄입니다.
 	if (bHasCachedMinimapPlayerArrowAngle && FMath::IsNearlyEqual(CachedMinimapPlayerArrowAngle, DesiredAngle, 0.1f))

@@ -2,7 +2,7 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-06-23T23:34:22+09:00
+updated: 2026-06-24T00:13:20+09:00
 status: active
 created: 2026-06-22T17:59:08
 tags:
@@ -12,12 +12,12 @@ tags:
 # Session Summary
 
 ## Status
-- Fixed minimap startup blanking: subsystem now schedules a one-shot fallback capture when a capture actor is registered/resolved, so maps without a PCG completion notification do not stay on an empty RenderTarget.
-- HUD minimap binding now defaults `M_UI_Minimap_StaticMap` in C++ and resolves renamed map images such as production `MiniMapImage`.
+- Minimap map material now uses a translucent circular opacity mask, keeping the captured map inside the brass ring.
+- Player minimap arrow now follows controller/view yaw by default, so camera-facing an enemy aligns the cursor more closely with the target marker.
 
 ## Verified
 - `Project_EdenEditor Win64 Development` build succeeded.
 - `ProjectEden.UI.Minimap.CaptureStability` automation succeeded.
 
 ## Handoff
-- PIE-check MainMap after PCG completes; no required editor setup should remain.
+- PIE-check ring fit and, if needed, tune `MinimapCircleMaskRadius` or `MinimapPlayerArrowAngleOffset` on `WBP_PlayerHUDWidget`.

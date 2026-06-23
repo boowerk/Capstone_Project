@@ -213,6 +213,7 @@ bool FMinimapCaptureStabilityTest::RunTest(const FString& Parameters)
 	if (StaticMapMaterial)
 	{
 		TestEqual(TEXT("Static minimap material uses the UI domain"), StaticMapMaterial->MaterialDomain, MD_UI);
+		TestEqual(TEXT("Static minimap material supports circular opacity"), StaticMapMaterial->BlendMode, BLEND_Translucent);
 	}
 
 	// Validate the production HUD contract so the subsystem always has a visible Image to receive the render target.

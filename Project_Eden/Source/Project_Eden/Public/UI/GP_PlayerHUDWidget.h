@@ -162,6 +162,10 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EldenRing HUD|Minimap", meta = (AllowPrivateAccess = "true", ClampMin = "-360.0", ClampMax = "360.0"))
 	float MinimapPlayerArrowAngleOffset = 90.0f;
 
+	// 카메라로 적을 바라보는 상황과 맞추기 위해 기본적으로 컨트롤러 시야 방향을 미니맵 화살표 기준으로 씁니다.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EldenRing HUD|Minimap", meta = (AllowPrivateAccess = "true"))
+	bool bUseControlRotationForMinimapPlayerArrow = true;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EldenRing HUD|Minimap", meta = (AllowPrivateAccess = "true"))
 	bool bInvertMinimapPlayerArrowRotation = false;
 
@@ -177,6 +181,10 @@ private:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EldenRing HUD|Minimap", meta = (AllowPrivateAccess = "true", ClampMin = "1.0", ClampMax = "12.0"))
 	float MinimapZoom = 3.0f;
+
+	// UI material opacity radius. 0.5 fills the whole square edge; slightly smaller keeps the map inside the brass ring.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EldenRing HUD|Minimap", meta = (AllowPrivateAccess = "true", ClampMin = "0.1", ClampMax = "0.5"))
+	float MinimapCircleMaskRadius = 0.49f;
 
 	// Enemy markers are regular UMG Images, intentionally separate from the captured map texture.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EldenRing HUD|Minimap", meta = (AllowPrivateAccess = "true"))
