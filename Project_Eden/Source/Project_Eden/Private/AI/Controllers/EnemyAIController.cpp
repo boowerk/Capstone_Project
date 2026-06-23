@@ -969,6 +969,12 @@ void AEnemyAIController::SetBlackboardTargetActor(AActor* NewTargetActor)
 	if (IsValid(NewTargetActor))
 	{
 		BlackboardComponent->SetValueAsObject(EnemyBlackboardKeys::TargetActor, NewTargetActor);
+
+		// Boss pawns present the selected player only on first acquisition or a real target swap.
+		if (AGP_EnemyCharacter* EnemyPawn = Cast<AGP_EnemyCharacter>(GetPawn()))
+		{
+			EnemyPawn->NotifyBossTargetSelected(NewTargetActor);
+		}
 	}
 	else
 	{

@@ -29,6 +29,7 @@
 #include "UI/GP_AttributeWidget.h"
 #include "UI/GP_WidgetComponent.h"
 #include "UObject/ConstructorHelpers.h"
+#include "VFX/GP_BossTargetMarkerVFXComponent.h"
 
 AGP_EnemyCharacter::AGP_EnemyCharacter()
 {
@@ -43,6 +44,8 @@ AGP_EnemyCharacter::AGP_EnemyCharacter()
 	DefaultEnemyAttackAbilityClass = UGP_EnemyAttack::StaticClass();
 	DefaultAttackAbilityTag = GPTags::Ability::Enemy::Attack_Melee;
 	DefaultEnemyDeathAbilityClass = UGP_EnemyDeathAbility::StaticClass();
+
+	BossTargetMarkerVFXComponent = CreateDefaultSubobject<UGP_BossTargetMarkerVFXComponent>(TEXT("BossTargetMarkerVFXComponent"));
 
 	WorldHealthBarComponent = CreateDefaultSubobject<UGP_WidgetComponent>(TEXT("WorldHealthBarComponent"));
 	WorldHealthBarComponent->SetupAttachment(GetRootComponent());
@@ -144,6 +147,17 @@ FText AGP_EnemyCharacter::GetBossDisplayName() const
 	}
 
 	return FText::FromString(GetName());
+}
+
+void AGP_EnemyCharacter::NotifyBossTargetSelected(AActor* TargetActor)
+{
+	if (!bIsBossEnemy || bIsDead || !IsValid(BossTargetMarkerVFXComponent))
+	{
+		return;
+	}
+
+	// Keep the AIController free of Niagara details; boss pawns own how their selected target is presented.
+	BossTargetMarkerVFXComponent->PlayTargetMarker(TargetActor);
 }
 
 void AGP_EnemyCharacter::BeginPlay()

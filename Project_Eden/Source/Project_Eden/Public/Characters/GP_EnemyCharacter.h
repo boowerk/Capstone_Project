@@ -12,6 +12,7 @@ class UBehaviorTree;
 class UBlackboardData;
 class UEnemyAIRangeVisualizationComponent;
 class UEnemyArchetypeData;
+class UGP_BossTargetMarkerVFXComponent;
 class UGP_EnemyDeathAbility;
 class UGP_WidgetComponent;
 class UPDA_EnemyAnimationSet;
@@ -50,6 +51,12 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Boss")
 	FText GetBossDisplayName() const;
+
+	UFUNCTION(BlueprintPure, Category = "Boss|VFX")
+	UGP_BossTargetMarkerVFXComponent* GetBossTargetMarkerVFXComponent() const { return BossTargetMarkerVFXComponent; }
+
+	// AIController calls this only when TargetActor is first acquired or changes to another valid player.
+	void NotifyBossTargetSelected(AActor* TargetActor);
 
 	UFUNCTION(BlueprintPure, Category = "AI")
 	FVector GetBehaviorAnchorLocation() const;
@@ -224,6 +231,9 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<UAttributeSet> AttributeSet;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|VFX", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UGP_BossTargetMarkerVFXComponent> BossTargetMarkerVFXComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Enemy|UI", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UGP_WidgetComponent> WorldHealthBarComponent;
