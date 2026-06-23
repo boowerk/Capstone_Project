@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-06-23T15:25:12+09:00
+updated: 2026-06-23T23:34:22+09:00
 status: active
 tags:
   - memoc
@@ -66,3 +66,4 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 
 ### 2026-06-23
 - Reinterpret the RegionState system as biome-type selection, not gameplay life/death/corruption status. Values should represent biome categories; GameMode terms like `AliveRegionState` / `DeadRegionState` are legacy naming to rename or replace when implementation resumes.
+- Minimap correctness should not depend on level-authored PCG completion wiring. Keep a startup fallback full-map capture, allow later PCG-ready notifications to restart it, and make the HUD map image resolver tolerate production widget renames such as `MiniMapImage`.

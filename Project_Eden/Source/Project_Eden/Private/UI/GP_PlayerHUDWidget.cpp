@@ -26,6 +26,26 @@
 #include "Player/GP_PlayerState.h"
 #include "AbilitySystem/Abilities/GP_SkillData.h"
 
+namespace
+{
+	bool IsLikelyMinimapMapImageName(const FString& WidgetName)
+	{
+		const bool bMentionsMinimap = WidgetName.Contains(TEXT("Minimap"), ESearchCase::IgnoreCase);
+		const bool bMentionsMapBackground =
+			WidgetName.Contains(TEXT("Background"), ESearchCase::IgnoreCase)
+			|| WidgetName.Contains(TEXT("MapImage"), ESearchCase::IgnoreCase);
+		const bool bLooksLikeOverlayOnly =
+			WidgetName.Contains(TEXT("Arrow"), ESearchCase::IgnoreCase)
+			|| WidgetName.Contains(TEXT("Marker"), ESearchCase::IgnoreCase)
+			|| WidgetName.Contains(TEXT("Point"), ESearchCase::IgnoreCase)
+			|| WidgetName.Contains(TEXT("Ring"), ESearchCase::IgnoreCase)
+			|| WidgetName.Contains(TEXT("Backplate"), ESearchCase::IgnoreCase);
+
+		// Keep the fallback conservative: only the actual map image should receive the render target.
+		return bMentionsMinimap && bMentionsMapBackground && !bLooksLikeOverlayOnly;
+	}
+}
+
 UGP_PlayerHUDWidget::UGP_PlayerHUDWidget(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
@@ -38,6 +58,14 @@ UGP_PlayerHUDWidget::UGP_PlayerHUDWidget(const FObjectInitializer& ObjectInitial
 	if (EnemyMarkerFinder.Succeeded())
 	{
 		MinimapEnemyMarkerTexture = EnemyMarkerFinder.Object;
+	}
+
+	// Provide the generated static-map material by default so the minimap works even if the BP field is left empty.
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> MinimapMaterialFinder(
+		TEXT("/Game/UI/HUD/Minimap/Materials/M_UI_Minimap_StaticMap.M_UI_Minimap_StaticMap"));
+	if (MinimapMaterialFinder.Succeeded())
+	{
+		MinimapMapMaterial = MinimapMaterialFinder.Object;
 	}
 }
 
@@ -265,11 +293,7 @@ UImage* UGP_PlayerHUDWidget::ResolveMinimapBackgroundImage() const
 		}
 
 		const FString WidgetName = ChildWidget->GetName();
-		const bool bLooksLikeMinimap = WidgetName.Contains(TEXT("Minimap")) || WidgetName.Contains(TEXT("MiniMap"));
-		const bool bLooksLikeBackground = WidgetName.Contains(TEXT("Background")) || WidgetName.Contains(TEXT("MapImage"));
-
-		// WBP 이름이 조금 달라도 미니맵 배경 Image를 자동으로 찾기 위한 보수적 fallback입니다.
-		if (bLooksLikeMinimap && bLooksLikeBackground)
+		if (IsLikelyMinimapMapImageName(WidgetName))
 		{
 			FoundImage = Cast<UImage>(ChildWidget);
 		}
