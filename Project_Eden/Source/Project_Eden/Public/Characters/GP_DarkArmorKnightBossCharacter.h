@@ -95,6 +95,9 @@ private:
 	void SpawnDarkWaveVolley(AActor* TargetActor, int32 ProjectileCount);
 	void SpawnGroundCracks(AActor* TargetActor);
 	bool ExecutePatternNow(FGameplayTag PatternTag, AActor* TargetActor);
+	float GetPatternPlayRate(FGameplayTag PatternTag) const;
+	float GetScaledAttackDelay(float AuthoredTime, FGameplayTag PatternTag) const;
+	float GetPatternMontageDuration(FGameplayTag PatternTag) const;
 
 	UFUNCTION()
 	void HandleGroggyChanged(bool bNewGroggy);
@@ -132,7 +135,17 @@ private:
 	TObjectPtr<UAnimMontage> PreAttackMontage;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Dark Knight|Animation", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "s"))
-	float PreAttackDuration = 1.0f;
+	float PreAttackBaseDuration = 1.0f;
+
+	/** Editable in BP. Damage timings automatically scale with these authored rates. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Dark Knight|Animation|Speed", meta = (AllowPrivateAccess = "true", ClampMin = "0.1", ClampMax = "2.0"))
+	float PreAttackPlayRate = 0.85f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Dark Knight|Animation|Speed", meta = (AllowPrivateAccess = "true", ClampMin = "0.1", ClampMax = "2.0"))
+	float AttackPlayRate = 0.80f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Dark Knight|Animation|Speed", meta = (AllowPrivateAccess = "true", ClampMin = "0.1", ClampMax = "2.0"))
+	float HeavyAttackPlayRate = 0.72f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Dark Knight|Combat", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "cm"))
 	float PreferredMeleeRange = 350.0f;
@@ -186,6 +199,7 @@ private:
 	float GroundCrackCooldown = 14.0f;
 
 	float LastPatternStartTime = -BIG_NUMBER;
+	float PatternLockEndTime = -BIG_NUMBER;
 	TMap<FGameplayTag, float> LastPatternUseTimes;
 	TArray<FTimerHandle> PatternTimerHandles;
 	TWeakObjectPtr<AActor> PendingCounterTarget;
