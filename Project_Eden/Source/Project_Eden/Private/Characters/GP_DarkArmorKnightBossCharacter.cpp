@@ -36,6 +36,15 @@ AGP_DarkArmorKnightBossCharacter::AGP_DarkArmorKnightBossCharacter()
 	BossDisplayName = NSLOCTEXT("GPDarkArmorKnightBoss", "BossDisplayName", "Dark Armor Knight");
 
 	DarkKnightStateComponent = CreateDefaultSubobject<UGP_DarkArmorKnightStateComponent>(TEXT("DarkKnightStateComponent"));
+	// Prefill every authored Dark Knight attack so Blueprint defaults expose one checkbox per pattern.
+	TelegraphVFXPatterns.Add(GPTags::Ability::Boss::DarkKnight::Basic, false);
+	TelegraphVFXPatterns.Add(GPTags::Ability::Boss::DarkKnight::Heavy, false);
+	TelegraphVFXPatterns.Add(GPTags::Ability::Boss::DarkKnight::Sweep, false);
+	TelegraphVFXPatterns.Add(GPTags::Ability::Boss::DarkKnight::Guard, false);
+	TelegraphVFXPatterns.Add(GPTags::Ability::Boss::DarkKnight::Counter, false);
+	TelegraphVFXPatterns.Add(GPTags::Ability::Boss::DarkKnight::Charge, false);
+	TelegraphVFXPatterns.Add(GPTags::Ability::Boss::DarkKnight::DarkWave, false);
+	TelegraphVFXPatterns.Add(GPTags::Ability::Boss::DarkKnight::GroundCrack, false);
 	DarkWaveProjectileClass = AGP_DarkWaveProjectile::StaticClass();
 	GroundCrackActorClass = AGP_DarkKnightGroundCrackActor::StaticClass();
 	ChargeActorClass = AGP_DarkKnightChargeActor::StaticClass();
@@ -129,6 +138,21 @@ UGP_BossTelegraphVFXComponent* AGP_DarkArmorKnightBossCharacter::GetBossTelegrap
 {
 	// BP_DarkArmorKnight already owns the designer-added component, so reuse it instead of creating a duplicate native node.
 	return FindComponentByClass<UGP_BossTelegraphVFXComponent>();
+}
+
+bool AGP_DarkArmorKnightBossCharacter::IsBossTelegraphEnabledForPattern(FGameplayTag PatternTag) const
+{
+	const UGP_BossTelegraphVFXComponent* TelegraphComponent = GetBossTelegraphVFXComponent();
+	return IsValid(TelegraphComponent)
+		&& TelegraphComponent->IsPatternTelegraphEnabled(PatternTag, TelegraphVFXPatterns);
+}
+
+float AGP_DarkArmorKnightBossCharacter::PlayBossTelegraphForPattern(FGameplayTag PatternTag)
+{
+	UGP_BossTelegraphVFXComponent* TelegraphComponent = GetBossTelegraphVFXComponent();
+	return IsValid(TelegraphComponent)
+		? TelegraphComponent->PlayPatternTelegraph(PatternTag, TelegraphVFXPatterns)
+		: 0.0f;
 }
 
 int32 AGP_DarkArmorKnightBossCharacter::GetDarkKnightPhase() const
@@ -398,10 +422,7 @@ bool AGP_DarkArmorKnightBossCharacter::StartPatternWithWindup(FGameplayTag Patte
 	}
 
 	// Groggy is a state reaction, not an authored attack, so it deliberately bypasses the optional VFX lead-in.
-	UGP_BossTelegraphVFXComponent* TelegraphComponent = GetBossTelegraphVFXComponent();
-	const float TelegraphDelay = PatternTag != GPTags::Ability::Boss::DarkKnight::Groggy && IsValid(TelegraphComponent)
-		? TelegraphComponent->PlayEnabledTelegraph()
-		: 0.0f;
+	const float TelegraphDelay = PlayBossTelegraphForPattern(PatternTag);
 	const float WindupDelay = bWindupStarted ? FMath::Max(0.0f, PreAttackDuration) : 0.0f;
 	const float ExecutionDelay = FMath::Max(WindupDelay, TelegraphDelay);
 	if (ExecutionDelay <= KINDA_SMALL_NUMBER)

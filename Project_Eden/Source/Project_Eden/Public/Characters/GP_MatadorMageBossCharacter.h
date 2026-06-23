@@ -26,6 +26,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Boss|Matador|VFX")
 	UGP_BossTelegraphVFXComponent* GetBossTelegraphVFXComponent() const { return BossTelegraphVFXComponent; }
 
+	bool IsBossTelegraphEnabledForPattern(FGameplayTag PatternTag) const;
+	float PlayBossTelegraphForPattern(FGameplayTag PatternTag);
+	const TMap<FGameplayTag, bool>& GetTelegraphVFXPatterns() const { return TelegraphVFXPatterns; }
+
 	UFUNCTION(BlueprintCallable, Category = "Boss|Matador")
 	AGP_MatadorBossDecoyActor* EnsureMatadorDecoy();
 
@@ -86,6 +90,11 @@ private:
 	/** Native inherited component exposes the shared Niagara cue and its opt-in bool on the Matador Blueprint. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Matador|VFX", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UGP_BossTelegraphVFXComponent> BossTelegraphVFXComponent;
+
+	/** Bull, Rapier, and Cape are listed separately so the Blueprint can opt in only chosen attacks. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Matador|VFX",
+		meta = (AllowPrivateAccess = "true", DisplayName = "Telegraph VFX Patterns"))
+	TMap<FGameplayTag, bool> TelegraphVFXPatterns;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Matador|Actors", meta = (AllowPrivateAccess = "true"))
 	TSubclassOf<AGP_MatadorBossDecoyActor> DecoyActorClass;

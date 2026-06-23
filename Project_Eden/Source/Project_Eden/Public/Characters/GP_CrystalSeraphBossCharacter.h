@@ -24,6 +24,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Boss|Crystal Seraph|VFX")
 	UGP_BossTelegraphVFXComponent* GetBossTelegraphVFXComponent() const { return BossTelegraphVFXComponent; }
 
+	bool IsBossTelegraphEnabledForPattern(FGameplayTag PatternTag) const;
+	float PlayBossTelegraphForPattern(FGameplayTag PatternTag);
+	const TMap<FGameplayTag, bool>& GetTelegraphVFXPatterns() const { return TelegraphVFXPatterns; }
+
 	UFUNCTION(BlueprintCallable, Category = "Boss|Crystal Seraph")
 	AActor* RequestSpawnCrystalPrism(AActor* PatternTargetActor);
 
@@ -115,6 +119,11 @@ private:
 	/** Inherited component keeps the per-boss Niagara selection and opt-in toggle in one Details panel. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph|VFX", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UGP_BossTelegraphVFXComponent> BossTelegraphVFXComponent;
+
+	/** Blueprint checkboxes opt individual damaging patterns into the master Boss Telegraph VFX cue. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Crystal Seraph|VFX",
+		meta = (AllowPrivateAccess = "true", DisplayName = "Telegraph VFX Patterns"))
+	TMap<FGameplayTag, bool> TelegraphVFXPatterns;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Crystal Seraph|Actors", meta = (AllowPrivateAccess = "true"))
 	TSubclassOf<AActor> CrystalPrismActorClass;

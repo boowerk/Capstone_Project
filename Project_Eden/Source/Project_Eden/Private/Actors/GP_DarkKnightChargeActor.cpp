@@ -63,8 +63,7 @@ void AGP_DarkKnightChargeActor::InitializeCharge(AGP_DarkArmorKnightBossCharacte
 	SetActorLocation(Boss->GetActorLocation());
 	SetActorRotation(ChargeDirection.Rotation());
 	Boss->SetActorRotation(ChargeDirection.Rotation());
-	bSkipInternalTelegraph = IsValid(Boss->GetBossTelegraphVFXComponent())
-		&& Boss->GetBossTelegraphVFXComponent()->IsTelegraphVFXEnabled();
+	bSkipInternalTelegraph = Boss->IsBossTelegraphEnabledForPattern(GPTags::Ability::Boss::DarkKnight::Charge);
 	if (bSkipInternalTelegraph)
 	{
 		// The boss-level cue already consumed its lead time before this coordinator was spawned.

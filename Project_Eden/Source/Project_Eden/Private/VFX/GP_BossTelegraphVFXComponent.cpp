@@ -48,6 +48,24 @@ float UGP_BossTelegraphVFXComponent::PlayEnabledTelegraph()
 	return FMath::Max(0.0f, TelegraphDuration);
 }
 
+bool UGP_BossTelegraphVFXComponent::IsPatternTelegraphEnabled(
+	FGameplayTag PatternTag,
+	const TMap<FGameplayTag, bool>& PatternToggles) const
+{
+	const bool* bPatternEnabled = PatternToggles.Find(PatternTag);
+	return bTelegraphVFXEnabled && bPatternEnabled != nullptr && *bPatternEnabled;
+}
+
+float UGP_BossTelegraphVFXComponent::PlayPatternTelegraph(
+	FGameplayTag PatternTag,
+	const TMap<FGameplayTag, bool>& PatternToggles)
+{
+	// The master switch alone never enables every attack; each pattern must be opted in from the owning boss Blueprint.
+	return IsPatternTelegraphEnabled(PatternTag, PatternToggles)
+		? PlayEnabledTelegraph()
+		: 0.0f;
+}
+
 void UGP_BossTelegraphVFXComponent::MulticastPlayTelegraph_Implementation()
 {
 	PlayTelegraphLocal();
