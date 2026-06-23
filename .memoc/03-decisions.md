@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-06-21T15:53:23+09:00
+updated: 2026-06-23T04:05:00+09:00
 status: active
 tags:
   - memoc
@@ -57,3 +57,6 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 
 ### 2026-06-22
 - Resolve player SkillData and actor-owned boss Niagara through the same cue/element specificity function. Pattern actors own persistent effect lifetime; authoritative gameplay events multicast cosmetic one-shots.
+
+### 2026-06-23
+- Reinterpret the RegionState system as biome-type selection, not gameplay life/death/corruption status. Values should represent biome categories; GameMode terms like `AliveRegionState` / `DeadRegionState` are legacy naming to rename or replace when implementation resumes.
