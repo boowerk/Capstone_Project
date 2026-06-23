@@ -2,7 +2,7 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-06-22T01:40:00+09:00
+updated: 2026-06-23T04:04:00+09:00
 status: active
 ---
 # Session Summary
@@ -16,9 +16,14 @@ status: active
 - DarkArmorKnight latest unbuilt: retargeted `A_DK_UEFN_Sword_Dash_RM`; created `AM_DK_ChargeRM` and `AM_DK_DarkSlash`, mapped Charge/DarkWave to them. ChargeActor now uses montage root motion (duration 1.57s) instead of AddActorWorldOffset. DarkWave replaced projectile volley with 1/2 timed cone slashes. ABP root mode confirmed MontagesOnly. External build required.
 - Seraph prisms are upright again and editable aura scale is reduced to 0.55 (`c8aac963`).
 - User-owned editor config, map, and HUD assets remain uncommitted.
+- Sans Ground Hands presents `/Game/Meshes/PLAZA_DE_TOROS/ActorMesh/SK_RightHand`; the actual asset/object name is `SK_RightHand`, not `SK_RightMesh`.
+- The old editor DLL caused the apparent failed swap. Full editor relink now succeeds.
+- Regression test also preserves the independent box location, extent, disabled-until-rise state, and Pawn overlap response (`7a25612b`).
 
 ## Verified
-- Changed units compile; final link/test is blocked by the open editor holding the module DLL.
+- `Project_EdenEditor Win64 Development` build passed.
+- `ProjectEden.AI.Boss.GroundHands.UsesRightHandMesh` passed.
 
 ## Resume
-- Close Unreal Editor, rebuild, run PrismCluster, then PIE-check upright crystals and aura size.
+- PIE-check visual orientation/scale and emergence. No editor assignment is required.
+- Preserve user changes in `DefaultEditor.ini`, `L_MainMap.umap`, and `WBP_PlayerHUDWidget.uasset`.
