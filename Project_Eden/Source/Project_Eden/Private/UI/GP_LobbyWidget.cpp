@@ -3,6 +3,7 @@
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
+#include "Game/GP_LobbyPlayerController.h"
 #include "Game/GP_LobbyPlayerState.h"
 #include "GameFramework/GameStateBase.h"
 #include "GameFramework/PlayerState.h"
@@ -22,6 +23,11 @@ void UGP_LobbyWidget::NativeConstruct()
 	if (Button_Leave)
 	{
 		Button_Leave->OnClicked.AddDynamic(this, &UGP_LobbyWidget::OnLeaveClicked);
+	}
+
+	if (Button_ForceStart)
+	{
+		Button_ForceStart->OnClicked.AddDynamic(this, &UGP_LobbyWidget::OnForceStartClicked);
 	}
 
 	BindToPlayerStates();
@@ -73,6 +79,19 @@ void UGP_LobbyWidget::OnLeaveClicked()
 	if (UGP_GameInstance* GameInstance = GetGameInstance<UGP_GameInstance>())
 	{
 		GameInstance->ReturnToMainMenu();
+	}
+}
+
+void UGP_LobbyWidget::OnForceStartClicked()
+{
+	if (bIsLoading)
+	{
+		return;
+	}
+
+	if (AGP_LobbyPlayerController* LPC = GetOwningPlayer<AGP_LobbyPlayerController>())
+	{
+		LPC->ServerForceStart();
 	}
 }
 

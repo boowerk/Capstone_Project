@@ -93,6 +93,14 @@ void AGP_LobbyGameMode::CheckAllReady()
 	TravelToGame();
 }
 
+void AGP_LobbyGameMode::ForceStartGame()
+{
+	// Skip the player-count and ready gates entirely so a lone player can start.
+	OnAllPlayersReady();
+	BroadcastLoading();
+	TravelToGame();
+}
+
 void AGP_LobbyGameMode::TravelToGame()
 {
 	// Restore game input for all players before travelling.
