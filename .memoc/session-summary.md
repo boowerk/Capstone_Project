@@ -2,18 +2,18 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-06-23T08:45:06+09:00
+updated: 2026-06-23T09:13:22+09:00
 status: active
 ---
 # Session Summary
 
 ## Status
-- Non-Sans boss attack boundaries now honor `Boss Telegraph VFX`.
-- Crystal/Matador inherit it; Dark Knight reuses its BP component; Sans has none.
-- Enabled cues wait Telegraph Duration; Dark charge avoids replaying its internal cue.
+- Non-Sans bosses use `Boss Telegraph VFX` plus per-pattern BP maps.
+- Master `Telegraph VFX On/Off` alone does nothing; checked `Telegraph VFX Patterns` tags get the cue/delay.
+- Dark charge skips its internal cue only when Charge is checked.
 
 ## Editor
-- Select `Boss Telegraph VFX`, assign System Asset, tune duration/scale, and enable `Telegraph VFX On/Off`.
+- Select `Boss Telegraph VFX`, assign System Asset, tune duration/scale, enable master bool, then check desired tags in Class Defaults.
 - PIE-check timing/placement; groggy and Crystal teleport intentionally bypass it.
 
 ## Verified
