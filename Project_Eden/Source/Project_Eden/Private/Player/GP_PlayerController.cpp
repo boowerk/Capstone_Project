@@ -1,9 +1,12 @@
-﻿#include "Player/GP_PlayerController.h"
+#include "Player/GP_PlayerController.h"
 
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
+#include "Abilities/GameplayAbilityTargetTypes.h"
 #include "AbilitySystem/Abilities/GP_SkillAugmentData.h"
 #include "AbilitySystem/Abilities/GP_SkillAugmentPoolData.h"
+#include "AbilitySystem/Abilities/GP_SkillData.h"
+#include "AbilitySystem/Abilities/GP_SkillPoolData.h"
 #include "AbilitySystem/Abilities/GP_TestSkillSet.h"
 #include "Blueprint/UserWidget.h"
 #include "Characters/GP_EnemyCharacter.h"
@@ -21,6 +24,7 @@
 #include "Player/GP_PlayerState.h"
 #include "UI/GP_AugmentSelectWidget.h"
 #include "UI/GP_CharacterStatsMenuWidget.h"
+#include "UI/GP_SkillSelectWidget.h"
 #include "UI/GP_PlayerHUDWidget.h"
 
 AGP_PlayerController::AGP_PlayerController()
@@ -32,6 +36,19 @@ AGP_PlayerController::AGP_PlayerController()
 void AGP_PlayerController::BeginPlay()
 {
 	Super::BeginPlay();
+
+	// Retry mapping-context registration here: by BeginPlay the local player is
+	// guaranteed to exist on clients, covering the case where SetupInputComponent
+	// ran before the subsystem was available (dedicated-server client travel).
+	AddInputMappingContexts();
+
+	if (IsLocalController())
+	{
+		// After ServerTravel from the lobby the viewport may still be in UIOnly
+		// mode (the lobby controller set it). Force game input back on.
+		SetInputMode(FInputModeGameOnly());
+		SetShowMouseCursor(false);
+	}
 
 	if (!IsLocalController() || HUDWidget)
 	{
@@ -63,6 +80,10 @@ void AGP_PlayerController::BeginPlay()
 			if (UAbilitySystemComponent* ASC = BaseChar->GetAbilitySystemComponent())
 			{
 				HUDWidget->BindToASC(ASC);
+				if (AGP_PlayerState* GPPS = GetPlayerState<AGP_PlayerState>())
+				{
+					HUDWidget->BindSkillSlots(GPPS);
+				}
 			}
 		}
 	}
@@ -97,6 +118,48 @@ bool AGP_PlayerController::RequestOpenAugmentSelect()
 	return OpenAugmentSelectWidget(CandidateAugments);
 }
 
+bool AGP_PlayerController::RequestEquipSkill(UGP_SkillData* SkillData, FGameplayTag SlotTag)
+{
+	if (!CanEquipSkill(SkillData, SlotTag))
+	{
+		return false;
+	}
+
+	Server_EquipSkill(SkillData, SlotTag);
+	return true;
+}
+
+void AGP_PlayerController::Server_EquipSkill_Implementation(UGP_SkillData* SkillData, FGameplayTag SlotTag)
+{
+	if (!CanEquipSkill(SkillData, SlotTag))
+	{
+		return;
+	}
+
+	if (AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetPawn()))
+	{
+		PlayerCharacter->EquipSkill(SkillData, SlotTag);
+	}
+}
+
+bool AGP_PlayerController::CanEquipSkill(UGP_SkillData* SkillData, FGameplayTag SlotTag) const
+{
+	if (!IsValid(SkillPoolData) || !IsValid(SkillData) || !SkillData->AbilityClass)
+	{
+		return false;
+	}
+
+	const bool bValidSlot =
+		SlotTag.MatchesTagExact(GPTags::Ability::Skill::Slot01) ||
+		SlotTag.MatchesTagExact(GPTags::Ability::Skill::Slot02);
+	if (!bValidSlot || !SkillPoolData->ContainsSkill(SkillData))
+	{
+		return false;
+	}
+
+	return SkillData->SupportedSlotTags.IsEmpty() || SkillData->SupportedSlotTags.HasTagExact(SlotTag);
+}
+
 bool AGP_PlayerController::OpenAugmentSelectWidget(const TArray<UGP_SkillAugmentData*>& Candidates)
 {
 	if (!IsLocalController() || Candidates.IsEmpty())
@@ -120,35 +183,51 @@ bool AGP_PlayerController::OpenAugmentSelectWidget(const TArray<UGP_SkillAugment
 	}
 
 	AugmentSelectWidget->SetCandidateAugments(Candidates);
-	if (!AugmentSelectWidget->IsInViewport())
+
+	// SetIgnoreMoveInput/SetIgnoreLookInput push onto a ref-count stack, not a
+	// bool — only arm them on the closed->open transition, otherwise a second
+	// level-up while the picker is still open pushes a second "ignore" that the
+	// single matching Close call never balances, permanently locking look input.
+	const bool bWasAlreadyOpen = AugmentSelectWidget->IsInViewport();
+	if (!bWasAlreadyOpen)
 	{
 		AugmentSelectWidget->AddToViewport(80);
+
+		bShowMouseCursor = true;
+		SetIgnoreMoveInput(true);
+		SetIgnoreLookInput(true);
+
+		FInputModeGameAndUI InputMode;
+		InputMode.SetWidgetToFocus(AugmentSelectWidget->TakeWidget());
+		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+		InputMode.SetHideCursorDuringCapture(false);
+		SetInputMode(InputMode);
 	}
-
-	bShowMouseCursor = true;
-	SetIgnoreMoveInput(true);
-	SetIgnoreLookInput(true);
-
-	FInputModeGameAndUI InputMode;
-	InputMode.SetWidgetToFocus(AugmentSelectWidget->TakeWidget());
-	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-	InputMode.SetHideCursorDuringCapture(false);
-	SetInputMode(InputMode);
 
 	return true;
 }
 
 void AGP_PlayerController::CloseAugmentSelectWidget()
 {
+	const bool bWasOpen = IsValid(AugmentSelectWidget) && AugmentSelectWidget->IsInViewport();
+
 	if (IsValid(AugmentSelectWidget))
 	{
 		AugmentSelectWidget->RemoveFromParent();
 		AugmentSelectWidget = nullptr;
 	}
 
+	if (!bWasOpen)
+	{
+		return;
+	}
+
 	bShowMouseCursor = false;
-	SetIgnoreMoveInput(false);
-	SetIgnoreLookInput(false);
+	// SetIgnoreMoveInput/SetIgnoreLookInput are ref-counted, so a single matching
+	// "false" can leave the counter > 0 (and movement/look permanently locked) if
+	// the picker was opened more than once. Reset the flags outright to guarantee
+	// control is fully restored on close.
+	ResetIgnoreInputFlags();
 	SetInputMode(FInputModeGameOnly());
 }
 
@@ -158,11 +237,14 @@ void AGP_PlayerController::Tick(float DeltaSeconds)
 
 	UpdateMovementSpeed(DeltaSeconds);
 	UpdateCharacterRotation(DeltaSeconds);
+	UpdateSkillSelectionInputMode();
 	if (HUDWidget)
 	{
 		// Controller tick keeps minimap updates alive even if the widget native tick is disabled.
 		HUDWidget->RefreshMinimapBackgroundFromSubsystem();
 		HUDWidget->RefreshMinimapPresentation(DeltaSeconds);
+		// Retry skill-slot binding until the PlayerState is ready (no-ops once bound).
+		HUDWidget->EnsureSkillSlotsBound();
 	}
 
 	BossRefreshAccumulator += DeltaSeconds;
@@ -177,14 +259,12 @@ void AGP_PlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
 
-	UEnhancedInputLocalPlayerSubsystem* InputSubsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer());
-	if (!IsValid(InputSubsystem)) return;
-
-	for (UInputMappingContext* Context : InputMappingContexts)
-	{
-		InputSubsystem->AddMappingContext(Context, 0);
-	}
-
+	// Add mapping contexts when possible, but do NOT early-return if the
+	// subsystem is unavailable: on dedicated-server clients GetLocalPlayer() can
+	// be null at input-setup time, and bailing here would skip all BindAction
+	// calls below, leaving the player completely uncontrollable. BeginPlay
+	// retries AddInputMappingContexts() once the local player exists.
+	AddInputMappingContexts();
 
 	UEnhancedInputComponent* EnhancedInputComponent = CastChecked<UEnhancedInputComponent>(InputComponent);
 
@@ -216,9 +296,24 @@ void AGP_PlayerController::SetupInputComponent()
 	if (PrimaryAttackAction)  EnhancedInputComponent->BindAction(PrimaryAttackAction,  ETriggerEvent::Started,   this, &ThisClass::Input_PrimaryAttack);
 	if (SecondarySkillConfirmAction) EnhancedInputComponent->BindAction(SecondarySkillConfirmAction, ETriggerEvent::Started, this, &ThisClass::Input_SecondarySkillConfirm);
 	if (CancelSkillSelectionAction) EnhancedInputComponent->BindAction(CancelSkillSelectionAction, ETriggerEvent::Started, this, &ThisClass::Input_CancelSkillSelection);
-	if (SkillSlot1Action) EnhancedInputComponent->BindAction(SkillSlot1Action, ETriggerEvent::Started, this, &ThisClass::Input_SkillSlot1);
-	if (SkillSlot2Action) EnhancedInputComponent->BindAction(SkillSlot2Action, ETriggerEvent::Started, this, &ThisClass::Input_SkillSlot2);
-	if (UltimateAction) EnhancedInputComponent->BindAction(UltimateAction, ETriggerEvent::Started, this, &ThisClass::Input_UltimateSkill);
+	if (SkillSlot1Action)
+	{
+		EnhancedInputComponent->BindAction(SkillSlot1Action, ETriggerEvent::Started, this, &ThisClass::Input_SkillSlot1);
+		EnhancedInputComponent->BindAction(SkillSlot1Action, ETriggerEvent::Completed, this, &ThisClass::Input_SkillSlotReleased);
+		EnhancedInputComponent->BindAction(SkillSlot1Action, ETriggerEvent::Canceled, this, &ThisClass::Input_SkillSlotReleased);
+	}
+	if (SkillSlot2Action)
+	{
+		EnhancedInputComponent->BindAction(SkillSlot2Action, ETriggerEvent::Started, this, &ThisClass::Input_SkillSlot2);
+		EnhancedInputComponent->BindAction(SkillSlot2Action, ETriggerEvent::Completed, this, &ThisClass::Input_SkillSlotReleased);
+		EnhancedInputComponent->BindAction(SkillSlot2Action, ETriggerEvent::Canceled, this, &ThisClass::Input_SkillSlotReleased);
+	}
+	if (UltimateAction)
+	{
+		EnhancedInputComponent->BindAction(UltimateAction, ETriggerEvent::Started, this, &ThisClass::Input_UltimateSkill);
+		EnhancedInputComponent->BindAction(UltimateAction, ETriggerEvent::Completed, this, &ThisClass::Input_SkillSlotReleased);
+		EnhancedInputComponent->BindAction(UltimateAction, ETriggerEvent::Canceled, this, &ThisClass::Input_SkillSlotReleased);
+	}
 	if (TestToggleSkillAction) EnhancedInputComponent->BindAction(TestToggleSkillAction, ETriggerEvent::Started, this, &ThisClass::Input_TestToggleSkill);
 	// Keep both debug bindings after the PR merge so neither test preset rotation nor White Void input is dropped.
 	if (RotateTestSkillAction) EnhancedInputComponent->BindAction(RotateTestSkillAction, ETriggerEvent::Started, this, &ThisClass::Input_RotateTestSkill);
@@ -232,6 +327,33 @@ void AGP_PlayerController::SetupInputComponent()
 	else
 	{
 		InputComponent->BindKey(EKeys::Tab, IE_Pressed, this, &ThisClass::Input_ToggleCharacterStatsMenu);
+	}
+
+	if (OpenSkillSelectAction)
+	{
+		EnhancedInputComponent->BindAction(OpenSkillSelectAction, ETriggerEvent::Started, this, &ThisClass::Input_ToggleSkillSelect);
+	}
+}
+
+void AGP_PlayerController::AddInputMappingContexts()
+{
+	if (!IsLocalController())
+	{
+		return;
+	}
+
+	UEnhancedInputLocalPlayerSubsystem* InputSubsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer());
+	if (!IsValid(InputSubsystem))
+	{
+		return;
+	}
+
+	for (UInputMappingContext* Context : InputMappingContexts)
+	{
+		if (Context)
+		{
+			InputSubsystem->AddMappingContext(Context, 0);
+		}
 	}
 }
 
@@ -512,6 +634,10 @@ void AGP_PlayerController::Input_UltimateSkill()
 	ActivateAbilityByTag(GPTags::Ability::Skill::Ultimate);
 }
 
+void AGP_PlayerController::Input_SkillSlotReleased()
+{
+}
+
 bool AGP_PlayerController::ActivateAbilityByTag(const FGameplayTag& AbilityTag) const
 {
 	UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn());
@@ -535,6 +661,12 @@ bool AGP_PlayerController::IsSkillSelectionActive() const
 	return IsValid(ASC) && ASC->HasMatchingGameplayTag(GPTags::State::Skill::Selecting);
 }
 
+bool AGP_PlayerController::IsGroundPositionSelectionActive() const
+{
+	UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn());
+	return IsValid(ASC) && ASC->HasMatchingGameplayTag(GPTags::State::Skill::GroundPosition);
+}
+
 bool AGP_PlayerController::SendSkillSelectionEvent(const FGameplayTag& EventTag) const
 {
 	APawn* ControlledPawn = GetPawn();
@@ -547,14 +679,82 @@ bool AGP_PlayerController::SendSkillSelectionEvent(const FGameplayTag& EventTag)
 	Payload.EventTag = EventTag;
 	Payload.Instigator = ControlledPawn;
 	Payload.Target = ControlledPawn;
+
+	FVector TargetLocation = FVector::ZeroVector;
+	const bool bHasTargetLocation =
+		EventTag.MatchesTagExact(GPTags::Event::Skill::ConfirmPrimary)
+		&& IsGroundPositionSelectionActive()
+		&& GetSkillSelectionCursorLocation(TargetLocation);
+	if (bHasTargetLocation)
+	{
+		FillSkillSelectionTargetData(Payload, TargetLocation);
+	}
+
 	UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(ControlledPawn, EventTag, Payload);
 
 	if (!HasAuthority())
 	{
-		const_cast<AGP_PlayerController*>(this)->Server_SendSkillSelectionEvent(EventTag);
+		const_cast<AGP_PlayerController*>(this)->Server_SendSkillSelectionEvent(EventTag, TargetLocation, bHasTargetLocation);
 	}
 
 	return true;
+}
+
+void AGP_PlayerController::FillSkillSelectionTargetData(
+	FGameplayEventData& Payload,
+	const FVector& TargetLocation) const
+{
+	FGameplayAbilityTargetData_LocationInfo* LocationData = new FGameplayAbilityTargetData_LocationInfo();
+	LocationData->TargetLocation.LocationType = EGameplayAbilityTargetingLocationType::LiteralTransform;
+	LocationData->TargetLocation.LiteralTransform = FTransform(TargetLocation);
+	Payload.TargetData.Add(LocationData);
+}
+
+bool AGP_PlayerController::GetSkillSelectionCursorLocation(FVector& OutTargetLocation) const
+{
+	FHitResult CursorHit;
+	if (!GetHitResultUnderCursor(ECC_Visibility, false, CursorHit))
+	{
+		return false;
+	}
+
+	OutTargetLocation = CursorHit.ImpactPoint;
+	return true;
+}
+
+void AGP_PlayerController::UpdateSkillSelectionInputMode()
+{
+	if (!IsLocalController())
+	{
+		return;
+	}
+
+	const bool bGroundSelectionActive = IsGroundPositionSelectionActive();
+	if (bGroundSelectionActive == bWasGroundPositionSelectionActive)
+	{
+		return;
+	}
+
+	bWasGroundPositionSelectionActive = bGroundSelectionActive;
+	if (bGroundSelectionActive)
+	{
+		bShowMouseCursor = true;
+		SetIgnoreLookInput(true);
+
+		FInputModeGameAndUI InputMode;
+		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+		InputMode.SetHideCursorDuringCapture(false);
+		SetInputMode(InputMode);
+		return;
+	}
+
+	const bool bAugmentOpen = IsValid(AugmentSelectWidget) && AugmentSelectWidget->IsInViewport();
+	if (!bAugmentOpen && !bIsCharacterStatsMenuOpen)
+	{
+		bShowMouseCursor = false;
+		SetIgnoreLookInput(false);
+		SetInputMode(FInputModeGameOnly());
+	}
 }
 
 void AGP_PlayerController::CancelSkillSelectionIfActive() const
@@ -565,14 +765,25 @@ void AGP_PlayerController::CancelSkillSelectionIfActive() const
 	}
 }
 
-bool AGP_PlayerController::Server_SendSkillSelectionEvent_Validate(FGameplayTag EventTag)
+bool AGP_PlayerController::Server_SendSkillSelectionEvent_Validate(
+	FGameplayTag EventTag,
+	FVector_NetQuantize TargetLocation,
+	bool bHasTargetLocation)
 {
-	return EventTag.MatchesTagExact(GPTags::Event::Skill::ConfirmPrimary)
+	const bool bValidEvent = EventTag.MatchesTagExact(GPTags::Event::Skill::ConfirmPrimary)
 		|| EventTag.MatchesTagExact(GPTags::Event::Skill::ConfirmSecondary)
 		|| EventTag.MatchesTagExact(GPTags::Event::Skill::Cancel);
+	const bool bValidLocation = !bHasTargetLocation
+		|| (FMath::IsFinite(TargetLocation.X)
+			&& FMath::IsFinite(TargetLocation.Y)
+			&& FMath::IsFinite(TargetLocation.Z));
+	return bValidEvent && bValidLocation;
 }
 
-void AGP_PlayerController::Server_SendSkillSelectionEvent_Implementation(FGameplayTag EventTag)
+void AGP_PlayerController::Server_SendSkillSelectionEvent_Implementation(
+	FGameplayTag EventTag,
+	FVector_NetQuantize TargetLocation,
+	bool bHasTargetLocation)
 {
 	APawn* ControlledPawn = GetPawn();
 	if (!IsValid(ControlledPawn) || !EventTag.IsValid())
@@ -584,6 +795,10 @@ void AGP_PlayerController::Server_SendSkillSelectionEvent_Implementation(FGamepl
 	Payload.EventTag = EventTag;
 	Payload.Instigator = ControlledPawn;
 	Payload.Target = ControlledPawn;
+	if (bHasTargetLocation)
+	{
+		FillSkillSelectionTargetData(Payload, TargetLocation);
+	}
 	UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(ControlledPawn, EventTag, Payload);
 }
 
@@ -734,9 +949,17 @@ FVector2D AGP_PlayerController::ResolveEffectiveMoveInput(const AGP_PlayerCharac
 		return FVector2D::ZeroVector;
 	}
 
+	const FVector2D ClampedMoveInput = CurrentMoveInput.GetClampedToMaxSize(1.0f);
+	if (!ClampedMoveInput.IsNearlyZero())
+	{
+		// 네트워크 이동 보정이 튀지 않도록 서버와 클라이언트가 같은 원본 입력값으로 방향별 속도를 고릅니다.
+		return ClampedMoveInput;
+	}
+
 	const UCharacterMovementComponent* MoveComp = PlayerCharacter->GetCharacterMovement();
 	if (HasAuthority() && MoveComp)
 	{
+		// 서버가 입력 RPC를 아직 받지 못한 첫 프레임만 현재 가속도를 백업 경로로 사용합니다.
 		const FVector AccelerationDirection = MoveComp->GetCurrentAcceleration().GetSafeNormal2D();
 		if (!AccelerationDirection.IsNearlyZero())
 		{
@@ -749,7 +972,7 @@ FVector2D AGP_PlayerController::ResolveEffectiveMoveInput(const AGP_PlayerCharac
 		}
 	}
 
-	return CurrentMoveInput;
+	return FVector2D::ZeroVector;
 }
 
 void AGP_PlayerController::UpdateMovementSpeed(float DeltaSeconds)
@@ -818,6 +1041,87 @@ void AGP_PlayerController::Input_ToggleCharacterStatsMenu()
 	else
 	{
 		OpenCharacterStatsMenu();
+	}
+}
+
+void AGP_PlayerController::Input_ToggleSkillSelect()
+{
+	// Derive open state from the widget itself so the picker's own close button
+	// (which calls RemoveFromParent) and this toggle stay in sync.
+	const bool bOpen = IsValid(SkillSelectWidget) && SkillSelectWidget->IsInViewport();
+	if (bOpen)
+	{
+		CloseSkillSelect();
+	}
+	else
+	{
+		OpenSkillSelect();
+	}
+}
+
+bool AGP_PlayerController::EnsureSkillSelectWidget()
+{
+	if (IsValid(SkillSelectWidget))
+	{
+		return true;
+	}
+
+	if (!SkillSelectWidgetClass)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("SkillSelectWidgetClass is not set on %s. Assign a Widget Blueprint based on GP_SkillSelectWidget."), *GetName());
+		return false;
+	}
+
+	SkillSelectWidget = CreateWidget<UGP_SkillSelectWidget>(this, SkillSelectWidgetClass);
+	return IsValid(SkillSelectWidget);
+}
+
+void AGP_PlayerController::OpenSkillSelect()
+{
+	if (!EnsureSkillSelectWidget())
+	{
+		return;
+	}
+
+	if (!SkillSelectWidget->IsInViewport())
+	{
+		SkillSelectWidget->AddToViewport(50);
+	}
+
+	SkillSelectWidget->RefreshSkillSelection();
+	SkillSelectWidget->SetVisibility(ESlateVisibility::Visible);
+	ApplySkillSelectInputMode(true);
+}
+
+void AGP_PlayerController::CloseSkillSelect()
+{
+	// Mirror the widget's own close path (RemoveFromParent) so both routes end
+	// in the same state; IsInViewport() then reports closed.
+	if (IsValid(SkillSelectWidget) && SkillSelectWidget->IsInViewport())
+	{
+		SkillSelectWidget->RemoveFromParent();
+	}
+
+	ApplySkillSelectInputMode(false);
+}
+
+void AGP_PlayerController::ApplySkillSelectInputMode(bool bMenuOpen)
+{
+	// Multiplayer: never freeze movement/look — the skill picker is non-blocking,
+	// so the player (and everyone else) keeps moving while it is open. Only the
+	// mouse cursor is toggled so the picker can be clicked.
+	bShowMouseCursor = bMenuOpen;
+
+	if (bMenuOpen)
+	{
+		FInputModeGameAndUI InputMode;
+		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+		InputMode.SetHideCursorDuringCapture(false);
+		SetInputMode(InputMode);
+	}
+	else
+	{
+		SetInputMode(FInputModeGameOnly());
 	}
 }
 

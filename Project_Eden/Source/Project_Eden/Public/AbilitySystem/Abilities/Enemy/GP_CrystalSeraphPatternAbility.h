@@ -40,6 +40,7 @@ protected:
 	virtual bool ExecuteCrystalSeraphPattern(AGP_CrystalSeraphBossCharacter* CrystalSeraphBoss, AActor* PatternTargetActor);
 	virtual bool UsesSharedPatternCadence() const { return true; }
 	virtual bool UsesBossTelegraphVFX() const { return true; }
+	FGameplayTag GetPatternTag() const;
 	AActor* ResolvePatternTarget(const FGameplayEventData* TriggerEventData) const;
 
 private:

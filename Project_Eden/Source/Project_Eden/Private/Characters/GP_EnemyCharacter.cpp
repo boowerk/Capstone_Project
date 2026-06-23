@@ -26,9 +26,11 @@
 #include "GameplayTags/GP_Tags.h"
 #include "Net/UnrealNetwork.h"
 #include "Player/GP_PlayerState.h"
+#include "GameFramework/GameStateBase.h"
 #include "UI/GP_AttributeWidget.h"
 #include "UI/GP_WidgetComponent.h"
 #include "UObject/ConstructorHelpers.h"
+#include "VFX/GP_BossTargetMarkerVFXComponent.h"
 
 AGP_EnemyCharacter::AGP_EnemyCharacter()
 {
@@ -43,6 +45,8 @@ AGP_EnemyCharacter::AGP_EnemyCharacter()
 	DefaultEnemyAttackAbilityClass = UGP_EnemyAttack::StaticClass();
 	DefaultAttackAbilityTag = GPTags::Ability::Enemy::Attack_Melee;
 	DefaultEnemyDeathAbilityClass = UGP_EnemyDeathAbility::StaticClass();
+
+	BossTargetMarkerVFXComponent = CreateDefaultSubobject<UGP_BossTargetMarkerVFXComponent>(TEXT("BossTargetMarkerVFXComponent"));
 
 	WorldHealthBarComponent = CreateDefaultSubobject<UGP_WidgetComponent>(TEXT("WorldHealthBarComponent"));
 	WorldHealthBarComponent->SetupAttachment(GetRootComponent());
@@ -146,6 +150,17 @@ FText AGP_EnemyCharacter::GetBossDisplayName() const
 	return FText::FromString(GetName());
 }
 
+void AGP_EnemyCharacter::NotifyBossTargetSelected(AActor* TargetActor)
+{
+	if (!bIsBossEnemy || bIsDead || !IsValid(BossTargetMarkerVFXComponent))
+	{
+		return;
+	}
+
+	// Keep the AIController free of Niagara details; boss pawns own how their selected target is presented.
+	BossTargetMarkerVFXComponent->PlayTargetMarker(TargetActor);
+}
+
 void AGP_EnemyCharacter::BeginPlay()
 {
 	Super::BeginPlay();
@@ -167,6 +182,7 @@ void AGP_EnemyCharacter::BeginPlay()
 
 	GetAbilitySystemComponent()->InitAbilityActorInfo(this, this);
 	OnASCInitialized.Broadcast(GetAbilitySystemComponent(), GetAttributeSet());
+	BindMoveSpeedAttribute();
 	if (UGP_AttributeSet* EnemyAttributeSet = Cast<UGP_AttributeSet>(GetAttributeSet()))
 	{
 		// AttributeSet publishes the terminal health event; the enemy translates it into a GAS death request.
@@ -188,9 +204,64 @@ void AGP_EnemyCharacter::BeginPlay()
 	}
 	InitializeAttributes();
 
+	const float AttributeMoveSpeed = GetAbilitySystemComponent()->GetNumericAttribute(UGP_AttributeSet::GetMoveSpeedAttribute());
+	if (AttributeMoveSpeed > KINDA_SMALL_NUMBER)
+	{
+		if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
+		{
+			MovementComponent->MaxWalkSpeed = AttributeMoveSpeed;
+		}
+	}
+	else if (const UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
+	{
+		GetAbilitySystemComponent()->SetNumericAttributeBase(
+			UGP_AttributeSet::GetMoveSpeedAttribute(),
+			MovementComponent->MaxWalkSpeed);
+	}
+
 	// 기준 위치는 캐릭터가 저장하고, 실제 Blackboard/Behavior Tree 시작은 AEnemyAIController::OnPossess에서 담당한다.
 	BehaviorAnchorLocation = GetActorTransform().TransformPosition(BehaviorAnchorOffset);
 	bHasBehaviorAnchorLocation = true;
+}
+
+void AGP_EnemyCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	UnbindMoveSpeedAttribute();
+	Super::EndPlay(EndPlayReason);
+}
+
+void AGP_EnemyCharacter::BindMoveSpeedAttribute()
+{
+	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+	if (!IsValid(ASC) || MoveSpeedAttributeDelegateHandle.IsValid())
+	{
+		return;
+	}
+
+	MoveSpeedAttributeDelegateHandle = ASC
+		->GetGameplayAttributeValueChangeDelegate(UGP_AttributeSet::GetMoveSpeedAttribute())
+		.AddUObject(this, &ThisClass::HandleMoveSpeedAttributeChanged);
+}
+
+void AGP_EnemyCharacter::UnbindMoveSpeedAttribute()
+{
+	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+	if (!IsValid(ASC) || !MoveSpeedAttributeDelegateHandle.IsValid())
+	{
+		return;
+	}
+
+	ASC->GetGameplayAttributeValueChangeDelegate(UGP_AttributeSet::GetMoveSpeedAttribute())
+		.Remove(MoveSpeedAttributeDelegateHandle);
+	MoveSpeedAttributeDelegateHandle.Reset();
+}
+
+void AGP_EnemyCharacter::HandleMoveSpeedAttributeChanged(const FOnAttributeChangeData& ChangeData)
+{
+	if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
+	{
+		MovementComponent->MaxWalkSpeed = FMath::Max(ChangeData.NewValue, 0.0f);
+	}
 }
 
 const FEnemyArchetypeTuning* AGP_EnemyCharacter::ResolveEnemyArchetypeTuning() const
@@ -314,6 +385,9 @@ void AGP_EnemyCharacter::HandlePostDamageTaken(AActor* InstigatorActor, float Da
 
 	bXPRewardGranted = true;
 	GrantXPRewardToInstigator(InstigatorActor);
+
+	// Same first-death gate as XP: let the GameMode count this enemy toward the current zone clear.
+	OnEnemyDied.Broadcast(this);
 }
 
 void AGP_EnemyCharacter::HandleOutOfHealth(AActor* InstigatorActor, AActor* TargetActor)
@@ -443,13 +517,28 @@ void AGP_EnemyCharacter::GrantXPRewardToInstigator(AActor* InstigatorActor)
 		return;
 	}
 
-	AGP_PlayerState* InstigatorPlayerState = ResolveInstigatorPlayerState(InstigatorActor);
-	if (!IsValid(InstigatorPlayerState))
+	// Shared-XP co-op: every player in the match gains the full reward, not just
+	// the one who landed the killing blow. Server-authoritative (callers guard on
+	// HasAuthority), so this loops the replicated PlayerArray once.
+	const UWorld* World = GetWorld();
+	const AGameStateBase* GameState = World ? World->GetGameState() : nullptr;
+	if (!GameState)
 	{
+		// Fall back to the instigator alone if the game state isn't available yet.
+		if (AGP_PlayerState* InstigatorPlayerState = ResolveInstigatorPlayerState(InstigatorActor))
+		{
+			InstigatorPlayerState->AddXP(XPReward);
+		}
 		return;
 	}
 
-	InstigatorPlayerState->AddXP(XPReward);
+	for (APlayerState* PartyPlayerState : GameState->PlayerArray)
+	{
+		if (AGP_PlayerState* GPPlayerState = Cast<AGP_PlayerState>(PartyPlayerState))
+		{
+			GPPlayerState->AddXP(XPReward);
+		}
+	}
 }
 
 AGP_PlayerState* AGP_EnemyCharacter::ResolveInstigatorPlayerState(AActor* InstigatorActor) const

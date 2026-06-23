@@ -5,6 +5,7 @@
 #include "Engine/EngineTypes.h"
 #include "GameplayTagContainer.h"
 #include "UObject/ObjectPtr.h"
+#include "VFX/GP_NiagaraParameterOverride.h"
 
 #include "GP_BaseCharacter.generated.h"
 
@@ -30,7 +31,12 @@ public:
 	virtual UAttributeSet* GetAttributeSet() const { return nullptr; }
 	
 	void ShowDamageNumber(int32 DamageAmount, EWeaponElement Element);
-	void ShowSkillVisualActor(TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation, float VisualScale = 1.0f);
+	void ShowSkillVisualActor(
+		TSubclassOf<AActor> VisualActorClass,
+		const FVector& Location,
+		const FRotator& Rotation,
+		float VisualScale = 1.0f,
+		const TArray<FGP_NiagaraParameterOverride>& NiagaraParameterOverrides = {});
 
 	/** 캐릭터의 외형과 애니메이션을 결정하는 데이터 에셋 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation")
@@ -67,13 +73,23 @@ protected:
 	void MulticastShowDamageNumber(int32 DamageAmount, EWeaponElement Element);
 
 	UFUNCTION(NetMulticast, Reliable)
-	void MulticastSpawnSkillVisualActor(TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation, float VisualScale);
+	void MulticastSpawnSkillVisualActor(
+		TSubclassOf<AActor> VisualActorClass,
+		const FVector& Location,
+		const FRotator& Rotation,
+		float VisualScale,
+		const TArray<FGP_NiagaraParameterOverride>& NiagaraParameterOverrides);
 
 	UFUNCTION(NetMulticast, Unreliable)
 	void MulticastShowHealthDebug(const FString& InstigatorName, float DamageAmount, float CurrentHealth, float MaxHealth, FGameplayTag ElementTag);
 
 	void SpawnDamageNumberActor(int32 DamageAmount, EWeaponElement Element);
-	void SpawnSkillVisualActor(TSubclassOf<AActor> VisualActorClass, const FVector& Location, const FRotator& Rotation, float VisualScale = 1.0f);
+	void SpawnSkillVisualActor(
+		TSubclassOf<AActor> VisualActorClass,
+		const FVector& Location,
+		const FRotator& Rotation,
+		float VisualScale = 1.0f,
+		const TArray<FGP_NiagaraParameterOverride>& NiagaraParameterOverrides = {});
 	void ShowHealthDebugMessage(const FString& InstigatorName, float DamageAmount, float CurrentHealth, float MaxHealth, FGameplayTag ElementTag) const;
 	
 	// ASC가 초기화되었을 때 AttributeSet의 델리게이트를 구독할 함수

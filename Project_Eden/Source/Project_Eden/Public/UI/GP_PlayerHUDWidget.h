@@ -18,6 +18,9 @@ class UCanvasPanel;
 class UAbilitySystemComponent;
 class UGP_AttributeSet;
 class UGP_MinimapSubsystem;
+class UGP_SkillSlotHUDWidget;
+class AGP_PlayerState;
+class UGP_SkillData;
 
 struct FGPAttributeDelegateBinding
 {
@@ -71,6 +74,21 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "EldenRing HUD|Minimap")
 	void RefreshMinimapPresentation(float DeltaSeconds = 0.0f);
+
+	// Call after BindToASC to wire up the two equipped-skill slot widgets.
+	UFUNCTION(BlueprintCallable, Category = "EldenRing HUD|Skill")
+	void BindSkillSlots(AGP_PlayerState* PS);
+
+	// Idempotent retry hook: binds the skill slots once the owning PlayerState is
+	// available. Safe to call every tick — it no-ops after the first successful
+	// bind. Needed because on a dedicated client the PlayerState/ASC can arrive
+	// after the controller's one-shot BeginPlay binding attempt.
+	UFUNCTION(BlueprintCallable, Category = "EldenRing HUD|Skill")
+	void EnsureSkillSlotsBound();
+
+private:
+	UFUNCTION()
+	void OnEquippedSkillChanged(FGameplayTag SlotTag, UGP_SkillData* SkillData);
 
 protected:
 	virtual void NativePreConstruct() override;
@@ -147,6 +165,12 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EldenRing HUD|Minimap", meta = (AllowPrivateAccess = "true"))
 	bool bInvertMinimapPlayerArrowRotation = false;
 
+	UPROPERTY(BlueprintReadOnly, Category = "HUD|Skill", meta = (BindWidgetOptional, AllowPrivateAccess = "true"))
+	TObjectPtr<UGP_SkillSlotHUDWidget> SkillSlot1;
+
+	UPROPERTY(BlueprintReadOnly, Category = "HUD|Skill", meta = (BindWidgetOptional, AllowPrivateAccess = "true"))
+	TObjectPtr<UGP_SkillSlotHUDWidget> SkillSlot2;
+
 	// UI material samples the one-shot full-map texture and pans/zooms it around the player's world-space UV.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EldenRing HUD|Minimap", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UMaterialInterface> MinimapMapMaterial;
@@ -169,6 +193,7 @@ private:
 
 	TWeakObjectPtr<UAbilitySystemComponent> BoundPlayerASC;
 	TWeakObjectPtr<UAbilitySystemComponent> BoundBossASC;
+	TWeakObjectPtr<AGP_PlayerState> BoundSkillPlayerState;
 	TArray<FGPAttributeDelegateBinding> PlayerAttributeDelegateHandles;
 	TArray<FGPAttributeDelegateBinding> BossAttributeDelegateHandles;
 	bool bHasCachedMinimapPlayerArrowAngle = false;

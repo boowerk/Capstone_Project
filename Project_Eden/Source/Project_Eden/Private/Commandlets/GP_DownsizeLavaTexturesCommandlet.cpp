@@ -1,5 +1,9 @@
 #include "Commandlets/GP_DownsizeLavaTexturesCommandlet.h"
 
+// This commandlet only runs in editor/cook tooling and pulls in editor-only
+// headers (TextureImportSettings, TextureSourceDataUtils). Guard the whole
+// implementation so the runtime/server target still compiles.
+#if WITH_EDITOR
 #include "Engine/Texture.h"
 #include "Interfaces/ITargetPlatformManagerModule.h"
 #include "Misc/PackageName.h"
@@ -47,6 +51,7 @@ bool SaveTexturePackage(UTexture* Texture)
 	return UPackage::SavePackage(Package, Texture, *PackageFilename, SaveArgs);
 }
 } // namespace
+#endif // WITH_EDITOR
 
 UGP_DownsizeLavaTexturesCommandlet::UGP_DownsizeLavaTexturesCommandlet()
 {

@@ -49,6 +49,26 @@ namespace GPTags
                 UE_DEFINE_GAMEPLAY_TAG_COMMENT(LineShock, "GPTags.Ability.Skill.Id.LineShock", "라인 쇼크 스킬 식별 태그");
                 UE_DEFINE_GAMEPLAY_TAG_COMMENT(MineBurst, "GPTags.Ability.Skill.Id.MineBurst", "마인 버스트 스킬 식별 태그");
                 UE_DEFINE_GAMEPLAY_TAG_COMMENT(ConeSlash, "GPTags.Ability.Skill.Id.ConeSlash", "콘 슬래시 스킬 식별 태그");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(MagmaShot, "GPTags.Ability.Skill.Id.MagmaShot", "마그마 샷 스킬 식별 태그");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(GelmirFury, "GPTags.Ability.Skill.Id.GelmirFury", "겔미어 퓨리 스킬 식별 태그");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(DarkSoloProjectile, "GPTags.Ability.Skill.Id.DarkSoloProjectile", "다크 단일 투사체 스킬 식별 태그");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(DarkStone, "GPTags.Ability.Skill.Id.DarkStone", "다크 스톤 스킬 식별 태그");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(DarkMist, "GPTags.Ability.Skill.Id.DarkMist", "다크 미스트 스킬 식별 태그");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(LightningStrike, "GPTags.Ability.Skill.Id.LightningStrike", "라이트닝 스트라이크 스킬 식별 태그");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(IceMist, "GPTags.Ability.Skill.Id.IceMist", "아이스 미스트 스킬 식별 태그");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(CrystalTorrent, "GPTags.Ability.Skill.Id.CrystalTorrent", "크리스탈 토렌트 스킬 식별 태그");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(ShatteringCrystal, "GPTags.Ability.Skill.Id.ShatteringCrystal", "섀터링 크리스탈 스킬 식별 태그");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(BigHammer, "GPTags.Ability.Skill.Id.BigHammer", "빅 해머 스킬 식별 태그");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(BigSword, "GPTags.Ability.Skill.Id.BigSword", "빅 소드 스킬 식별 태그");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(MagicBigBubbles, "GPTags.Ability.Skill.Id.MagicBigBubbles", "매직 빅 버블 스킬 식별 태그");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(MagicBubbles, "GPTags.Ability.Skill.Id.MagicBubbles", "매직 버블 스킬 식별 태그");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(Potion, "GPTags.Ability.Skill.Id.Potion", "포션 스킬 식별 태그");
+            }
+            namespace Visual
+            {
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(Projectile, "GPTags.Ability.Skill.Visual.Projectile", "투사체 비행 연출");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(Impact, "GPTags.Ability.Skill.Visual.Impact", "충돌 연출");
+                UE_DEFINE_GAMEPLAY_TAG_COMMENT(Cast, "GPTags.Ability.Skill.Visual.Cast", "시전 연출");
             }
         }
         namespace Enemy
@@ -174,6 +194,7 @@ namespace GPTags
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Projectile, "GPTags.State.Skill.Projectile", "투사체 스킬 조준 상태");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ray, "GPTags.State.Skill.Ray", "레이/라인 스킬 조준 상태");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(TargetActor, "GPTags.State.Skill.TargetActor", "대상 선택 스킬 조준 상태");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(GroundPosition, "GPTags.State.Skill.GroundPosition", "지면 위치 선택 스킬 조준 상태");
         }
         namespace Buff
         {
@@ -273,7 +294,14 @@ namespace GPTags
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(WaterPuddle, "GPTags.Cooldown.Skill.WaterPuddle", "물웅덩이 스킬 쿨다운");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(NetTestProjectile, "GPTags.Cooldown.Skill.NetTestProjectile", "테스트 프로젝타일 스킬 쿨다운");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(SplitShot, "GPTags.Cooldown.Skill.SplitShot", "스플릿샷 스킬 쿨다운");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(MagmaShot, "GPTags.Cooldown.Skill.MagmaShot", "마그마 샷 스킬 쿨다운");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(DarkSoloProjectile, "GPTags.Cooldown.Skill.DarkSoloProjectile", "다크 단일 투사체 스킬 쿨다운");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(CrystalTorrent, "GPTags.Cooldown.Skill.CrystalTorrent", "크리스탈 토렌트 스킬 쿨다운");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(DarkStone, "GPTags.Cooldown.Skill.DarkStone", "다크 스톤 스킬 쿨다운");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(GroundBurst, "GPTags.Cooldown.Skill.GroundBurst", "그라운드 버스트 스킬 쿨다운");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(LightningStrike, "GPTags.Cooldown.Skill.LightningStrike", "라이트닝 스트라이크 스킬 쿨다운");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(IceMist, "GPTags.Cooldown.Skill.IceMist", "아이스 미스트 스킬 쿨다운");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(BigHammer, "GPTags.Cooldown.Skill.BigHammer", "빅 해머 스킬 쿨다운");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(ThrownBurst, "GPTags.Cooldown.Skill.ThrownBurst", "투척 버스트 스킬 쿨다운");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(PulseBurst, "GPTags.Cooldown.Skill.PulseBurst", "펄스 버스트 스킬 쿨다운");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(LineShock, "GPTags.Cooldown.Skill.LineShock", "라인 쇼크 스킬 쿨다운");

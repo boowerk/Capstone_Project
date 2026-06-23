@@ -477,8 +477,8 @@ void UGP_MatadorRapierThrustAbility::ActivateAbility(
 
 	StopAIMovement(AvatarActor);
 	AGP_MatadorMageBossCharacter* MatadorBoss = Cast<AGP_MatadorMageBossCharacter>(AvatarActor);
-	const float TelegraphDelay = IsValid(MatadorBoss) && IsValid(MatadorBoss->GetBossTelegraphVFXComponent())
-		? MatadorBoss->GetBossTelegraphVFXComponent()->PlayEnabledTelegraph()
+	const float TelegraphDelay = IsValid(MatadorBoss)
+		? MatadorBoss->PlayBossTelegraphForPattern(GPTags::Ability::Boss::Matador::RapierThrust)
 		: 0.0f;
 	if (TelegraphDelay > KINDA_SMALL_NUMBER)
 	{
@@ -719,8 +719,8 @@ void UGP_MatadorCapeGustAbility::ActivateAbility(
 
 	StopAIMovement(AvatarActor);
 	AGP_MatadorMageBossCharacter* MatadorBoss = Cast<AGP_MatadorMageBossCharacter>(AvatarActor);
-	const float TelegraphDelay = IsValid(MatadorBoss) && IsValid(MatadorBoss->GetBossTelegraphVFXComponent())
-		? MatadorBoss->GetBossTelegraphVFXComponent()->PlayEnabledTelegraph()
+	const float TelegraphDelay = IsValid(MatadorBoss)
+		? MatadorBoss->PlayBossTelegraphForPattern(GPTags::Ability::Boss::Matador::CapeGust)
 		: 0.0f;
 	if (TelegraphDelay > KINDA_SMALL_NUMBER)
 	{

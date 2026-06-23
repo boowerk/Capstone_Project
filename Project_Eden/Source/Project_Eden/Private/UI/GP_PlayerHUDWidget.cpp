@@ -22,6 +22,9 @@
 #include "Materials/MaterialInterface.h"
 #include "UObject/ConstructorHelpers.h"
 #include "UI/GP_MinimapSubsystem.h"
+#include "UI/GP_SkillSlotHUDWidget.h"
+#include "Player/GP_PlayerState.h"
+#include "AbilitySystem/Abilities/GP_SkillData.h"
 
 UGP_PlayerHUDWidget::UGP_PlayerHUDWidget(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -808,9 +811,82 @@ void UGP_PlayerHUDWidget::RefreshPreview()
 void UGP_PlayerHUDWidget::OnASCInitializedCallback(UAbilitySystemComponent* ASC, UAttributeSet* AS)
 {
 	BindToASC(ASC);
+
+	// On a dedicated-server client the ASC (and equipped skill data) arrive after
+	// the controller's BeginPlay binding attempt, so re-bind the skill slots here
+	// once the ASC is ready. Otherwise the slot icons stay empty even though the
+	// skill list (which reads the always-loaded skill pool) shows them fine.
+	if (APlayerController* OwningPC = GetOwningPlayer())
+	{
+		if (AGP_PlayerState* GPPS = OwningPC->GetPlayerState<AGP_PlayerState>())
+		{
+			BindSkillSlots(GPPS);
+		}
+	}
 }
 
 void UGP_PlayerHUDWidget::HandleMinimapRenderTargetChanged(UTextureRenderTarget2D* InRenderTarget)
 {
 	SetMinimapRenderTarget(InRenderTarget);
+}
+
+void UGP_PlayerHUDWidget::BindSkillSlots(AGP_PlayerState* PS)
+{
+	if (!IsValid(PS))
+	{
+		return;
+	}
+
+	// The icon only needs the (replicated) equipped SkillData from the PlayerState;
+	// the ASC is just for cooldown polling and may still be null on a dedicated
+	// client. Bind regardless so icons appear, and rely on OnEquippedSkillChanged /
+	// the ASC rebind to fill in cooldowns once it arrives.
+	UAbilitySystemComponent* ASC = BoundPlayerASC.Get();
+
+	// Slot tags match the convention used in GP_PlayerState (Slot01, Slot02).
+	static const FGameplayTag Slot1Tag = FGameplayTag::RequestGameplayTag(TEXT("GPTags.Ability.Skill.Slot01"), false);
+	static const FGameplayTag Slot2Tag = FGameplayTag::RequestGameplayTag(TEXT("GPTags.Ability.Skill.Slot02"), false);
+
+	if (SkillSlot1)
+	{
+		UGP_SkillData* Data = PS->GetEquippedSkillData(Slot1Tag);
+		SkillSlot1->SetupSlot(ASC, Data, FText::FromString(TEXT("Q")));
+	}
+
+	if (SkillSlot2)
+	{
+		UGP_SkillData* Data = PS->GetEquippedSkillData(Slot2Tag);
+		SkillSlot2->SetupSlot(ASC, Data, FText::FromString(TEXT("E")));
+	}
+
+	// Re-bind whenever the player swaps skills.
+	BoundSkillPlayerState = PS;
+	PS->OnEquippedSkillChanged.AddUniqueDynamic(this, &UGP_PlayerHUDWidget::OnEquippedSkillChanged);
+}
+
+void UGP_PlayerHUDWidget::OnEquippedSkillChanged(FGameplayTag /*SlotTag*/, UGP_SkillData* /*SkillData*/)
+{
+	if (BoundSkillPlayerState.IsValid())
+	{
+		BindSkillSlots(BoundSkillPlayerState.Get());
+	}
+}
+
+void UGP_PlayerHUDWidget::EnsureSkillSlotsBound()
+{
+	// Once BindSkillSlots succeeds it caches BoundSkillPlayerState and subscribes
+	// to OnEquippedSkillChanged, so later equips are handled by the delegate — no
+	// need to keep retrying.
+	if (BoundSkillPlayerState.IsValid())
+	{
+		return;
+	}
+
+	if (APlayerController* OwningPC = GetOwningPlayer())
+	{
+		if (AGP_PlayerState* GPPS = OwningPC->GetPlayerState<AGP_PlayerState>())
+		{
+			BindSkillSlots(GPPS);
+		}
+	}
 }

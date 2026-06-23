@@ -54,9 +54,8 @@ void UGP_CrystalSeraphPatternAbility::ActivateAbility(
 	}
 
 	PendingPatternTarget = ResolvePatternTarget(TriggerEventData);
-	const UGP_BossTelegraphVFXComponent* TelegraphComponent = CrystalSeraphBoss->GetBossTelegraphVFXComponent();
-	const float TelegraphDelay = UsesBossTelegraphVFX() && IsValid(TelegraphComponent)
-		? CrystalSeraphBoss->GetBossTelegraphVFXComponent()->PlayEnabledTelegraph()
+	const float TelegraphDelay = UsesBossTelegraphVFX()
+		? CrystalSeraphBoss->PlayBossTelegraphForPattern(GetPatternTag())
 		: 0.0f;
 	if (TelegraphDelay > KINDA_SMALL_NUMBER)
 	{
@@ -111,6 +110,16 @@ void UGP_CrystalSeraphPatternAbility::ExecutePendingPattern()
 bool UGP_CrystalSeraphPatternAbility::ExecuteCrystalSeraphPattern(AGP_CrystalSeraphBossCharacter* CrystalSeraphBoss, AActor* PatternTargetActor)
 {
 	return false;
+}
+
+FGameplayTag UGP_CrystalSeraphPatternAbility::GetPatternTag() const
+{
+	// Each concrete Crystal Seraph GAS ability owns exactly one pattern asset tag.
+	for (const FGameplayTag& Tag : GetAssetTags())
+	{
+		return Tag;
+	}
+	return FGameplayTag();
 }
 
 AActor* UGP_CrystalSeraphPatternAbility::ResolvePatternTarget(const FGameplayEventData* TriggerEventData) const

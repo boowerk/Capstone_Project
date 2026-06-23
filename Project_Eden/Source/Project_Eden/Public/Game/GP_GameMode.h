@@ -1,0 +1,109 @@
+#pragma once
+
+#include "CoreMinimal.h"
+#include "GameFramework/GameModeBase.h"
+#include "GP_GameMode.generated.h"
+
+class AGP_EnemyCharacter;
+class AGP_EnemySpawnVolume;
+class AGP_GameState;
+class AGP_RunPortal;
+class AGP_EnemySpawnMarker;
+
+/**
+ * Server-authoritative progression manager for the linear "city -> boss room -> next city" loop.
+ *
+ * Zones are AGP_EnemySpawnVolume actors placed in the level. GameMode collects and sorts them by
+ * ZoneOrder. Zone 0 is unlocked at BeginPlay; enemies spawn when the player physically enters the box.
+ * On clear, the next zone unlocks and waits for player entry.
+ */
+UCLASS()
+class PROJECT_EDEN_API AGP_GameMode : public AGameModeBase
+{
+	GENERATED_BODY()
+
+public:
+	AGP_GameMode();
+
+	// Manual trigger — bypasses overlap and immediately spawns zone 0. Use from BP if needed.
+	UFUNCTION(BlueprintCallable, Category = "Run")
+	void StartRun();
+
+	UFUNCTION(BlueprintCallable, Category = "Run")
+	void NotifyAllPlayersDead();
+
+protected:
+	virtual void BeginPlay() override;
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "Run|Zone")
+	void OnZoneStarted(int32 ZoneIndex, AGP_EnemySpawnVolume* Zone);
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "Run|Zone")
+	void OnZoneCompleted(int32 ZoneIndex, AGP_EnemySpawnVolume* Zone);
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "Run")
+	void OnRunFinished(bool bVictory);
+
+	// Portal actor spawned at a cleared zone to teleport players into the next zone. Set a BP child
+	// (with mesh/VFX) here. If left empty, zones simply unlock and players walk in.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run")
+	TSubclassOf<AGP_RunPortal> PortalClass;
+
+	// Map to send the party back to once a run ends (victory or defeat). The
+	// delay lets clients see the result screen before the lobby travel kicks in.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run")
+	FString ReturnMapName = TEXT("MainMap/LobbyMap");
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run", meta = (ClampMin = "0.0"))
+	float ReturnToLobbyDelay = 8.0f;
+
+	// Region revival config. In the current RegionStateManager/PCG setup,
+	// state 0 is the healthy/alive vegetation state.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Region", meta = (ClampMin = "0"))
+	int32 RegionCount = 9;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Region")
+	uint8 DeadRegionState = 3;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Region")
+	uint8 AliveRegionState = 0;
+
+private:
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<AGP_EnemySpawnVolume>> OrderedZones;
+
+	int32 CurrentZoneIndex = INDEX_NONE;
+	int32 PendingZoneIndex = INDEX_NONE;
+	int32 AliveZoneEnemies = 0;
+	int32 MarkersTotal = 0;
+	int32 MarkersTriggered = 0;
+	bool bRunStarted = false;
+	bool bRunFinished = false;
+
+	FTimerHandle ReturnToLobbyTimerHandle;
+
+	void GatherZones();
+	void InitializeRegionStates();
+	void UnlockZone(int32 ZoneIndex);
+	void StartZone(int32 ZoneIndex);
+	void SpawnZoneEnemies(AGP_EnemySpawnVolume* Zone);
+	void SpawnMarkerEnemies(AGP_EnemySpawnVolume* Zone, AGP_EnemySpawnMarker* Marker);
+	void RegisterZoneEnemy(AGP_EnemyCharacter* Enemy);
+	void MaybeCompleteZone();
+	void CompleteCurrentZone();
+	void AdvanceZone();
+	void SpawnPortalToZone(int32 FromZoneIndex, int32 ToZoneIndex);
+	void FinishRun(bool bVictory);
+	void ReturnToLobby();
+
+	UFUNCTION()
+	void HandlePlayerEnteredZone(AGP_EnemySpawnVolume* Zone);
+
+	UFUNCTION()
+	void HandleMarkerTriggered(AGP_EnemySpawnVolume* Zone, AGP_EnemySpawnMarker* Marker);
+
+	UFUNCTION()
+	void HandleZoneEnemyDied(AGP_EnemyCharacter* DeadEnemy);
+
+	AGP_GameState* GetGPGameState() const;
+};

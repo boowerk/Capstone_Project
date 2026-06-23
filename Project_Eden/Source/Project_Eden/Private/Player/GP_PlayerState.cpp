@@ -5,6 +5,9 @@
 #include "Engine/Engine.h"
 #include "Net/UnrealNetwork.h"
 #include "AbilitySystem/GP_AttributeSet.h"
+#include "AbilitySystem/Abilities/GP_SkillData.h"
+#include "GameplayTags/GP_Tags.h"
+#include "Player/GP_PlayerController.h"
 
 
 AGP_PlayerState::AGP_PlayerState()
@@ -76,11 +79,6 @@ void AGP_PlayerState::AddSkillAugment(UGP_SkillAugmentData* AugmentData)
 	}
 
 	SelectedSkillAugments.Add(AugmentData);
-
-	if (AugmentData->GrantedElementTag.IsValid())
-	{
-		CurrentTechElementTag = AugmentData->GrantedElementTag;
-	}
 
 	ForceNetUpdate();
 }
@@ -208,6 +206,29 @@ int32 AGP_PlayerState::GetSkillAugmentProjectileCountBonus(FGameplayTag SkillIdT
 	return ProjectileCountBonus;
 }
 
+bool AGP_PlayerState::HasSkillAugmentInfiniteProjectilePierce(FGameplayTag SkillIdTag) const
+{
+	if (!SkillIdTag.IsValid())
+	{
+		return false;
+	}
+
+	for (const UGP_SkillAugmentData* Augment : SelectedSkillAugments)
+	{
+		if (!DoesAugmentApplyToSkill(Augment, SkillIdTag))
+		{
+			continue;
+		}
+
+		if (Augment->Modifiers.bProjectileInfinitePierce)
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
 TSubclassOf<AActor> AGP_PlayerState::GetSkillAugmentImpactVisualActorOverride(FGameplayTag SkillIdTag) const
 {
 	for (int32 Index = SelectedSkillAugments.Num() - 1; Index >= 0; --Index)
@@ -234,6 +255,56 @@ UNiagaraSystem* AGP_PlayerState::GetSkillAugmentActiveVFXOverride(FGameplayTag S
 	}
 
 	return nullptr;
+}
+
+TArray<FGP_NiagaraParameterOverride> AGP_PlayerState::GetSkillAugmentNiagaraParameterOverrides(FGameplayTag SkillIdTag) const
+{
+	TArray<FGP_NiagaraParameterOverride> Overrides;
+	if (!SkillIdTag.IsValid())
+	{
+		return Overrides;
+	}
+
+	TMap<FName, int32> OverrideIndices;
+	for (const UGP_SkillAugmentData* Augment : SelectedSkillAugments)
+	{
+		if (!DoesAugmentApplyToSkill(Augment, SkillIdTag))
+		{
+			continue;
+		}
+
+		for (const FGP_NiagaraParameterOverride& Override : Augment->NiagaraParameterOverrides)
+		{
+			if (Override.ParameterName.IsNone())
+			{
+				continue;
+			}
+
+			if (const int32* ExistingIndex = OverrideIndices.Find(Override.ParameterName))
+			{
+				Overrides[*ExistingIndex] = Override;
+				continue;
+			}
+
+			OverrideIndices.Add(Override.ParameterName, Overrides.Add(Override));
+		}
+	}
+
+	return Overrides;
+}
+
+FGP_SkillAugmentPeriodicAreaDamage AGP_PlayerState::GetSkillAugmentPeriodicAreaDamage(FGameplayTag SkillIdTag) const
+{
+	FGP_SkillAugmentPeriodicAreaDamage Settings;
+	for (const UGP_SkillAugmentData* Augment : SelectedSkillAugments)
+	{
+		if (DoesAugmentApplyToSkill(Augment, SkillIdTag) && Augment->PeriodicAreaDamage.bEnabled)
+		{
+			Settings = Augment->PeriodicAreaDamage;
+		}
+	}
+
+	return Settings;
 }
 
 void AGP_PlayerState::AddXP(float Amount)
@@ -264,6 +335,14 @@ void AGP_PlayerState::AddXP(float Amount)
 	if (bLeveledUp)
 	{
 		OnLevelUp(CurrentLevel);
+
+		// OnRep_CurrentLevel never fires on the server for its own authoritative
+		// value, so a listen-server host needs this call here too; RequestOpenAugmentSelect
+		// itself only acts if the controller is local (the host's own).
+		if (AGP_PlayerController* PC = Cast<AGP_PlayerController>(GetPlayerController()))
+		{
+			PC->RequestOpenAugmentSelect();
+		}
 	}
 
 	if (bDebugXPChanges)
@@ -277,6 +356,46 @@ void AGP_PlayerState::AddXP(float Amount)
 void AGP_PlayerState::ServerAddXP_Implementation(float Amount)
 {
 	AddXP(Amount);
+}
+
+void AGP_PlayerState::SetEquippedSkillData(FGameplayTag SlotTag, UGP_SkillData* SkillData)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	if (SlotTag.MatchesTagExact(GPTags::Ability::Skill::Slot01))
+	{
+		Slot01SkillData = SkillData;
+		OnEquippedSkillChanged.Broadcast(SlotTag, SkillData);
+	}
+	else if (SlotTag.MatchesTagExact(GPTags::Ability::Skill::Slot02))
+	{
+		Slot02SkillData = SkillData;
+		OnEquippedSkillChanged.Broadcast(SlotTag, SkillData);
+	}
+	else
+	{
+		return;
+	}
+
+	ForceNetUpdate();
+}
+
+UGP_SkillData* AGP_PlayerState::GetEquippedSkillData(FGameplayTag SlotTag) const
+{
+	if (SlotTag.MatchesTagExact(GPTags::Ability::Skill::Slot01))
+	{
+		return Slot01SkillData;
+	}
+
+	if (SlotTag.MatchesTagExact(GPTags::Ability::Skill::Slot02))
+	{
+		return Slot02SkillData;
+	}
+
+	return nullptr;
 }
 
 float AGP_PlayerState::GetCurrentXP() const
@@ -330,7 +449,7 @@ bool AGP_PlayerState::DoesAugmentApplyToSkill(const UGP_SkillAugmentData* Augmen
 		return false;
 	}
 
-	return !AugmentData->RequiredElementTag.IsValid() || CurrentTechElementTag.MatchesTagExact(AugmentData->RequiredElementTag);
+	return true;
 }
 
 void AGP_PlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -342,6 +461,8 @@ void AGP_PlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
 	DOREPLIFETIME(AGP_PlayerState, CurrentXP);
 	DOREPLIFETIME(AGP_PlayerState, CurrentLevel);
 	DOREPLIFETIME(AGP_PlayerState, XPToNextLevel);
+	DOREPLIFETIME(AGP_PlayerState, Slot01SkillData);
+	DOREPLIFETIME(AGP_PlayerState, Slot02SkillData);
 }
 
 void AGP_PlayerState::OnRep_EquippedWeaponData()
@@ -365,9 +486,27 @@ void AGP_PlayerState::OnRep_CurrentLevel(int32 PreviousLevel)
 	if (CurrentLevel > PreviousLevel)
 	{
 		OnLevelUp(CurrentLevel);
+
+		// Runs on every client this PlayerState replicates to; RequestOpenAugmentSelect
+		// internally checks IsLocalController() so only the leveling player's own
+		// controller actually opens the picker.
+		if (AGP_PlayerController* PC = Cast<AGP_PlayerController>(GetPlayerController()))
+		{
+			PC->RequestOpenAugmentSelect();
+		}
 	}
 }
 
 void AGP_PlayerState::OnRep_XPToNextLevel()
 {
+}
+
+void AGP_PlayerState::OnRep_Slot01SkillData()
+{
+	OnEquippedSkillChanged.Broadcast(GPTags::Ability::Skill::Slot01, Slot01SkillData);
+}
+
+void AGP_PlayerState::OnRep_Slot02SkillData()
+{
+	OnEquippedSkillChanged.Broadcast(GPTags::Ability::Skill::Slot02, Slot02SkillData);
 }

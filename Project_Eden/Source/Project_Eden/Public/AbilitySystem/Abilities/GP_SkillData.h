@@ -52,12 +52,34 @@ struct FGP_ElementVisualActorEntry
 	TObjectPtr<UNiagaraSystem> ProjectileVisualSystem;
 };
 
+USTRUCT(BlueprintType, meta = (DisplayName = "Periodic Area Niagara Bindings"))
+struct FGP_PeriodicAreaNiagaraBindings
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Visual|Niagara", meta = (DisplayName = "Radius Parameter Name", ToolTip = "Optional Niagara float parameter that receives the periodic area's radius. Use the exact User parameter name."))
+	FName RadiusParameterName;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Visual|Niagara", meta = (DisplayName = "Duration Parameter Name", ToolTip = "Optional Niagara float parameter that receives the periodic area's duration. Use the exact User parameter name."))
+	FName DurationParameterName;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Visual|Niagara", meta = (DisplayName = "Spawn Rate Parameter Name", ToolTip = "Optional Niagara float parameter that receives 1 / damage interval. Use the exact User parameter name."))
+	FName SpawnRateParameterName;
+};
+
 UENUM(BlueprintType)
 enum class EGP_CooldownPolicy : uint8
 {
 	None,
 	Generic,
 	Custom
+};
+
+UENUM(BlueprintType)
+enum class EGP_ProjectileImpactDamageMode : uint8
+{
+	DirectOnly,
+	DirectAndSplash
 };
 
 /**
@@ -93,8 +115,38 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Visual", meta = (DisplayName = "Element Visual Overrides", TitleProperty = "ElementTag", ToolTip = "Element-specific visual overrides for impact visuals and active execution VFX."))
 	TArray<FGP_ElementVisualActorEntry> ElementVisualActorClasses;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Visual|Niagara", meta = (DisplayName = "Periodic Area Parameter Bindings", ToolTip = "Maps periodic area gameplay values to this skill's Niagara User parameters. Empty names are ignored."))
+	FGP_PeriodicAreaNiagaraBindings PeriodicAreaNiagaraBindings;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Actor", meta = (DisplayName = "Execution Actor Class", ToolTip = "Actor spawned to execute this skill. Projectile, mine, field, trap, or other runtime actor. If empty, the ability fallback actor is used."))
 	TSubclassOf<AActor> SpawnActorClass;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Projectile")
+	EGP_ProjectileImpactDamageMode ProjectileImpactDamageMode = EGP_ProjectileImpactDamageMode::DirectOnly;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Projectile", meta = (DisplayName = "Projectile Spread Angle", ClampMin = "0.0", ClampMax = "180.0", Units = "deg", ToolTip = "Total horizontal angle covered when projectile count augments spawn multiple projectiles."))
+	float ProjectileSpreadAngle = 10.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Projectile", meta = (ClampMin = "0.0", EditCondition = "ProjectileImpactDamageMode == EGP_ProjectileImpactDamageMode::DirectAndSplash", EditConditionHides))
+	float SplashRadius = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Projectile", meta = (ClampMin = "0.0", EditCondition = "ProjectileImpactDamageMode == EGP_ProjectileImpactDamageMode::DirectAndSplash", EditConditionHides))
+	float SplashDamageMultiplier = 1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Projectile|Visual", meta = (DisplayName = "Impact Radius Scale Parameter Name", ToolTip = "Optional Niagara Vector2D User parameter whose authored BP value is multiplied by the final splash radius multiplier. Example: User.SpriteAllSize.", EditCondition = "ProjectileImpactDamageMode == EGP_ProjectileImpactDamageMode::DirectAndSplash", EditConditionHides))
+	FName ImpactRadiusScaleParameterName;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Projectile|Debug", meta = (EditCondition = "ProjectileImpactDamageMode == EGP_ProjectileImpactDamageMode::DirectAndSplash", EditConditionHides))
+	bool bDrawSplashDebug = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Projectile|Multi Hit", meta = (DisplayName = "Projectile Max Total Hits", ClampMin = "1", ToolTip = "Maximum total number of damage hits applied by one multi-hit projectile across all targets."))
+	int32 ProjectileMaxHitsPerTarget = 3;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Projectile|Multi Hit", meta = (ClampMin = "0.01", Units = "s", ToolTip = "Delay between reserved hits after a multi-hit projectile touches a target."))
+	float ProjectileHitInterval = 0.1f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Projectile|Multi Hit", meta = (ClampMin = "0.0", ToolTip = "Damage scale applied to each hit of a multi-hit projectile."))
+	float ProjectileDamagePerHitMultiplier = 0.4f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skill|Damage")
 	float BaseDamage = 0.f;

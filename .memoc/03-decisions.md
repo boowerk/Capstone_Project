@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-06-23T08:39:35+09:00
+updated: 2026-06-23T15:25:12+09:00
 status: active
 tags:
   - memoc
@@ -57,8 +57,12 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 ### 2026-06-23
 - Ground Hands floor placement traces only WorldStatic geometry, never pawns. Keep the skeletal hand hidden for the entire decal warning and reveal it when rise begins; the native box remains the sole hit authority.
 - Production boss danger ranges use floor decals rather than `DrawDebug` geometry. Sans Sweep uses one parameterized fan decal whose radius and angle mirror the real forward-arc hit calculation.
-- Supersede the component-only telegraph seam: all non-Sans boss attack boundaries use `UGP_BossTelegraphVFXComponent`. `Telegraph VFX On/Off` is the authoritative opt-in even if an old BP serialized Auto Activate; enabled attacks multicast the configured Niagara and wait its lead time, while groggy/teleport state utilities bypass it. Reuse Dark Knight's existing BP component instead of adding a duplicate.
+- Boss telegraph selection is two-stage: `Telegraph VFX On/Off` is only the master switch, and each non-Sans boss owns a BP-editable `Telegraph VFX Patterns` tag->bool map. Only checked pattern tags multicast the configured Niagara and wait its lead time; groggy/teleport state utilities bypass it. Reuse Dark Knight's existing BP component instead of adding a duplicate.
 - Supersede periodic FollowTarget minimap capture with one post-PCG full-map capture. Keep the resulting RenderTarget fixed, disable SceneCapture after its fenced GPU copy, and move pan/zoom plus player/enemy marker presentation into C++/UMG.
+- Boss target indication belongs to the boss pawn, not the BT task: `AEnemyAIController` only detects `TargetActor` acquisition/swap, then `AGP_EnemyCharacter` gates boss-only playback through `UGP_BossTargetMarkerVFXComponent`.
 
 ### 2026-06-22
 - Resolve player SkillData and actor-owned boss Niagara through the same cue/element specificity function. Pattern actors own persistent effect lifetime; authoritative gameplay events multicast cosmetic one-shots.
+
+### 2026-06-23
+- Reinterpret the RegionState system as biome-type selection, not gameplay life/death/corruption status. Values should represent biome categories; GameMode terms like `AliveRegionState` / `DeadRegionState` are legacy naming to rename or replace when implementation resumes.

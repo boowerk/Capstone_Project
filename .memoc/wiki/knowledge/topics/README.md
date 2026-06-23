@@ -18,7 +18,7 @@ Synthesized topic pages that compound knowledge across sessions.
 
 ## Topic Pages
 
-_None yet. Add pages here when a concept deserves durable synthesis._
+- [PCG Region System & Gameplay Flow](pcg-region-system-and-gameplay-flow.md) — how the RegionSystem PCG/region-state layer works and the shrinking-zone gameplay direction built on it.
 
 ## How To Link
 

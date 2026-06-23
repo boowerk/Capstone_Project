@@ -22,6 +22,7 @@
 #include "GameFramework/Controller.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerState.h"
+#include "GameplayTags/GP_Tags.h"
 #include "Kismet/GameplayStatics.h"
 #include "NavigationSystem.h"
 #include "TimerManager.h"
@@ -38,6 +39,11 @@ AGP_CrystalSeraphBossCharacter::AGP_CrystalSeraphBossCharacter()
 	BossTelegraphVFXComponent = CreateDefaultSubobject<UGP_BossTelegraphVFXComponent>(TEXT("BossTelegraphVFXComponent"));
 	BossTelegraphVFXComponent->SetupAttachment(GetRootComponent());
 	BossTelegraphVFXComponent->SetAutoActivate(false);
+	// Expose every Crystal Seraph attack without treating teleport or groggy state changes as attacks.
+	TelegraphVFXPatterns.Add(GPTags::Ability::Boss::CrystalSeraph::Basic, false);
+	TelegraphVFXPatterns.Add(GPTags::Ability::Boss::CrystalSeraph::Laser, false);
+	TelegraphVFXPatterns.Add(GPTags::Ability::Boss::CrystalSeraph::Prism, false);
+	TelegraphVFXPatterns.Add(GPTags::Ability::Boss::CrystalSeraph::Area, false);
 	CrystalPrismActorClass = AGP_CrystalPrismActor::StaticClass();
 	SeraphLaserActorClass = AGP_SeraphLaserActor::StaticClass();
 	WingCoreHitActorClass = AGP_WingCoreHitActor::StaticClass();
@@ -78,6 +84,19 @@ AGP_CrystalSeraphBossCharacter::AGP_CrystalSeraphBossCharacter()
 	{
 		GetMesh()->SetSkeletalMesh(MaskManMeshFinder.Object);
 	}
+}
+
+bool AGP_CrystalSeraphBossCharacter::IsBossTelegraphEnabledForPattern(FGameplayTag PatternTag) const
+{
+	return IsValid(BossTelegraphVFXComponent)
+		&& BossTelegraphVFXComponent->IsPatternTelegraphEnabled(PatternTag, TelegraphVFXPatterns);
+}
+
+float AGP_CrystalSeraphBossCharacter::PlayBossTelegraphForPattern(FGameplayTag PatternTag)
+{
+	return IsValid(BossTelegraphVFXComponent)
+		? BossTelegraphVFXComponent->PlayPatternTelegraph(PatternTag, TelegraphVFXPatterns)
+		: 0.0f;
 }
 
 void AGP_CrystalSeraphBossCharacter::OnConstruction(const FTransform& Transform)

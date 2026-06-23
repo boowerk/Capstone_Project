@@ -1,4 +1,5 @@
-﻿#include "Actors/GP_Projectile.h"
+#include "Actors/GP_Projectile.h"
+#include "AbilitySystem/Abilities/GP_SkillData.h"
 #include "Components/ShapeComponent.h" 
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "GameplayTags/GP_Tags.h"
@@ -7,6 +8,7 @@
 #include "GameplayEffect.h"
 #include "GameFramework/Pawn.h"
 #include "Net/UnrealNetwork.h"
+#include "NiagaraComponent.h"
 
 AGP_Projectile::AGP_Projectile()
 {
@@ -83,6 +85,21 @@ void AGP_Projectile::SetProjectileVisualSystem(UNiagaraSystem* InProjectileVisua
 	BP_OnProjectileVisualSystemChanged(ProjectileVisualSystem);
 }
 
+void AGP_Projectile::SetImpactVisualActorClass(TSubclassOf<AActor> InImpactVisualActorClass)
+{
+	ImpactVisualActorClass = InImpactVisualActorClass;
+}
+
+void AGP_Projectile::ApplySplashRadiusMultiplier(float RadiusMultiplier)
+{
+	SplashRadiusMultiplier = FMath::Max(RadiusMultiplier, 0.0f);
+}
+
+void AGP_Projectile::SetInfinitePierce(bool bInInfinitePierce)
+{
+	bInfinitePierce = bInInfinitePierce;
+}
+
 void AGP_Projectile::OnRep_ProjectileVisualSystem()
 {
 	if (ProjectileVisualSystem)
@@ -108,7 +125,12 @@ void AGP_Projectile::OnProjectileOverlap(UPrimitiveComponent* OverlappedComponen
 		return;
 	}
 
-	bHasHit = true;
+	const TWeakObjectPtr<AActor> HitActor(OtherActor);
+	if (PiercedActors.Contains(HitActor))
+	{
+		return;
+	}
+	PiercedActors.Add(HitActor);
 
 
 	if (GetInstigator())
@@ -117,17 +139,95 @@ void AGP_Projectile::OnProjectileOverlap(UPrimitiveComponent* OverlappedComponen
 		HitActors.Add(OtherActor);
 
 		UGP_BlueprintLibrary::ApplyGameplayEffectAndEventToActors(GetInstigator(), HitActors, DamageEffectClass, HitEventTag, EffectLevel, SkillData);
+
+		if (SkillData
+			&& SkillData->ProjectileImpactDamageMode == EGP_ProjectileImpactDamageMode::DirectAndSplash
+			&& SkillData->SplashRadius > 0.0f)
+		{
+			TArray<AActor*> SplashActors = UGP_BlueprintLibrary::SphereOverlapActorsAtLocation(
+				this,
+				GetActorLocation(),
+				SkillData->SplashRadius * SplashRadiusMultiplier,
+				GetInstigator(),
+				SkillData->bDrawSplashDebug);
+			SplashActors.Remove(OtherActor);
+
+			UGP_BlueprintLibrary::ApplyGameplayEffectAndEventToActors(
+				GetInstigator(),
+				SplashActors,
+				DamageEffectClass,
+				HitEventTag,
+				EffectLevel,
+				SkillData,
+				SkillData->SplashDamageMultiplier);
+		}
 	}
 
-	MulticastPlayHitEffect(GetActorLocation());
+	MulticastPlayHitEffect(
+		GetActorLocation(),
+		GetActorRotation(),
+		ImpactVisualActorClass,
+		SkillData ? SkillData->ImpactRadiusScaleParameterName : NAME_None,
+		SplashRadiusMultiplier);
 
+	if (bInfinitePierce)
+	{
+		return;
+	}
+
+	bHasHit = true;
 	if (bDestroyOnHit)
 	{
 		Destroy();
 	}
 }
 
-void AGP_Projectile::MulticastPlayHitEffect_Implementation(const FVector& ImpactLocation)
+void AGP_Projectile::MulticastPlayHitEffect_Implementation(
+	const FVector& ImpactLocation,
+	const FRotator& ImpactRotation,
+	TSubclassOf<AActor> InImpactVisualActorClass,
+	FName RadiusScaleParameterName,
+	float RadiusScaleMultiplier)
 {
+	if (InImpactVisualActorClass)
+	{
+		FActorSpawnParameters SpawnParams;
+		SpawnParams.Owner = GetOwner();
+		SpawnParams.Instigator = GetInstigator();
+		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		AActor* VisualActor = GetWorld()->SpawnActor<AActor>(
+			InImpactVisualActorClass,
+			ImpactLocation,
+			ImpactRotation,
+			SpawnParams);
+
+		if (IsValid(VisualActor) && !RadiusScaleParameterName.IsNone())
+		{
+			TArray<UNiagaraComponent*> NiagaraComponents;
+			VisualActor->GetComponents(NiagaraComponents);
+
+			for (UNiagaraComponent* NiagaraComponent : NiagaraComponents)
+			{
+				if (!IsValid(NiagaraComponent))
+				{
+					continue;
+				}
+
+				bool bHasBaseScale = false;
+				const FVector2D AuthoredBaseScale =
+					NiagaraComponent->GetVariableVec2(RadiusScaleParameterName, bHasBaseScale);
+				const FVector2D BaseScale =
+					bHasBaseScale ? AuthoredBaseScale : FVector2D(1.0f, 1.0f);
+				NiagaraComponent->DestroyInstanceNotComponent();
+				const float SafeMultiplier = FMath::Max(RadiusScaleMultiplier, 0.0f);
+				NiagaraComponent->SetVariableVec2(
+					RadiusScaleParameterName,
+					BaseScale * SafeMultiplier);
+				NiagaraComponent->Activate(true);
+			}
+		}
+		return;
+	}
+
 	BP_OnHitEffect(ImpactLocation);
 }

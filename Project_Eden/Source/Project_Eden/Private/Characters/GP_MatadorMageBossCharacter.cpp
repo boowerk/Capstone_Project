@@ -16,6 +16,7 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/Controller.h"
+#include "GameplayTags/GP_Tags.h"
 #include "Kismet/GameplayStatics.h"
 #include "NavigationSystem.h"
 #include "TimerManager.h"
@@ -33,6 +34,10 @@ AGP_MatadorMageBossCharacter::AGP_MatadorMageBossCharacter()
 	BossTelegraphVFXComponent = CreateDefaultSubobject<UGP_BossTelegraphVFXComponent>(TEXT("BossTelegraphVFXComponent"));
 	BossTelegraphVFXComponent->SetupAttachment(GetRootComponent());
 	BossTelegraphVFXComponent->SetAutoActivate(false);
+	// Prefill the three damaging Matador choices while leaving groggy state handling immediate.
+	TelegraphVFXPatterns.Add(GPTags::Ability::Enemy::Utility_MatadorBullPattern, false);
+	TelegraphVFXPatterns.Add(GPTags::Ability::Boss::Matador::RapierThrust, false);
+	TelegraphVFXPatterns.Add(GPTags::Ability::Boss::Matador::CapeGust, false);
 
 	DecoyActorClass = AGP_MatadorBossDecoyActor::StaticClass();
 	ChainEffectActorClass = AGP_ChainEffectActor::StaticClass();
@@ -60,6 +65,19 @@ AGP_MatadorMageBossCharacter::AGP_MatadorMageBossCharacter()
 	{
 		GetMesh()->SetSkeletalMesh(MaskManMeshFinder.Object);
 	}
+}
+
+bool AGP_MatadorMageBossCharacter::IsBossTelegraphEnabledForPattern(FGameplayTag PatternTag) const
+{
+	return IsValid(BossTelegraphVFXComponent)
+		&& BossTelegraphVFXComponent->IsPatternTelegraphEnabled(PatternTag, TelegraphVFXPatterns);
+}
+
+float AGP_MatadorMageBossCharacter::PlayBossTelegraphForPattern(FGameplayTag PatternTag)
+{
+	return IsValid(BossTelegraphVFXComponent)
+		? BossTelegraphVFXComponent->PlayPatternTelegraph(PatternTag, TelegraphVFXPatterns)
+		: 0.0f;
 }
 
 void AGP_MatadorMageBossCharacter::Tick(float DeltaSeconds)
@@ -291,9 +309,7 @@ bool AGP_MatadorMageBossCharacter::RequestStartBullPattern(AActor* PatternTarget
 		return false;
 	}
 
-	const float TelegraphDelay = IsValid(BossTelegraphVFXComponent)
-		? BossTelegraphVFXComponent->PlayEnabledTelegraph()
-		: 0.0f;
+	const float TelegraphDelay = PlayBossTelegraphForPattern(GPTags::Ability::Enemy::Utility_MatadorBullPattern);
 	if (TelegraphDelay <= KINDA_SMALL_NUMBER)
 	{
 		return IsValid(SpawnBullPattern(PatternTargetActor));

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "GameplayTagContainer.h"
 #include "NiagaraComponent.h"
 #include "GP_BossTelegraphVFXComponent.generated.h"
 
@@ -31,6 +32,16 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Boss|Telegraph")
 	float GetEnabledTelegraphDuration() const { return bTelegraphVFXEnabled ? GetTelegraphDuration() : 0.0f; }
+
+	/** Returns true only when the master switch and the selected pattern entry are both enabled. */
+	bool IsPatternTelegraphEnabled(
+		FGameplayTag PatternTag,
+		const TMap<FGameplayTag, bool>& PatternToggles) const;
+
+	/** Plays the cue for one explicitly selected boss pattern and returns the resulting lead time. */
+	float PlayPatternTelegraph(
+		FGameplayTag PatternTag,
+		const TMap<FGameplayTag, bool>& PatternToggles);
 
 	UFUNCTION(BlueprintPure, Category = "Boss|Telegraph")
 	float GetTelegraphDuration() const { return TelegraphDuration; }

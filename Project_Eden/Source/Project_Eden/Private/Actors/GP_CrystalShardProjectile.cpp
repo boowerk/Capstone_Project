@@ -80,8 +80,8 @@ void AGP_CrystalShardProjectile::OnProjectileOverlap(UPrimitiveComponent* Overla
 		0.0f,
 		true);
 
+	MulticastPlayHitEffect(GetActorLocation(), GetActorRotation(), ImpactVisualActorClass, NAME_None, 1.0f);
 	MulticastPlayShardImpactVFX(GetActorLocation(), GetActorRotation());
-	MulticastPlayHitEffect(GetActorLocation());
 	Destroy();
 }
 

@@ -12,11 +12,13 @@ class UBehaviorTree;
 class UBlackboardData;
 class UEnemyAIRangeVisualizationComponent;
 class UEnemyArchetypeData;
+class UGP_BossTargetMarkerVFXComponent;
 class UGP_EnemyDeathAbility;
 class UGP_WidgetComponent;
 class UPDA_EnemyAnimationSet;
 class AGP_EnemyCharacter;
 class AGP_PlayerState;
+struct FOnAttributeChangeData;
 struct FDataTableRowHandle;
 struct FEnemyArchetypeTuning;
 struct FEnemyLLMEvaluation;
@@ -30,6 +32,9 @@ enum class EGPEnemyCombatArchetype : uint8
 	Ranged UMETA(DisplayName = "Ranged"),
 	Flying UMETA(DisplayName = "Flying")
 };
+
+// Broadcast on the server the first time this enemy's health reaches zero, so the GameMode can track zone clears.
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FGPOnEnemyDied, AGP_EnemyCharacter*, DeadEnemy);
 
 UCLASS()
 class PROJECT_EDEN_API AGP_EnemyCharacter : public AGP_BaseCharacter
@@ -48,8 +53,18 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Boss")
 	bool IsBossEnemy() const { return bIsBossEnemy; }
 
+	// Fires once (server authority) when this enemy dies. The GameMode subscribes to count down zone clears.
+	UPROPERTY(BlueprintAssignable, Category = "Enemy|Lifecycle")
+	FGPOnEnemyDied OnEnemyDied;
+
 	UFUNCTION(BlueprintPure, Category = "Boss")
 	FText GetBossDisplayName() const;
+
+	UFUNCTION(BlueprintPure, Category = "Boss|VFX")
+	UGP_BossTargetMarkerVFXComponent* GetBossTargetMarkerVFXComponent() const { return BossTargetMarkerVFXComponent; }
+
+	// AIController calls this only when TargetActor is first acquired or changes to another valid player.
+	void NotifyBossTargetSelected(AActor* TargetActor);
 
 	UFUNCTION(BlueprintPure, Category = "AI")
 	FVector GetBehaviorAnchorLocation() const;
@@ -103,6 +118,7 @@ public:
 protected:
 	virtual void OnConstruction(const FTransform& Transform) override;
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	/** Enemy-only visual and combat animation data. Leave the legacy base AnimationSet empty for new enemies. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation")
@@ -225,6 +241,9 @@ private:
 	UPROPERTY()
 	TObjectPtr<UAttributeSet> AttributeSet;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|VFX", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UGP_BossTargetMarkerVFXComponent> BossTargetMarkerVFXComponent;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Enemy|UI", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UGP_WidgetComponent> WorldHealthBarComponent;
 
@@ -259,4 +278,9 @@ private:
 	void RefreshAIRangeVisualizers();
 	void GrantXPRewardToInstigator(AActor* InstigatorActor);
 	AGP_PlayerState* ResolveInstigatorPlayerState(AActor* InstigatorActor) const;
+	void HandleMoveSpeedAttributeChanged(const FOnAttributeChangeData& ChangeData);
+	void BindMoveSpeedAttribute();
+	void UnbindMoveSpeedAttribute();
+
+	FDelegateHandle MoveSpeedAttributeDelegateHandle;
 };

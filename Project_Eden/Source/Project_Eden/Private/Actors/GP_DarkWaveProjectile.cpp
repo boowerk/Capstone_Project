@@ -51,6 +51,6 @@ void AGP_DarkWaveProjectile::OnProjectileOverlap(UPrimitiveComponent* Overlapped
 	bHasHit = true;
 	TArray<AActor*> Targets { OtherActor };
 	GPBossCombatUtils::ApplyDamage(GetInstigator(), Targets, DamageEffectClass, AttackPowerDamageCoefficient, 0.0f, true, GPTags::Damage::Element::Chaos);
-	MulticastPlayHitEffect(GetActorLocation());
+	MulticastPlayHitEffect(GetActorLocation(), GetActorRotation(), ImpactVisualActorClass, NAME_None, 1.0f);
 	Destroy();
 }

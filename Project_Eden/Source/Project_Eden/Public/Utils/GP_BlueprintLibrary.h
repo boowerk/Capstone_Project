@@ -64,11 +64,11 @@ public:
 	
 	// 액터배열에 게임플레이 이펙트 일괄 적용
 	UFUNCTION(BlueprintCallable, Category = "Eden|Combat|Abilities")
-	static void ApplyGameplayEffectToActors(AActor* Instigator, const TArray<AActor*>& TargetActors, TSubclassOf<UGameplayEffect> EffectClass, float EffectLevel = 1.0f, UGP_SkillData* SkillData = nullptr);
+	static void ApplyGameplayEffectToActors(AActor* Instigator, const TArray<AActor*>& TargetActors, TSubclassOf<UGameplayEffect> EffectClass, float EffectLevel = 1.0f, UGP_SkillData* SkillData = nullptr, float DamageScale = 1.0f);
 
 	// 액터배열에 게임플레이 이펙트 적용 후 이벤트 전송
 	UFUNCTION(BlueprintCallable, Category = "Eden|Combat|Abilities")
-	static void ApplyGameplayEffectAndEventToActors(AActor* Instigator, const TArray<AActor*>& TargetActors, TSubclassOf<UGameplayEffect> EffectClass, FGameplayTag EventTag, float EffectLevel = 1.0f, UGP_SkillData* SkillData = nullptr);
+	static void ApplyGameplayEffectAndEventToActors(AActor* Instigator, const TArray<AActor*>& TargetActors, TSubclassOf<UGameplayEffect> EffectClass, FGameplayTag EventTag, float EffectLevel = 1.0f, UGP_SkillData* SkillData = nullptr, float DamageScale = 1.0f);
 
 	// 지정 위치 기준 범위 안의 액터들에게 게임플레이 이펙트 적용
 	UFUNCTION(BlueprintCallable, Category = "Eden|Combat|Abilities")

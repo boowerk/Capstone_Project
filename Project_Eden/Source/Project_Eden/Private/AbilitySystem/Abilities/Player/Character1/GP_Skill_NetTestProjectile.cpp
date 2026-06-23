@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "AbilitySystem/Abilities/Player/Character1/GP_Skill_NetTestProjectile.h"
@@ -175,7 +175,7 @@ void UGP_Skill_NetTestProjectile::SpawnProjectiles(const FGP_SkillTargetData& Ta
 			ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
 		const int32 SafeProjectileCount = FMath::Max(1, 1 + GetSkillAugmentProjectileCountBonus(SkillData, CurrentActorInfo));
-		constexpr float BonusSpreadAngle = 10.0f;
+		const float BonusSpreadAngle = FMath::Max(SkillData->ProjectileSpreadAngle, 0.0f);
 		const float StepAngle = SafeProjectileCount > 1
 			? BonusSpreadAngle / static_cast<float>(SafeProjectileCount - 1)
 			: 0.0f;
@@ -205,6 +205,15 @@ void UGP_Skill_NetTestProjectile::SpawnProjectiles(const FGP_SkillTargetData& Ta
 			{
 				Projectile->SetSkillData(SkillData);
 				Projectile->SetProjectileVisualSystem(GetProjectileVisualSystem(SkillData, TechElementTag));
+				Projectile->ApplySplashRadiusMultiplier(
+					GetSkillAugmentRadiusMultiplier(SkillData, CurrentActorInfo));
+				Projectile->SetInfinitePierce(
+					HasSkillAugmentInfiniteProjectilePierce(SkillData, CurrentActorInfo));
+				Projectile->SetImpactVisualActorClass(GetSkillVisualActorClass(
+					SkillData,
+					nullptr,
+					TechElementTag,
+					GPTags::Ability::Skill::Visual::Impact));
 			}
 			else if (SpawnedActor)
 			{
@@ -216,7 +225,8 @@ void UGP_Skill_NetTestProjectile::SpawnProjectiles(const FGP_SkillTargetData& Ta
 
 void UGP_Skill_NetTestProjectile::EndAfterProjectileMontage(bool bWasCancelled)
 {
-	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, bWasCancelled);
+	const bool bReplicateEndAbility = bWasCancelled || HasAuthority(&CurrentActivationInfo);
+	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, bReplicateEndAbility, bWasCancelled);
 }
 
 void UGP_Skill_NetTestProjectile::OnAttackHitEventReceived(FGameplayEventData Payload)

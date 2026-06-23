@@ -12,12 +12,16 @@ class UGP_AugmentSelectWidget;
 class UGP_CharacterStatsMenuWidget;
 class UGP_SkillAugmentData;
 class UGP_SkillAugmentPoolData;
+class UGP_SkillData;
+class UGP_SkillPoolData;
+class UGP_SkillSelectWidget;
 class UGP_TestSkillSet;
 class UGP_PlayerHUDWidget;
 class UInputAction;
 class UInputMappingContext;
 class UUserWidget;
 struct FGameplayTag;
+struct FGameplayEventData;
 struct FInputActionValue;
 
 UCLASS()
@@ -39,6 +43,12 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "UI|Augment")
 	void CloseAugmentSelectWidget();
+
+	UFUNCTION(BlueprintCallable, Category = "UI|Skill")
+	bool RequestEquipSkill(UGP_SkillData* SkillData, FGameplayTag SlotTag);
+
+	UFUNCTION(BlueprintPure, Category = "UI|Skill")
+	UGP_SkillPoolData* GetSkillPoolData() const { return SkillPoolData; }
 
 protected:
 	virtual void BeginPlay() override;
@@ -126,6 +136,15 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UGP_CharacterStatsMenuWidget> CharacterStatsMenuWidget;
 
+	UPROPERTY(EditDefaultsOnly, Category = "UI|Skill")
+	TSubclassOf<UGP_SkillSelectWidget> SkillSelectWidgetClass;
+
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Input|UI")
+	TObjectPtr<UInputAction> OpenSkillSelectAction;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UGP_SkillSelectWidget> SkillSelectWidget;
+
 	UPROPERTY(EditDefaultsOnly, Category = "UI|Augment")
 	TSubclassOf<UGP_AugmentSelectWidget> AugmentSelectWidgetClass;
 
@@ -137,6 +156,9 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UGP_AugmentSelectWidget> AugmentSelectWidget;
+
+	UPROPERTY(EditDefaultsOnly, Category = "UI|Skill")
+	TObjectPtr<UGP_SkillPoolData> SkillPoolData;
 
 	UPROPERTY(Transient)
 	TObjectPtr<AGP_EnemyCharacter> CurrentBossEnemy;
@@ -176,6 +198,7 @@ private:
 	void Input_SkillSlot1();
 	void Input_SkillSlot2();
 	void Input_UltimateSkill();
+	void Input_SkillSlotReleased();
 	void Input_TestToggleSkill();
 	void Input_RotateTestSkill();
 	void Input_ToggleWhiteVoid();
@@ -188,7 +211,7 @@ private:
 	void Server_RotateTestSkill();
 
 	UFUNCTION(Server, Reliable, WithValidation)
-	void Server_SendSkillSelectionEvent(FGameplayTag EventTag);
+	void Server_SendSkillSelectionEvent(FGameplayTag EventTag, FVector_NetQuantize TargetLocation, bool bHasTargetLocation);
 
 	UFUNCTION(Server, Unreliable, WithValidation)
 	void Server_UpdateMoveInput(FVector2D MovementVector);
@@ -196,9 +219,17 @@ private:
 	UFUNCTION(Server, Reliable, WithValidation)
 	void Server_ClearMoveInput();
 
+	UFUNCTION(Server, Reliable)
+	void Server_EquipSkill(UGP_SkillData* SkillData, FGameplayTag SlotTag);
+
+	bool CanEquipSkill(UGP_SkillData* SkillData, FGameplayTag SlotTag) const;
 	bool ActivateAbilityByTag(const FGameplayTag& AbilityTag) const;
 	bool IsSkillSelectionActive() const;
+	bool IsGroundPositionSelectionActive() const;
 	bool SendSkillSelectionEvent(const FGameplayTag& EventTag) const;
+	void FillSkillSelectionTargetData(FGameplayEventData& Payload, const FVector& TargetLocation) const;
+	bool GetSkillSelectionCursorLocation(FVector& OutTargetLocation) const;
+	void UpdateSkillSelectionInputMode();
 	void CancelSkillSelectionIfActive() const;
 	void ClearTestSkillSlots(UAbilitySystemComponent* ASC);
 	int32 GetTestSkillPresetCount() const;
@@ -208,6 +239,11 @@ private:
 	void OpenCharacterStatsMenu();
 	void CloseCharacterStatsMenu();
 	void ApplyCharacterStatsMenuInputMode(bool bMenuOpen);
+	void Input_ToggleSkillSelect();
+	bool EnsureSkillSelectWidget();
+	void OpenSkillSelect();
+	void CloseSkillSelect();
+	void ApplySkillSelectInputMode(bool bMenuOpen);
 	FVector2D ResolveEffectiveMoveInput(const AGP_PlayerCharacter* PlayerCharacter) const;
 	void UpdateMovementSpeed(float DeltaSeconds);
 	void UpdateCharacterRotation(float DeltaSeconds);
@@ -215,6 +251,7 @@ private:
 	bool bSkillsEquipped = false;
 	int32 TestSkillPresetIndex = 0;
 	bool bIsCharacterStatsMenuOpen = false;
+	bool bWasGroundPositionSelectionActive = false;
 
 	// --- Movement Input Smoothing ---
 	FVector SmoothedMoveWorldDirection = FVector::ZeroVector;
@@ -226,4 +263,11 @@ private:
 	bool ShouldSmoothMoveDirection() const;
 	void ResetMoveDirectionSmoothing();
 	void Input_MoveCompleted(const FInputActionValue& Value);
+
+	// Adds the configured Input Mapping Contexts to the local player's Enhanced
+	// Input subsystem. Safe to call multiple times; no-op on non-local or when
+	// the subsystem is not yet available (e.g. early during dedicated-server
+	// client travel). Called from both SetupInputComponent and BeginPlay so a
+	// null subsystem at input-setup time on clients does not leave input unbound.
+	void AddInputMappingContexts();
 };

@@ -27,6 +27,11 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Boss|Dark Knight|VFX")
 	UGP_BossTelegraphVFXComponent* GetBossTelegraphVFXComponent() const;
 
+	/** Pattern-level gate used by GAS and the charge coordinator after the Blueprint master toggle. */
+	bool IsBossTelegraphEnabledForPattern(FGameplayTag PatternTag) const;
+	float PlayBossTelegraphForPattern(FGameplayTag PatternTag);
+	const TMap<FGameplayTag, bool>& GetTelegraphVFXPatterns() const { return TelegraphVFXPatterns; }
+
 	UFUNCTION(BlueprintPure, Category = "Boss|Dark Knight")
 	int32 GetDarkKnightPhase() const;
 
@@ -100,6 +105,11 @@ private:
 private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Dark Knight", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UGP_DarkArmorKnightStateComponent> DarkKnightStateComponent;
+
+	/** All selectable attack tags are prefilled; checking a value opts only that pattern into the shared cue. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Dark Knight|VFX",
+		meta = (AllowPrivateAccess = "true", DisplayName = "Telegraph VFX Patterns"))
+	TMap<FGameplayTag, bool> TelegraphVFXPatterns;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Dark Knight|Actors", meta = (AllowPrivateAccess = "true"))
 	TSubclassOf<AGP_DarkWaveProjectile> DarkWaveProjectileClass;

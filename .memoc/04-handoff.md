@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-06-23T08:45:06+09:00
+updated: 2026-06-23T17:59:34+09:00
 status: active
 tags:
   - memoc
@@ -11,13 +11,18 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-06-23T08:45:06+09:00
+Last synced: 2026-06-23T17:59:34+09:00
+
+## Player Network Movement Handoff
+
+- Client/server movement jitter was likely caused by directional `MaxWalkSpeed` mismatch. `AGP_PlayerController::ResolveEffectiveMoveInput()` now uses replicated/local raw move input first so server and owning client choose the same forward/side/back/sprint speed; server acceleration remains only as a fallback before input RPC arrival.
+- `Project_EdenEditor Win64 Development` build passed. PIE-check with a separate server/client session for remaining camera shake; if any remains, inspect root-motion fallback actions next.
 
 ## Dark Armor Knight Boss Handoff
 
 - Commits `4abb1dc1`, `85c40d78`, `0d0da2aa`, and `1c837936` implement the plan as native GAS/state/AI layers and create `/Game/Characters/EnemyCharacter/Boss/BP_Boss_DarkArmorKnight/BP_DarkArmorKnight` with `SK_KnightBoss`.
 - Commits `b439e0f5` and `dfb86b4b` add the requested Easy Impact Frames lightning to the replicated charge actor. It auto-plays at the boss transform during the existing 0.9s warning, then `StartCharge()` begins root-motion movement. Editor build and `ProjectEden.Combat.DarkArmorKnight.ChargeTelegraphVFX` pass; PIE-check effect scale and whether 0.9s matches the visual strike finish.
-- Commits `7dbebaba`, `cde64ad5`, `b1e740c5`, `bc692729`, `4b1452c0`, `6b0b58ac`, and `0e736fc7` add `Telegraph VFX On/Off` and connect non-Sans damaging GAS patterns. Crystal Seraph and Matador inherit `BossTelegraphVFXComponent`; Dark Knight reuses its existing `GP_BossTelegraphVFX` BP component. Select the component, choose Niagara System Asset, set Telegraph Duration/Uniform Visual Scale, and enable the bool. Groggy and Crystal teleport stay immediate. Dark Knight's charge coordinator skips its own cue and delay after a boss-level cue, avoiding a double warning. Build, configuration/exclusion automation, and legacy charge automation pass; PIE-check timing and placement on each attack.
+- Commits `b451bf12` and `3e5dbf35` correct telegraph selection to per-pattern opt-in. `Telegraph VFX On/Off` is only the master switch; edit each boss Class Defaults `Telegraph VFX Patterns` map to check the exact tags that should use the cue. Crystal Seraph and Matador still inherit `BossTelegraphVFXComponent`; Dark Knight still reuses `GP_BossTelegraphVFX`. Dark Knight charge skips its own coordinator cue/delay only if the Charge tag is checked. Build, configuration/exclusion automation, and legacy charge automation pass; PIE-check timing and placement on selected attacks.
 - Full editor build plus `ProjectEden.AI.Boss.PatternSelector.DarkArmorKnight` and `ProjectEden.Combat.DarkArmorKnight.GuardLifecycle` pass. Commandlet still reports the unrelated corrupt `Content/Maps/DemoMap/TestMap.umap` and missing Fab fence meshes.
 - Editor work: place `BP_DarkArmorKnight`; assign/tune its Anim Class and mesh/capsule transform for `SK_KnightBoss`. For final art, create BP children of DarkWave/GroundCrack/Charge actors, replace their primitive component meshes/materials/VFX, then assign those classes on the boss. Optional Dark Knight Blackboard mirror keys are not required for runtime truth.
 
@@ -192,6 +197,7 @@ _None yet._
 
 ## Not Verified
 
+- 2026-06-23 boss target marker VFX build and automation pass; PIE-check with one or more players that first acquisition and target swaps display on the selected player's torso, and tune `TargetBodySocketName`/`TargetBodyOffset` if the imported player skeleton lacks `spine_03`.
 - 2026-06-23 Sans Ground Hands decal/visibility fixes are built and automated coverage passes; PIE-check all three decals per wave and confirm each hand appears only as its rise begins.
 - 2026-06-23 Sans Sweep fan decal is built and automated coverage passes; PIE-check that the fan points forward and visually matches the 165-degree damage arc on uneven terrain.
 - 2026-06-17 basic enemy templates: C++ build succeeded and BP templates were created, but PIE runtime behavior still needs checking for common BT chase/attack transitions, ranged hit distance, and flying movement/pathing.
