@@ -192,6 +192,7 @@ _None yet._
 
 ## Not Verified
 
+- 2026-06-23 boss target marker VFX build and automation pass; PIE-check with one or more players that first acquisition and target swaps display on the selected player's torso, and tune `TargetBodySocketName`/`TargetBodyOffset` if the imported player skeleton lacks `spine_03`.
 - 2026-06-23 Sans Ground Hands decal/visibility fixes are built and automated coverage passes; PIE-check all three decals per wave and confirm each hand appears only as its rise begins.
 - 2026-06-23 Sans Sweep fan decal is built and automated coverage passes; PIE-check that the fan points forward and visually matches the 165-degree damage arc on uneven terrain.
 - 2026-06-17 basic enemy templates: C++ build succeeded and BP templates were created, but PIE runtime behavior still needs checking for common BT chase/attack transitions, ranged hit distance, and flying movement/pathing.
