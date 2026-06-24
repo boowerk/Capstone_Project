@@ -24,10 +24,17 @@ public:
 		const FGameplayAbilityActivationInfo ActivationInfo,
 		const FGameplayEventData* TriggerEventData) override;
 
+	// Global runtime switch for all skill debug drawing. Console: `g.DrawSkillDebug 0` to suppress, `1` to allow.
+	// Skill-spawned actors that own a bDrawDebugs copy also consult this so video capture can mute every debug draw at once.
+	static bool IsSkillDebugDrawEnabled();
+
 protected:
 	// =========================================================================
 	// 2. 디버깅 설정 변수군 (Debug Settings)
 	// =========================================================================
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS|Debug")
 	bool bDrawDebugs = false;
+
+	// Per-ability bDrawDebugs AND the global g.DrawSkillDebug cvar must both be on before any debug shape is drawn.
+	bool ShouldDrawDebug() const;
 };

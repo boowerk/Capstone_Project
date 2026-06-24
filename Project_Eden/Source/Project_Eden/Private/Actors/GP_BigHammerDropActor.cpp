@@ -1,5 +1,6 @@
 #include "Actors/GP_BigHammerDropActor.h"
 
+#include "AbilitySystem/Abilities/GP_GameplayAbility.h"
 #include "AbilitySystem/Abilities/GP_SkillData.h"
 #include "Characters/GP_BaseCharacter.h"
 #include "Components/SceneComponent.h"
@@ -99,7 +100,7 @@ void AGP_BigHammerDropActor::CompleteDrop()
 			DamageImpactLocation,
 			ImpactRadius,
 			SourceActor,
-			bDrawDebugs);
+			bDrawDebugs && UGP_GameplayAbility::IsSkillDebugDrawEnabled());
 
 		UGP_BlueprintLibrary::ApplyGameplayEffectAndEventToActors(
 			SourceActor,

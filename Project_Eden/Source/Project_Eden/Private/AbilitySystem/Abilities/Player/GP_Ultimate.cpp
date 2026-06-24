@@ -9,7 +9,7 @@ void UGP_Ultimate::ActivateAbility(const FGameplayAbilitySpecHandle Handle, cons
 {
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 	
-	if (bDrawDebugs)
+	if (ShouldDrawDebug())
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Ultimate Ability Activated!"));
 	}

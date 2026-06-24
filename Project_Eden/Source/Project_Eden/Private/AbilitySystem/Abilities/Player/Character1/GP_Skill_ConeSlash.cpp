@@ -58,7 +58,7 @@ void UGP_Skill_ConeSlash::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 			Origin,
 			FinalRange,
 			Avatar,
-			bDrawDebugs
+			ShouldDrawDebug()
 		);
 
 		TArray<AActor*> HitActors;

@@ -71,7 +71,7 @@ void UGP_Skill_GroundBurst::ActivateAbility(const FGameplayAbilitySpecHandle Han
 			BurstLocation,
 			FinalBurstRadius,
 			Avatar,
-			bDrawDebugs
+			ShouldDrawDebug()
 		);
 
 		UGP_BlueprintLibrary::ApplyGameplayEffectAndEventToActors(Avatar, HitActors, DamageEffectClass, HitEventTag, GetAbilityLevel(), SkillData);

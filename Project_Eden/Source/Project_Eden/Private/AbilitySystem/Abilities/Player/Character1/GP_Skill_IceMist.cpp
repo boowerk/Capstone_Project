@@ -72,7 +72,7 @@ void UGP_Skill_IceMist::ExecuteConfirmedSkill_Implementation(
 		LaunchDirection,
 		LaunchSpeed,
 		MoveDuration,
-		bDrawDebugs);
+		ShouldDrawDebug());
 	IceMistArea->FinishSpawning(
 		FTransform(LaunchRotation, SpawnLocation));
 }

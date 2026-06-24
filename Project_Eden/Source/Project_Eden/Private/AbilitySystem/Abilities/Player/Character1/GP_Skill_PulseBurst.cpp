@@ -42,7 +42,7 @@ void UGP_Skill_PulseBurst::ActivateAbility(const FGameplayAbilitySpecHandle Hand
 			BurstLocation,
 			FinalBurstRadius,
 			Avatar,
-			bDrawDebugs
+			ShouldDrawDebug()
 		);
 
 		UGP_BlueprintLibrary::ApplyGameplayEffectAndEventToActors(Avatar, HitActors, DamageEffectClass, HitEventTag, GetAbilityLevel(), SkillData);

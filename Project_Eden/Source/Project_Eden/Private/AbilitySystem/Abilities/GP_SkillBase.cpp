@@ -533,7 +533,7 @@ void UGP_SkillBase::PerformAreaAttack()
 		AttackRadius,   // 수치: BP에서 설정됨
 		ForwardOffset,  // 수치: BP에서 설정됨
 		0.0f,
-		bDrawDebugs);
+		ShouldDrawDebug());
 
 	// 2. 이펙트 배달: 찾은 적들에게 데미지 이펙트 적용
 	TSubclassOf<UGameplayEffect> ResolvedDamageEffectClass = DamageEffectClass;

@@ -537,7 +537,7 @@ void UGP_TargetedSkillBase::UpdatePreview()
 		}
 	}
 
-	if (!bDrawSelectionDebug && !bDrawDebugs)
+	if (!bDrawSelectionDebug && !ShouldDrawDebug())
 	{
 		return;
 	}

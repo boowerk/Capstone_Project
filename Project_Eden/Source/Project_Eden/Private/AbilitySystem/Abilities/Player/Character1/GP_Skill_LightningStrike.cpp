@@ -94,7 +94,7 @@ void UGP_Skill_LightningStrike::ExecuteConfirmedSkill_Implementation(
 		TargetData.TargetLocation,
 		FinalRadius,
 		AvatarActor,
-		bDrawDebugs);
+		ShouldDrawDebug());
 
 	UGP_BlueprintLibrary::ApplyGameplayEffectAndEventToActors(
 		AvatarActor,
@@ -131,7 +131,7 @@ void UGP_Skill_LightningStrike::ExecuteConfirmedSkill_Implementation(
 				PeriodicAreaDamage.Duration,
 				PeriodicAreaDamage.Interval,
 				PeriodicAreaDamage.DamagePerTickMultiplier,
-				bDrawDebugs);
+				ShouldDrawDebug());
 			PeriodicDamageActor->FinishSpawning(
 				FTransform(FRotator::ZeroRotator, TargetData.TargetLocation));
 		}

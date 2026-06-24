@@ -59,7 +59,7 @@ void UGP_Skill_LineShock::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 			BoxExtent,
 			AimRotation,
 			Avatar,
-			bDrawDebugs
+			ShouldDrawDebug()
 		);
 
 		UGP_BlueprintLibrary::ApplyGameplayEffectAndEventToActors(Avatar, HitActors, DamageEffectClass, HitEventTag, GetAbilityLevel(), SkillData);
