@@ -4,12 +4,83 @@
 #include "Components/Image.h"
 #include "Components/CanvasPanel.h"
 #include "Components/Overlay.h"
+#include "Components/Widget.h"
 #include "Engine/World.h"
 #include "Materials/Material.h"
 #include "Misc/AutomationTest.h"
 #include "UI/GP_MinimapCaptureActor.h"
+#include "UI/GP_MinimapSubsystem.h"
 #include "Blueprint/WidgetBlueprintGeneratedClass.h"
 #include "Blueprint/WidgetTree.h"
+
+namespace
+{
+	bool IsLikelyProductionMinimapMapImageName(const FString& WidgetName)
+	{
+		const bool bMentionsMinimap = WidgetName.Contains(TEXT("Minimap"), ESearchCase::IgnoreCase);
+		const bool bMentionsMapBackground =
+			WidgetName.Contains(TEXT("Background"), ESearchCase::IgnoreCase)
+			|| WidgetName.Contains(TEXT("MapImage"), ESearchCase::IgnoreCase);
+		const bool bLooksLikeOverlayOnly =
+			WidgetName.Contains(TEXT("Arrow"), ESearchCase::IgnoreCase)
+			|| WidgetName.Contains(TEXT("Marker"), ESearchCase::IgnoreCase)
+			|| WidgetName.Contains(TEXT("Point"), ESearchCase::IgnoreCase)
+			|| WidgetName.Contains(TEXT("Ring"), ESearchCase::IgnoreCase)
+			|| WidgetName.Contains(TEXT("Backplate"), ESearchCase::IgnoreCase);
+
+		// Match the runtime resolver so the test follows intentional BP widget renames.
+		return bMentionsMinimap && bMentionsMapBackground && !bLooksLikeOverlayOnly;
+	}
+
+	UImage* ResolveProductionMinimapMapImage(UWidgetTree* WidgetTree)
+	{
+		if (!WidgetTree)
+		{
+			return nullptr;
+		}
+
+		static const FName CandidateNames[] =
+		{
+			TEXT("MinimapBackgroundImage"),
+			TEXT("MiniMapBackgroundImage"),
+			TEXT("MinimapBackground"),
+			TEXT("MiniMapBackground"),
+			TEXT("MinimapImage"),
+			TEXT("MiniMapImage"),
+			TEXT("MinimapMapImage"),
+			TEXT("MiniMapMapImage"),
+			TEXT("MinimapRenderTargetImage"),
+			TEXT("MiniMapRenderTargetImage"),
+			TEXT("MapBackgroundImage"),
+			TEXT("MapBackground"),
+			TEXT("MapImage")
+		};
+
+		for (const FName& CandidateName : CandidateNames)
+		{
+			if (UImage* CandidateImage = Cast<UImage>(WidgetTree->FindWidget(CandidateName)))
+			{
+				return CandidateImage;
+			}
+		}
+
+		UImage* FoundImage = nullptr;
+		WidgetTree->ForEachWidget([&FoundImage](UWidget* ChildWidget)
+		{
+			if (FoundImage || !ChildWidget)
+			{
+				return;
+			}
+
+			if (IsLikelyProductionMinimapMapImageName(ChildWidget->GetName()))
+			{
+				FoundImage = Cast<UImage>(ChildWidget);
+			}
+		});
+
+		return FoundImage;
+	}
+}
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FMinimapCaptureStabilityTest,
@@ -58,6 +129,17 @@ bool FMinimapCaptureStabilityTest::RunTest(const FString& Parameters)
 	{
 		// Compare the resolved pointers explicitly because TObjectPtr and raw-pointer template deduction differs by engine version.
 		TestTrue(TEXT("Scene capture targets the back buffer"), SceneCapture->TextureTarget.Get() == CaptureActor->CaptureBackBuffer.Get());
+	}
+
+	UGP_MinimapSubsystem* MinimapSubsystem = TestWorld->GetSubsystem<UGP_MinimapSubsystem>();
+	TestNotNull(TEXT("Transient world owns a minimap subsystem"), MinimapSubsystem);
+	if (MinimapSubsystem)
+	{
+		MinimapSubsystem->RegisterCaptureActor(CaptureActor);
+		TestTrue(TEXT("Registering the capture actor schedules the no-PCG fallback capture"), MinimapSubsystem->bInitialCaptureScheduled);
+		TestTrue(TEXT("Fallback capture request remains pending until a completed map frame is promoted"), MinimapSubsystem->bPcgLayoutCaptureRequested);
+		MinimapSubsystem->NotifyPcgLayoutReady(0.0f);
+		TestTrue(TEXT("Explicit PCG-ready notification is not ignored while fallback is pending"), MinimapSubsystem->bPcgLayoutCaptureRequested);
 	}
 
 	UTextureRenderTarget2D* StableFrontBuffer = CaptureActor->RenderTarget.Get();
@@ -131,16 +213,15 @@ bool FMinimapCaptureStabilityTest::RunTest(const FString& Parameters)
 	if (StaticMapMaterial)
 	{
 		TestEqual(TEXT("Static minimap material uses the UI domain"), StaticMapMaterial->MaterialDomain, MD_UI);
+		TestEqual(TEXT("Static minimap material supports circular opacity"), StaticMapMaterial->BlendMode, BLEND_Translucent);
 	}
 
 	// Validate the production HUD contract so the subsystem always has a visible Image to receive the render target.
 	UClass* HUDWidgetClass = LoadClass<UUserWidget>(nullptr, TEXT("/Game/UI/HUD/WBP_PlayerHUDWidget.WBP_PlayerHUDWidget_C"));
 	UWidgetBlueprintGeneratedClass* HUDGeneratedClass = Cast<UWidgetBlueprintGeneratedClass>(HUDWidgetClass);
 	UWidgetTree* HUDWidgetTree = HUDGeneratedClass ? HUDGeneratedClass->GetWidgetTreeArchetype() : nullptr;
-	UImage* MinimapBackgroundImage = HUDWidgetTree
-		? Cast<UImage>(HUDWidgetTree->FindWidget(TEXT("MinimapBackgroundImage")))
-		: nullptr;
-	TestNotNull(TEXT("Production HUD contains MinimapBackgroundImage"), MinimapBackgroundImage);
+	UImage* MinimapBackgroundImage = ResolveProductionMinimapMapImage(HUDWidgetTree);
+	TestNotNull(TEXT("Production HUD contains a minimap map Image"), MinimapBackgroundImage);
 	if (MinimapBackgroundImage)
 	{
 		TestTrue(

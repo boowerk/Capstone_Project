@@ -7,6 +7,11 @@
 #include "TimerManager.h"
 #include "UI/GP_MinimapCaptureActor.h"
 
+namespace
+{
+	constexpr float InitialMinimapFallbackCaptureDelay = 1.0f;
+}
+
 void UGP_MinimapSubsystem::Deinitialize()
 {
 	if (UWorld* World = GetWorld())
@@ -32,6 +37,7 @@ void UGP_MinimapSubsystem::RegisterCaptureActor(AGP_MinimapCaptureActor* Capture
 	ActiveCaptureActor = CaptureActor;
 	CaptureActor->OnMapCaptureReady.AddUniqueDynamic(this, &ThisClass::HandleMapCaptureReady);
 	BroadcastCurrentRenderTarget();
+	EnsureInitialCaptureScheduled();
 }
 
 void UGP_MinimapSubsystem::CaptureFullMap(AActor* BoundsActor)
@@ -47,6 +53,24 @@ void UGP_MinimapSubsystem::CaptureFullMap(AActor* BoundsActor)
 
 void UGP_MinimapSubsystem::NotifyPcgLayoutReady(float CaptureDelay)
 {
+	SchedulePcgLayoutCapture(CaptureDelay, true);
+}
+
+void UGP_MinimapSubsystem::EnsureInitialCaptureScheduled()
+{
+	if (bInitialCaptureScheduled || (ActiveCaptureActor.IsValid() && ActiveCaptureActor->IsFullMapCaptureReady()))
+	{
+		return;
+	}
+
+	bInitialCaptureScheduled = true;
+	// Schedule a fallback capture so maps without a PCG completion notification do not leave HUD on a blank render target.
+	// A later explicit PCG-ready notification will restart this schedule and refresh the final map.
+	SchedulePcgLayoutCapture(InitialMinimapFallbackCaptureDelay, true);
+}
+
+void UGP_MinimapSubsystem::SchedulePcgLayoutCapture(float CaptureDelay, bool bResetQuietPolls)
+{
 	UWorld* World = GetWorld();
 	if (!World)
 	{
@@ -54,11 +78,11 @@ void UGP_MinimapSubsystem::NotifyPcgLayoutReady(float CaptureDelay)
 	}
 
 	World->GetTimerManager().ClearTimer(DelayedCaptureTimerHandle);
-	if (bPcgLayoutCaptureRequested)
-	{
-		return;
-	}
 	bPcgLayoutCaptureRequested = true;
+	if (bResetQuietPolls)
+	{
+		ConsecutivePcgIdlePolls = 0;
+	}
 
 	if (CaptureDelay <= 0.0f)
 	{
@@ -109,7 +133,11 @@ void UGP_MinimapSubsystem::CapturePcgLayoutOnce()
 	if (AGP_MinimapCaptureActor* CaptureActor = ResolveCaptureActor())
 	{
 		CaptureActor->CaptureFullMap(nullptr);
+		return;
 	}
+
+	// If the capture actor could not be created, allow the next HUD/PCG request to retry instead of staying blocked.
+	bPcgLayoutCaptureRequested = false;
 }
 
 bool UGP_MinimapSubsystem::ArePcgComponentsStillGenerating() const
@@ -176,6 +204,7 @@ AGP_MinimapCaptureActor* UGP_MinimapSubsystem::ResolveCaptureActor()
 {
 	if (ActiveCaptureActor.IsValid())
 	{
+		EnsureInitialCaptureScheduled();
 		return ActiveCaptureActor.Get();
 	}
 
@@ -190,6 +219,7 @@ AGP_MinimapCaptureActor* UGP_MinimapSubsystem::ResolveCaptureActor()
 		ActiveCaptureActor = *It;
 		It->OnMapCaptureReady.AddUniqueDynamic(this, &ThisClass::HandleMapCaptureReady);
 		BroadcastCurrentRenderTarget();
+		EnsureInitialCaptureScheduled();
 		return *It;
 	}
 
@@ -224,6 +254,7 @@ AGP_MinimapCaptureActor* UGP_MinimapSubsystem::SpawnDefaultCaptureActor()
 	CaptureActor->OnMapCaptureReady.AddUniqueDynamic(this, &ThisClass::HandleMapCaptureReady);
 	CaptureActor->InitializeCapture();
 	BroadcastCurrentRenderTarget();
+	EnsureInitialCaptureScheduled();
 	return CaptureActor;
 }
 
@@ -238,5 +269,7 @@ void UGP_MinimapSubsystem::BroadcastCurrentRenderTarget()
 void UGP_MinimapSubsystem::HandleMapCaptureReady()
 {
 	// The render-target object stays stable; this event only announces completed one-shot PCG pixels.
+	bPcgLayoutCaptureRequested = false;
+	ConsecutivePcgIdlePolls = 0;
 	OnMinimapReady.Broadcast();
 }

@@ -18,6 +18,7 @@
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerController.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "UObject/ConstructorHelpers.h"
@@ -25,6 +26,26 @@
 #include "UI/GP_SkillSlotHUDWidget.h"
 #include "Player/GP_PlayerState.h"
 #include "AbilitySystem/Abilities/GP_SkillData.h"
+
+namespace
+{
+	bool IsLikelyMinimapMapImageName(const FString& WidgetName)
+	{
+		const bool bMentionsMinimap = WidgetName.Contains(TEXT("Minimap"), ESearchCase::IgnoreCase);
+		const bool bMentionsMapBackground =
+			WidgetName.Contains(TEXT("Background"), ESearchCase::IgnoreCase)
+			|| WidgetName.Contains(TEXT("MapImage"), ESearchCase::IgnoreCase);
+		const bool bLooksLikeOverlayOnly =
+			WidgetName.Contains(TEXT("Arrow"), ESearchCase::IgnoreCase)
+			|| WidgetName.Contains(TEXT("Marker"), ESearchCase::IgnoreCase)
+			|| WidgetName.Contains(TEXT("Point"), ESearchCase::IgnoreCase)
+			|| WidgetName.Contains(TEXT("Ring"), ESearchCase::IgnoreCase)
+			|| WidgetName.Contains(TEXT("Backplate"), ESearchCase::IgnoreCase);
+
+		// Keep the fallback conservative: only the actual map image should receive the render target.
+		return bMentionsMinimap && bMentionsMapBackground && !bLooksLikeOverlayOnly;
+	}
+}
 
 UGP_PlayerHUDWidget::UGP_PlayerHUDWidget(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -38,6 +59,14 @@ UGP_PlayerHUDWidget::UGP_PlayerHUDWidget(const FObjectInitializer& ObjectInitial
 	if (EnemyMarkerFinder.Succeeded())
 	{
 		MinimapEnemyMarkerTexture = EnemyMarkerFinder.Object;
+	}
+
+	// Provide the generated static-map material by default so the minimap works even if the BP field is left empty.
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> MinimapMaterialFinder(
+		TEXT("/Game/UI/HUD/Minimap/Materials/M_UI_Minimap_StaticMap.M_UI_Minimap_StaticMap"));
+	if (MinimapMaterialFinder.Succeeded())
+	{
+		MinimapMapMaterial = MinimapMaterialFinder.Object;
 	}
 }
 
@@ -140,6 +169,7 @@ void UGP_PlayerHUDWidget::EnsureMinimapMaterial(UTextureRenderTarget2D* InRender
 		// MapTexture never changes after initialization; only UV center and zoom are updated during play.
 		MinimapMaterialInstance->SetTextureParameterValue(TEXT("MapTexture"), InRenderTarget);
 		MinimapMaterialInstance->SetScalarParameterValue(TEXT("MapZoom"), MinimapZoom);
+		MinimapMaterialInstance->SetScalarParameterValue(TEXT("CircleMaskRadius"), MinimapCircleMaskRadius);
 		Brush.SetResourceObject(MinimapMaterialInstance);
 	}
 	else
@@ -172,6 +202,9 @@ void UGP_PlayerHUDWidget::RefreshMinimapMapUV()
 	{
 		return;
 	}
+
+	// Keep the circular mask tweak live so designers can tune the ring fit in BP without rebuilding the material.
+	MinimapMaterialInstance->SetScalarParameterValue(TEXT("CircleMaskRadius"), MinimapCircleMaskRadius);
 
 	if (PlayerMapUV.Equals(CachedPlayerMapUV, 0.0001f) && FMath::IsNearlyEqual(CachedMinimapZoom, MinimapZoom))
 	{
@@ -265,11 +298,7 @@ UImage* UGP_PlayerHUDWidget::ResolveMinimapBackgroundImage() const
 		}
 
 		const FString WidgetName = ChildWidget->GetName();
-		const bool bLooksLikeMinimap = WidgetName.Contains(TEXT("Minimap")) || WidgetName.Contains(TEXT("MiniMap"));
-		const bool bLooksLikeBackground = WidgetName.Contains(TEXT("Background")) || WidgetName.Contains(TEXT("MapImage"));
-
-		// WBP 이름이 조금 달라도 미니맵 배경 Image를 자동으로 찾기 위한 보수적 fallback입니다.
-		if (bLooksLikeMinimap && bLooksLikeBackground)
+		if (IsLikelyMinimapMapImageName(WidgetName))
 		{
 			FoundImage = Cast<UImage>(ChildWidget);
 		}
@@ -477,7 +506,16 @@ void UGP_PlayerHUDWidget::RefreshMinimapPlayerArrowRotation()
 	}
 
 	const float RotationSign = bInvertMinimapPlayerArrowRotation ? -1.0f : 1.0f;
-	const float DesiredAngle = FRotator::NormalizeAxis((OwningPawn->GetActorRotation().Yaw * RotationSign) + MinimapPlayerArrowAngleOffset);
+	float HeadingYaw = OwningPawn->GetActorRotation().Yaw;
+	if (bUseControlRotationForMinimapPlayerArrow)
+	{
+		if (const APlayerController* OwningPlayerController = GetOwningPlayer())
+		{
+			// In idle/camera-look states the pawn yaw can lag behind the player's view, so the minimap cursor follows view yaw.
+			HeadingYaw = OwningPlayerController->GetControlRotation().Yaw;
+		}
+	}
+	const float DesiredAngle = FRotator::NormalizeAxis((HeadingYaw * RotationSign) + MinimapPlayerArrowAngleOffset);
 
 	// 같은 각도를 반복해서 쓰지 않도록 캐시해 Slate transform 갱신 비용을 줄입니다.
 	if (bHasCachedMinimapPlayerArrowAngle && FMath::IsNearlyEqual(CachedMinimapPlayerArrowAngle, DesiredAngle, 0.1f))

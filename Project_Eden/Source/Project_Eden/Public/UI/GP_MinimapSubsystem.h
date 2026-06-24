@@ -46,8 +46,15 @@ public:
 	FGPMinimapReady OnMinimapReady;
 
 private:
+#if WITH_DEV_AUTOMATION_TESTS
+	// Automation verifies the startup fallback capture state without exposing test-only accessors to gameplay code.
+	friend class FMinimapCaptureStabilityTest;
+#endif
+
 	AGP_MinimapCaptureActor* ResolveCaptureActor();
 	AGP_MinimapCaptureActor* SpawnDefaultCaptureActor();
+	void EnsureInitialCaptureScheduled();
+	void SchedulePcgLayoutCapture(float CaptureDelay, bool bResetQuietPolls);
 	void CapturePcgLayoutOnce();
 	bool ArePcgComponentsStillGenerating() const;
 	void BroadcastCurrentRenderTarget();
@@ -58,5 +65,6 @@ private:
 	TWeakObjectPtr<AGP_MinimapCaptureActor> ActiveCaptureActor;
 	FTimerHandle DelayedCaptureTimerHandle;
 	bool bPcgLayoutCaptureRequested = false;
+	bool bInitialCaptureScheduled = false;
 	int32 ConsecutivePcgIdlePolls = 0;
 };
