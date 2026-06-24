@@ -11,10 +11,13 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-06-23T17:59:34+09:00
+Last synced: 2026-06-24T00:45:00+09:00
 
 ## Current Status
 
+- Boss target marker VFX no longer survives boss death: `UGP_BossTargetMarkerVFXComponent` tracks spawned player-attached Niagara components, clears them through reliable death cleanup/EndPlay, and suppresses late unreliable play RPCs after death. Editor build and `ProjectEden.Combat.Boss.TargetMarkerVFXConfiguration` pass.
+- Minimap presentation now stays circular and view-aligned: `M_UI_Minimap_StaticMap` is translucent with a `CircleMaskRadius` opacity mask, `UGP_PlayerHUDWidget` pushes the radius at runtime, and the player arrow follows controller/view yaw by default while retaining BP-tunable offset/invert controls. Editor build and `ProjectEden.UI.Minimap.CaptureStability` pass.
+- Minimap startup no longer depends solely on an explicit PCG completion notification. `UGP_MinimapSubsystem` schedules a one-shot fallback capture whenever a capture actor is registered/resolved, later PCG-ready notifications can refresh that pending capture, and `UGP_PlayerHUDWidget` defaults `M_UI_Minimap_StaticMap` while resolving the production `MiniMapImage` widget name. Editor build and `ProjectEden.UI.Minimap.CaptureStability` pass.
 - Client-server player movement now resolves directional speed from the same clamped raw move input before falling back to server acceleration. This prevents server/client `MaxWalkSpeed` disagreement from causing movement corrections and camera-lag shake during network play. Editor build passed; PIE network visual confirmation remains recommended.
 - `/Game/Maps/MainMap/L_LandscapeMap` has 15 `BP_RegionSeed` actors normalized to labels/indices `RegionSeed_0` through `RegionSeed_14`; their X/Y positions now match the latest user-provided `SEEDS_WORLD` list. Existing Z heights were preserved. The placed `BP_RegionStateManager` override is `RegionCount=15` and `StateRT=/Game/RegionSystem/RenderTargets/RT_RegionState_15x1` (`15x1`). `L_GameMap` was not modified.
 - RegionState direction changed: treat state values as biome-type IDs rather than default/dead/corrupted gameplay status. Existing `AliveRegionState` / `DeadRegionState` naming in GameMode is legacy and should be renamed or replaced when this path is implemented.

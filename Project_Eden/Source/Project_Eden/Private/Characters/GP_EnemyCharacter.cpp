@@ -227,6 +227,12 @@ void AGP_EnemyCharacter::BeginPlay()
 void AGP_EnemyCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	UnbindMoveSpeedAttribute();
+	if (IsValid(BossTargetMarkerVFXComponent))
+	{
+		// Target marker VFX is attached to the player, so clear it explicitly when the boss leaves the world.
+		BossTargetMarkerVFXComponent->HandleOwnerDeath();
+	}
+
 	Super::EndPlay(EndPlayReason);
 }
 
@@ -455,6 +461,12 @@ void AGP_EnemyCharacter::ApplyDeathState()
 	}
 
 	bDeathStateApplied = true;
+	if (IsValid(BossTargetMarkerVFXComponent))
+	{
+		// Death must revoke selected-target presentation before delayed despawn can leave the boss corpse around.
+		BossTargetMarkerVFXComponent->HandleOwnerDeath();
+	}
+
 	RefreshWorldHealthBarVisibility();
 	SetCanBeDamaged(false);
 	SetActorTickEnabled(false);

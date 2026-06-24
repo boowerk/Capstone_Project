@@ -3,6 +3,7 @@
 #include "Characters/GP_DarkArmorKnightBossCharacter.h"
 #include "Characters/GP_EnemyCharacter.h"
 #include "Misc/AutomationTest.h"
+#include "NiagaraComponent.h"
 #include "NiagaraSystem.h"
 #include "UObject/UnrealType.h"
 #include "VFX/GP_BossTargetMarkerVFXComponent.h"
@@ -26,6 +27,23 @@ bool FBossTargetMarkerVFXConfigurationTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Target marker is enabled by default"), ComponentFixture->IsTargetMarkerVFXEnabled());
 	TestNotNull(TEXT("Target marker uses the render-on-top stroke Niagara by default"), ComponentFixture->GetTargetMarkerSystem());
 	TestFalse(TEXT("No marker can play without a valid target actor"), ComponentFixture->ShouldPlayTargetMarker(nullptr));
+
+	ComponentFixture->ActiveTargetMarkerComponents.AddDefaulted();
+	ComponentFixture->SetTargetMarkerVFXEnabled(false);
+	TestFalse(TEXT("Disabling the marker toggle also disables playback"), ComponentFixture->IsTargetMarkerVFXEnabled());
+	TestEqual(TEXT("Disabling the marker toggle clears tracked marker handles"),
+		ComponentFixture->ActiveTargetMarkerComponents.Num(),
+		0);
+
+	ComponentFixture->SetTargetMarkerVFXEnabled(true);
+	ComponentFixture->bTargetMarkerPlaybackStoppedForOwnerDeath = false;
+	ComponentFixture->ActiveTargetMarkerComponents.AddDefaulted();
+	ComponentFixture->HandleOwnerDeath();
+	TestTrue(TEXT("Boss death suppresses any later target marker playback"),
+		ComponentFixture->bTargetMarkerPlaybackStoppedForOwnerDeath);
+	TestEqual(TEXT("Boss death clears tracked marker handles"),
+		ComponentFixture->ActiveTargetMarkerComponents.Num(),
+		0);
 
 	const AGP_EnemyCharacter* EnemyDefaults = GetDefault<AGP_EnemyCharacter>();
 	const AGP_DarkArmorKnightBossCharacter* DarkKnightDefaults = GetDefault<AGP_DarkArmorKnightBossCharacter>();

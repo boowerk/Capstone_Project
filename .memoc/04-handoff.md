@@ -11,7 +11,7 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-06-23T17:59:34+09:00
+Last synced: 2026-06-24T00:45:00+09:00
 
 ## Player Network Movement Handoff
 
@@ -28,6 +28,8 @@ Last synced: 2026-06-23T17:59:34+09:00
 
 ## Minimap Handoff
 
+- Latest fix makes the minimap visually circular and aligns the player cursor with camera-facing direction: `M_UI_Minimap_StaticMap` is now a translucent UI material with `CircleMaskRadius`, and `UGP_PlayerHUDWidget` defaults the arrow to controller/view yaw. Build and `ProjectEden.UI.Minimap.CaptureStability` pass. PIE-check the screenshots' cases; tune `MinimapCircleMaskRadius` or `MinimapPlayerArrowAngleOffset` on `WBP_PlayerHUDWidget` only if art alignment still needs minor adjustment.
+- Latest fix schedules a fallback one-shot capture when `UGP_MinimapSubsystem` first registers/resolves a capture actor, so missing `PcgControllerActor`/PCG-ready calls no longer leave the HUD on a blank generated RenderTarget. Explicit PCG-ready notifications are no longer ignored while the fallback is pending. `UGP_PlayerHUDWidget` now defaults `/Game/UI/HUD/Minimap/Materials/M_UI_Minimap_StaticMap` and resolves the production `MiniMapImage` name instead of relying on the old `MinimapBackgroundImage`. Build and `ProjectEden.UI.Minimap.CaptureStability` pass; PIE-check MainMap for final PCG coverage/orientation.
 - Commits `a88bfee6`, `b3652834`, and `e6806c69` replace runtime follow capture with one full-map capture after PCG becomes idle. The stable texture is panned/zoomed by `M_UI_Minimap_StaticMap`; player arrow and pooled red enemy markers are separate UMG widgets. Assign `/Game/UI/HUD/Minimap/Materials/M_UI_Minimap_StaticMap` to `WBP_PlayerHUDWidget.MinimapMapMaterial`, then PIE-check map orientation, coverage, zoom, and markers. Editor build and real D3D12 offscreen `ProjectEden.UI.Minimap.CaptureStability` passed with no material compile warning.
 - Commits `42b72f57` and `19340f27` remove periodic RenderTarget swapping/rebinding. UMG keeps one stable display target while SceneCapture remains isolated on a back buffer; completed captures are GPU-copied only after the capture fence, and the pipeline remains blocked until the copy fence completes. Editor build plus NullRHI and D3D12 offscreen `ProjectEden.UI.Minimap.CaptureStability` passed. No editor setup is required; PIE-check repeated attack Niagara visually.
 - Commits `23aedf2b` and `0bfa780f` replace render-command-only promotion with an `FRHIGPUFence` completion gate. The old front buffer remains bound until the capture fence write is issued, pending writes drain, and `Poll()` succeeds. Editor build, NullRHI automation, and real D3D12 offscreen `ProjectEden.UI.Minimap.CaptureStability` passed; PIE-check attack Niagara visually.
@@ -46,6 +48,11 @@ Last synced: 2026-06-23T17:59:34+09:00
 
 - Commits `4783ba61` and `a0ae0cb4` implement shared HP-zero death for melee, ranged, flying, and boss children of `AGP_EnemyCharacter`. Editor build and `ProjectEden.Combat.EnemyDeath.Lifecycle` passed.
 - PIE-check representative enemy/Boss assets for lethal damage and the 2-second default despawn. No editor assignment is required; later animation work should implement `BP_OnDeathStarted` and tune `DeathDespawnDelay`.
+
+## Boss Target Marker VFX Handoff
+
+- Latest fix makes boss target marker VFX death-safe: the boss-owned marker component tracks spawned player-attached Niagara components, clears them on death/EndPlay, and blocks delayed play RPCs after owner death. Editor build and `ProjectEden.Combat.Boss.TargetMarkerVFXConfiguration` pass.
+- PIE-check a multiplayer boss fight where the boss selects a target, swaps targets, then dies; the torso marker should vanish on every client and not reappear after delayed network messages.
 
 ## FurnaceWalker Handoff
 
@@ -197,7 +204,7 @@ _None yet._
 
 ## Not Verified
 
-- 2026-06-23 boss target marker VFX build and automation pass; PIE-check with one or more players that first acquisition and target swaps display on the selected player's torso, and tune `TargetBodySocketName`/`TargetBodyOffset` if the imported player skeleton lacks `spine_03`.
+- 2026-06-24 boss target marker VFX death cleanup is built and automated, but PIE still needs a multiplayer visual check for death, first acquisition, and target swaps.
 - 2026-06-23 Sans Ground Hands decal/visibility fixes are built and automated coverage passes; PIE-check all three decals per wave and confirm each hand appears only as its rise begins.
 - 2026-06-23 Sans Sweep fan decal is built and automated coverage passes; PIE-check that the fan points forward and visually matches the 165-degree damage arc on uneven terrain.
 - 2026-06-17 basic enemy templates: C++ build succeeded and BP templates were created, but PIE runtime behavior still needs checking for common BT chase/attack transitions, ranged hit distance, and flying movement/pathing.
