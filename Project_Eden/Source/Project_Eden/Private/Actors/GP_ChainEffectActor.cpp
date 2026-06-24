@@ -33,7 +33,10 @@ void AGP_ChainEffectActor::Tick(float DeltaSeconds)
 		SetChainStage(MatadorStateComponent->GetChainBreakCount());
 	}
 
-	DrawChainPreview();
+	if (bShowDebugVisuals)
+	{
+		DrawChainPreview();
+	}
 }
 
 void AGP_ChainEffectActor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

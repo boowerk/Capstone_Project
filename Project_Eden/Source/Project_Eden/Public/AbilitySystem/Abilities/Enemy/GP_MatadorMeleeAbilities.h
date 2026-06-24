@@ -72,7 +72,7 @@ protected:
 	bool bDebugHitShape = false;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Matador|Telegraph")
-	bool bShowTemporaryTelegraph = true;
+	bool bShowTemporaryTelegraph = false;
 
 	FTimerHandle PrimaryTimerHandle;
 	FTimerHandle SecondaryTimerHandle;

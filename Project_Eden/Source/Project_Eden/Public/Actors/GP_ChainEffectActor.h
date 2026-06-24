@@ -60,4 +60,8 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Boss|Matador")
 	float BrokenLineThicknessBonus = 4.0f;
+
+	/** Prototype link preview. Disabled by default; real chain presentation belongs in Blueprint/VFX. */
+	UPROPERTY(EditDefaultsOnly, Category = "Boss|Matador|Debug")
+	bool bShowDebugVisuals = false;
 };
