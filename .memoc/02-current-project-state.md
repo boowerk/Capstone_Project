@@ -11,11 +11,15 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-06-24T16:28:57+09:00
+Last synced: 2026-06-24T17:06:00+09:00
 
 ## Current Status
 
+- World enemy health bars now cull by distance: `AGP_EnemyCharacter` re-checks distance to the local player pawn on a timer (`HealthBarDistanceCheckInterval`) and shows the bar only within `HealthBarVisibleDistance` (default 1500cm, 0 disables); bosses and dedicated servers skip the check.
+- Skill debug drawing is gated behind the `g.DrawSkillDebug` cvar (default 1). `UGP_GameplayAbility::ShouldDrawDebug()` ANDs per-ability `bDrawDebugs` with the cvar across all skills; `AGP_BigHammerDropActor` consults `IsSkillDebugDrawEnabled()`. Console `g.DrawSkillDebug 0` mutes overlap shapes and "Activated" messages for video capture.
 - Boss spawn progression fix landed on `feature/vfx-skills` in `dd299e22` and `8dfcc0b1`: `AGP_EnemySpawnVolume` now projects spawn points with vertical extent based on scaled box height and samples fallback points, `AGP_GameMode` refuses invalid portal targets, and `/Game/Maps/MainMap/L_LandscapeMap` aligns boss `GP_EnemySpawnVolume_0` to navmesh Z. Live Coding compile succeeded; full UBT was blocked by active Live Coding.
+- Crystal Seraph animation/VFX polish is current: `/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/Animation/ABP_CrystalSeraph` still uses `TravelMode_Hover_Idle` through DefaultSlot, while `AM_CrystalSeraph_Basic_Simple` and `AM_CrystalSeraph_Laser_Double` now compose Enter→Shoot→Hold→Exit so the attack pose remains visible briefly after firing. Pattern actors now reference duplicated `/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/VFX/NS_CrystalSeraph_*` Niagara copies and apply `59ADFFFF` through `UGP_VisualCueComponent`; original Free_Magic assets remain untouched. Build, `ProjectEden.Combat.CrystalSeraph.AnimationSetup`, and `ProjectEden.Combat.CrystalSeraph.VisualCues` pass.
+- `BP_Crystal_Seraph.uasset` is restored from the valid `59fa4cfb` LFS object after `82b7d607`/`3f13056e` left the Blueprint path pointing at a 287-byte conflict-pointer LFS object. The restored working file is a 37,300-byte binary `.uasset`; PIE/editor visual confirmation remains recommended.
 - Boss target marker VFX no longer survives boss death: `UGP_BossTargetMarkerVFXComponent` tracks spawned player-attached Niagara components, clears them through reliable death cleanup/EndPlay, and suppresses late unreliable play RPCs after death. Editor build and `ProjectEden.Combat.Boss.TargetMarkerVFXConfiguration` pass.
 - Minimap presentation now stays circular and view-aligned: `M_UI_Minimap_StaticMap` is translucent with a `CircleMaskRadius` opacity mask, `UGP_PlayerHUDWidget` pushes the radius at runtime, and the player arrow follows controller/view yaw by default while retaining BP-tunable offset/invert controls. Editor build and `ProjectEden.UI.Minimap.CaptureStability` pass.
 - Minimap startup no longer depends solely on an explicit PCG completion notification. `UGP_MinimapSubsystem` schedules a one-shot fallback capture whenever a capture actor is registered/resolved, later PCG-ready notifications can refresh that pending capture, and `UGP_PlayerHUDWidget` defaults `M_UI_Minimap_StaticMap` while resolving the production `MiniMapImage` widget name. Editor build and `ProjectEden.UI.Minimap.CaptureStability` pass.

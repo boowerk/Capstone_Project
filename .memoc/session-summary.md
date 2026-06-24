@@ -2,7 +2,7 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-06-24T16:28:57+09:00
+updated: 2026-06-24T17:06:00+09:00
 status: active
 created: 2026-06-22T17:59:08
 tags:
@@ -12,12 +12,12 @@ tags:
 # Session Summary
 
 ## Status
-- Boss spawn after zone-0 clear was fixed in two commits: spawn volume nav projection now searches vertically across tall boxes and samples fallback points, portal targets reject invalid nav projection, and `GP_EnemySpawnVolume_0` boss volume was aligned to navmesh Z.
+- Merged `origin/main` into `feature/vfx-skills`; code merged clean, only `.memoc` memory conflicts resolved.
+- vfx-skills adds: world health bars cull by local-player distance (`HealthBarVisibleDistance`); skill debug draws gated behind `g.DrawSkillDebug` cvar (ANDs per-ability `bDrawDebugs`).
+- main adds: Crystal Seraph attack montages (Enter→Shoot→Hold→Exit) and tinted Niagara VFX copies.
 
 ## Verified
-- Live Coding compile succeeded after the C++ changes.
-- Full external UBT was attempted but blocked because Live Coding is active in the open editor.
+- Editor build + Crystal Seraph AnimationSetup/VisualCues automation passed pre-merge.
 
 ## Handoff
-- PIE-check zone 0 clear -> portal -> boss spawn flow.
-- Unrelated dirty files remain: `BP_DarkArmorKnight.uasset`, `GP_DarkArmorKnightBossCharacter.cpp`.
+- Rebuild C++ (header changed), PIE-check health-bar distance cull and `g.DrawSkillDebug 0` mute.

@@ -12,6 +12,7 @@
 #include "Animation/GP_BossAnimInstance.h"
 #include "Animation/GP_FemaleAnimInstance.h"
 #include "Animation/PDA_CharacterAnimationSet.h"
+#include "Animation/PDA_EnemyAnimationSet.h"
 #include "AnimationGraphSchema.h"
 #include "AnimGraphNode_Base.h"
 #include "AnimGraphNode_BlendListByBool.h"
@@ -22,6 +23,7 @@
 #include "AlphaBlend.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "AssetToolsModule.h"
+#include "Characters/GP_CrystalSeraphBossCharacter.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "EdGraph/EdGraph.h"
 #include "EdGraphSchema_K2.h"
@@ -1244,6 +1246,388 @@ namespace GPSansBossAnimationSetup
 	}
 }
 
+namespace GPCrystalSeraphAnimationSetup
+{
+	const FString AssetRootPath = TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph");
+	const FString AnimationPackagePath = TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/Animation");
+	const FString CrystalSeraphMeshPath = TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/CrystalSeraph");
+	const FString CrystalSeraphSkeletonPath = TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/CrystalSeraph_Skeleton");
+	const FString HoverIdlePath = TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/Animation/TravelMode_Hover_Idle");
+	const FString BasicAttackEnterSequencePath = TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/Animation/UEFN_Spell_Simple_Enter");
+	const FString BasicAttackShootSequencePath = TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/Animation/UEFN_Spell_Simple_Shoot");
+	const FString BasicAttackHoldSequencePath = TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/Animation/UEFN_Spell_Simple_Idle_Loop");
+	const FString BasicAttackExitSequencePath = TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/Animation/UEFN_Spell_Simple_Exit");
+	const FString LaserAttackEnterSequencePath = TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/Animation/UEFN_Spell_Double_Enter");
+	const FString LaserAttackShootSequencePath = TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/Animation/UEFN_Spell_Double_Shoot_Loop");
+	const FString LaserAttackHoldSequencePath = TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/Animation/UEFN_Spell_Double_Idle_Loop");
+	const FString LaserAttackExitSequencePath = TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/Animation/UEFN_Spell_Double_Exit");
+	const FString DeathSequencePath = TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/Animation/Death_A");
+	const FString BossBlueprintPath = TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/BP_Crystal_Seraph");
+	const FString AnimBlueprintName = TEXT("ABP_CrystalSeraph");
+	const FString AnimationSetName = TEXT("PDA_CrystalSeraphAnimationSet");
+	const FString BasicAttackMontageName = TEXT("AM_CrystalSeraph_Basic_Simple");
+	const FString LaserAttackMontageName = TEXT("AM_CrystalSeraph_Laser_Double");
+	const FString DeathMontageName = TEXT("AM_CrystalSeraph_Death");
+	constexpr float BasicAttackHoldTime = 0.45f;
+	constexpr float LaserAttackHoldTime = 0.65f;
+
+	struct FPatternMontageClip
+	{
+		FString SourceAnimationPath;
+		float MaxDuration = 0.0f;
+	};
+
+	float AppendPatternMontageSegment(FAnimTrack& AnimTrack, UAnimSequenceBase* SourceAnimation, float StartTime, float MaxDuration)
+	{
+		if (!IsValid(SourceAnimation))
+		{
+			return StartTime;
+		}
+
+		const float SourceLength = SourceAnimation->GetPlayLength();
+		const float SegmentLength = MaxDuration > 0.0f ? FMath::Min(SourceLength, MaxDuration) : SourceLength;
+		if (SegmentLength <= UE_KINDA_SMALL_NUMBER)
+		{
+			return StartTime;
+		}
+
+		FAnimSegment Segment;
+		Segment.SetAnimReference(SourceAnimation, true);
+		Segment.StartPos = StartTime;
+		Segment.AnimStartTime = 0.0f;
+		Segment.AnimEndTime = SegmentLength;
+		Segment.AnimPlayRate = 1.0f;
+		Segment.LoopingCount = 1;
+#if WITH_EDITOR
+		Segment.UpdateCachedPlayLength();
+#endif
+		AnimTrack.AnimSegments.Add(Segment);
+		return StartTime + Segment.GetLength();
+	}
+
+	UAnimMontage* CreateOrUpdateMontageFromSequence(USkeleton* Skeleton, const FString& SourceAnimationPath, const FString& MontageName, const TCHAR* LogName)
+	{
+		if (!IsValid(Skeleton))
+		{
+			return nullptr;
+		}
+
+		const FString MontageObjectPath = FString::Printf(TEXT("%s/%s.%s"), *AnimationPackagePath, *MontageName, *MontageName);
+		UAnimMontage* Montage = LoadObject<UAnimMontage>(nullptr, *MontageObjectPath);
+		if (!Montage)
+		{
+			UAnimSequence* SourceAnimation = GPFemaleAnimationSetup::LoadRequiredAsset<UAnimSequence>(SourceAnimationPath);
+			if (!SourceAnimation)
+			{
+				return nullptr;
+			}
+
+			UAnimMontageFactory* Factory = NewObject<UAnimMontageFactory>();
+			Factory->TargetSkeleton = Skeleton;
+			Factory->SourceAnimation = SourceAnimation;
+
+			Montage = Cast<UAnimMontage>(FAssetToolsModule::GetModule().Get().CreateAsset(
+				MontageName,
+				AnimationPackagePath,
+				UAnimMontage::StaticClass(),
+				Factory));
+		}
+
+		if (!IsValid(Montage))
+		{
+			UE_LOG(LogTemp, Error, TEXT("Failed to create %s montage"), LogName);
+			return nullptr;
+		}
+
+		Montage->Modify();
+		// Crystal Seraph pattern montages layer through DefaultSlot over the hover idle base pose.
+		Montage->BlendIn.SetBlendOption(EAlphaBlendOption::Cubic);
+		Montage->BlendIn.SetBlendTime(GPFemaleAnimationSetup::AttackMontageBlendInTime);
+		Montage->BlendOut.SetBlendOption(EAlphaBlendOption::Cubic);
+		Montage->BlendOut.SetBlendTime(GPFemaleAnimationSetup::AttackMontageBlendOutTime);
+		Montage->BlendOutTriggerTime = -1.0f;
+		Montage->MarkPackageDirty();
+
+		return GPFemaleAnimationSetup::SaveAsset(Montage) ? Montage : nullptr;
+	}
+
+	UAnimMontage* CreateOrUpdatePatternMontage(USkeleton* Skeleton, const TArray<FPatternMontageClip>& Clips, const FString& MontageName, const TCHAR* LogName)
+	{
+		if (!IsValid(Skeleton) || Clips.IsEmpty())
+		{
+			return nullptr;
+		}
+
+		const FString MontageObjectPath = FString::Printf(TEXT("%s/%s.%s"), *AnimationPackagePath, *MontageName, *MontageName);
+		UAnimMontage* Montage = LoadObject<UAnimMontage>(nullptr, *MontageObjectPath);
+		if (!Montage)
+		{
+			UAnimSequence* FirstSourceAnimation = GPFemaleAnimationSetup::LoadRequiredAsset<UAnimSequence>(Clips[0].SourceAnimationPath);
+			if (!FirstSourceAnimation)
+			{
+				return nullptr;
+			}
+
+			UAnimMontageFactory* Factory = NewObject<UAnimMontageFactory>();
+			Factory->TargetSkeleton = Skeleton;
+			Factory->SourceAnimation = FirstSourceAnimation;
+
+			Montage = Cast<UAnimMontage>(FAssetToolsModule::GetModule().Get().CreateAsset(
+				MontageName,
+				AnimationPackagePath,
+				UAnimMontage::StaticClass(),
+				Factory));
+		}
+
+		if (!IsValid(Montage))
+		{
+			UE_LOG(LogTemp, Error, TEXT("Failed to create %s montage"), LogName);
+			return nullptr;
+		}
+
+		Montage->Modify();
+		Montage->SlotAnimTracks.Reset();
+		FSlotAnimationTrack& SlotTrack = Montage->AddSlot(FName(TEXT("DefaultSlot")));
+		SlotTrack.AnimTrack.AnimSegments.Reset();
+
+		float CurrentTime = 0.0f;
+		for (const FPatternMontageClip& Clip : Clips)
+		{
+			UAnimSequenceBase* ClipAnimation = GPFemaleAnimationSetup::LoadRequiredAsset<UAnimSequenceBase>(Clip.SourceAnimationPath);
+			CurrentTime = AppendPatternMontageSegment(SlotTrack.AnimTrack, ClipAnimation, CurrentTime, Clip.MaxDuration);
+		}
+
+		if (SlotTrack.AnimTrack.AnimSegments.IsEmpty())
+		{
+			UE_LOG(LogTemp, Error, TEXT("Failed to populate %s montage segments"), LogName);
+			return nullptr;
+		}
+
+		// Pattern montages intentionally keep a short post-fire hold so the spell pose remains visible before returning to hover idle.
+		Montage->CompositeSections.Reset();
+#if WITH_EDITOR
+		Montage->AddAnimCompositeSection(FName(TEXT("Default")), 0.0f);
+#endif
+		Montage->SetCompositeLength(CurrentTime);
+		Montage->BlendIn.SetBlendOption(EAlphaBlendOption::Cubic);
+		Montage->BlendIn.SetBlendTime(GPFemaleAnimationSetup::AttackMontageBlendInTime);
+		Montage->BlendOut.SetBlendOption(EAlphaBlendOption::Cubic);
+		Montage->BlendOut.SetBlendTime(GPFemaleAnimationSetup::AttackMontageBlendOutTime);
+		Montage->BlendOutTriggerTime = -1.0f;
+#if WITH_EDITOR
+		Montage->UpdateLinkableElements();
+#endif
+		Montage->RefreshCacheData();
+		Montage->MarkPackageDirty();
+
+		return GPFemaleAnimationSetup::SaveAsset(Montage) ? Montage : nullptr;
+	}
+
+	UAnimBlueprint* CreateOrUpdateAnimBlueprint(USkeleton* Skeleton, USkeletalMesh* SkeletalMesh, UAnimSequence* HoverIdle)
+	{
+		if (!IsValid(Skeleton) || !IsValid(SkeletalMesh) || !IsValid(HoverIdle))
+		{
+			return nullptr;
+		}
+
+		const FString BlueprintObjectPath = FString::Printf(TEXT("%s/%s.%s"), *AnimationPackagePath, *AnimBlueprintName, *AnimBlueprintName);
+		UAnimBlueprint* AnimBlueprint = LoadObject<UAnimBlueprint>(nullptr, *BlueprintObjectPath);
+		if (!AnimBlueprint)
+		{
+			UAnimBlueprintFactory* Factory = NewObject<UAnimBlueprintFactory>();
+			Factory->ParentClass = UGP_BossAnimInstance::StaticClass();
+			Factory->TargetSkeleton = Skeleton;
+			Factory->PreviewSkeletalMesh = SkeletalMesh;
+
+			AnimBlueprint = Cast<UAnimBlueprint>(FAssetToolsModule::GetModule().Get().CreateAsset(
+				AnimBlueprintName,
+				AnimationPackagePath,
+				UAnimBlueprint::StaticClass(),
+				Factory));
+		}
+
+		if (!IsValid(AnimBlueprint))
+		{
+			UE_LOG(LogTemp, Error, TEXT("Failed to create Crystal Seraph anim blueprint"));
+			return nullptr;
+		}
+
+		AnimBlueprint->ParentClass = UGP_BossAnimInstance::StaticClass();
+		AnimBlueprint->TargetSkeleton = Skeleton;
+
+		UEdGraph* AnimationGraph = nullptr;
+		for (UEdGraph* Graph : AnimBlueprint->FunctionGraphs)
+		{
+			if (Graph && Graph->GetSchema() && Graph->GetSchema()->IsA(UAnimationGraphSchema::StaticClass()))
+			{
+				AnimationGraph = Graph;
+				break;
+			}
+		}
+
+		if (!AnimationGraph)
+		{
+			TArray<UEdGraph*> AllGraphs;
+			AnimBlueprint->GetAllGraphs(AllGraphs);
+			for (UEdGraph* Graph : AllGraphs)
+			{
+				if (Graph && Graph->GetSchema() && Graph->GetSchema()->IsA(UAnimationGraphSchema::StaticClass()))
+				{
+					AnimationGraph = Graph;
+					break;
+				}
+			}
+		}
+
+		if (!AnimationGraph)
+		{
+			UE_LOG(LogTemp, Error, TEXT("Crystal Seraph anim blueprint has no animation graph"));
+			return nullptr;
+		}
+
+		AnimationGraph->Modify();
+		UAnimGraphNode_Root* RootNode = nullptr;
+		TArray<UEdGraphNode*> ExistingNodes = AnimationGraph->Nodes;
+		for (UEdGraphNode* Node : ExistingNodes)
+		{
+			if (UAnimGraphNode_Root* CandidateRoot = Cast<UAnimGraphNode_Root>(Node))
+			{
+				RootNode = CandidateRoot;
+				continue;
+			}
+
+			AnimationGraph->RemoveNode(Node);
+		}
+
+		if (!IsValid(RootNode))
+		{
+			UE_LOG(LogTemp, Error, TEXT("Crystal Seraph anim blueprint root node was not found"));
+			return nullptr;
+		}
+
+		FGraphNodeCreator<UAnimGraphNode_SequencePlayer> HoverIdleNodeCreator(*AnimationGraph);
+		UAnimGraphNode_SequencePlayer* HoverIdleNode = HoverIdleNodeCreator.CreateNode();
+		HoverIdleNode->NodePosX = -520;
+		HoverIdleNode->NodePosY = 0;
+		HoverIdleNode->SetAnimationAsset(HoverIdle);
+		HoverIdleNodeCreator.Finalize();
+
+		FGraphNodeCreator<UAnimGraphNode_Slot> SlotNodeCreator(*AnimationGraph);
+		UAnimGraphNode_Slot* SlotNode = SlotNodeCreator.CreateNode();
+		SlotNode->Node.SlotName = FName(TEXT("DefaultSlot"));
+		SlotNode->NodePosX = -120;
+		SlotNode->NodePosY = 0;
+		SlotNodeCreator.Finalize();
+
+		if (!GPFemaleAnimationSetup::ConnectPins(GPFemaleAnimationSetup::FindPoseOutputPin(HoverIdleNode), GPFemaleAnimationSetup::FindPinChecked(SlotNode, TEXT("Source"), EGPD_Input))
+			|| !GPFemaleAnimationSetup::ConnectPins(GPFemaleAnimationSetup::FindPoseOutputPin(SlotNode), GPFemaleAnimationSetup::FindPinChecked(RootNode, TEXT("Result"), EGPD_Input)))
+		{
+			UE_LOG(LogTemp, Error, TEXT("Failed to wire Crystal Seraph anim blueprint graph"));
+			return nullptr;
+		}
+
+		FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(AnimBlueprint);
+		FKismetEditorUtilities::CompileBlueprint(AnimBlueprint);
+		return GPFemaleAnimationSetup::SaveAsset(AnimBlueprint) ? AnimBlueprint : nullptr;
+	}
+
+	UPDA_EnemyAnimationSet* CreateOrUpdateAnimationSet(
+		USkeletalMesh* SkeletalMesh,
+		UAnimSequence* HoverIdle,
+		UAnimBlueprint* AnimBlueprint,
+		UAnimMontage* BasicAttackMontage,
+		UAnimMontage* LaserAttackMontage,
+		UAnimMontage* DeathMontage)
+	{
+		if (!IsValid(SkeletalMesh) || !IsValid(HoverIdle) || !IsValid(AnimBlueprint) || !IsValid(BasicAttackMontage) || !IsValid(LaserAttackMontage))
+		{
+			return nullptr;
+		}
+
+		const FString AnimationSetObjectPath = FString::Printf(TEXT("%s/%s.%s"), *AnimationPackagePath, *AnimationSetName, *AnimationSetName);
+		UPDA_EnemyAnimationSet* AnimationSet = LoadObject<UPDA_EnemyAnimationSet>(nullptr, *AnimationSetObjectPath);
+		if (!AnimationSet)
+		{
+			UDataAssetFactory* Factory = NewObject<UDataAssetFactory>();
+			Factory->DataAssetClass = UPDA_EnemyAnimationSet::StaticClass();
+
+			AnimationSet = Cast<UPDA_EnemyAnimationSet>(FAssetToolsModule::GetModule().Get().CreateAsset(
+				AnimationSetName,
+				AnimationPackagePath,
+				UPDA_EnemyAnimationSet::StaticClass(),
+				Factory));
+		}
+
+		if (!IsValid(AnimationSet))
+		{
+			UE_LOG(LogTemp, Error, TEXT("Failed to create Crystal Seraph enemy animation set"));
+			return nullptr;
+		}
+
+		AnimationSet->Modify();
+		// EnemyAnimationSet is the shared enemy path that applies mesh and ABP from AGP_EnemyCharacter::UpdateAnimationSet.
+		AnimationSet->CharacterMesh = SkeletalMesh;
+		AnimationSet->AnimBlueprintClass = AnimBlueprint->GeneratedClass;
+		AnimationSet->IdleAnimation = HoverIdle;
+		AnimationSet->PrimaryAttackMontage = BasicAttackMontage;
+		AnimationSet->LightAttackMontages.Reset();
+		AnimationSet->LightAttackMontages.Add(BasicAttackMontage);
+		AnimationSet->LightAttackMontages.Add(LaserAttackMontage);
+		AnimationSet->DeathMontages.Reset();
+		if (IsValid(DeathMontage))
+		{
+			AnimationSet->DeathMontages.Add(DeathMontage);
+		}
+		AnimationSet->MarkPackageDirty();
+
+		return GPFemaleAnimationSetup::SaveAsset(AnimationSet) ? AnimationSet : nullptr;
+	}
+
+	bool AssignBossBlueprint(
+		USkeletalMesh* SkeletalMesh,
+		UAnimBlueprint* AnimBlueprint,
+		UPDA_EnemyAnimationSet* AnimationSet,
+		UAnimMontage* BasicAttackMontage,
+		UAnimMontage* LaserAttackMontage)
+	{
+		UBlueprint* BossBlueprint = GPFemaleAnimationSetup::LoadRequiredAsset<UBlueprint>(*BossBlueprintPath);
+		if (!IsValid(BossBlueprint) || !BossBlueprint->GeneratedClass || !IsValid(SkeletalMesh) || !IsValid(AnimBlueprint) || !IsValid(AnimationSet))
+		{
+			return false;
+		}
+
+		AGP_CrystalSeraphBossCharacter* DefaultBoss = Cast<AGP_CrystalSeraphBossCharacter>(BossBlueprint->GeneratedClass->GetDefaultObject());
+		USkeletalMeshComponent* MeshComponent = IsValid(DefaultBoss) ? DefaultBoss->FindComponentByClass<USkeletalMeshComponent>() : nullptr;
+		if (!IsValid(DefaultBoss) || !IsValid(MeshComponent))
+		{
+			UE_LOG(LogTemp, Error, TEXT("Failed to find Crystal Seraph blueprint mesh component"));
+			return false;
+		}
+
+		MeshComponent->Modify();
+		MeshComponent->SetSkeletalMesh(SkeletalMesh);
+		MeshComponent->SetAnimInstanceClass(AnimBlueprint->GeneratedClass);
+		MeshComponent->SetAnimationMode(EAnimationMode::AnimationBlueprint);
+
+		FObjectProperty* EnemyAnimationSetProperty = FindFProperty<FObjectProperty>(BossBlueprint->GeneratedClass, TEXT("EnemyAnimationSet"));
+		FObjectProperty* BasicMontageProperty = FindFProperty<FObjectProperty>(BossBlueprint->GeneratedClass, TEXT("BasicAttackMontage"));
+		FObjectProperty* LaserMontageProperty = FindFProperty<FObjectProperty>(BossBlueprint->GeneratedClass, TEXT("LaserAttackMontage"));
+		if (!EnemyAnimationSetProperty || !BasicMontageProperty || !LaserMontageProperty)
+		{
+			UE_LOG(LogTemp, Error, TEXT("Failed to find Crystal Seraph animation properties on boss blueprint"));
+			return false;
+		}
+
+		DefaultBoss->Modify();
+		// Keep the BP editable: designers can later swap montages or the entire enemy animation set in Class Defaults.
+		EnemyAnimationSetProperty->SetObjectPropertyValue_InContainer(DefaultBoss, AnimationSet);
+		BasicMontageProperty->SetObjectPropertyValue_InContainer(DefaultBoss, BasicAttackMontage);
+		LaserMontageProperty->SetObjectPropertyValue_InContainer(DefaultBoss, LaserAttackMontage);
+		BossBlueprint->MarkPackageDirty();
+		return GPFemaleAnimationSetup::SaveAsset(BossBlueprint);
+	}
+}
+
 #endif
 
 bool UGP_AnimationSetupLibrary::CreateFemalePlayerAnimationSetup()
@@ -1387,6 +1771,84 @@ bool UGP_AnimationSetupLibrary::CreateSansBossAnimationSetup()
 	return true;
 #else
 	UE_LOG(LogTemp, Warning, TEXT("CreateSansBossAnimationSetup is only available in editor builds."));
+	return false;
+#endif
+}
+
+bool UGP_AnimationSetupLibrary::CreateCrystalSeraphAnimationSetup()
+{
+#if WITH_EDITOR
+	USkeletalMesh* CrystalSeraphMesh = GPFemaleAnimationSetup::LoadRequiredAsset<USkeletalMesh>(*GPCrystalSeraphAnimationSetup::CrystalSeraphMeshPath);
+	USkeleton* CrystalSeraphSkeleton = GPFemaleAnimationSetup::LoadRequiredAsset<USkeleton>(*GPCrystalSeraphAnimationSetup::CrystalSeraphSkeletonPath);
+	UAnimSequence* HoverIdle = GPFemaleAnimationSetup::LoadRequiredAsset<UAnimSequence>(*GPCrystalSeraphAnimationSetup::HoverIdlePath);
+	if (!CrystalSeraphMesh || !CrystalSeraphSkeleton || !HoverIdle)
+	{
+		return false;
+	}
+
+	UAnimMontage* BasicAttackMontage = GPCrystalSeraphAnimationSetup::CreateOrUpdatePatternMontage(
+		CrystalSeraphSkeleton,
+		{
+			{ GPCrystalSeraphAnimationSetup::BasicAttackEnterSequencePath },
+			{ GPCrystalSeraphAnimationSetup::BasicAttackShootSequencePath },
+			{ GPCrystalSeraphAnimationSetup::BasicAttackHoldSequencePath, GPCrystalSeraphAnimationSetup::BasicAttackHoldTime },
+			{ GPCrystalSeraphAnimationSetup::BasicAttackExitSequencePath }
+		},
+		GPCrystalSeraphAnimationSetup::BasicAttackMontageName,
+		TEXT("Crystal Seraph simple basic attack"));
+	if (!BasicAttackMontage)
+	{
+		return false;
+	}
+
+	UAnimMontage* LaserAttackMontage = GPCrystalSeraphAnimationSetup::CreateOrUpdatePatternMontage(
+		CrystalSeraphSkeleton,
+		{
+			{ GPCrystalSeraphAnimationSetup::LaserAttackEnterSequencePath },
+			{ GPCrystalSeraphAnimationSetup::LaserAttackShootSequencePath },
+			{ GPCrystalSeraphAnimationSetup::LaserAttackHoldSequencePath, GPCrystalSeraphAnimationSetup::LaserAttackHoldTime },
+			{ GPCrystalSeraphAnimationSetup::LaserAttackExitSequencePath }
+		},
+		GPCrystalSeraphAnimationSetup::LaserAttackMontageName,
+		TEXT("Crystal Seraph double laser attack"));
+	if (!LaserAttackMontage)
+	{
+		return false;
+	}
+
+	UAnimMontage* DeathMontage = GPCrystalSeraphAnimationSetup::CreateOrUpdateMontageFromSequence(
+		CrystalSeraphSkeleton,
+		GPCrystalSeraphAnimationSetup::DeathSequencePath,
+		GPCrystalSeraphAnimationSetup::DeathMontageName,
+		TEXT("Crystal Seraph death"));
+
+	UAnimBlueprint* AnimBlueprint = GPCrystalSeraphAnimationSetup::CreateOrUpdateAnimBlueprint(CrystalSeraphSkeleton, CrystalSeraphMesh, HoverIdle);
+	if (!AnimBlueprint)
+	{
+		return false;
+	}
+
+	UPDA_EnemyAnimationSet* AnimationSet = GPCrystalSeraphAnimationSetup::CreateOrUpdateAnimationSet(
+		CrystalSeraphMesh,
+		HoverIdle,
+		AnimBlueprint,
+		BasicAttackMontage,
+		LaserAttackMontage,
+		DeathMontage);
+	if (!AnimationSet)
+	{
+		return false;
+	}
+
+	if (!GPCrystalSeraphAnimationSetup::AssignBossBlueprint(CrystalSeraphMesh, AnimBlueprint, AnimationSet, BasicAttackMontage, LaserAttackMontage))
+	{
+		return false;
+	}
+
+	UE_LOG(LogTemp, Display, TEXT("Crystal Seraph animation setup completed successfully."));
+	return true;
+#else
+	UE_LOG(LogTemp, Warning, TEXT("CreateCrystalSeraphAnimationSetup is only available in editor builds."));
 	return false;
 #endif
 }

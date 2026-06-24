@@ -11,7 +11,7 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-06-24T00:45:00+09:00
+Last synced: 2026-06-24T17:06:00+09:00
 
 ## Player Network Movement Handoff
 
@@ -79,6 +79,8 @@ Last synced: 2026-06-24T00:45:00+09:00
 
 ## Crystal Seraph Boss Handoff
 
+- Latest animation/VFX polish keeps `/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/Animation/ABP_CrystalSeraph`, `PDA_CrystalSeraphAnimationSet`, and multicast pattern montage playback, but Basic/Shard and Laser montages now compose Enter→Shoot→Hold→Exit so the attack pose remains visible briefly after firing. Pattern actors use duplicated `/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/VFX/NS_CrystalSeraph_*` Niagara assets plus `UGP_VisualCueComponent` tint `59ADFFFF`; original Free_Magic assets are not modified. Build, `ProjectEden.Combat.CrystalSeraph.AnimationSetup`, and `ProjectEden.Combat.CrystalSeraph.VisualCues` pass. PIE-check final animation timing and tint intensity.
+- Latest restore fixes the missing Blueprint symptom: `BP_Crystal_Seraph.uasset` had been committed as an LFS object containing merge-conflict pointer text in `82b7d607` and then kept by merge `3f13056e`. It is now restored from the valid `59fa4cfb` version. Open the BP in editor and compile/save if prompted.
 - Commits `c8aac963` and `3dd2fb6b` restore zero pitch/roll prism placement and reduce editable `PrismAuraScale` from 1.25 to 0.55. All changed translation units compile, but final DLL link and test execution are pending because the open Unreal Editor holds `UnrealEditor-Project_Eden.dll`; close the editor and rebuild.
 - Commits `50569b35`, `5fab4c1f`, and `7ed563c2` share the player visual-cue resolver with actor-owned presentation and add default Niagara to prism, shard, laser, and sanctuary patterns. Full build and all `ProjectEden.Combat.CrystalSeraph` tests pass. No required editor assignment; PIE-check asset scale/orientation and override each actor's `VisualCueComponent.VisualCues` in BP if art tuning is needed.
 - Commits `d79c7f35` and `b12a5dd5` enlarge the prototype prism and spawn three non-overlapping crystals on a 650cm target-centered ring. Editor build, PrismCluster, and existing GroggyLifecycle tests pass; PIE-check visual spacing and tune `PrismVisualScale` / `PrismRingRadius` only if needed.
@@ -205,6 +207,7 @@ _None yet._
 ## Not Verified
 
 - 2026-06-24 boss target marker VFX death cleanup is built and automated, but PIE still needs a multiplayer visual check for death, first acquisition, and target swaps.
+- 2026-06-24 Crystal Seraph BP LFS restore is committed locally; editor visual check is still needed because commandlet startup hit unrelated project load issues (`EventMap2.umap`, missing Fab fence meshes).
 - 2026-06-23 Sans Ground Hands decal/visibility fixes are built and automated coverage passes; PIE-check all three decals per wave and confirm each hand appears only as its rise begins.
 - 2026-06-23 Sans Sweep fan decal is built and automated coverage passes; PIE-check that the fan points forward and visually matches the 165-degree damage arc on uneven terrain.
 - 2026-06-17 basic enemy templates: C++ build succeeded and BP templates were created, but PIE runtime behavior still needs checking for common BT chase/attack transitions, ranged hit distance, and flying movement/pathing.

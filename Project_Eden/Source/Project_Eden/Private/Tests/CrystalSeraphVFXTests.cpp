@@ -3,6 +3,7 @@
 #include "Actors/GP_CrystalPrismActor.h"
 #include "Actors/GP_CrystalSanctuaryMarkerActor.h"
 #include "Actors/GP_CrystalShardProjectile.h"
+#include "Actors/GP_CrystalSeraphVFXDefaults.h"
 #include "Actors/GP_SeraphLaserActor.h"
 #include "Engine/World.h"
 #include "GameplayTags/GP_Tags.h"
@@ -56,15 +57,43 @@ bool FCrystalSeraphVisualCueTest::RunTest(const FString& Parameters)
 	const UGP_VisualCueComponent* ShardCues = PatternActors[1]->FindComponentByClass<UGP_VisualCueComponent>();
 	const UGP_VisualCueComponent* LaserCues = PatternActors[2]->FindComponentByClass<UGP_VisualCueComponent>();
 	const UGP_VisualCueComponent* SanctuaryCues = PatternActors[3]->FindComponentByClass<UGP_VisualCueComponent>();
-	TestNotNull(TEXT("Prism has persistent aura VFX"), PrismCues->ResolveNiagara(GPTags::GameplayCue::Ability::Active_Magic));
-	TestNotNull(TEXT("Prism has reflection burst VFX"), PrismCues->ResolveNiagara(GPTags::GameplayCue::Ability::Reflect_Magic));
-	TestNotNull(TEXT("Shard has active projectile VFX"), ShardCues->ResolveNiagara(GPTags::GameplayCue::Ability::Active_Magic));
-	TestNotNull(TEXT("Shard has impact VFX"), ShardCues->ResolveNiagara(GPTags::GameplayCue::Ability::Impact_Magic));
-	TestNotNull(TEXT("Laser has telegraph VFX"), LaserCues->ResolveNiagara(GPTags::GameplayCue::Ability::Telegraph_Magic));
-	TestNotNull(TEXT("Laser has active VFX"), LaserCues->ResolveNiagara(GPTags::GameplayCue::Ability::Active_Magic));
-	TestNotNull(TEXT("Laser has reflection VFX"), LaserCues->ResolveNiagara(GPTags::GameplayCue::Ability::Reflect_Magic));
-	TestNotNull(TEXT("Sanctuary has telegraph VFX"), SanctuaryCues->ResolveNiagara(GPTags::GameplayCue::Ability::Telegraph_Magic));
-	TestNotNull(TEXT("Sanctuary has explosion VFX"), SanctuaryCues->ResolveNiagara(GPTags::GameplayCue::Ability::Impact_Magic));
+
+	const auto IsCrystalSeraphCopy = [](const UNiagaraSystem* NiagaraSystem) -> bool
+	{
+		return NiagaraSystem
+			&& NiagaraSystem->GetPathName().Contains(TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/VFX/NS_CrystalSeraph_"));
+	};
+	const auto HasCrystalSeraphTint = [](const UGP_VisualCueComponent* VisualCueComponent) -> bool
+	{
+		return VisualCueComponent
+			&& VisualCueComponent->IsNiagaraTintOverrideEnabled()
+			&& VisualCueComponent->GetNiagaraTintOverrideColor().Equals(GPCrystalSeraphVFXDefaults::GetCrystalTintColor(), 0.001f);
+	};
+
+	UNiagaraSystem* PrismAura = PrismCues->ResolveNiagara(GPTags::GameplayCue::Ability::Active_Magic);
+	UNiagaraSystem* PrismReflect = PrismCues->ResolveNiagara(GPTags::GameplayCue::Ability::Reflect_Magic);
+	UNiagaraSystem* ShardActive = ShardCues->ResolveNiagara(GPTags::GameplayCue::Ability::Active_Magic);
+	UNiagaraSystem* ShardImpact = ShardCues->ResolveNiagara(GPTags::GameplayCue::Ability::Impact_Magic);
+	UNiagaraSystem* LaserTelegraph = LaserCues->ResolveNiagara(GPTags::GameplayCue::Ability::Telegraph_Magic);
+	UNiagaraSystem* LaserActive = LaserCues->ResolveNiagara(GPTags::GameplayCue::Ability::Active_Magic);
+	UNiagaraSystem* LaserReflect = LaserCues->ResolveNiagara(GPTags::GameplayCue::Ability::Reflect_Magic);
+	UNiagaraSystem* SanctuaryTelegraph = SanctuaryCues->ResolveNiagara(GPTags::GameplayCue::Ability::Telegraph_Magic);
+	UNiagaraSystem* SanctuaryImpact = SanctuaryCues->ResolveNiagara(GPTags::GameplayCue::Ability::Impact_Magic);
+
+	TestTrue(TEXT("Prism uses Crystal Seraph aura VFX copy"), IsCrystalSeraphCopy(PrismAura));
+	TestTrue(TEXT("Prism uses Crystal Seraph reflection VFX copy"), IsCrystalSeraphCopy(PrismReflect));
+	TestTrue(TEXT("Shard uses Crystal Seraph projectile VFX copy"), IsCrystalSeraphCopy(ShardActive));
+	TestTrue(TEXT("Shard uses Crystal Seraph impact VFX copy"), IsCrystalSeraphCopy(ShardImpact));
+	TestTrue(TEXT("Laser uses Crystal Seraph telegraph VFX copy"), IsCrystalSeraphCopy(LaserTelegraph));
+	TestTrue(TEXT("Laser uses Crystal Seraph active VFX copy"), IsCrystalSeraphCopy(LaserActive));
+	TestTrue(TEXT("Laser uses Crystal Seraph reflection VFX copy"), IsCrystalSeraphCopy(LaserReflect));
+	TestTrue(TEXT("Sanctuary uses Crystal Seraph telegraph VFX copy"), IsCrystalSeraphCopy(SanctuaryTelegraph));
+	TestTrue(TEXT("Sanctuary uses Crystal Seraph explosion VFX copy"), IsCrystalSeraphCopy(SanctuaryImpact));
+	// Crystal Seraph actors tint their copied Niagara components at spawn time so the original Free_Magic assets remain untouched.
+	TestTrue(TEXT("Prism applies Crystal Seraph tint"), HasCrystalSeraphTint(PrismCues));
+	TestTrue(TEXT("Shard applies Crystal Seraph tint"), HasCrystalSeraphTint(ShardCues));
+	TestTrue(TEXT("Laser applies Crystal Seraph tint"), HasCrystalSeraphTint(LaserCues));
+	TestTrue(TEXT("Sanctuary applies Crystal Seraph tint"), HasCrystalSeraphTint(SanctuaryCues));
 
 	TestWorld->DestroyWorld(false);
 	return true;

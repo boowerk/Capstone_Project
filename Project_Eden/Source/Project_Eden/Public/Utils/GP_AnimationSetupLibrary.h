@@ -18,5 +18,8 @@ public:
 	static bool CreateSansBossAnimationSetup();
 
 	UFUNCTION(BlueprintCallable, Category = "ProjectEden|Editor")
+	static bool CreateCrystalSeraphAnimationSetup();
+
+	UFUNCTION(BlueprintCallable, Category = "ProjectEden|Editor")
 	static bool CreateDashInputSetup();
 };
