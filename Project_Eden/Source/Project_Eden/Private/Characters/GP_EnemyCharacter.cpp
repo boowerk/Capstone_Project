@@ -165,6 +165,7 @@ void AGP_EnemyCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 	RefreshWorldHealthBarVisibility();
+	StartHealthBarDistanceCulling();
 
 	if (IsValid(EnemyAnimationSet))
 	{
@@ -467,6 +468,11 @@ void AGP_EnemyCharacter::ApplyDeathState()
 		BossTargetMarkerVFXComponent->HandleOwnerDeath();
 	}
 
+	if (UWorld* World = GetWorld())
+	{
+		// Dead enemies hide the bar permanently, so stop re-evaluating distance during the corpse despawn delay.
+		World->GetTimerManager().ClearTimer(HealthBarDistanceTimerHandle);
+	}
 	RefreshWorldHealthBarVisibility();
 	SetCanBeDamaged(false);
 	SetActorTickEnabled(false);
@@ -519,7 +525,65 @@ void AGP_EnemyCharacter::RefreshWorldHealthBarVisibility()
 	}
 
 	// Bosses already have a dedicated HUD bar, while dead enemies must not leave an orphaned screen-space bar.
-	WorldHealthBarComponent->SetVisibility(bShowWorldHealthBar && !bIsBossEnemy && !bIsDead, true);
+	// Distance culling keeps only the bars near the local player on screen during dense fights.
+	const bool bShouldShow = bShowWorldHealthBar && !bIsBossEnemy && !bIsDead && IsLocalPlayerWithinHealthBarDistance();
+	WorldHealthBarComponent->SetVisibility(bShouldShow, true);
+}
+
+void AGP_EnemyCharacter::StartHealthBarDistanceCulling()
+{
+	// Server-only builds never render the bar, and bosses/disabled bars have nothing to cull.
+	if (GetNetMode() == NM_DedicatedServer || bIsBossEnemy || !bShowWorldHealthBar)
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World || HealthBarVisibleDistance <= 0.0f)
+	{
+		// No distance limit requested: leave the bar at its event-driven visibility.
+		return;
+	}
+
+	World->GetTimerManager().SetTimer(
+		HealthBarDistanceTimerHandle,
+		this,
+		&AGP_EnemyCharacter::RefreshWorldHealthBarVisibility,
+		FMath::Max(HealthBarDistanceCheckInterval, 0.05f),
+		true);
+}
+
+bool AGP_EnemyCharacter::IsLocalPlayerWithinHealthBarDistance() const
+{
+	if (HealthBarVisibleDistance <= 0.0f)
+	{
+		// 0 means no distance limit, so the bar follows only the boss/dead/enabled gates.
+		return true;
+	}
+
+	const UWorld* World = GetWorld();
+	const APlayerController* LocalController = World ? World->GetFirstPlayerController() : nullptr;
+	if (!LocalController)
+	{
+		// Without a local viewer (e.g. server or pre-spawn) keep the existing behavior rather than hiding everything.
+		return true;
+	}
+
+	FVector ViewLocation;
+	if (const APawn* LocalPawn = LocalController->GetPawn())
+	{
+		ViewLocation = LocalPawn->GetActorLocation();
+	}
+	else if (LocalController->PlayerCameraManager)
+	{
+		ViewLocation = LocalController->PlayerCameraManager->GetCameraLocation();
+	}
+	else
+	{
+		return true;
+	}
+
+	return FVector::DistSquared(ViewLocation, GetActorLocation()) <= FMath::Square(HealthBarVisibleDistance);
 }
 
 void AGP_EnemyCharacter::GrantXPRewardToInstigator(AActor* InstigatorActor)

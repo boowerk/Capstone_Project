@@ -2,7 +2,7 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-06-24T00:45:00+09:00
+updated: 2026-06-24T16:28:57+09:00
 status: active
 created: 2026-06-22T17:59:08
 tags:
@@ -12,11 +12,12 @@ tags:
 # Session Summary
 
 ## Status
-- Boss target marker VFX now tracks spawned player-attached Niagara components, clears them on boss death/EndPlay, and suppresses late target-marker play RPCs after death.
+- Boss spawn after zone-0 clear was fixed in two commits: spawn volume nav projection now searches vertically across tall boxes and samples fallback points, portal targets reject invalid nav projection, and `GP_EnemySpawnVolume_0` boss volume was aligned to navmesh Z.
 
 ## Verified
-- `Project_EdenEditor Win64 Development` build succeeded.
-- `ProjectEden.Combat.Boss.TargetMarkerVFXConfiguration` automation succeeded.
+- Live Coding compile succeeded after the C++ changes.
+- Full external UBT was attempted but blocked because Live Coding is active in the open editor.
 
 ## Handoff
-- PIE-check multiplayer boss death/target swap cases; the selected-target VFX should disappear when the boss dies and not reappear from delayed RPCs.
+- PIE-check zone 0 clear -> portal -> boss spawn flow.
+- Unrelated dirty files remain: `BP_DarkArmorKnight.uasset`, `GP_DarkArmorKnightBossCharacter.cpp`.

@@ -527,13 +527,37 @@ void AGP_DarkArmorKnightBossCharacter::GrantDarkKnightAbilities()
 	{
 		return;
 	}
-	for (const TSubclassOf<UGameplayAbility>& AbilityClass : DarkKnightAbilityClasses)
+
+	// Canonical native list is authoritative. A Blueprint child that re-saves DarkKnightAbilityClasses can serialize a
+	// stale/empty array (e.g. a single None) that overrides the constructor default and silently ungrants patterns,
+	// which leaves the pattern selector with candidates it can never activate and the boss frozen. Always grant natives,
+	// then layer any extra designer entries on top.
+	static const TArray<TSubclassOf<UGameplayAbility>> NativeAbilityClasses =
+	{
+		UGP_DarkKnightBasicAbility::StaticClass(),
+		UGP_DarkKnightHeavyAbility::StaticClass(),
+		UGP_DarkKnightChargeAbility::StaticClass(),
+		UGP_DarkKnightDarkWaveAbility::StaticClass(),
+		UGP_DarkKnightGroundCrackAbility::StaticClass(),
+		UGP_DarkKnightGroggyAbility::StaticClass(),
+	};
+
+	auto GrantAbility = [ASC](const TSubclassOf<UGameplayAbility>& AbilityClass)
 	{
 		if (*AbilityClass && ASC->FindAbilitySpecFromClass(AbilityClass) == nullptr)
 		{
 			// Native grants make the C++ boss playable before polished GameplayAbility Blueprint children exist.
 			ASC->GiveAbility(FGameplayAbilitySpec(AbilityClass));
 		}
+	};
+
+	for (const TSubclassOf<UGameplayAbility>& AbilityClass : NativeAbilityClasses)
+	{
+		GrantAbility(AbilityClass);
+	}
+	for (const TSubclassOf<UGameplayAbility>& AbilityClass : DarkKnightAbilityClasses)
+	{
+		GrantAbility(AbilityClass);
 	}
 }
 

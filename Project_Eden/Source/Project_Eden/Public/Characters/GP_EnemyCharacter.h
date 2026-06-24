@@ -218,6 +218,14 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|UI")
 	bool bShowWorldHealthBar = true;
 
+	// Only show the world health bar when the local player is within this distance. 0 disables the distance limit.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|UI", meta = (EditCondition = "bShowWorldHealthBar", ClampMin = "0.0", Units = "cm"))
+	float HealthBarVisibleDistance = 1500.0f;
+
+	// How often each client re-evaluates the distance check. Cheaper than per-frame; the bar pops in/out at this cadence.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|UI", meta = (EditCondition = "bShowWorldHealthBar", ClampMin = "0.05", Units = "s"))
+	float HealthBarDistanceCheckInterval = 0.25f;
+
 	// No death montage is played yet; the actor remains visible in its current pose until this delay expires.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|Death", meta = (ClampMin = "0.0", Units = "s"))
 	float DeathDespawnDelay = 2.0f;
@@ -275,6 +283,9 @@ private:
 	void EnterDeathStateFromAbility();
 	void ApplyDeathState();
 	void RefreshWorldHealthBarVisibility();
+	void StartHealthBarDistanceCulling();
+	bool IsLocalPlayerWithinHealthBarDistance() const;
+	FTimerHandle HealthBarDistanceTimerHandle;
 	void RefreshAIRangeVisualizers();
 	void GrantXPRewardToInstigator(AActor* InstigatorActor);
 	AGP_PlayerState* ResolveInstigatorPlayerState(AActor* InstigatorActor) const;
