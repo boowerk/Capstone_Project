@@ -44,6 +44,12 @@ bool FCrystalSeraphAnimationSetupTest::RunTest(const FString& Parameters)
 	const UAnimSequence* HoverIdle = LoadObject<UAnimSequence>(
 		nullptr,
 		TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/Animation/TravelMode_Hover_Idle.TravelMode_Hover_Idle"));
+	const UAnimSequence* BasicHold = LoadObject<UAnimSequence>(
+		nullptr,
+		TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/Animation/UEFN_Spell_Simple_Idle_Loop.UEFN_Spell_Simple_Idle_Loop"));
+	const UAnimSequence* LaserHold = LoadObject<UAnimSequence>(
+		nullptr,
+		TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/Animation/UEFN_Spell_Double_Idle_Loop.UEFN_Spell_Double_Idle_Loop"));
 	const UPDA_EnemyAnimationSet* AnimationSet = LoadObject<UPDA_EnemyAnimationSet>(
 		nullptr,
 		TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/Animation/PDA_CrystalSeraphAnimationSet.PDA_CrystalSeraphAnimationSet"));
@@ -52,12 +58,44 @@ bool FCrystalSeraphAnimationSetupTest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("Simple spell montage is available for the basic attack"), BasicMontage);
 	TestNotNull(TEXT("Double spell montage is available for the laser attack"), LaserMontage);
 	TestNotNull(TEXT("Hover idle animation is available"), HoverIdle);
+	TestNotNull(TEXT("Simple spell hold animation is available"), BasicHold);
+	TestNotNull(TEXT("Double spell hold animation is available"), LaserHold);
 	TestNotNull(TEXT("Crystal Seraph enemy animation set exists"), AnimationSet);
+
+	const auto HasReadableHoldSegment = [](const UAnimMontage* Montage, const UAnimSequence* HoldAnimation) -> bool
+	{
+		if (!Montage || !HoldAnimation || Montage->SlotAnimTracks.IsEmpty())
+		{
+			return false;
+		}
+
+		const TArray<FAnimSegment>& Segments = Montage->SlotAnimTracks[0].AnimTrack.AnimSegments;
+		for (const FAnimSegment& Segment : Segments)
+		{
+			// The hold segment is the proof that the attack pose remains visible after the gameplay projectile/laser is fired.
+			if (Segment.GetAnimReference() == HoldAnimation && Segment.GetLength() >= 0.35f)
+			{
+				return true;
+			}
+		}
+
+		return false;
+	};
 
 	TestTrue(TEXT("Basic pattern montage points at the Simple spell montage"),
 		BossDefaults->GetCrystalSeraphBasicAttackMontage() == BasicMontage);
 	TestTrue(TEXT("Laser pattern montage points at the Double spell montage"),
 		BossDefaults->GetCrystalSeraphLaserAttackMontage() == LaserMontage);
+	TestTrue(TEXT("Basic pattern montage is composed from enter, fire, hold, and exit clips"),
+		BasicMontage
+		&& !BasicMontage->SlotAnimTracks.IsEmpty()
+		&& BasicMontage->SlotAnimTracks[0].AnimTrack.AnimSegments.Num() >= 4
+		&& HasReadableHoldSegment(BasicMontage, BasicHold));
+	TestTrue(TEXT("Laser pattern montage is composed from enter, fire, hold, and exit clips"),
+		LaserMontage
+		&& !LaserMontage->SlotAnimTracks.IsEmpty()
+		&& LaserMontage->SlotAnimTracks[0].AnimTrack.AnimSegments.Num() >= 4
+		&& HasReadableHoldSegment(LaserMontage, LaserHold));
 
 	USkeletalMeshComponent* MeshComponent = BossDefaults->GetMesh();
 	TestNotNull(TEXT("Crystal Seraph defaults keep a skeletal mesh component"), MeshComponent);
