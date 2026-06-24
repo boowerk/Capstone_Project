@@ -11,11 +11,11 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-06-24T16:16:00+09:00
+Last synced: 2026-06-24T17:06:00+09:00
 
 ## Current Status
 
-- Crystal Seraph animation pass is wired: `/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/Animation/ABP_CrystalSeraph` plays `TravelMode_Hover_Idle` through a DefaultSlot, `AM_CrystalSeraph_Basic_Simple` drives the shard/basic pattern, and `AM_CrystalSeraph_Laser_Double` drives the laser pattern via multicast montage playback. `PDA_CrystalSeraphAnimationSet` is assigned to `BP_Crystal_Seraph`. Build and `ProjectEden.Combat.CrystalSeraph.AnimationSetup` pass.
+- Crystal Seraph animation/VFX polish is current: `/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/Animation/ABP_CrystalSeraph` still uses `TravelMode_Hover_Idle` through DefaultSlot, while `AM_CrystalSeraph_Basic_Simple` and `AM_CrystalSeraph_Laser_Double` now compose Enter→Shoot→Hold→Exit so the attack pose remains visible briefly after firing. Pattern actors now reference duplicated `/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/VFX/NS_CrystalSeraph_*` Niagara copies and apply `59ADFFFF` through `UGP_VisualCueComponent`; original Free_Magic assets remain untouched. Build, `ProjectEden.Combat.CrystalSeraph.AnimationSetup`, and `ProjectEden.Combat.CrystalSeraph.VisualCues` pass.
 - `BP_Crystal_Seraph.uasset` is restored from the valid `59fa4cfb` LFS object after `82b7d607`/`3f13056e` left the Blueprint path pointing at a 287-byte conflict-pointer LFS object. The restored working file is a 37,300-byte binary `.uasset`; PIE/editor visual confirmation remains recommended.
 - Boss target marker VFX no longer survives boss death: `UGP_BossTargetMarkerVFXComponent` tracks spawned player-attached Niagara components, clears them through reliable death cleanup/EndPlay, and suppresses late unreliable play RPCs after death. Editor build and `ProjectEden.Combat.Boss.TargetMarkerVFXConfiguration` pass.
 - Minimap presentation now stays circular and view-aligned: `M_UI_Minimap_StaticMap` is translucent with a `CircleMaskRadius` opacity mask, `UGP_PlayerHUDWidget` pushes the radius at runtime, and the player arrow follows controller/view yaw by default while retaining BP-tunable offset/invert controls. Editor build and `ProjectEden.UI.Minimap.CaptureStability` pass.

@@ -2,7 +2,7 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-06-24T16:16:00+09:00
+updated: 2026-06-24T17:06:00+09:00
 status: active
 created: 2026-06-22T17:59:08
 tags:
@@ -12,12 +12,13 @@ tags:
 # Session Summary
 
 ## Status
-- Crystal Seraph now has `ABP_CrystalSeraph` using `TravelMode_Hover_Idle` as the base pose plus `DefaultSlot` for pattern montages.
-- Simple spell shoot drives the basic/shard pattern montage; Double spell shoot loop drives the laser pattern montage.
+- Crystal Seraph basic/laser montages now compose Enter→Shoot→Hold→Exit, so spell poses remain visible briefly after the projectile/laser fires before blending back to hover idle.
+- Crystal Seraph pattern VFX now reference duplicated `/Game/.../BP_Boss_CrystalSeraph/VFX/NS_CrystalSeraph_*` Niagara copies and apply the requested `59ADFFFF` tint through `UGP_VisualCueComponent`.
 
 ## Verified
 - `Project_EdenEditor Win64 Development` build succeeded.
 - `ProjectEden.Combat.CrystalSeraph.AnimationSetup` automation succeeded.
+- `ProjectEden.Combat.CrystalSeraph.VisualCues` automation succeeded.
 
 ## Handoff
-- PIE-check Crystal Seraph basic and laser attacks visually. The setup commandlet succeeded, but its process returned failure only because of unrelated existing `EventMap2.umap` and missing Fab fence mesh load errors.
+- PIE-check animation timing and final VFX tint intensity. Commandlets may still report unrelated `EventMap2.umap` and missing Fab fence mesh errors.

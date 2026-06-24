@@ -11,7 +11,7 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-06-24T16:16:00+09:00
+Last synced: 2026-06-24T17:06:00+09:00
 
 ## Player Network Movement Handoff
 
@@ -79,7 +79,7 @@ Last synced: 2026-06-24T16:16:00+09:00
 
 ## Crystal Seraph Boss Handoff
 
-- Latest animation setup creates/assigns `/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/Animation/ABP_CrystalSeraph`, `PDA_CrystalSeraphAnimationSet`, and pattern montages. Idle is `TravelMode_Hover_Idle`; Basic/Shard plays `AM_CrystalSeraph_Basic_Simple`; Laser plays `AM_CrystalSeraph_Laser_Double` through multicast montage playback. Build and `ProjectEden.Combat.CrystalSeraph.AnimationSetup` pass. PIE-check visual timing on basic and laser attacks.
+- Latest animation/VFX polish keeps `/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/Animation/ABP_CrystalSeraph`, `PDA_CrystalSeraphAnimationSet`, and multicast pattern montage playback, but Basic/Shard and Laser montages now compose Enter→Shoot→Hold→Exit so the attack pose remains visible briefly after firing. Pattern actors use duplicated `/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/VFX/NS_CrystalSeraph_*` Niagara assets plus `UGP_VisualCueComponent` tint `59ADFFFF`; original Free_Magic assets are not modified. Build, `ProjectEden.Combat.CrystalSeraph.AnimationSetup`, and `ProjectEden.Combat.CrystalSeraph.VisualCues` pass. PIE-check final animation timing and tint intensity.
 - Latest restore fixes the missing Blueprint symptom: `BP_Crystal_Seraph.uasset` had been committed as an LFS object containing merge-conflict pointer text in `82b7d607` and then kept by merge `3f13056e`. It is now restored from the valid `59fa4cfb` version. Open the BP in editor and compile/save if prompted.
 - Commits `c8aac963` and `3dd2fb6b` restore zero pitch/roll prism placement and reduce editable `PrismAuraScale` from 1.25 to 0.55. All changed translation units compile, but final DLL link and test execution are pending because the open Unreal Editor holds `UnrealEditor-Project_Eden.dll`; close the editor and rebuild.
 - Commits `50569b35`, `5fab4c1f`, and `7ed563c2` share the player visual-cue resolver with actor-owned presentation and add default Niagara to prism, shard, laser, and sanctuary patterns. Full build and all `ProjectEden.Combat.CrystalSeraph` tests pass. No required editor assignment; PIE-check asset scale/orientation and override each actor's `VisualCueComponent.VisualCues` in BP if art tuning is needed.
