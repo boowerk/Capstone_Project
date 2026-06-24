@@ -33,6 +33,9 @@ void AGP_RunPortal::BeginPlay()
 void AGP_RunPortal::HandleOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
 	UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
+	UE_LOG(LogTemp, Warning, TEXT("[Portal] overlap by %s, target=%s"),
+		*GetNameSafe(OtherActor), *TargetLocation.ToString());
+
 	AGP_PlayerCharacter* Player = Cast<AGP_PlayerCharacter>(OtherActor);
 	if (!Player || PlayersEntered.Contains(Player))
 	{
@@ -40,7 +43,13 @@ void AGP_RunPortal::HandleOverlapBegin(UPrimitiveComponent* OverlappedComp, AAct
 	}
 
 	PlayersEntered.Add(Player);
-	Player->TeleportTo(TargetLocation, Player->GetActorRotation());
+
+	// Lift the target above the navmesh ground point by the capsule half-height so the
+	// player doesn't encroach the floor (which makes a collision-checked teleport fail).
+	const float HalfHeight = Player->GetSimpleCollisionHalfHeight();
+	const FVector SafeTarget = TargetLocation + FVector(0.0f, 0.0f, HalfHeight + 10.0f);
+	Player->SetActorLocation(SafeTarget, /*bSweep=*/false, nullptr, ETeleportType::TeleportPhysics);
+
 	OnPlayerPassedThrough(Player);
 
 	// Destroy when every player in the level has passed through.

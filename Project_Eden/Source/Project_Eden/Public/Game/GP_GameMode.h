@@ -75,6 +75,11 @@ private:
 	int32 CurrentZoneIndex = INDEX_NONE;
 	int32 PendingZoneIndex = INDEX_NONE;
 	int32 AliveZoneEnemies = 0;
+
+	// Location of the most recent zone enemy death. The advance portal spawns here
+	// (where the last monster fell) instead of the zone center. Reset per zone start.
+	FVector LastEnemyDeathLocation = FVector::ZeroVector;
+	bool bHasLastDeathLocation = false;
 	int32 MarkersTotal = 0;
 	int32 MarkersTriggered = 0;
 	bool bRunStarted = false;

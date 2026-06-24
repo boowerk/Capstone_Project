@@ -130,6 +130,7 @@ void AGP_GameMode::StartZone(int32 ZoneIndex)
 	bRunStarted = true;
 	CurrentZoneIndex = ZoneIndex;
 	AliveZoneEnemies = 0;
+	bHasLastDeathLocation = false;
 
 	AGP_EnemySpawnVolume* Zone = OrderedZones[ZoneIndex];
 
@@ -299,6 +300,13 @@ void AGP_GameMode::HandleZoneEnemyDied(AGP_EnemyCharacter* DeadEnemy)
 {
 	AliveZoneEnemies = FMath::Max(0, AliveZoneEnemies - 1);
 
+	// Remember where this enemy fell so the advance portal can spawn on the kill spot.
+	if (IsValid(DeadEnemy))
+	{
+		LastEnemyDeathLocation = DeadEnemy->GetActorLocation();
+		bHasLastDeathLocation = true;
+	}
+
 	if (AGP_GameState* GPGameState = GetGPGameState())
 	{
 		GPGameState->SetEnemiesRemaining(AliveZoneEnemies);
@@ -363,7 +371,11 @@ void AGP_GameMode::SpawnPortalToZone(int32 FromZoneIndex, int32 ToZoneIndex)
 	}
 
 	bool bProjected = false;
-	const FVector SpawnPos = OrderedZones[FromZoneIndex]->GetSpawnPoint(/*bRandomizeInVolume=*/false, bProjected);
+	// Spawn on the spot where the last monster fell; fall back to the cleared zone
+	// center if no enemy death was recorded (e.g. an empty zone auto-completing).
+	const FVector SpawnPos = bHasLastDeathLocation
+		? LastEnemyDeathLocation
+		: OrderedZones[FromZoneIndex]->GetSpawnPoint(/*bRandomizeInVolume=*/false, bProjected);
 	const FVector TargetPos = OrderedZones[ToZoneIndex]->GetSpawnPoint(/*bRandomizeInVolume=*/false, bProjected);
 
 	FActorSpawnParameters SpawnParameters;
