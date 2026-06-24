@@ -31,7 +31,7 @@ protected:
 	int32 ExpectedPlayerCount = 3;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Lobby")
-	FString GameMapName = TEXT("DemoMap/ServerTest");
+	FString GameMapName = TEXT("MainMap/L_LandscapeMap");
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "Lobby")
 	void OnAllPlayersReady();
