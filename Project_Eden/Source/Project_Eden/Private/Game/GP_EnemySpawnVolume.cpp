@@ -6,6 +6,14 @@
 #include "Kismet/GameplayStatics.h"
 #include "NavigationSystem.h"
 
+namespace GPEnemySpawnVolume
+{
+	constexpr int32 SpawnProjectionAttempts = 8;
+	constexpr float MinProjectionHorizontalExtent = 600.0f;
+	constexpr float MinProjectionVerticalExtent = 1000.0f;
+	constexpr float ProjectionVerticalPadding = 200.0f;
+}
+
 AGP_EnemySpawnVolume::AGP_EnemySpawnVolume()
 {
 	PrimaryActorTick.bCanEverTick = false;
@@ -84,12 +92,17 @@ void AGP_EnemySpawnVolume::HandleBoxOverlap(UPrimitiveComponent* OverlappedComp,
 
 FVector AGP_EnemySpawnVolume::ProjectToNavmesh(const FVector& DesiredLocation, bool& bOutProjected) const
 {
+	return ProjectToNavmesh(DesiredLocation, GetSpawnProjectionExtent(), bOutProjected);
+}
+
+FVector AGP_EnemySpawnVolume::ProjectToNavmesh(const FVector& DesiredLocation, const FVector& QueryExtent, bool& bOutProjected) const
+{
 	bOutProjected = false;
 
 	if (const UNavigationSystemV1* NavigationSystem = UNavigationSystemV1::GetCurrent(GetWorld()))
 	{
 		FNavLocation ProjectedLocation;
-		if (NavigationSystem->ProjectPointToNavigation(DesiredLocation, ProjectedLocation, FVector(600.0f, 600.0f, 1000.0f)))
+		if (NavigationSystem->ProjectPointToNavigation(DesiredLocation, ProjectedLocation, QueryExtent))
 		{
 			bOutProjected = true;
 			return ProjectedLocation.Location;
@@ -99,21 +112,74 @@ FVector AGP_EnemySpawnVolume::ProjectToNavmesh(const FVector& DesiredLocation, b
 	return DesiredLocation;
 }
 
-FVector AGP_EnemySpawnVolume::GetSpawnPoint(bool bRandomizeInVolume, bool& bOutProjected) const
+FVector AGP_EnemySpawnVolume::GetSpawnProjectionExtent() const
 {
-	FVector DesiredLocation = SpawnBox->GetComponentLocation();
+	FVector QueryExtent(
+		GPEnemySpawnVolume::MinProjectionHorizontalExtent,
+		GPEnemySpawnVolume::MinProjectionHorizontalExtent,
+		GPEnemySpawnVolume::MinProjectionVerticalExtent);
 
-	if (bRandomizeInVolume)
+	if (SpawnBox)
 	{
-		const FVector Extent = SpawnBox->GetScaledBoxExtent();
-		const FVector LocalOffset(
-			FMath::FRandRange(-Extent.X, Extent.X),
-			FMath::FRandRange(-Extent.Y, Extent.Y),
-			0.0f);
-		DesiredLocation = SpawnBox->GetComponentTransform().TransformPositionNoScale(LocalOffset);
+		const FVector BoxExtent = SpawnBox->GetScaledBoxExtent();
+		QueryExtent.Z = FMath::Max(QueryExtent.Z, BoxExtent.Z + GPEnemySpawnVolume::ProjectionVerticalPadding);
 	}
 
-	return ProjectToNavmesh(DesiredLocation, bOutProjected);
+	return QueryExtent;
+}
+
+FVector AGP_EnemySpawnVolume::GetRandomPointInSpawnBox() const
+{
+	if (!SpawnBox)
+	{
+		return GetActorLocation();
+	}
+
+	const FVector Extent = SpawnBox->GetScaledBoxExtent();
+	const FVector LocalOffset(
+		FMath::FRandRange(-Extent.X, Extent.X),
+		FMath::FRandRange(-Extent.Y, Extent.Y),
+		0.0f);
+
+	return SpawnBox->GetComponentTransform().TransformPositionNoScale(LocalOffset);
+}
+
+FVector AGP_EnemySpawnVolume::GetSpawnPoint(bool bRandomizeInVolume, bool& bOutProjected) const
+{
+	if (bRandomizeInVolume)
+	{
+		for (int32 AttemptIndex = 0; AttemptIndex < GPEnemySpawnVolume::SpawnProjectionAttempts; ++AttemptIndex)
+		{
+			const FVector DesiredLocation = GetRandomPointInSpawnBox();
+			const FVector ProjectedLocation = ProjectToNavmesh(DesiredLocation, bOutProjected);
+			if (bOutProjected)
+			{
+				return ProjectedLocation;
+			}
+		}
+	}
+
+	const FVector CenterLocation = SpawnBox ? SpawnBox->GetComponentLocation() : GetActorLocation();
+	FVector ProjectedLocation = ProjectToNavmesh(CenterLocation, bOutProjected);
+	if (bOutProjected)
+	{
+		return ProjectedLocation;
+	}
+
+	if (!bRandomizeInVolume)
+	{
+		for (int32 AttemptIndex = 0; AttemptIndex < GPEnemySpawnVolume::SpawnProjectionAttempts; ++AttemptIndex)
+		{
+			const FVector DesiredLocation = GetRandomPointInSpawnBox();
+			ProjectedLocation = ProjectToNavmesh(DesiredLocation, bOutProjected);
+			if (bOutProjected)
+			{
+				return ProjectedLocation;
+			}
+		}
+	}
+
+	return CenterLocation;
 }
 
 FVector AGP_EnemySpawnVolume::GetSpawnPointNearMarker(const AGP_EnemySpawnMarker* Marker, bool& bOutProjected) const

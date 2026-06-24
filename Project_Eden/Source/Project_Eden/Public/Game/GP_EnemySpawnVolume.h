@@ -97,6 +97,9 @@ private:
 	bool bEntered = false;
 
 	FVector ProjectToNavmesh(const FVector& DesiredLocation, bool& bOutProjected) const;
+	FVector ProjectToNavmesh(const FVector& DesiredLocation, const FVector& QueryExtent, bool& bOutProjected) const;
+	FVector GetSpawnProjectionExtent() const;
+	FVector GetRandomPointInSpawnBox() const;
 
 	UFUNCTION()
 	void HandleBoxOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
