@@ -1,5 +1,6 @@
 #include "Actors/GP_CrystalPrismActor.h"
 
+#include "Actors/GP_CrystalSeraphVFXDefaults.h"
 #include "Actors/GP_SeraphLaserActor.h"
 #include "Characters/GP_CrystalSeraphBossCharacter.h"
 #include "Components/SphereComponent.h"
@@ -18,6 +19,7 @@ AGP_CrystalPrismActor::AGP_CrystalPrismActor()
 	SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("SceneRoot"));
 	SetRootComponent(SceneRoot);
 	VisualCueComponent = CreateDefaultSubobject<UGP_VisualCueComponent>(TEXT("VisualCueComponent"));
+	VisualCueComponent->SetNiagaraTintOverride(true, GPCrystalSeraphVFXDefaults::GetCrystalTintColor());
 
 	ReflectionCollision = CreateDefaultSubobject<USphereComponent>(TEXT("ReflectionCollision"));
 	ReflectionCollision->SetupAttachment(SceneRoot);
@@ -38,8 +40,8 @@ AGP_CrystalPrismActor::AGP_CrystalPrismActor()
 		PrismMesh->SetStaticMesh(ConeMeshFinder.Object);
 	}
 
-	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> AuraVFXFinder(TEXT("/Game/Imported_VFX/Free_Magic/VFX_Niagara/NS_Free_Magic_Aura.NS_Free_Magic_Aura"));
-	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> ReflectVFXFinder(TEXT("/Game/Imported_VFX/Free_Magic/VFX_Niagara/NS_Free_Magic_Hit2.NS_Free_Magic_Hit2"));
+	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> AuraVFXFinder(TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/VFX/NS_CrystalSeraph_Aura.NS_CrystalSeraph_Aura"));
+	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> ReflectVFXFinder(TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/VFX/NS_CrystalSeraph_Hit2.NS_CrystalSeraph_Hit2"));
 	if (AuraVFXFinder.Succeeded())
 	{
 		VisualCueComponent->AddNiagaraCue(GPTags::GameplayCue::Ability::Active_Magic, AuraVFXFinder.Object);

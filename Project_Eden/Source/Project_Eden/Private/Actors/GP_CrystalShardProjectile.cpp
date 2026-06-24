@@ -1,6 +1,7 @@
 #include "Actors/GP_CrystalShardProjectile.h"
 
 #include "Actors/GP_CrystalSeraphCombatUtils.h"
+#include "Actors/GP_CrystalSeraphVFXDefaults.h"
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "GameFramework/ProjectileMovementComponent.h"
@@ -13,6 +14,7 @@
 AGP_CrystalShardProjectile::AGP_CrystalShardProjectile()
 {
 	VisualCueComponent = CreateDefaultSubobject<UGP_VisualCueComponent>(TEXT("VisualCueComponent"));
+	VisualCueComponent->SetNiagaraTintOverride(true, GPCrystalSeraphVFXDefaults::GetCrystalTintColor());
 
 	ShardCollision = CreateDefaultSubobject<USphereComponent>(TEXT("ShardCollision"));
 	ShardCollision->SetupAttachment(RootScene);
@@ -41,8 +43,8 @@ AGP_CrystalShardProjectile::AGP_CrystalShardProjectile()
 		DamageEffectClass = DamageEffectFinder.Class;
 	}
 
-	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> ActiveVFXFinder(TEXT("/Game/Imported_VFX/Free_Magic/VFX_Niagara/NS_Free_Magic_Projectile2.NS_Free_Magic_Projectile2"));
-	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> ImpactVFXFinder(TEXT("/Game/Imported_VFX/Free_Magic/VFX_Niagara/NS_Free_Magic_Hit1.NS_Free_Magic_Hit1"));
+	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> ActiveVFXFinder(TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/VFX/NS_CrystalSeraph_Projectile2.NS_CrystalSeraph_Projectile2"));
+	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> ImpactVFXFinder(TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/VFX/NS_CrystalSeraph_Hit1.NS_CrystalSeraph_Hit1"));
 	if (ActiveVFXFinder.Succeeded())
 	{
 		VisualCueComponent->AddNiagaraCue(GPTags::GameplayCue::Ability::Active_Magic, ActiveVFXFinder.Object);

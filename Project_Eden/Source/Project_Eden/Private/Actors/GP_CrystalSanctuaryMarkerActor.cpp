@@ -1,6 +1,7 @@
 #include "Actors/GP_CrystalSanctuaryMarkerActor.h"
 
 #include "Actors/GP_CrystalSeraphCombatUtils.h"
+#include "Actors/GP_CrystalSeraphVFXDefaults.h"
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "GameFramework/Pawn.h"
@@ -19,6 +20,7 @@ AGP_CrystalSanctuaryMarkerActor::AGP_CrystalSanctuaryMarkerActor()
 	SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("SceneRoot"));
 	SetRootComponent(SceneRoot);
 	VisualCueComponent = CreateDefaultSubobject<UGP_VisualCueComponent>(TEXT("VisualCueComponent"));
+	VisualCueComponent->SetNiagaraTintOverride(true, GPCrystalSeraphVFXDefaults::GetCrystalTintColor());
 
 	DamageArea = CreateDefaultSubobject<USphereComponent>(TEXT("DamageArea"));
 	DamageArea->SetupAttachment(SceneRoot);
@@ -44,8 +46,8 @@ AGP_CrystalSanctuaryMarkerActor::AGP_CrystalSanctuaryMarkerActor()
 		DamageEffectClass = DamageEffectFinder.Class;
 	}
 
-	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> TelegraphVFXFinder(TEXT("/Game/Imported_VFX/Free_Magic/VFX_Niagara/NS_Free_Magic_Circle2.NS_Free_Magic_Circle2"));
-	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> ImpactVFXFinder(TEXT("/Game/Imported_VFX/Free_Magic/VFX_Niagara/NS_Free_Magic_Area2.NS_Free_Magic_Area2"));
+	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> TelegraphVFXFinder(TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/VFX/NS_CrystalSeraph_Circle2.NS_CrystalSeraph_Circle2"));
+	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> ImpactVFXFinder(TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/VFX/NS_CrystalSeraph_Area2.NS_CrystalSeraph_Area2"));
 	if (TelegraphVFXFinder.Succeeded())
 	{
 		VisualCueComponent->AddNiagaraCue(GPTags::GameplayCue::Ability::Telegraph_Magic, TelegraphVFXFinder.Object);

@@ -46,9 +46,23 @@ public:
 		const FRotator& WorldRotation = FRotator::ZeroRotator,
 		const FVector& WorldScale = FVector::OneVector) const;
 
+	UFUNCTION(BlueprintCallable, Category = "VFX|Visual Cue")
+	void SetNiagaraTintOverride(bool bEnabled, const FLinearColor& InTintColor);
+
+	bool IsNiagaraTintOverrideEnabled() const { return bApplyNiagaraTintOverride; }
+	FLinearColor GetNiagaraTintOverrideColor() const { return NiagaraTintOverrideColor; }
+
 private:
+	void ApplyNiagaraTintOverride(UNiagaraComponent* NiagaraComponent) const;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "VFX|Visual Cue", meta = (AllowPrivateAccess = "true", TitleProperty = "CueTag"))
 	TArray<FGP_SkillVisualCueEntry> VisualCues;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "VFX|Visual Cue", meta = (AllowPrivateAccess = "true"))
+	bool bApplyNiagaraTintOverride = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "VFX|Visual Cue", meta = (AllowPrivateAccess = "true", EditCondition = "bApplyNiagaraTintOverride"))
+	FLinearColor NiagaraTintOverrideColor = FLinearColor::White;
 
 	UPROPERTY(Transient)
 	TMap<FGameplayTag, TObjectPtr<UNiagaraComponent>> ActiveCueComponents;

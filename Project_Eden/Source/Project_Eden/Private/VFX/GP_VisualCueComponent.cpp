@@ -76,12 +76,14 @@ UNiagaraComponent* UGP_VisualCueComponent::ActivatePersistentCue(
 		RelativeRotation,
 		EAttachLocation::KeepRelativeOffset,
 		false,
-		true,
+		false,
 		ENCPoolMethod::None,
 		true);
 	if (IsValid(NiagaraComponent))
 	{
 		NiagaraComponent->SetRelativeScale3D(RelativeScale);
+		ApplyNiagaraTintOverride(NiagaraComponent);
+		NiagaraComponent->Activate(true);
 		ActiveCueComponents.Add(CueTag, NiagaraComponent);
 	}
 	return NiagaraComponent;
@@ -133,12 +135,14 @@ UNiagaraComponent* UGP_VisualCueComponent::PlayOneShotAttached(
 		RelativeRotation,
 		EAttachLocation::KeepRelativeOffset,
 		true,
-		true,
+		false,
 		ENCPoolMethod::AutoRelease,
 		true);
 	if (IsValid(NiagaraComponent))
 	{
 		NiagaraComponent->SetRelativeScale3D(RelativeScale);
+		ApplyNiagaraTintOverride(NiagaraComponent);
+		NiagaraComponent->Activate(true);
 	}
 	return NiagaraComponent;
 }
@@ -150,7 +154,7 @@ UNiagaraComponent* UGP_VisualCueComponent::PlayOneShotAtLocation(
 	const FVector& WorldScale) const
 {
 	UNiagaraSystem* NiagaraSystem = ResolveNiagara(CueTag);
-	return IsValid(NiagaraSystem)
+	UNiagaraComponent* NiagaraComponent = IsValid(NiagaraSystem)
 		? UNiagaraFunctionLibrary::SpawnSystemAtLocation(
 			this,
 			NiagaraSystem,
@@ -158,7 +162,51 @@ UNiagaraComponent* UGP_VisualCueComponent::PlayOneShotAtLocation(
 			WorldRotation,
 			WorldScale,
 			true,
-			true,
+			false,
 			ENCPoolMethod::AutoRelease)
 		: nullptr;
+	if (IsValid(NiagaraComponent))
+	{
+		ApplyNiagaraTintOverride(NiagaraComponent);
+		NiagaraComponent->Activate(true);
+	}
+	return NiagaraComponent;
+}
+
+void UGP_VisualCueComponent::SetNiagaraTintOverride(bool bEnabled, const FLinearColor& InTintColor)
+{
+	bApplyNiagaraTintOverride = bEnabled;
+	NiagaraTintOverrideColor = InTintColor;
+}
+
+void UGP_VisualCueComponent::ApplyNiagaraTintOverride(UNiagaraComponent* NiagaraComponent) const
+{
+	if (!bApplyNiagaraTintOverride || !IsValid(NiagaraComponent))
+	{
+		return;
+	}
+
+	static const FName TintParameterNames[] =
+	{
+		TEXT("User.Color"),
+		TEXT("User.Tint"),
+		TEXT("User.TintColor"),
+		TEXT("User.ParticleColor"),
+		TEXT("User.Color_Main"),
+		TEXT("User.Color1"),
+		TEXT("User.Color2"),
+		TEXT("User.Color_Ray"),
+		TEXT("User.Color_Smoke"),
+		TEXT("User.Color_Sparks1"),
+		TEXT("User.Color_Sparks2"),
+		TEXT("User.Color_Spiral1"),
+		TEXT("User.Color_Trace"),
+		TEXT("User.Color_Wave")
+	};
+
+	for (const FName TintParameterName : TintParameterNames)
+	{
+		// Several marketplace Niagara packs use different User color names, so apply the same tint to the common set.
+		NiagaraComponent->SetVariableLinearColor(TintParameterName, NiagaraTintOverrideColor);
+	}
 }

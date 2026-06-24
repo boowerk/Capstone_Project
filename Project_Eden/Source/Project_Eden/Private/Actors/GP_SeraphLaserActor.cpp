@@ -2,6 +2,7 @@
 
 #include "Actors/GP_CrystalPrismActor.h"
 #include "Actors/GP_CrystalSeraphCombatUtils.h"
+#include "Actors/GP_CrystalSeraphVFXDefaults.h"
 #include "Characters/GP_CrystalSeraphBossCharacter.h"
 #include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -22,6 +23,7 @@ AGP_SeraphLaserActor::AGP_SeraphLaserActor()
 	SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("SceneRoot"));
 	SetRootComponent(SceneRoot);
 	VisualCueComponent = CreateDefaultSubobject<UGP_VisualCueComponent>(TEXT("VisualCueComponent"));
+	VisualCueComponent->SetNiagaraTintOverride(true, GPCrystalSeraphVFXDefaults::GetCrystalTintColor());
 
 	DamageBox = CreateDefaultSubobject<UBoxComponent>(TEXT("DamageBox"));
 	DamageBox->SetupAttachment(SceneRoot);
@@ -45,9 +47,9 @@ AGP_SeraphLaserActor::AGP_SeraphLaserActor()
 		DamageEffectClass = DamageEffectFinder.Class;
 	}
 
-	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> TelegraphVFXFinder(TEXT("/Game/Imported_VFX/Free_Magic/VFX_Niagara/NS_Free_Magic_Attack_Line.NS_Free_Magic_Attack_Line"));
-	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> ActiveVFXFinder(TEXT("/Game/Imported_VFX/Free_Magic/VFX_Niagara/NS_Free_Magic_Attack_Line_Brute.NS_Free_Magic_Attack_Line_Brute"));
-	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> ReflectVFXFinder(TEXT("/Game/Imported_VFX/Free_Magic/VFX_Niagara/NS_Free_Magic_Hit2.NS_Free_Magic_Hit2"));
+	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> TelegraphVFXFinder(TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/VFX/NS_CrystalSeraph_Attack_Line.NS_CrystalSeraph_Attack_Line"));
+	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> ActiveVFXFinder(TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/VFX/NS_CrystalSeraph_Attack_Line_Brute.NS_CrystalSeraph_Attack_Line_Brute"));
+	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> ReflectVFXFinder(TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/VFX/NS_CrystalSeraph_Hit2.NS_CrystalSeraph_Hit2"));
 	if (TelegraphVFXFinder.Succeeded())
 	{
 		VisualCueComponent->AddNiagaraCue(GPTags::GameplayCue::Ability::Telegraph_Magic, TelegraphVFXFinder.Object);
