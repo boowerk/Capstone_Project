@@ -2,7 +2,7 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-06-24T15:50:00+09:00
+updated: 2026-06-24T16:16:00+09:00
 status: active
 created: 2026-06-22T17:59:08
 tags:
@@ -12,11 +12,12 @@ tags:
 # Session Summary
 
 ## Status
-- Restored `BP_Crystal_Seraph.uasset` from the valid `59fa4cfb` LFS object after the latest GitHub merge left it as a 287-byte LFS conflict-pointer object.
+- Crystal Seraph now has `ABP_CrystalSeraph` using `TravelMode_Hover_Idle` as the base pose plus `DefaultSlot` for pattern montages.
+- Simple spell shoot drives the basic/shard pattern montage; Double spell shoot loop drives the laser pattern montage.
 
 ## Verified
-- Restored file is a 37,300-byte binary `.uasset` again.
-- Target LFS object `b71c3010...` exists locally.
+- `Project_EdenEditor Win64 Development` build succeeded.
+- `ProjectEden.Combat.CrystalSeraph.AnimationSetup` automation succeeded.
 
 ## Handoff
-- Open `/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/BP_Crystal_Seraph` in the editor and compile/save if Unreal asks; unrelated existing load errors remain for `EventMap2.umap` and missing Fab fence meshes.
+- PIE-check Crystal Seraph basic and laser attacks visually. The setup commandlet succeeded, but its process returned failure only because of unrelated existing `EventMap2.umap` and missing Fab fence mesh load errors.

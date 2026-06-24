@@ -6,6 +6,7 @@
 #include "GP_CrystalSeraphBossCharacter.generated.h"
 
 class UGameplayAbility;
+class UAnimMontage;
 class UGP_BossTelegraphVFXComponent;
 class UGP_CrystalSeraphStateComponent;
 class FCrystalSeraphGroggyLifecycleTest;
@@ -82,6 +83,15 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Boss|Crystal Seraph")
 	bool IsGroggyRecoveryScheduled() const { return bGroggyRecoveryScheduled; }
 
+	UFUNCTION(BlueprintCallable, Category = "Boss|Crystal Seraph|Animation")
+	void PlayCrystalSeraphPatternAnimation(FGameplayTag PatternTag);
+
+	UFUNCTION(BlueprintPure, Category = "Boss|Crystal Seraph|Animation")
+	UAnimMontage* GetCrystalSeraphBasicAttackMontage() const { return BasicAttackMontage; }
+
+	UFUNCTION(BlueprintPure, Category = "Boss|Crystal Seraph|Animation")
+	UAnimMontage* GetCrystalSeraphLaserAttackMontage() const { return LaserAttackMontage; }
+
 	// Reserves the shared attack cadence before a GAS pattern executes so back-to-back BT tasks cannot pass the same check.
 	bool TryStartCrystalSeraphPattern();
 
@@ -99,6 +109,9 @@ private:
 
 	UFUNCTION()
 	void HandleCrystalSeraphWingCoreExposedChanged(bool bNewExposed);
+
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastPlayCrystalSeraphPatternMontage(UAnimMontage* MontageToPlay);
 
 	void GrantCrystalSeraphPatternAbilities();
 	AActor* ResolvePatternTarget(AActor* ExplicitTargetActor) const;
@@ -160,6 +173,14 @@ private:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph|Abilities", meta = (AllowPrivateAccess = "true"))
 	bool bGrantCrystalSeraphPatternAbilities = true;
+
+	// Simple spell montage is played when the shard/basic pattern starts.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Crystal Seraph|Animation", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UAnimMontage> BasicAttackMontage;
+
+	// Double spell montage is played when the laser pattern starts.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Crystal Seraph|Animation", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UAnimMontage> LaserAttackMontage;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph|Air", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "cm"))
 	float PreferredHoverHeight = 650.0f;

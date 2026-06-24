@@ -6,6 +6,8 @@
 #include "Abilities/GameplayAbility.h"
 #include "AIController.h"
 #include "AI/Data/EnemyBlackboardKeys.h"
+#include "Animation/AnimInstance.h"
+#include "Animation/AnimMontage.h"
 #include "Actors/GP_CrystalPrismActor.h"
 #include "Actors/GP_CrystalSanctuaryMarkerActor.h"
 #include "Actors/GP_CrystalShardProjectile.h"
@@ -135,6 +137,43 @@ bool AGP_CrystalSeraphBossCharacter::TryStartCrystalSeraphPattern()
 	return true;
 }
 
+void AGP_CrystalSeraphBossCharacter::PlayCrystalSeraphPatternAnimation(FGameplayTag PatternTag)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	UAnimMontage* MontageToPlay = nullptr;
+	if (PatternTag.MatchesTagExact(GPTags::Ability::Boss::CrystalSeraph::Basic))
+	{
+		MontageToPlay = BasicAttackMontage;
+	}
+	else if (PatternTag.MatchesTagExact(GPTags::Ability::Boss::CrystalSeraph::Laser))
+	{
+		MontageToPlay = LaserAttackMontage;
+	}
+
+	if (IsValid(MontageToPlay))
+	{
+		// The boss AI runs on the server, so multicast the montage for remote clients that only own a simulated mesh.
+		MulticastPlayCrystalSeraphPatternMontage(MontageToPlay);
+	}
+}
+
+void AGP_CrystalSeraphBossCharacter::MulticastPlayCrystalSeraphPatternMontage_Implementation(UAnimMontage* MontageToPlay)
+{
+	if (!IsValid(MontageToPlay) || !IsValid(GetMesh()))
+	{
+		return;
+	}
+
+	if (UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance())
+	{
+		AnimInstance->Montage_Play(MontageToPlay);
+	}
+}
+
 void AGP_CrystalSeraphBossCharacter::BeginPlay()
 {
 	Super::BeginPlay();
@@ -227,6 +266,8 @@ bool AGP_CrystalSeraphBossCharacter::RequestStartLaserPattern(AActor* PatternTar
 		return false;
 	}
 
+	PlayCrystalSeraphPatternAnimation(GPTags::Ability::Boss::CrystalSeraph::Laser);
+
 	AActor* TargetActor = ResolvePatternTarget(PatternTargetActor);
 	FVector AimDirection = IsValid(TargetActor)
 		? (TargetActor->GetActorLocation() - GetActorLocation()).GetSafeNormal()
@@ -252,6 +293,8 @@ bool AGP_CrystalSeraphBossCharacter::RequestSpawnCrystalShardPattern(AActor* Pat
 	{
 		return false;
 	}
+
+	PlayCrystalSeraphPatternAnimation(GPTags::Ability::Boss::CrystalSeraph::Basic);
 
 	AActor* TargetActor = ResolvePatternTarget(PatternTargetActor);
 	const FVector TargetLocation = IsValid(TargetActor) ? TargetActor->GetActorLocation() : GetActorLocation() + GetActorForwardVector() * PreferredAirRange;
