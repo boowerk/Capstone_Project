@@ -613,7 +613,7 @@ void UGP_MatadorRapierThrustAbility::PerformThrust()
 		BoxExtent,
 		BoxRotation,
 		AvatarActor,
-		bDebugHitShape || bDrawDebugs);
+		bDebugHitShape);
 
 	ApplySetByCallerDamage(AvatarActor, HitActors, FallbackBaseDamage, FallbackToughnessDamage, FallbackAttackPowerCoefficient);
 	BP_OnRapierThrust(AvatarActor, LockedThrustDirection);
@@ -833,7 +833,7 @@ void UGP_MatadorCapeGustAbility::PerformGustBurst()
 		GustForwardOffset,
 		GustArcAngleDegrees,
 		HitBoxElevationOffset,
-		bDebugHitShape || bDrawDebugs);
+		bDebugHitShape);
 
 	ApplySetByCallerDamage(AvatarActor, HitActors, FallbackBaseDamage, FallbackToughnessDamage, FallbackAttackPowerCoefficient);
 	ApplyEffectToTargets(AvatarActor, HitActors, SlowEffectClass);

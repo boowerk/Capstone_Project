@@ -18,6 +18,7 @@
 #include "Materials/MaterialInterface.h"
 #include "Net/UnrealNetwork.h"
 #include "NiagaraFunctionLibrary.h"
+#include "NiagaraComponent.h"
 #include "NiagaraSystem.h"
 #include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
@@ -110,7 +111,7 @@ void AGP_BullChargeActor::BeginPlay()
 	BP_OnBullSpawnPresentation();
 	if (BullSpawnEffect)
 	{
-		UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+		UNiagaraComponent* SpawnedEffect = UNiagaraFunctionLibrary::SpawnSystemAtLocation(
 			this,
 			BullSpawnEffect,
 			GetActorLocation() + BullSpawnEffectOffset,
@@ -119,8 +120,23 @@ void AGP_BullChargeActor::BeginPlay()
 			true,
 			true,
 			ENCPoolMethod::AutoRelease);
+
+		if (IsValid(SpawnedEffect))
+		{
+			// NS_Free_Magic_Area2 exposes separate colors for every visible emitter.
+			SpawnedEffect->SetVariableLinearColor(TEXT("User.Color_Ray"), BullSpawnEffectColor);
+			SpawnedEffect->SetVariableLinearColor(TEXT("User.Color_Smoke"), BullSpawnEffectColor);
+			SpawnedEffect->SetVariableLinearColor(TEXT("User.Color_Sparks1"), BullSpawnEffectColor);
+			SpawnedEffect->SetVariableLinearColor(TEXT("User.Color_Sparks2"), BullSpawnEffectColor);
+			SpawnedEffect->SetVariableLinearColor(TEXT("User.Color_Spiral1"), BullSpawnEffectColor);
+			SpawnedEffect->SetVariableLinearColor(TEXT("User.Color_Trace"), BullSpawnEffectColor);
+			SpawnedEffect->SetVariableLinearColor(TEXT("User.Color_Wave"), BullSpawnEffectColor);
+		}
 	}
-	DrawTelegraph();
+	if (bShowDebugVisuals)
+	{
+		DrawTelegraph();
+	}
 }
 
 void AGP_BullChargeActor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -609,11 +625,14 @@ void AGP_BullChargeActor::TickDecoyCircleRedirect(float DeltaSeconds)
 		return;
 	}
 
-	for (int32 SampleIndex = 0; SampleIndex < 12; ++SampleIndex)
+	if (bShowDebugVisuals)
 	{
-		const float AlphaA = static_cast<float>(SampleIndex) / 12.0f;
-		const float AlphaB = static_cast<float>(SampleIndex + 1) / 12.0f;
-		DrawDebugLine(GetWorld(), EvaluateDecoyRedirectCurve(AlphaA), EvaluateDecoyRedirectCurve(AlphaB), FColor::Cyan, false, 0.05f, 0, 4.0f);
+		for (int32 SampleIndex = 0; SampleIndex < 12; ++SampleIndex)
+		{
+			const float AlphaA = static_cast<float>(SampleIndex) / 12.0f;
+			const float AlphaB = static_cast<float>(SampleIndex + 1) / 12.0f;
+			DrawDebugLine(GetWorld(), EvaluateDecoyRedirectCurve(AlphaA), EvaluateDecoyRedirectCurve(AlphaB), FColor::Cyan, false, 0.05f, 0, 4.0f);
+		}
 	}
 
 	if (DecoyRedirectCurveAlpha >= 1.0f - KINDA_SMALL_NUMBER)
@@ -692,15 +711,18 @@ bool AGP_BullChargeActor::TryRedirectTowardPlayerFromDecoy()
 	SetChargeState(EGPMatadorBullChargeState::RedirectedByDecoyToPlayer);
 	DecoyActor->PlayBullRedirectPresentation(this, PlayerTarget);
 	BP_OnBullRedirected(DecoyActor.Get(), PlayerTarget);
-	DrawDebugLine(
-		GetWorld(),
-		GetActorLocation() + FVector(0.0f, 0.0f, 80.0f),
-		GetActorLocation() + LockedRedirectDirection * 1600.0f + FVector(0.0f, 0.0f, 80.0f),
-		FColor::Yellow,
-		false,
-		2.0f,
-		0,
-		10.0f);
+	if (bShowDebugVisuals)
+	{
+		DrawDebugLine(
+			GetWorld(),
+			GetActorLocation() + FVector(0.0f, 0.0f, 80.0f),
+			GetActorLocation() + LockedRedirectDirection * 1600.0f + FVector(0.0f, 0.0f, 80.0f),
+			FColor::Yellow,
+			false,
+			2.0f,
+			0,
+			10.0f);
+	}
 
 	UE_LOG(LogTemp, Log, TEXT("[MatadorBull] Decoy redirected bull toward player. Bull=%s Decoy=%s Player=%s CurrentDirection=%s LockedDirection=%s Life=%.2f"),
 		*GetNameSafe(this),

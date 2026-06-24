@@ -201,6 +201,14 @@ private:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Matador|VFX", meta = (AllowPrivateAccess = "true"))
 	FVector BullSpawnEffectScale = FVector(1.6f);
 
+	/** Applied only to this Bull's spawn Niagara instance; source Niagara asset remains reusable by other effects. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Matador|VFX", meta = (AllowPrivateAccess = "true"))
+	FLinearColor BullSpawnEffectColor = FLinearColor(1.0f, 0.02f, 0.0f, 1.0f);
+
+	/** Prototype trajectory helpers. Disabled by default for normal gameplay. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Matador|Debug", meta = (AllowPrivateAccess = "true"))
+	bool bShowDebugVisuals = false;
+
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Boss|Matador", meta = (AllowPrivateAccess = "true"))
 	EGPMatadorBullChargeState ChargeState = EGPMatadorBullChargeState::SpawnTelegraph;
 
