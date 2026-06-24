@@ -2,7 +2,7 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-06-24T00:45:00+09:00
+updated: 2026-06-24T15:50:00+09:00
 status: active
 created: 2026-06-22T17:59:08
 tags:
@@ -12,11 +12,11 @@ tags:
 # Session Summary
 
 ## Status
-- Boss target marker VFX now tracks spawned player-attached Niagara components, clears them on boss death/EndPlay, and suppresses late target-marker play RPCs after death.
+- Restored `BP_Crystal_Seraph.uasset` from the valid `59fa4cfb` LFS object after the latest GitHub merge left it as a 287-byte LFS conflict-pointer object.
 
 ## Verified
-- `Project_EdenEditor Win64 Development` build succeeded.
-- `ProjectEden.Combat.Boss.TargetMarkerVFXConfiguration` automation succeeded.
+- Restored file is a 37,300-byte binary `.uasset` again.
+- Target LFS object `b71c3010...` exists locally.
 
 ## Handoff
-- PIE-check multiplayer boss death/target swap cases; the selected-target VFX should disappear when the boss dies and not reappear from delayed RPCs.
+- Open `/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/BP_Crystal_Seraph` in the editor and compile/save if Unreal asks; unrelated existing load errors remain for `EventMap2.umap` and missing Fab fence meshes.
