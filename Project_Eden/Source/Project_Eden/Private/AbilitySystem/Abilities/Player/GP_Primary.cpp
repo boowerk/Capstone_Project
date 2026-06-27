@@ -376,22 +376,16 @@ const UGP_SkillData* UGP_Primary::ResolvePrimarySkillData() const
 UNiagaraSystem* UGP_Primary::ResolvePrimaryNiagaraSystem(FGameplayTag CueTag, int32 FallbackVisualCueIndex) const
 {
 	const UGP_SkillData* SkillData = ResolvePrimarySkillData();
-	UNiagaraSystem* NiagaraSystem = GetSkillNiagaraSystem(SkillData, GetCurrentTechElementTag(CurrentActorInfo), CueTag);
-	if (IsValid(NiagaraSystem))
-	{
-		return NiagaraSystem;
-	}
-
 	if (SkillData && SkillData->VisualCues.IsValidIndex(FallbackVisualCueIndex))
 	{
 		const FGP_SkillVisualCueEntry& Entry = SkillData->VisualCues[FallbackVisualCueIndex];
-		if (Entry.VisualType == EGP_SkillVisualType::Niagara && IsValid(Entry.NiagaraSystem))
+		if (Entry.VisualType == EGP_SkillVisualType::Niagara)
 		{
 			return Entry.NiagaraSystem;
 		}
 	}
 
-	return nullptr;
+	return GetSkillNiagaraSystem(SkillData, GetCurrentTechElementTag(CurrentActorInfo), CueTag);
 }
 
 void UGP_Primary::StartPrimaryTrailVFX()
@@ -437,6 +431,11 @@ void UGP_Primary::StopPrimaryTrailVFX()
 
 void UGP_Primary::SpawnPrimaryBurstVFX()
 {
+	if (!bEnablePrimaryBurstVFX)
+	{
+		return;
+	}
+
 	AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetAvatarActorFromActorInfo());
 	USkeletalMeshComponent* AttachMesh = IsValid(PC) ? PC->GetMesh() : nullptr;
 	if (!IsValid(AttachMesh))
