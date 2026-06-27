@@ -182,9 +182,6 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Primary Attack", meta = (ClampMin = "0.0"))
 	float PrimaryAttackAutoFacingRotationInterpSpeed = 18.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Primary Attack", meta = (ClampMin = "0.0"))
-	float PrimaryAttackAutoFacingCameraInterpSpeed = 8.0f;
-
 	// =========================================================================
 	// 11. 장비 & 무기 관련 설정 (Equipment & Weapon Settings)
 	// =========================================================================

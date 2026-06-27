@@ -349,20 +349,6 @@ void AGP_PlayerCharacter::UpdatePrimaryAttackAutoFacing(float DeltaSeconds)
 		? FMath::RInterpTo(GetActorRotation(), TargetYaw, DeltaSeconds, PrimaryAttackAutoFacingRotationInterpSpeed)
 		: TargetYaw;
 	SetActorRotation(NewActorRotation);
-
-	AController* OwningController = GetController();
-	if (!OwningController || !OwningController->IsLocalController())
-	{
-		return;
-	}
-
-	const FVector CameraFrom = FollowCamera ? FollowCamera->GetComponentLocation() : GetActorLocation();
-	const FRotator TargetCameraRotation = (PrimaryAttackAutoFacingTarget->GetActorLocation() - CameraFrom).Rotation();
-	const FRotator CurrentControlRotation = OwningController->GetControlRotation();
-	const FRotator NewControlRotation = DeltaSeconds > KINDA_SMALL_NUMBER
-		? FMath::RInterpTo(CurrentControlRotation, TargetCameraRotation, DeltaSeconds, PrimaryAttackAutoFacingCameraInterpSpeed)
-		: CurrentControlRotation;
-	OwningController->SetControlRotation(FRotator(NewControlRotation.Pitch, NewControlRotation.Yaw, 0.0f));
 }
 
 UAnimInstance* AGP_PlayerCharacter::GetUEFNSourceAnimInstance() const
