@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-06-23T17:59:34+09:00
+updated: 2026-06-28T15:10:00+09:00
 status: active
 tags:
   - memoc
@@ -11,9 +11,12 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-06-24T17:06:00+09:00
+Last synced: 2026-06-28T15:10:00+09:00
 
 ## Current Status
+
+- Basic enemy attack cadence no longer relies on the shared BT's fixed three-second wait. Melee (`0.95-1.45s`), ranged (`1.45-2.15s`), and flying (`0.80-1.30s`) roll a new post-attack delay only after successful GAS activation, plus a short per-instance initial delay to stagger groups. The tactics service closes `bCanAttack` during cadence and forces safe root reevaluation; bosses keep their existing pattern cadence. Build and `ProjectEden.AI.Enemy.AttackCadence` pass.
+- Enemy AI Perception now combines sight and hearing candidates. Basic archetype hearing ranges are melee `1500cm`, ranged `1900cm`, and flying `2200cm`. The authoritative player emits `Footstep` hearing events only while moving on ground; sprint is more frequent/louder and crouch quieter. Build and `ProjectEden.AI.Perception.FootstepNoise` pass; PIE mixed-group/occlusion validation remains.
 
 - Crystal Seraph animation/VFX polish is current: `/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/Animation/ABP_CrystalSeraph` still uses `TravelMode_Hover_Idle` through DefaultSlot, while `AM_CrystalSeraph_Basic_Simple` and `AM_CrystalSeraph_Laser_Double` now compose Enter→Shoot→Hold→Exit so the attack pose remains visible briefly after firing. Pattern actors now reference duplicated `/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/VFX/NS_CrystalSeraph_*` Niagara copies and apply `59ADFFFF` through `UGP_VisualCueComponent`; original Free_Magic assets remain untouched. Build, `ProjectEden.Combat.CrystalSeraph.AnimationSetup`, and `ProjectEden.Combat.CrystalSeraph.VisualCues` pass.
 - `BP_Crystal_Seraph.uasset` is restored from the valid `59fa4cfb` LFS object after `82b7d607`/`3f13056e` left the Blueprint path pointing at a 287-byte conflict-pointer LFS object. The restored working file is a 37,300-byte binary `.uasset`; PIE/editor visual confirmation remains recommended.
