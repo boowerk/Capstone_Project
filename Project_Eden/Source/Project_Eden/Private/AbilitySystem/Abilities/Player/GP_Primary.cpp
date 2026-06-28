@@ -19,7 +19,7 @@ namespace GP_Primary_VFX
 {
 	constexpr int32 TrailVisualCueIndex = 0;
 	constexpr int32 BurstVisualCueIndex = 1;
-	const TCHAR* PrimarySkillDataFallbackPath = TEXT("/Game/GAS_Pattern/AbilitySystem/SkillData/DA_Skill_Primary.DA_Skill_Primary");
+	const TCHAR* PrimarySkillDataFallbackPath = TEXT("/Game/GAS_Pattern/AbilitySystem/SkillData/Legacy/DA_Skill_Primary.DA_Skill_Primary");
 }
 
 UGP_Primary::UGP_Primary()
