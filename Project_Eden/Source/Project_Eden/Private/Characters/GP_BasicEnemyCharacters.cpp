@@ -86,6 +86,11 @@ AGP_MeleeEnemyCharacter::AGP_MeleeEnemyCharacter()
 	}
 
 	CombatArchetype = EGPEnemyCombatArchetype::Melee;
+	// Melee enemies recover quickly, but still vary enough that a surrounding group does not swing in unison.
+	AttackCadenceSettings.InitialDelayMinSeconds = 0.05f;
+	AttackCadenceSettings.InitialDelayMaxSeconds = 0.35f;
+	AttackCadenceSettings.NextAttackDelayMinSeconds = 0.95f;
+	AttackCadenceSettings.NextAttackDelayMaxSeconds = 1.45f;
 	ReturnHomeDistance = 2200.0f;
 	ReturnHomeAcceptanceRadius = 150.0f;
 	PatrolRadius = 900.0f;
@@ -124,6 +129,11 @@ AGP_RangedEnemyCharacter::AGP_RangedEnemyCharacter()
 	}
 
 	CombatArchetype = EGPEnemyCombatArchetype::Ranged;
+	// Ranged attacks leave a wider breathing window after each projectile than melee attacks.
+	AttackCadenceSettings.InitialDelayMinSeconds = 0.20f;
+	AttackCadenceSettings.InitialDelayMaxSeconds = 0.70f;
+	AttackCadenceSettings.NextAttackDelayMinSeconds = 1.45f;
+	AttackCadenceSettings.NextAttackDelayMaxSeconds = 2.15f;
 	ReturnHomeDistance = 3000.0f;
 	ReturnHomeAcceptanceRadius = 180.0f;
 	PatrolRadius = 1400.0f;
@@ -162,6 +172,11 @@ AGP_FlyingEnemyCharacter::AGP_FlyingEnemyCharacter()
 	}
 
 	CombatArchetype = EGPEnemyCombatArchetype::Flying;
+	// Flying enemies use short, irregular bursts to distinguish them from grounded ranged enemies.
+	AttackCadenceSettings.InitialDelayMinSeconds = 0.10f;
+	AttackCadenceSettings.InitialDelayMaxSeconds = 0.55f;
+	AttackCadenceSettings.NextAttackDelayMinSeconds = 0.80f;
+	AttackCadenceSettings.NextAttackDelayMaxSeconds = 1.30f;
 	ReturnHomeDistance = 3400.0f;
 	ReturnHomeAcceptanceRadius = 220.0f;
 	PatrolRadius = 1600.0f;

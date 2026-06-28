@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "AI/Combat/EnemyAttackCadencePolicy.h"
 #include "AI/Data/EnemyArchetypeData.h"
 #include "Characters/GP_BaseCharacter.h"
 #include "GameplayTagContainer.h"
@@ -93,6 +94,15 @@ public:
 	UFUNCTION(BlueprintPure, Category = "AI|Combat")
 	FGameplayTag GetDefaultAttackAbilityTag() const { return DefaultAttackAbilityTag; }
 
+	// Regular-enemy BT tasks use this server-side gate instead of a fixed shared Wait node.
+	UFUNCTION(BlueprintPure, Category = "AI|Combat|Cadence")
+	bool IsBasicEnemyAttackReady() const;
+
+	// Returns the newly rolled delay so attack logs and tests can inspect the selected cadence.
+	float ScheduleNextBasicEnemyAttack();
+
+	const FGPEnemyAttackCadenceSettings& GetAttackCadenceSettings() const { return AttackCadenceSettings; }
+
 	UFUNCTION(BlueprintPure, Category = "Enemy|Death")
 	bool IsDead() const { return bIsDead; }
 
@@ -149,6 +159,10 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AI|Archetype")
 	EGPEnemyCombatArchetype CombatArchetype = EGPEnemyCombatArchetype::Melee;
+
+	// Each native archetype provides a different sub-three-second range; Blueprint children may fine-tune it.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AI|Combat|Cadence")
+	FGPEnemyAttackCadenceSettings AttackCadenceSettings;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AI|Debug")
 	bool bShowAIRangesInEditor = true;
@@ -259,6 +273,8 @@ private:
 	TObjectPtr<AActor> DeathInstigatorActor;
 
 	bool bDeathStateApplied = false;
+	float BasicEnemyAttackReadyTimeSeconds = 0.0f;
+	FRandomStream AttackCadenceRandomStream;
 
 	const FEnemyArchetypeTuning* ResolveEnemyArchetypeTuning() const;
 	int32 ResolvePersonalitySeed() const;
@@ -281,6 +297,7 @@ private:
 	void HandleMoveSpeedAttributeChanged(const FOnAttributeChangeData& ChangeData);
 	void BindMoveSpeedAttribute();
 	void UnbindMoveSpeedAttribute();
+	void InitializeBasicEnemyAttackCadence();
 
 	FDelegateHandle MoveSpeedAttributeDelegateHandle;
 };
