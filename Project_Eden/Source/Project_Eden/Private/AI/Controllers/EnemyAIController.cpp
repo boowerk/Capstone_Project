@@ -17,7 +17,9 @@
 #include "Kismet/GameplayStatics.h"
 #include "Navigation/PathFollowingComponent.h"
 #include "Perception/AIPerceptionComponent.h"
+#include "Perception/AISense_Hearing.h"
 #include "Perception/AISense_Sight.h"
+#include "Perception/AISenseConfig_Hearing.h"
 #include "Perception/AISenseConfig_Sight.h"
 #include "TimerManager.h"
 #include "UObject/UObjectGlobals.h"
@@ -178,6 +180,7 @@ AEnemyAIController::AEnemyAIController()
 {
 	EnemyPerceptionComponent = CreateDefaultSubobject<UAIPerceptionComponent>(TEXT("EnemyPerceptionComponent"));
 	SightSenseConfig = CreateDefaultSubobject<UAISenseConfig_Sight>(TEXT("SightSenseConfig"));
+	HearingSenseConfig = CreateDefaultSubobject<UAISenseConfig_Hearing>(TEXT("HearingSenseConfig"));
 
 	// Keep sensing on the engine perception component and keep this controller as the target selector.
 	SetPerceptionComponent(*EnemyPerceptionComponent);
@@ -190,6 +193,7 @@ AEnemyAIController::AEnemyAIController()
 	}
 
 	ConfigureSightSense();
+	ConfigureHearingSense();
 }
 
 FPathFollowingRequestResult AEnemyAIController::MoveTo(const FAIMoveRequest& MoveRequest, FNavPathSharedPtr* OutPath)
@@ -245,6 +249,7 @@ void AEnemyAIController::OnPossess(APawn* InPawn)
 	UE_LOG(LogEnemyAI, Log, TEXT("[AI] Possess: Controller=%s Pawn=%s"), *GetName(), *EnemyAIDebugUtils::DescribeActor(InPawn));
 
 	ConfigureSightSense();
+	ConfigureHearingSense();
 	InitializeBehaviorTree(InPawn);
 	StartEvaluationRefreshLoop();
 
@@ -701,6 +706,31 @@ void AEnemyAIController::ConfigureSightSense()
 	EnemyPerceptionComponent->RequestStimuliListenerUpdate();
 }
 
+void AEnemyAIController::ConfigureHearingSense()
+{
+	if (!IsValid(EnemyPerceptionComponent) || !IsValid(HearingSenseConfig))
+	{
+		return;
+	}
+
+	float EffectiveHearingRange = HearingRange;
+	if (const AGP_EnemyCharacter* EnemyCharacter = Cast<AGP_EnemyCharacter>(GetPawn()))
+	{
+		// The possessed enemy remains the single designer-facing source for its perception ranges.
+		EffectiveHearingRange = EnemyCharacter->GetHearingRange();
+	}
+
+	HearingSenseConfig->HearingRange = FMath::Max(0.0f, EffectiveHearingRange);
+	HearingSenseConfig->SetMaxAge(HearingMaxAge);
+	HearingSenseConfig->DetectionByAffiliation.bDetectEnemies = bDetectEnemies;
+	HearingSenseConfig->DetectionByAffiliation.bDetectFriendlies = bDetectFriendlies;
+	HearingSenseConfig->DetectionByAffiliation.bDetectNeutrals = bDetectNeutrals;
+
+	// Sight remains dominant for location resolution, while hearing can still acquire and remember candidates.
+	EnemyPerceptionComponent->ConfigureSense(*HearingSenseConfig);
+	EnemyPerceptionComponent->RequestStimuliListenerUpdate();
+}
+
 void AEnemyAIController::HandleTargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
 {
 	UE_LOG(
@@ -734,10 +764,10 @@ void AEnemyAIController::RefreshTargetActorFromPerception()
 
 bool AEnemyAIController::HasCurrentlyPerceivedTargetCandidate() const
 {
-	TArray<AActor*> VisibleCandidates;
+	TArray<AActor*> CurrentlyPerceivedCandidates;
 	TArray<AActor*> KnownCandidates;
-	GatherPerceptionTargetCandidates(VisibleCandidates, KnownCandidates);
-	return !VisibleCandidates.IsEmpty();
+	GatherPerceptionTargetCandidates(CurrentlyPerceivedCandidates, KnownCandidates);
+	return !CurrentlyPerceivedCandidates.IsEmpty();
 }
 
 AActor* AEnemyAIController::SelectBestTargetActorFromPerception() const
@@ -747,9 +777,9 @@ AActor* AEnemyAIController::SelectBestTargetActorFromPerception() const
 		return nullptr;
 	}
 
-	TArray<AActor*> VisibleCandidates;
+	TArray<AActor*> CurrentlyPerceivedCandidates;
 	TArray<AActor*> KnownCandidates;
-	GatherPerceptionTargetCandidates(VisibleCandidates, KnownCandidates);
+	GatherPerceptionTargetCandidates(CurrentlyPerceivedCandidates, KnownCandidates);
 
 	if (KnownCandidates.IsEmpty())
 	{
@@ -762,9 +792,9 @@ AActor* AEnemyAIController::SelectBestTargetActorFromPerception() const
 		? BlackboardComponent->GetValueAsName(EnemyBlackboardKeys::FocusTargetRule)
 		: FEnemyLLMEvaluationParser::ToBlackboardName(EEnemyFocusTargetRule::CurrentThreat);
 
-	// Prefer visible targets for snap responsiveness, but keep remembered targets available so TargetActor does not blink away.
-	const bool bUseVisibleCandidatesFirst = bPreferCurrentlyVisibleTargets && !VisibleCandidates.IsEmpty();
-	const TArray<AActor*>& PreferredCandidates = bUseVisibleCandidatesFirst ? VisibleCandidates : KnownCandidates;
+	// Fresh sight or sound should win over remembered stimuli, while the legacy editor setting remains compatible.
+	const bool bUseCurrentlyPerceivedCandidatesFirst = bPreferCurrentlyVisibleTargets && !CurrentlyPerceivedCandidates.IsEmpty();
+	const TArray<AActor*>& PreferredCandidates = bUseCurrentlyPerceivedCandidatesFirst ? CurrentlyPerceivedCandidates : KnownCandidates;
 
 	if (FocusTargetRule == FEnemyLLMEvaluationParser::ToBlackboardName(EEnemyFocusTargetRule::CurrentThreat) && IsValid(BlackboardComponent))
 	{
@@ -782,7 +812,7 @@ AActor* AEnemyAIController::SelectBestTargetActorFromPerception() const
 			return PlayerFirstTarget;
 		}
 
-		if (bUseVisibleCandidatesFirst)
+		if (bUseCurrentlyPerceivedCandidatesFirst)
 		{
 			if (AActor* RememberedPlayerTarget = SelectPlayerFirstTargetCandidate(GetPawn(), KnownCandidates))
 			{
@@ -841,9 +871,9 @@ AActor* AEnemyAIController::SelectFallbackPlayerTargetByDistance() const
 	return LineOfSightTo(PlayerPawn) ? PlayerPawn : nullptr;
 }
 
-void AEnemyAIController::GatherPerceptionTargetCandidates(TArray<AActor*>& OutVisibleCandidates, TArray<AActor*>& OutKnownCandidates) const
+void AEnemyAIController::GatherPerceptionTargetCandidates(TArray<AActor*>& OutCurrentlyPerceivedCandidates, TArray<AActor*>& OutKnownCandidates) const
 {
-	OutVisibleCandidates.Reset();
+	OutCurrentlyPerceivedCandidates.Reset();
 	OutKnownCandidates.Reset();
 
 	if (!IsValid(EnemyPerceptionComponent))
@@ -851,35 +881,38 @@ void AEnemyAIController::GatherPerceptionTargetCandidates(TArray<AActor*>& OutVi
 		return;
 	}
 
-	TArray<AActor*> VisibleActors;
-	EnemyPerceptionComponent->GetCurrentlyPerceivedActors(UAISense_Sight::StaticClass(), VisibleActors);
-
-	for (AActor* CandidateActor : VisibleActors)
+	auto GatherCandidatesForSense = [this, &OutCurrentlyPerceivedCandidates, &OutKnownCandidates](TSubclassOf<UAISense> SenseClass)
 	{
-		if (!IsValidPerceptionTarget(CandidateActor))
+		TArray<AActor*> CurrentlyPerceivedActors;
+		EnemyPerceptionComponent->GetCurrentlyPerceivedActors(SenseClass, CurrentlyPerceivedActors);
+		for (AActor* CandidateActor : CurrentlyPerceivedActors)
 		{
-			continue;
+			if (IsValidPerceptionTarget(CandidateActor))
+			{
+				OutCurrentlyPerceivedCandidates.AddUnique(CandidateActor);
+				OutKnownCandidates.AddUnique(CandidateActor);
+			}
 		}
 
-		OutVisibleCandidates.AddUnique(CandidateActor);
-		OutKnownCandidates.AddUnique(CandidateActor);
-	}
-
-	if (!bUseKnownSightTargetsForSelection)
-	{
-		return;
-	}
-
-	TArray<AActor*> KnownActors;
-	EnemyPerceptionComponent->GetKnownPerceivedActors(UAISense_Sight::StaticClass(), KnownActors);
-
-	for (AActor* CandidateActor : KnownActors)
-	{
-		if (IsValidPerceptionTarget(CandidateActor))
+		if (!bUseKnownSightTargetsForSelection)
 		{
-			OutKnownCandidates.AddUnique(CandidateActor);
+			return;
 		}
-	}
+
+		TArray<AActor*> KnownActors;
+		EnemyPerceptionComponent->GetKnownPerceivedActors(SenseClass, KnownActors);
+		for (AActor* CandidateActor : KnownActors)
+		{
+			if (IsValidPerceptionTarget(CandidateActor))
+			{
+				OutKnownCandidates.AddUnique(CandidateActor);
+			}
+		}
+	};
+
+	// Both senses intentionally feed one deduplicated candidate list for the existing focus-target rules.
+	GatherCandidatesForSense(UAISense_Sight::StaticClass());
+	GatherCandidatesForSense(UAISense_Hearing::StaticClass());
 }
 
 bool AEnemyAIController::IsValidPerceptionTarget(AActor* CandidateActor) const

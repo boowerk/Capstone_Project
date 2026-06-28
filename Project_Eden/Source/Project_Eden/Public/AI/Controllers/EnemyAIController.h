@@ -9,6 +9,7 @@
 class AActor;
 class APawn;
 class UAIPerceptionComponent;
+class UAISenseConfig_Hearing;
 class UAISenseConfig_Sight;
 class UBehaviorTree;
 class UBlackboardComponent;
@@ -68,6 +69,10 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI|Perception")
 	TObjectPtr<UAISenseConfig_Sight> SightSenseConfig;
 
+	// Hearing feeds the same target-selection pipeline as sight instead of maintaining a parallel chase state.
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI|Perception")
+	TObjectPtr<UAISenseConfig_Hearing> HearingSenseConfig;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AI|Perception", meta = (ClampMin = "0.0"))
 	float SightRadius = 2000.0f;
 
@@ -82,6 +87,12 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AI|Perception", meta = (ClampMin = "0.0"))
 	float AutoSuccessRangeFromLastSeenLocation = 600.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AI|Perception", meta = (ClampMin = "0.0", Units = "cm"))
+	float HearingRange = 1600.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AI|Perception", meta = (ClampMin = "0.0", Units = "s"))
+	float HearingMaxAge = 2.25f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AI|Perception")
 	bool bTargetOnlyPlayerControlledPawns = true;
@@ -139,8 +150,9 @@ protected:
 	bool ValidateSharedBlackboardSchema(UBlackboardComponent* BlackboardComponent);
 
 	void ConfigureSightSense();
+	void ConfigureHearingSense();
 	void RefreshTargetActorFromPerception();
-	void GatherPerceptionTargetCandidates(TArray<AActor*>& OutVisibleCandidates, TArray<AActor*>& OutKnownCandidates) const;
+	void GatherPerceptionTargetCandidates(TArray<AActor*>& OutCurrentlyPerceivedCandidates, TArray<AActor*>& OutKnownCandidates) const;
 	AActor* SelectBestTargetActorFromPerception() const;
 	AActor* SelectFallbackPlayerTargetByDistance() const;
 	bool IsValidPerceptionTarget(AActor* CandidateActor) const;

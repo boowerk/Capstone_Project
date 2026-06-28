@@ -97,6 +97,7 @@ AGP_MeleeEnemyCharacter::AGP_MeleeEnemyCharacter()
 	SightRadius = 1800.0f;
 	LoseSightRadius = 2200.0f;
 	PeripheralVisionAngleDegrees = 85.0f;
+	HearingRange = 1500.0f;
 	XPReward = 20.0f;
 
 	DefaultEnemyAttackAbilityClass = UGP_EnemyAttack::StaticClass();
@@ -140,6 +141,7 @@ AGP_RangedEnemyCharacter::AGP_RangedEnemyCharacter()
 	SightRadius = 2600.0f;
 	LoseSightRadius = 3200.0f;
 	PeripheralVisionAngleDegrees = 95.0f;
+	HearingRange = 1900.0f;
 	XPReward = 30.0f;
 
 	DefaultEnemyAttackAbilityClass = UGP_EnemyRangedAttack::StaticClass();
@@ -183,6 +185,7 @@ AGP_FlyingEnemyCharacter::AGP_FlyingEnemyCharacter()
 	SightRadius = 3000.0f;
 	LoseSightRadius = 3800.0f;
 	PeripheralVisionAngleDegrees = 120.0f;
+	HearingRange = 2200.0f;
 	XPReward = 35.0f;
 
 	DefaultEnemyAttackAbilityClass = UGP_EnemyRangedAttack::StaticClass();

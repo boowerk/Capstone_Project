@@ -88,6 +88,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "AI|Perception")
 	float GetPeripheralVisionAngleDegrees() const { return FMath::Clamp(PeripheralVisionAngleDegrees, 0.0f, 180.0f); }
 
+	UFUNCTION(BlueprintPure, Category = "AI|Perception")
+	float GetHearingRange() const { return FMath::Max(0.0f, HearingRange); }
+
 	UFUNCTION(BlueprintPure, Category = "AI|Archetype")
 	EGPEnemyCombatArchetype GetCombatArchetype() const { return CombatArchetype; }
 
@@ -156,6 +159,10 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AI|Perception", meta = (ClampMin = "0.0", ClampMax = "180.0", Units = "deg"))
 	float PeripheralVisionAngleDegrees = 70.0f;
+
+	// Footstep noises inside this radius can acquire or refresh a player target even without line of sight.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AI|Perception", meta = (ClampMin = "0.0", Units = "cm"))
+	float HearingRange = 1600.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AI|Archetype")
 	EGPEnemyCombatArchetype CombatArchetype = EGPEnemyCombatArchetype::Melee;
