@@ -336,9 +336,11 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 	const bool bInsideAttackBand = DistanceToTarget <= MaxAttackRange && (bAllowAttacksInsidePreferredRange || DistanceToTarget >= MinAttackRange);
 	const bool bTooClose = !bAllowAttacksInsidePreferredRange && DistanceToTarget < MinAttackRange;
 	const bool bTooFar = DistanceToTarget > MaxAttackRange;
+	const bool bAttackCadenceReady = !IsValid(EnemyCharacter) || EnemyCharacter->IsBasicEnemyAttackReady();
 
 	bool bShouldRetreat = bModeForcesRetreat || (HealthRatio <= RetreatThreshold);
-	bool bCanAttack = !bShouldRetreat && bHasLineOfSight && bInsideAttackBand;
+	// Closing bCanAttack forces the shared BT to leave its old fixed Wait node while this enemy's own cadence runs.
+	bool bCanAttack = !bShouldRetreat && bHasLineOfSight && bInsideAttackBand && bAttackCadenceReady;
 	bool bShouldReposition = false;
 	bool bShouldChase = false;
 
