@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "AI/Perception/FootstepNoisePolicy.h"
 #include "Characters/GP_BaseCharacter.h"
 #include "Animation/PDA_CharacterAnimationSet.h"
 #include "AbilitySystemInterface.h"
@@ -152,6 +153,7 @@ protected:
 	// 8. 가속도 제어 & 무브먼트 튜닝 함수군 (Movement Acceleration & Tuning)
 	// =========================================================================
 	void UpdateConditionalMaxAcceleration(float DeltaSeconds);
+	void UpdateFootstepNoise();
 	bool ShouldStartAccelerationClamp() const;
 	bool ShouldReleaseAccelerationClamp() const;
 	void RestoreNormalMaxAcceleration();
@@ -172,6 +174,13 @@ protected:
 	// =========================================================================
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Combat|LockOn")
 	bool bIsLockOn = false;
+
+	// AI hearing stimuli are emitted only by the authoritative player instance to avoid network duplicates.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AI|Footsteps")
+	bool bEmitFootstepNoise = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AI|Footsteps", meta = (EditCondition = "bEmitFootstepNoise"))
+	FGPFootstepNoiseSettings FootstepNoiseSettings;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Combat|LockOn")
 	TObjectPtr<AActor> TargetActor;
@@ -411,6 +420,7 @@ private:
 	float NormalMaxAcceleration = 2048.0f;
 	FVector LastMoveInputDirection = FVector::ZeroVector;
 	float MoveInputReversalGraceTimeRemaining = 0.0f;
+	float LastFootstepNoiseTimeSeconds = -1000000.0f;
 
 	// =========================================================================
 	// 17. 능력 및 스킬 제어 유틸 함수 (Ability Slot Control Helpers)
