@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-06-23T17:59:34+09:00
+updated: 2026-07-01T14:21:48+09:00
 status: active
 tags:
   - memoc
@@ -11,7 +11,11 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-06-24T17:06:00+09:00
+Last synced: 2026-07-01T14:21:48+09:00
+
+## Main Merge Handoff
+
+- `origin/main` (`fc34c45a`) is merged into `feature/vfx-skills`; main's `GA_Primary.uasset` resolved the only binary conflict. Editor build passed. PIE-check Primary Attack, F9 encounter panel, lobby travel, portal, Nav, and enemy spawns before merging this feature branch into main.
 
 ## Player Network Movement Handoff
 

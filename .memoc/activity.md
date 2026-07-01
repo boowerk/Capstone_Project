@@ -2,8 +2,8 @@
 memoc: true
 type: core
 scope: project-memory
-created: 2026-06-17T07:49:44
-updated: 2026-06-17T07:49:44
+created: 2026-07-01T05:22:45
+updated: 2026-07-01T05:22:45
 status: active
 tags:
   - memoc
@@ -13,10 +13,12 @@ tags:
 
 Generated shared activity index for memoc work logs.
 
-Last generated: 2026-06-17T07:49:44
+Last generated: 2026-07-01T05:22:45
 
 ## Recent Work
 
+- [Matador Bull spawn VFX red and debug visuals disabled](worklog/lim/2026-06/20260623T1450-matador-bull-spawn-vfx-red-and-debug-visuals-disabled.md) — lim active.
+- [Create FurnaceWalker melee enemy foundation](worklog/lim/2026-06/20260620T0450-create-furnacewalker-melee-enemy-foundation.md) — lim active.
 - [fix: resolve const correctness compile error C2662 in GP_PlayerController](worklog/lim/2026-06/20260601T1010-fix-resolve-const-correctness-compile-error-c2662-in-gp-playercontroller.md) — lim active.
 - [fix memoc wrapper timeout](worklog/lim/2026-06/20260601T0521-fix-memoc-wrapper-timeout.md) — lim active.
 - [refactor: move temporary and diagnostic python utility scripts from project root to agent scratch space](worklog/lim/2026-06/20260601T0508-refactor-move-temporary-and-diagnostic-python-utility-scripts-from-project-root-.md) — lim active.
@@ -35,8 +37,6 @@ Last generated: 2026-06-17T07:49:44
 - [Implemented White Void transition setup](worklog/lim/2026-05/20260526T1700-implemented-white-void-transition-setup.md) — lim active.
 - [Bridge fallback dash ActionEnd notify timing](worklog/lim/2026-05/20260526T1112-bridge-fallback-dash-actionend-notify-timing.md) — lim active.
 - [Restore movement scale on fallback root motion montage](worklog/lim/2026-05/20260526T1101-restore-movement-scale-on-fallback-root-motion-montage.md) — lim active.
-- [Fix MM speed debug scale and source chooser gating](worklog/lim/2026-05/20260526T1033-fix-mm-speed-debug-scale-and-source-chooser-gating.md) — lim active.
-- [gate speed debug to character mesh](worklog/lim/2026-05/20260526T1005-gate-speed-debug-to-character-mesh.md) — lim active.
 
 ## Related
 

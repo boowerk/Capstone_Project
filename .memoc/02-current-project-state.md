@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-06-24T16:28:57+09:00
+updated: 2026-07-01T14:21:48+09:00
 status: active
 tags:
   - memoc
@@ -11,10 +11,11 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-06-24T17:06:00+09:00
+Last synced: 2026-07-01T14:21:48+09:00
 
 ## Current Status
 
+- `origin/main` (`fc34c45a`) is merged into `feature/vfx-skills`; main's `GA_Primary.uasset` was selected to stay aligned with the refactored Primary Attack C++ and skill data. `Project_EdenEditor Win64 Development` builds successfully with `C:\Engine_server\Windows`.
 - World enemy health bars now cull by distance: `AGP_EnemyCharacter` re-checks distance to the local player pawn on a timer (`HealthBarDistanceCheckInterval`) and shows the bar only within `HealthBarVisibleDistance` (default 1500cm, 0 disables); bosses and dedicated servers skip the check.
 - Skill debug drawing is gated behind the `g.DrawSkillDebug` cvar (default 1). `UGP_GameplayAbility::ShouldDrawDebug()` ANDs per-ability `bDrawDebugs` with the cvar across all skills; `AGP_BigHammerDropActor` consults `IsSkillDebugDrawEnabled()`. Console `g.DrawSkillDebug 0` mutes overlap shapes and "Activated" messages for video capture.
 - Boss spawn progression fix landed on `feature/vfx-skills` in `dd299e22` and `8dfcc0b1`: `AGP_EnemySpawnVolume` now projects spawn points with vertical extent based on scaled box height and samples fallback points, `AGP_GameMode` refuses invalid portal targets, and `/Game/Maps/MainMap/L_LandscapeMap` aligns boss `GP_EnemySpawnVolume_0` to navmesh Z. Live Coding compile succeeded; full UBT was blocked by active Live Coding.
