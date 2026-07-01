@@ -70,6 +70,9 @@ protected:
 	FGameplayTag PrimaryBurstCueTag;
 
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Skill|Visuals")
+	bool bEnablePrimaryBurstVFX = false;
+
+	UPROPERTY(EditDefaultsOnly, Category = "GAS|Skill|Visuals")
 	FName PrimaryVFXSocketName = TEXT("hand_r");
 
 	UPROPERTY(EditDefaultsOnly, Category = "GAS|Skill|Visuals")

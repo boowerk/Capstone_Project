@@ -23,6 +23,7 @@ public class Project_Eden : ModuleRules
             "GameplayTasks",
             "GameplayTags",
             "AIModule",
+			"AssetRegistry",
 			"NavigationSystem",
 			"Niagara",
 			"PoseSearch",

@@ -354,13 +354,14 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 	const bool bDarkKnightCrackReady = bDarkKnightCadenceReady
 		&& DistanceToTarget <= DarkKnightBoss->GetGroundCrackMaxRange()
 		&& DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::GroundCrack);
+	const bool bDarkKnightCanAttackAtCurrentRange = bDarkKnightGuardBroken || bDarkKnightMeleeReady;
 	const bool bCanUseDarkKnightPattern = bIsDarkKnightBoss
 		&& bHasTarget
 		&& !bReturningHome
 		&& !bShouldPhaseTransition
 		&& !bDarkKnightGroggy
 		&& bHasLineOfSight
-		&& (bDarkKnightGuardBroken || bDarkKnightMeleeReady || bDarkKnightChargeReady || bDarkKnightWaveReady || bDarkKnightCrackReady);
+		&& bDarkKnightCanAttackAtCurrentRange;
 
 	if (bMatadorGroggy)
 	{
@@ -524,9 +525,9 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bIsGuarding, bDarkKnightGuarding);
 	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanParry, IsValid(DarkKnightStateComponent) && DarkKnightStateComponent->IsParryWindowOpen());
 	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bGuardBroken, bDarkKnightGuardBroken);
-	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldCharge, bDarkKnightChargeReady);
-	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseGroundCrack, bDarkKnightCrackReady);
-	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseDarkWave, bDarkKnightWaveReady);
+	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldCharge, bCanUseDarkKnightPattern && bDarkKnightChargeReady);
+	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseGroundCrack, bCanUseDarkKnightPattern && bDarkKnightCrackReady);
+	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanUseDarkWave, bCanUseDarkKnightPattern && bDarkKnightWaveReady);
 	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardName(BlackboardComponent, EnemyBlackboardKeys::LastHitDirection, IsValid(DarkKnightStateComponent) ? DarkKnightStateComponent->GetLastHitDirectionName() : NAME_None);
 	BTS_UpdateBossTactics_Internal::SetOptionalBlackboardFloat(BlackboardComponent, EnemyBlackboardKeys::PreferredMeleeRange, IsValid(DarkKnightBoss) ? DarkKnightBoss->GetPreferredMeleeRange() : 350.0f);
 }

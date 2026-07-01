@@ -2,7 +2,7 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-06-24T17:06:00+09:00
+updated: 2026-07-01T14:19:11+09:00
 status: active
 created: 2026-06-22T17:59:08
 tags:
@@ -12,12 +12,10 @@ tags:
 # Session Summary
 
 ## Status
-- Merged `origin/main` into `feature/vfx-skills`; code merged clean, only `.memoc` memory conflicts resolved.
-- vfx-skills adds: world health bars cull by local-player distance (`HealthBarVisibleDistance`); skill debug draws gated behind `g.DrawSkillDebug` cvar (ANDs per-ability `bDrawDebugs`).
-- main adds: Crystal Seraph attack montages (Enter→Shoot→Hold→Exit) and tinted Niagara VFX copies.
-
-## Verified
-- Editor build + Crystal Seraph AnimationSetup/VisualCues automation passed pre-merge.
+- Merging `origin/main` (`fc34c45a`) into `feature/vfx-skills`.
+- Use main's `GA_Primary.uasset`; it matches the new `GP_Primary.cpp/.h` and `DA_Skill_Primary` logic.
+- Main brings encounter debug tools, build rules, and restored assets. Feature keeps landscape, Nav/spawn, portal, server travel, health-bar, and skill-debug work.
 
 ## Handoff
-- Rebuild C++ (header changed), PIE-check health-bar distance cull and `g.DrawSkillDebug 0` mute.
+- Finish merge commit and Editor build.
+- PIE-check Primary Attack, F9 encounter panel, lobby travel, portal, Nav, and enemy spawns.
