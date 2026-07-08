@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-06-23T17:59:34+09:00
+updated: 2026-06-28T15:10:00+09:00
 status: active
 tags:
   - memoc
@@ -11,7 +11,13 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-06-24T17:06:00+09:00
+Last synced: 2026-06-28T15:10:00+09:00
+
+## Basic Enemy Cadence and Hearing Handoff
+
+- Commits `24374376`, `f76cb69b`, `cbc771a8`, and `a1bbdc40` add per-archetype randomized attack cadence, shared BT enforcement, enemy hearing perception, and server-authoritative player footsteps.
+- Full editor build passed. `ProjectEden.AI.Enemy.AttackCadence` and `ProjectEden.AI.Perception.FootstepNoise` pass.
+- PIE-check several mixed basic enemies acquiring one player at once: first and repeated attacks should stagger, all intervals should stay below 3s, and moving behind a sight blocker inside HearingRange should acquire/refresh pursuit. Tune native/BP `Attack Cadence Settings`, `Hearing Range`, or player `Footstep Noise Settings` only if encounter feel needs adjustment.
 
 ## Matador Boss Pattern/AnimBP Handoff
 

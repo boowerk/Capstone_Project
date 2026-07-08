@@ -109,6 +109,24 @@ EBTNodeResult::Type UBTT_ExecuteEnemyAttack::ExecuteTask(UBehaviorTreeComponent&
 		bActivated = ASC->TryActivateAbilitiesByTag(EffectiveAttackAbilityTag.GetSingleTagContainer());
 	}
 
+	if (bActivated)
+	{
+		if (AGP_EnemyCharacter* EnemyCharacter = Cast<AGP_EnemyCharacter>(ControlledPawn))
+		{
+			// Start cadence only after GAS accepts the attack; rejected activations must remain immediately retryable.
+			const float NextAttackDelay = EnemyCharacter->ScheduleNextBasicEnemyAttack();
+			if (!EnemyCharacter->IsBossEnemy())
+			{
+				UE_LOG(
+					LogEnemyAI,
+					Verbose,
+					TEXT("[AttackCadence] Next attack in %.2fs: Pawn=%s"),
+					NextAttackDelay,
+					*EnemyAIDebugUtils::DescribeActor(ControlledPawn));
+			}
+		}
+	}
+
 	return bActivated ? EBTNodeResult::Succeeded : EBTNodeResult::Failed;
 }
 

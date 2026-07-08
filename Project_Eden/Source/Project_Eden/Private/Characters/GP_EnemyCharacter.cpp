@@ -165,6 +165,7 @@ void AGP_EnemyCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 	RefreshWorldHealthBarVisibility();
+	InitializeBasicEnemyAttackCadence();
 
 	if (IsValid(EnemyAnimationSet))
 	{
@@ -234,6 +235,57 @@ void AGP_EnemyCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	}
 
 	Super::EndPlay(EndPlayReason);
+}
+
+bool AGP_EnemyCharacter::IsBasicEnemyAttackReady() const
+{
+	if (bIsBossEnemy)
+	{
+		// Boss pattern selectors own their cadence and must not inherit regular-enemy timing.
+		return true;
+	}
+
+	const UWorld* World = GetWorld();
+	return IsValid(World)
+		&& EnemyAttackCadencePolicy::IsReady(World->GetTimeSeconds(), BasicEnemyAttackReadyTimeSeconds);
+}
+
+float AGP_EnemyCharacter::ScheduleNextBasicEnemyAttack()
+{
+	if (bIsBossEnemy || !HasAuthority())
+	{
+		return 0.0f;
+	}
+
+	const FVector2D DelayRange = EnemyAttackCadencePolicy::SanitizeDelayRange(
+		AttackCadenceSettings.NextAttackDelayMinSeconds,
+		AttackCadenceSettings.NextAttackDelayMaxSeconds);
+	const float SelectedDelay = EnemyAttackCadencePolicy::RollDelay(DelayRange, AttackCadenceRandomStream);
+	if (const UWorld* World = GetWorld())
+	{
+		// Only the authoritative enemy owns AI decisions, so this timestamp does not need replication.
+		BasicEnemyAttackReadyTimeSeconds = World->GetTimeSeconds() + SelectedDelay;
+	}
+	return SelectedDelay;
+}
+
+void AGP_EnemyCharacter::InitializeBasicEnemyAttackCadence()
+{
+	if (bIsBossEnemy || !HasAuthority())
+	{
+		return;
+	}
+
+	// Actor names/IDs differ across spawned instances, preventing identical random streams in an encounter group.
+	AttackCadenceRandomStream.Initialize(HashCombineFast(GetTypeHash(GetFName()), GetUniqueID()));
+	const FVector2D InitialDelayRange = EnemyAttackCadencePolicy::SanitizeDelayRange(
+		AttackCadenceSettings.InitialDelayMinSeconds,
+		AttackCadenceSettings.InitialDelayMaxSeconds);
+	const float InitialDelay = EnemyAttackCadencePolicy::RollDelay(InitialDelayRange, AttackCadenceRandomStream);
+	if (const UWorld* World = GetWorld())
+	{
+		BasicEnemyAttackReadyTimeSeconds = World->GetTimeSeconds() + InitialDelay;
+	}
 }
 
 void AGP_EnemyCharacter::BindMoveSpeedAttribute()
