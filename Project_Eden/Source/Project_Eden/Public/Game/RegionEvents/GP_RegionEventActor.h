@@ -38,13 +38,13 @@ public:
 	void InitializeRegionEvent(int32 InRegionId, UGP_RegionEventData* InEventData);
 
 	UFUNCTION(BlueprintCallable, Category = "Region Event")
-	void ActivateRegionEvent();
+	virtual void ActivateRegionEvent();
 
 	UFUNCTION(BlueprintCallable, Category = "Region Event")
-	void CompleteRegionEvent();
+	virtual void CompleteRegionEvent();
 
 	UFUNCTION(BlueprintCallable, Category = "Region Event")
-	void ExpireRegionEvent();
+	virtual void ExpireRegionEvent();
 
 	UFUNCTION(BlueprintPure, Category = "Region Event")
 	int32 GetRegionId() const { return RegionId; }
@@ -96,6 +96,11 @@ protected:
 	UFUNCTION(BlueprintImplementableEvent, Category = "Region Event")
 	void BP_OnRegionEventExpired();
 
+	void SetRuntimeState(EGPRegionEventRuntimeState NewState);
+	void ApplyRegionState(uint8 NewState) const;
+	void SpawnConfiguredEnemies();
+	FVector ResolveSpawnLocation(float ScatterRadius, bool& bOutProjected) const;
+
 private:
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Region Event", meta = (AllowPrivateAccess = "true"))
 	int32 RegionId = INDEX_NONE;
@@ -108,10 +113,6 @@ private:
 
 	FTimerHandle AutoExpireTimerHandle;
 
-	void SetRuntimeState(EGPRegionEventRuntimeState NewState);
-	void ApplyRegionState(uint8 NewState) const;
-	void SpawnConfiguredEnemies();
-	FVector ResolveSpawnLocation(float ScatterRadius, bool& bOutProjected) const;
 	void DispatchStatePresentation(EGPRegionEventRuntimeState PresentedState);
 
 	UFUNCTION()
