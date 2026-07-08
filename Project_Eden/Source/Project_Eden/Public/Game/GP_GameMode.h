@@ -9,6 +9,9 @@ class AGP_EnemySpawnVolume;
 class AGP_GameState;
 class AGP_RunPortal;
 class AGP_EnemySpawnMarker;
+class AGP_RegionEventActor;
+class AGP_RegionEventDirector;
+enum class EGPRegionEventTrigger : uint8;
 
 /**
  * Server-authoritative progression manager for the linear "city -> boss room -> next city" loop.
@@ -68,9 +71,26 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Region")
 	uint8 AliveRegionState = 0;
 
+	// Optional regional event coordinator. Place one in the map for authored pools, or provide a class to auto-spawn.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Region Events")
+	TSubclassOf<AGP_RegionEventDirector> RegionEventDirectorClass;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Region Events")
+	bool bAutoSpawnRegionEventDirector = false;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Region Events")
+	bool bStartRegionEventsOnZoneStart = true;
+
+	// Completion events are meant for reward/cleanup presentation. Enemy-spawning completion events should stay disabled.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Region Events")
+	bool bStartRegionEventsOnZoneCompleted = false;
+
 private:
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<AGP_EnemySpawnVolume>> OrderedZones;
+
+	UPROPERTY(Transient)
+	TObjectPtr<AGP_RegionEventDirector> RegionEventDirector;
 
 	int32 CurrentZoneIndex = INDEX_NONE;
 	int32 PendingZoneIndex = INDEX_NONE;
@@ -83,9 +103,11 @@ private:
 	FTimerHandle ReturnToLobbyTimerHandle;
 
 	void GatherZones();
+	void ResolveRegionEventDirector();
 	void InitializeRegionStates();
 	void UnlockZone(int32 ZoneIndex);
 	void StartZone(int32 ZoneIndex);
+	void StartRegionEventForZone(AGP_EnemySpawnVolume* Zone, EGPRegionEventTrigger Trigger);
 	void SpawnZoneEnemies(AGP_EnemySpawnVolume* Zone);
 	void SpawnMarkerEnemies(AGP_EnemySpawnVolume* Zone, AGP_EnemySpawnMarker* Marker);
 	void RegisterZoneEnemy(AGP_EnemyCharacter* Enemy);
@@ -104,6 +126,9 @@ private:
 
 	UFUNCTION()
 	void HandleZoneEnemyDied(AGP_EnemyCharacter* DeadEnemy);
+
+	UFUNCTION()
+	void HandleRegionEventEnemySpawned(AGP_RegionEventActor* EventActor, AGP_EnemyCharacter* Enemy);
 
 	AGP_GameState* GetGPGameState() const;
 };

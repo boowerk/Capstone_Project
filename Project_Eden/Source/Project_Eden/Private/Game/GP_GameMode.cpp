@@ -5,11 +5,14 @@
 #include "Game/GP_EnemySpawnVolume.h"
 #include "Game/GP_GameState.h"
 #include "Game/GP_RunPortal.h"
+#include "Game/RegionEvents/GP_RegionEventActor.h"
+#include "Game/RegionEvents/GP_RegionEventDirector.h"
 #include "Kismet/GameplayStatics.h"
 
 AGP_GameMode::AGP_GameMode()
 {
 	GameStateClass = AGP_GameState::StaticClass();
+	RegionEventDirectorClass = AGP_RegionEventDirector::StaticClass();
 
 	// Match the lobby's seamless transition so arriving clients are carried
 	// into this map instead of being dropped during the load.
@@ -21,6 +24,7 @@ void AGP_GameMode::BeginPlay()
 	Super::BeginPlay();
 
 	GatherZones();
+	ResolveRegionEventDirector();
 
 	// Let placed BP actors bind to GameState delegates in their BeginPlay before
 	// the initial all-dead reset is broadcast on the server/listen host.
@@ -65,6 +69,42 @@ void AGP_GameMode::GatherZones()
 	{
 		return A.GetZoneOrder() < B.GetZoneOrder();
 	});
+}
+
+void AGP_GameMode::ResolveRegionEventDirector()
+{
+	TArray<AActor*> FoundDirectors;
+	UGameplayStatics::GetAllActorsOfClass(this, AGP_RegionEventDirector::StaticClass(), FoundDirectors);
+
+	for (AActor* FoundActor : FoundDirectors)
+	{
+		if (AGP_RegionEventDirector* FoundDirector = Cast<AGP_RegionEventDirector>(FoundActor))
+		{
+			RegionEventDirector = FoundDirector;
+			break;
+		}
+	}
+
+	if (!RegionEventDirector && bAutoSpawnRegionEventDirector && *RegionEventDirectorClass)
+	{
+		if (UWorld* World = GetWorld())
+		{
+			FActorSpawnParameters SpawnParameters;
+			SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+			RegionEventDirector = World->SpawnActor<AGP_RegionEventDirector>(
+				RegionEventDirectorClass,
+				FVector::ZeroVector,
+				FRotator::ZeroRotator,
+				SpawnParameters);
+		}
+	}
+
+	if (RegionEventDirector)
+	{
+		// The director is server orchestration; spawned event actors replicate their own presentation state.
+		RegionEventDirector->InitializeRegionEventDirector(RegionCount);
+		RegionEventDirector->OnRegionEventEnemySpawned.AddDynamic(this, &ThisClass::HandleRegionEventEnemySpawned);
+	}
 }
 
 void AGP_GameMode::UnlockZone(int32 ZoneIndex)
@@ -147,11 +187,13 @@ void AGP_GameMode::StartZone(int32 ZoneIndex)
 	{
 		// Progressive mode: enemies spawn marker-by-marker as the player advances into the city.
 		Zone->ActivateMarkers();
+		StartRegionEventForZone(Zone, EGPRegionEventTrigger::ZoneStarted);
 		OnZoneStarted(ZoneIndex, Zone);
 		return;
 	}
 
 	// Box-fallback mode: spawn the whole composition at once.
+	StartRegionEventForZone(Zone, EGPRegionEventTrigger::ZoneStarted);
 	SpawnZoneEnemies(Zone);
 	OnZoneStarted(ZoneIndex, Zone);
 
@@ -215,6 +257,26 @@ void AGP_GameMode::SpawnMarkerEnemies(AGP_EnemySpawnVolume* Zone, AGP_EnemySpawn
 			RegisterZoneEnemy(SpawnedEnemy);
 		}
 	}
+}
+
+void AGP_GameMode::StartRegionEventForZone(AGP_EnemySpawnVolume* Zone, EGPRegionEventTrigger Trigger)
+{
+	if (!RegionEventDirector || !IsValid(Zone))
+	{
+		return;
+	}
+
+	if (Trigger == EGPRegionEventTrigger::ZoneStarted && !bStartRegionEventsOnZoneStart)
+	{
+		return;
+	}
+
+	if (Trigger == EGPRegionEventTrigger::ZoneCompleted && !bStartRegionEventsOnZoneCompleted)
+	{
+		return;
+	}
+
+	RegionEventDirector->TryStartRegionEventForZone(Zone, Trigger);
 }
 
 void AGP_GameMode::MaybeCompleteZone()
@@ -307,6 +369,12 @@ void AGP_GameMode::HandleZoneEnemyDied(AGP_EnemyCharacter* DeadEnemy)
 	MaybeCompleteZone();
 }
 
+void AGP_GameMode::HandleRegionEventEnemySpawned(AGP_RegionEventActor* EventActor, AGP_EnemyCharacter* Enemy)
+{
+	// Event-spawned enemies join the current zone budget so events cannot be ignored during a city clear.
+	RegisterZoneEnemy(Enemy);
+}
+
 void AGP_GameMode::CompleteCurrentZone()
 {
 	if (bRunFinished || !OrderedZones.IsValidIndex(CurrentZoneIndex))
@@ -315,6 +383,12 @@ void AGP_GameMode::CompleteCurrentZone()
 	}
 
 	AGP_EnemySpawnVolume* ClearedZone = OrderedZones[CurrentZoneIndex];
+
+	if (RegionEventDirector)
+	{
+		// Finish any active region event before the zone writes its final revived state.
+		RegionEventDirector->CompleteEventsForZone(ClearedZone);
+	}
 
 	// Revive this zone's regions: the cleared city brings its surrounding nature
 	// regions back to life. Server writes the replicated state; clients apply the
@@ -328,6 +402,7 @@ void AGP_GameMode::CompleteCurrentZone()
 	}
 
 	OnZoneCompleted(CurrentZoneIndex, ClearedZone);
+	StartRegionEventForZone(ClearedZone, EGPRegionEventTrigger::ZoneCompleted);
 	AdvanceZone();
 }
 
