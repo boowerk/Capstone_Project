@@ -38,6 +38,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "UI|Augment")
 	bool RequestOpenAugmentSelect();
 
+	UFUNCTION(Client, Reliable, BlueprintCallable, Category = "UI|Augment")
+	void ClientOpenRegionEventAugmentSelect();
+
 	UFUNCTION(BlueprintCallable, Category = "UI|Augment")
 	bool OpenAugmentSelectWidget(const TArray<UGP_SkillAugmentData*>& Candidates);
 
