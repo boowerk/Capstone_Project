@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-09T02:08:00+09:00
+updated: 2026-07-09T02:52:00+09:00
 status: active
 tags:
   - memoc
@@ -11,11 +11,12 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-07-09T02:08:00+09:00
+Last synced: 2026-07-09T02:52:00+09:00
 
 ## Current Status
 
 - Region Event system foundation is current (`28c677a5` through `873eab0c`): `UGP_RegionEventData` assets define event type/trigger/weight/duration, optional region-state writes, icon metadata, and enemy waves. `AGP_RegionEventActor` is a replicated runtime instance with BP hooks for initialized/activated/completed/expired presentation and optional enemy spawning. `AGP_RegionEventDirector` selects weighted events per zone/trigger, spawns event actors near `AGP_EnemySpawnVolume`, and forwards event-spawned enemies to `AGP_GameMode` so zone clears wait for them. GameMode finds a placed director or auto-spawns one when enabled, starts `ZoneStarted` events by default, and completes active zone events before applying final revived region state. Build and `ProjectEden.Game.RegionEvents.Selection` pass. Pending: author editor assets/pools and PIE-check the zone-start event flow.
+- Region Event examples are now native and BP/DataAsset-selectable (`537c98b5` through `c24402f5`). `UGP_RegionEventData.EventActorClass` can point to `AGP_RedRiftRegionEventActor` (immediate configured wave plus periodic waves), `AGP_CrystalCorruptionRegionEventActor` (spawns destructible `AGP_RegionEventCrystalNode`s, slows nearby players until all crystals break), `AGP_ShrineRuinsRegionEventActor` (opens the normal augment picker on the overlapping player's client), or `AGP_StructureDefenseRegionEventActor` (survive a timed defense while waves spawn). Player attacks can now damage region crystal nodes through the shared combat overlap helper. Build and `ProjectEden.Game.RegionEvents.Selection` pass; PIE-check each DataAsset's placement, spawn composition, and multiplayer UI behavior.
 - Basic enemy attack cadence no longer relies on the shared BT's fixed three-second wait. Melee (`0.95-1.45s`), ranged (`1.45-2.15s`), and flying (`0.80-1.30s`) roll a new post-attack delay only after successful GAS activation, plus a short per-instance initial delay to stagger groups. The tactics service closes `bCanAttack` during cadence and forces safe root reevaluation; bosses keep their existing pattern cadence. Build and `ProjectEden.AI.Enemy.AttackCadence` pass.
 - Enemy AI Perception now combines sight and hearing candidates. Basic archetype hearing ranges are melee `1500cm`, ranged `1900cm`, and flying `2200cm`. The authoritative player emits `Footstep` hearing events only while moving on ground; sprint is more frequent/louder and crouch quieter. Build and `ProjectEden.AI.Perception.FootstepNoise` pass; PIE mixed-group/occlusion validation remains.
 

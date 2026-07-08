@@ -2,7 +2,7 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-07-09T02:08:00+09:00
+updated: 2026-07-09T02:52:00+09:00
 status: active
 created: 2026-06-22T17:59:08
 tags:
@@ -12,12 +12,12 @@ tags:
 # Session Summary
 
 ## Status
-- Region Event system foundation is implemented and committed. Designers can author `UGP_RegionEventData` assets, place/configure `AGP_RegionEventDirector`, and let `AGP_GameMode` roll events on zone start.
-- Event actors replicate state, expose BP presentation hooks, optionally spawn event enemies, and can write temporary/completed region states through `AGP_GameState`.
+- Region events now have four concrete C++ examples: Red Rift periodic waves, Crystal Corruption slow-until-crystals-break, Shrine Ruins augment choice, and Structure Defense timed survival.
+- Event DataAssets can override `EventActorClass`; GameMode/director flow remains the same.
 
 ## Verified
 - `Project_EdenEditor Win64 Development` build succeeded.
 - `ProjectEden.Game.RegionEvents.Selection` automation passed.
 
 ## Handoff
-- Editor content still needed: create event data assets, place/configure director/event BP visuals, and PIE-check zone event flow.
+- In each Region Event DataAsset, set `EventActorClass` to the desired example actor and tune event values/EnemySpawns in editor, then PIE-check zone flow.
