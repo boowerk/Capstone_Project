@@ -93,6 +93,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Movement|Speed")
 	void SetGASMovementSpeedMultiplier(float NewMultiplier);
 
+	UFUNCTION(BlueprintPure, Category = "Movement|Speed")
+	float GetGASMovementSpeedMultiplier() const { return GASMovementSpeedMultiplier; }
+
 	UFUNCTION(BlueprintCallable, Category = "Movement|Speed")
 	void SetGASMovementSpeedScaleRatioMultiplier(float NewMultiplier);
 
