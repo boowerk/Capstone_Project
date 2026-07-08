@@ -1,9 +1,13 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Game/RegionEvents/GP_RegionEventActor.h"
+#include "Game/RegionEvents/GP_CrystalCorruptionRegionEventActor.h"
+#include "Game/RegionEvents/GP_RedRiftRegionEventActor.h"
 #include "Game/RegionEvents/GP_RegionEventData.h"
 #include "Game/RegionEvents/GP_RegionEventDirector.h"
 #include "Game/RegionEvents/GP_RegionEventSelectionPolicy.h"
+#include "Game/RegionEvents/GP_ShrineRuinsRegionEventActor.h"
+#include "Game/RegionEvents/GP_StructureDefenseRegionEventActor.h"
 #include "Misc/AutomationTest.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -61,6 +65,16 @@ bool FRegionEventSelectionPolicyTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("The director has no active events by default"),
 		GetDefault<AGP_RegionEventDirector>()->GetActiveEventCount(),
 		0);
+
+	AmbushEvent->EventActorClass = AGP_RedRiftRegionEventActor::StaticClass();
+	TestTrue(TEXT("Region event data can override the runtime actor class"),
+		AmbushEvent->EventActorClass->IsChildOf(AGP_RegionEventActor::StaticClass()));
+	TestTrue(TEXT("Crystal corruption event is a region event actor"),
+		AGP_CrystalCorruptionRegionEventActor::StaticClass()->IsChildOf(AGP_RegionEventActor::StaticClass()));
+	TestTrue(TEXT("Shrine ruins event is a region event actor"),
+		AGP_ShrineRuinsRegionEventActor::StaticClass()->IsChildOf(AGP_RegionEventActor::StaticClass()));
+	TestTrue(TEXT("Structure defense event is a region event actor"),
+		AGP_StructureDefenseRegionEventActor::StaticClass()->IsChildOf(AGP_RegionEventActor::StaticClass()));
 
 	return true;
 }
