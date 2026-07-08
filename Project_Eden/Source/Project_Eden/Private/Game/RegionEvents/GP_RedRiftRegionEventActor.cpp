@@ -14,10 +14,8 @@ void AGP_RedRiftRegionEventActor::ActivateRegionEvent()
 		return;
 	}
 
-	if (InitialWaveDelaySeconds <= 0.0f)
-	{
-		SpawnWave();
-	}
+	// The base activation already spawns the first configured enemy wave.
+	SpawnedWaveCount = 1;
 
 	if (MaxWaveCount <= 0 || SpawnedWaveCount < MaxWaveCount)
 	{

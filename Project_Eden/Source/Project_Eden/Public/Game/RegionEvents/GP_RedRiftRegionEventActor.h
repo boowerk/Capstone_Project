@@ -19,7 +19,7 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Region Event|Red Rift", meta = (ClampMin = "0.0"))
-	float InitialWaveDelaySeconds = 0.0f;
+	float InitialWaveDelaySeconds = 8.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Region Event|Red Rift", meta = (ClampMin = "0.1"))
 	float WaveIntervalSeconds = 8.0f;
