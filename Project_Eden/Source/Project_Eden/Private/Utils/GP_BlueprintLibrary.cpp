@@ -8,6 +8,7 @@
 #include "AbilitySystem/Abilities/GP_SkillData.h"
 #include "Actors/GP_BullChargeActor.h"
 #include "Characters/GP_EnemyCharacter.h"
+#include "Game/RegionEvents/GP_RegionEventCrystalNode.h"
 #include "GameplayEffect.h"
 #include "GameplayTags/GP_Tags.h"
 #include "GameFramework/Pawn.h"
@@ -96,6 +97,19 @@ bool TryHandleMatadorBullCounter(AActor* Instigator, AActor* TargetActor)
 		*GetNameSafe(Instigator),
 		*GetNameSafe(BullActor),
 		static_cast<int32>(BullActor->GetChargeState()));
+	return true;
+}
+
+bool TryHandleRegionEventCrystalHit(AActor* Instigator, AActor* TargetActor)
+{
+	AGP_RegionEventCrystalNode* CrystalNode = Cast<AGP_RegionEventCrystalNode>(TargetActor);
+	if (!IsValid(Instigator) || !IsValid(CrystalNode) || Instigator->IsA<AGP_EnemyCharacter>())
+	{
+		return false;
+	}
+
+	// Region crystals are objective actors without ASC, so player combat overlap consumes one crystal hit here.
+	CrystalNode->ApplyRegionEventHit(Instigator, 1.0f);
 	return true;
 }
 }
@@ -353,6 +367,11 @@ void UGP_BlueprintLibrary::SendGameplayEventToActors(AActor* Instigator, const T
 			continue;
 		}
 
+		if (TryHandleRegionEventCrystalHit(Instigator, HitActor))
+		{
+			continue;
+		}
+
 		if (!CanApplyCombatEffect(Instigator, HitActor))
 		{
 			continue;
@@ -387,6 +406,11 @@ void UGP_BlueprintLibrary::ApplyGameplayEffectToActors(AActor* Instigator, const
 	for (AActor* TargetActor : TargetActors)
 	{
 		if (TryHandleMatadorBullCounter(Instigator, TargetActor))
+		{
+			continue;
+		}
+
+		if (TryHandleRegionEventCrystalHit(Instigator, TargetActor))
 		{
 			continue;
 		}
