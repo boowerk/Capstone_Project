@@ -11,7 +11,15 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-06-28T15:10:00+09:00
+Last synced: 2026-07-09T02:08:00+09:00
+
+## Region Event System Handoff
+
+- Commits `28c677a5`, `726bb5ad`, `ea6ae331`, `b25dbac2`, `e1472c42`, `def21134`, and `873eab0c` add a new region event foundation for PCG/zone presentation.
+- Runtime flow: place/configure `AGP_RegionEventDirector` with `EventPool`; `AGP_GameMode` finds it at BeginPlay, initializes it with `RegionCount`, and starts a weighted `ZoneStarted` event when a zone begins. `ZoneCompleted` rolls are available but disabled by default on GameMode because reward-style events should avoid spawning extra clear-blocking enemies unless intentionally enabled.
+- `UGP_RegionEventData` fields to author first: `EventId`, `DisplayName`, `EventType`, `Trigger`, `SelectionWeight`, `DurationSeconds`, optional active/completed region state, and optional `EnemySpawns`.
+- `AGP_RegionEventActor` owns BP hooks `BP_OnRegionEventInitialized`, `BP_OnRegionEventActivated`, `BP_OnRegionEventCompleted`, and `BP_OnRegionEventExpired`; create BP children for VFX/decal/UI polish. Event-spawned enemies are forwarded to GameMode and count toward the current zone clear.
+- Verified: `Project_EdenEditor Win64 Development` build succeeded and `ProjectEden.Game.RegionEvents.Selection` passed. PIE-check remains: create at least one event data asset, add it to the director pool, enter a zone, confirm event VFX/enemies spawn, and confirm the zone does not complete until event enemies die.
 
 ## Basic Enemy Cadence and Hearing Handoff
 
