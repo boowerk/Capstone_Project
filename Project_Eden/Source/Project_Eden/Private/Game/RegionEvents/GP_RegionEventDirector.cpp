@@ -69,12 +69,20 @@ AGP_RegionEventActor* AGP_RegionEventDirector::TryStartRegionEventForZone(AGP_En
 		return nullptr;
 	}
 
+	const TSubclassOf<AGP_RegionEventActor> ActorClassToSpawn = SelectedEvent->EventActorClass
+		? SelectedEvent->EventActorClass
+		: RegionEventActorClass;
+	if (!*ActorClassToSpawn)
+	{
+		return nullptr;
+	}
+
 	FActorSpawnParameters SpawnParameters;
 	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	SpawnParameters.Owner = this;
 
 	AGP_RegionEventActor* EventActor = World->SpawnActor<AGP_RegionEventActor>(
-		RegionEventActorClass,
+		ActorClassToSpawn,
 		ResolveSpawnLocationForZone(Zone),
 		FRotator::ZeroRotator,
 		SpawnParameters);

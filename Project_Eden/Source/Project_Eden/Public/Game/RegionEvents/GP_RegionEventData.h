@@ -6,6 +6,7 @@
 #include "GP_RegionEventData.generated.h"
 
 class UTexture2D;
+class AGP_RegionEventActor;
 
 /** Presentation/gameplay category used by the region event director and BP widgets. */
 UENUM(BlueprintType)
@@ -49,6 +50,10 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Region Event")
 	EGPRegionEventTrigger Trigger = EGPRegionEventTrigger::ZoneStarted;
+
+	// Optional per-event runtime class. Leave empty to use the director's default actor class.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Region Event")
+	TSubclassOf<AGP_RegionEventActor> EventActorClass;
 
 	// Weight is kept on the data asset so content designers can tune the pool without touching C++.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Region Event", meta = (ClampMin = "0.0"))
