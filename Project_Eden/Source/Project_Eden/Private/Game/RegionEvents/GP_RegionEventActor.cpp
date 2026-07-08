@@ -12,7 +12,7 @@ AGP_RegionEventActor::AGP_RegionEventActor()
 {
 	PrimaryActorTick.bCanEverTick = false;
 	bReplicates = true;
-	NetUpdateFrequency = 5.0f;
+	SetNetUpdateFrequency(5.0f);
 
 	SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("SceneRoot"));
 	SetRootComponent(SceneRoot);
