@@ -8,6 +8,7 @@
 #include "Actors/GP_BullChargeActor.h"
 #include "Actors/GP_ChainEffectActor.h"
 #include "Actors/GP_MatadorBossDecoyActor.h"
+#include "Actors/GP_MatadorDecoyPressureComponent.h"
 #include "AIController.h"
 #include "BehaviorTree/BehaviorTree.h"
 #include "BehaviorTree/BlackboardComponent.h"
@@ -544,6 +545,14 @@ void AGP_MatadorMageBossCharacter::UpdateDecoyFollow(float DeltaSeconds)
 	if (!IsValid(DecoyActor) || !IsValid(TargetActor))
 	{
 		return;
+	}
+
+	if (const UGP_MatadorDecoyPressureComponent* PressureComponent = DecoyActor->GetPressureComponent())
+	{
+		if (PressureComponent->IsPressureActive())
+		{
+			return;
+		}
 	}
 
 	FVector FromTargetToDecoy = DecoyActor->GetActorLocation() - TargetActor->GetActorLocation();

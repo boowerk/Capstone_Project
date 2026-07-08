@@ -18,6 +18,17 @@ enum class EGPEncounterDebugSpawnKind : uint8
 	Boss UMETA(DisplayName = "Boss")
 };
 
+UENUM(BlueprintType)
+enum class EGPEncounterDebugReportMode : uint8
+{
+	Summary UMETA(DisplayName = "Summary"),
+	AI UMETA(DisplayName = "AI"),
+	Skill UMETA(DisplayName = "Skill"),
+	GAS UMETA(DisplayName = "GAS"),
+	Matador UMETA(DisplayName = "Matador"),
+	All UMETA(DisplayName = "All")
+};
+
 USTRUCT(BlueprintType)
 struct FGPEncounterDebugStageSlot
 {
@@ -168,6 +179,18 @@ public:
 	AGP_EnemyCharacter* GetSelectedEnemy() const;
 
 	UFUNCTION(BlueprintCallable, Category = "Encounter Debug|Enemy")
+	FString GetSelectedEnemyDebugReport(EGPEncounterDebugReportMode ReportMode = EGPEncounterDebugReportMode::Summary) const;
+
+	UFUNCTION(BlueprintCallable, Category = "Encounter Debug|Enemy")
+	FString GetSelectedEnemyHeaderReport() const;
+
+	UFUNCTION(BlueprintCallable, Category = "Encounter Debug|Enemy")
+	FString GetSelectedEnemySkillReport() const;
+
+	UFUNCTION(BlueprintCallable, Category = "Encounter Debug|Enemy")
+	FString GetSelectedEnemyLinkedActorReport() const;
+
+	UFUNCTION(BlueprintCallable, Category = "Encounter Debug|Enemy")
 	bool KillSelectedEnemy();
 
 	UFUNCTION(BlueprintCallable, Category = "Encounter Debug|Enemy")
@@ -270,5 +293,9 @@ private:
 	bool IsDebugSpawnedEnemy(const AGP_EnemyCharacter* Enemy) const;
 	int32 ResolveDebugStageIndex(const AGP_EnemyCharacter* Enemy) const;
 	FGPEncounterDebugEnemySnapshot BuildEnemySnapshot(AGP_EnemyCharacter* Enemy) const;
+	FString BuildEnemyDebugReport(AGP_EnemyCharacter* Enemy, EGPEncounterDebugReportMode ReportMode) const;
+	FString BuildEnemyHeaderReport(AGP_EnemyCharacter* Enemy) const;
+	FString BuildEnemySkillReport(AGP_EnemyCharacter* Enemy) const;
+	FString BuildEnemyLinkedActorReport(AGP_EnemyCharacter* Enemy) const;
 	void Log(const FString& Message) const;
 };

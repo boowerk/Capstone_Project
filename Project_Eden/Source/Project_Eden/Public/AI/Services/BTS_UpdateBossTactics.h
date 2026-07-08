@@ -56,10 +56,10 @@ protected:
 
 	// Matador bull pattern opens on a rhythm like other boss specials, but only while the state component is not groggy.
 	UPROPERTY(EditAnywhere, Category = "AI|Boss|Matador", meta = (ClampMin = "0.1", Units = "s"))
-	float BullPatternInterval = 3.0f;
+	float BullPatternInterval = 6.0f;
 
 	UPROPERTY(EditAnywhere, Category = "AI|Boss|Matador", meta = (ClampMin = "0.0", Units = "s"))
-	float BullPatternWindow = 2.5f;
+	float BullPatternWindow = 3.0f;
 
 	UPROPERTY(EditAnywhere, Category = "AI|Boss|Matador", meta = (ClampMin = "0.0", Units = "cm"))
 	float BullPatternMinRange = 0.0f;
