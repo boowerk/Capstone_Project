@@ -4,6 +4,7 @@
 #include "Game/RegionEvents/GP_RedRiftRegionEventActor.h"
 #include "Game/RegionEvents/GP_RegionEventData.h"
 #include "Game/RegionEvents/GP_RegionEventDirector.h"
+#include "Game/RegionEvents/GP_RegionEventTestTriggerActor.h"
 #include "Game/RegionEvents/GP_ShrineRuinsRegionEventActor.h"
 #include "Game/RegionEvents/GP_StructureDefenseRegionEventActor.h"
 #include "Misc/AutomationTest.h"
@@ -36,6 +37,19 @@ namespace GPRegionEventExampleAssetTests
 	{
 		const FIntProperty* IntProperty = IsValid(Object) ? FindFProperty<FIntProperty>(Object->GetClass(), PropertyName) : nullptr;
 		return IntProperty ? IntProperty->GetPropertyValue_InContainer(Object) : MIN_int32;
+	}
+
+	bool GetBoolProperty(UObject* Object, const FName PropertyName)
+	{
+		const FBoolProperty* BoolProperty = IsValid(Object) ? FindFProperty<FBoolProperty>(Object->GetClass(), PropertyName) : nullptr;
+		return BoolProperty ? BoolProperty->GetPropertyValue_InContainer(Object) : false;
+	}
+
+	UObject* GetObjectProperty(UObject* Object, const FName PropertyName)
+	{
+		const FProperty* Property = IsValid(Object) ? FindFProperty<FProperty>(Object->GetClass(), PropertyName) : nullptr;
+		const FObjectPropertyBase* ObjectProperty = CastField<FObjectPropertyBase>(Property);
+		return ObjectProperty ? ObjectProperty->GetObjectPropertyValue_InContainer(Object) : nullptr;
 	}
 
 	int32 GetEventPoolCount(UObject* Object)
@@ -76,6 +90,18 @@ bool FRegionEventExampleAssetsTest::RunTest(const FString& Parameters)
 	UClass* DirectorClass = LoadClassChecked<AGP_RegionEventDirector>(
 		*this,
 		TEXT("/Game/RegionEvents/Examples/BP_RE_Test_Director_AllExamples.BP_RE_Test_Director_AllExamples_C"));
+	UClass* RedRiftTriggerClass = LoadClassChecked<AGP_RegionEventTestTriggerActor>(
+		*this,
+		TEXT("/Game/RegionEvents/Examples/BP_RE_TestTrigger_RedRift.BP_RE_TestTrigger_RedRift_C"));
+	UClass* CrystalTriggerClass = LoadClassChecked<AGP_RegionEventTestTriggerActor>(
+		*this,
+		TEXT("/Game/RegionEvents/Examples/BP_RE_TestTrigger_CrystalCorruption.BP_RE_TestTrigger_CrystalCorruption_C"));
+	UClass* ShrineTriggerClass = LoadClassChecked<AGP_RegionEventTestTriggerActor>(
+		*this,
+		TEXT("/Game/RegionEvents/Examples/BP_RE_TestTrigger_ShrineRuins.BP_RE_TestTrigger_ShrineRuins_C"));
+	UClass* DefenseTriggerClass = LoadClassChecked<AGP_RegionEventTestTriggerActor>(
+		*this,
+		TEXT("/Game/RegionEvents/Examples/BP_RE_TestTrigger_StructureDefense.BP_RE_TestTrigger_StructureDefense_C"));
 
 	UGP_RegionEventData* RedRiftData = LoadEventDataChecked(*this, TEXT("/Game/RegionEvents/Examples/DA_RE_Test_RedRift.DA_RE_Test_RedRift"));
 	UGP_RegionEventData* CrystalData = LoadEventDataChecked(*this, TEXT("/Game/RegionEvents/Examples/DA_RE_Test_CrystalCorruption.DA_RE_Test_CrystalCorruption"));
@@ -105,6 +131,21 @@ bool FRegionEventExampleAssetsTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Test director pools all four examples"),
 		GetEventPoolCount(IsValid(DirectorClass) ? DirectorClass->GetDefaultObject() : nullptr),
 		4);
+
+	UObject* RedRiftTriggerDefaults = IsValid(RedRiftTriggerClass) ? RedRiftTriggerClass->GetDefaultObject() : nullptr;
+	UObject* CrystalTriggerDefaults = IsValid(CrystalTriggerClass) ? CrystalTriggerClass->GetDefaultObject() : nullptr;
+	UObject* ShrineTriggerDefaults = IsValid(ShrineTriggerClass) ? ShrineTriggerClass->GetDefaultObject() : nullptr;
+	UObject* DefenseTriggerDefaults = IsValid(DefenseTriggerClass) ? DefenseTriggerClass->GetDefaultObject() : nullptr;
+
+	// Direct test triggers are intended for designers: drop one BP in any PIE map and that single event starts immediately.
+	TestTrue(TEXT("Red Rift direct trigger starts on BeginPlay"), GetBoolProperty(RedRiftTriggerDefaults, TEXT("bTriggerOnBeginPlay")));
+	TestTrue(TEXT("Crystal direct trigger starts on BeginPlay"), GetBoolProperty(CrystalTriggerDefaults, TEXT("bTriggerOnBeginPlay")));
+	TestTrue(TEXT("Shrine direct trigger starts on BeginPlay"), GetBoolProperty(ShrineTriggerDefaults, TEXT("bTriggerOnBeginPlay")));
+	TestTrue(TEXT("Defense direct trigger starts on BeginPlay"), GetBoolProperty(DefenseTriggerDefaults, TEXT("bTriggerOnBeginPlay")));
+	TestTrue(TEXT("Red Rift direct trigger uses Red Rift data"), GetObjectProperty(RedRiftTriggerDefaults, TEXT("EventData")) == RedRiftData);
+	TestTrue(TEXT("Crystal direct trigger uses Crystal data"), GetObjectProperty(CrystalTriggerDefaults, TEXT("EventData")) == CrystalData);
+	TestTrue(TEXT("Shrine direct trigger uses Shrine data"), GetObjectProperty(ShrineTriggerDefaults, TEXT("EventData")) == ShrineData);
+	TestTrue(TEXT("Defense direct trigger uses Defense data"), GetObjectProperty(DefenseTriggerDefaults, TEXT("EventData")) == DefenseData);
 
 	return true;
 }
