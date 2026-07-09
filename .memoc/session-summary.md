@@ -2,7 +2,7 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-07-09T02:52:00+09:00
+updated: 2026-07-09T16:46:33+09:00
 status: active
 created: 2026-06-22T17:59:08
 tags:
@@ -12,12 +12,13 @@ tags:
 # Session Summary
 
 ## Status
-- Region events now have four concrete C++ examples: Red Rift periodic waves, Crystal Corruption slow-until-crystals-break, Shrine Ruins augment choice, and Structure Defense timed survival.
-- Event DataAssets can override `EventActorClass`; GameMode/director flow remains the same.
+- Boss death/clear presentation is native. `UGP_BossDeathPresentationComponent` plays local-only clear actors from the shared GAS death flow.
+- Crystal Seraph shatters into falling crystal pieces, Sans auto-maps to sinking hands/closing crack, Dark Armor Knight bursts armor/black lightning, and Matador shows a bull apparition plus arena debris.
 
 ## Verified
 - `Project_EdenEditor Win64 Development` build succeeded.
-- `ProjectEden.Game.RegionEvents.Selection` automation passed.
+- `ProjectEden.Combat.Boss.DeathPresentation` automation passed.
+- `ProjectEden.Combat.EnemyDeath.Lifecycle` automation passed.
 
 ## Handoff
-- In each Region Event DataAsset, set `EventActorClass` to the desired example actor and tune event values/EnemySpawns in editor, then PIE-check zone flow.
+- Optional editor polish: override `BossDeathPresentationComponent` settings/Niagara per boss BP if stronger art assets are ready.
