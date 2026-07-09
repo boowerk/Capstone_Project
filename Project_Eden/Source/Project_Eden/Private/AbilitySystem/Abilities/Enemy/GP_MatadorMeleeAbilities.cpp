@@ -10,6 +10,7 @@
 #include "Characters/GP_MatadorBossStateComponent.h"
 #include "Characters/GP_MatadorMageBossCharacter.h"
 #include "Actors/GP_MatadorBossDecoyActor.h"
+#include "Actors/GP_MatadorDecoyPressureComponent.h"
 #include "Components/MeshComponent.h"
 #include "DrawDebugHelpers.h"
 #include "Engine/OverlapResult.h"
@@ -32,6 +33,33 @@ namespace GPMatadorMelee
 		const AAIController* AIController = IsValid(AvatarPawn) ? Cast<AAIController>(AvatarPawn->GetController()) : nullptr;
 		const UBlackboardComponent* BlackboardComponent = IsValid(AIController) ? AIController->GetBlackboardComponent() : nullptr;
 		return IsValid(BlackboardComponent) ? Cast<AActor>(BlackboardComponent->GetValueAsObject(EnemyBlackboardKeys::TargetActor)) : nullptr;
+	}
+
+	AGP_MatadorBossDecoyActor* ResolveDecoyActor(AActor* PatternActor)
+	{
+		return IsValid(PatternActor) ? Cast<AGP_MatadorBossDecoyActor>(PatternActor) : nullptr;
+	}
+
+	void NotifyDecoyActionStarted(AActor* PatternActor)
+	{
+		if (AGP_MatadorBossDecoyActor* DecoyActor = ResolveDecoyActor(PatternActor))
+		{
+			if (UGP_MatadorDecoyPressureComponent* PressureComponent = DecoyActor->GetPressureComponent())
+			{
+				PressureComponent->NotifyPatternActionStarted();
+			}
+		}
+	}
+
+	void NotifyDecoyActionFinished(AActor* PatternActor)
+	{
+		if (AGP_MatadorBossDecoyActor* DecoyActor = ResolveDecoyActor(PatternActor))
+		{
+			if (UGP_MatadorDecoyPressureComponent* PressureComponent = DecoyActor->GetPressureComponent())
+			{
+				PressureComponent->NotifyPatternActionFinished();
+			}
+		}
 	}
 
 	void AddDamageSetByCallers(FGameplayEffectSpec& Spec, float BaseDamage, float ToughnessDamage, float AttackPowerCoefficient)
@@ -224,6 +252,7 @@ void UGP_MatadorMeleeAbilityBase::EndAbility(
 	bool bReplicateEndAbility,
 	bool bWasCancelled)
 {
+	GPMatadorMelee::NotifyDecoyActionFinished(ResolvePatternActor(ActorInfo ? ActorInfo->AvatarActor.Get() : nullptr));
 	ClearOwnedTimers();
 
 	if (bMeleeLockActive)
@@ -475,6 +504,7 @@ void UGP_MatadorRapierThrustAbility::ActivateAbility(
 		return;
 	}
 
+	GPMatadorMelee::NotifyDecoyActionStarted(AvatarActor);
 	StopAIMovement(AvatarActor);
 	AGP_MatadorMageBossCharacter* MatadorBoss = Cast<AGP_MatadorMageBossCharacter>(AvatarActor);
 	const float TelegraphDelay = IsValid(MatadorBoss)
@@ -507,6 +537,10 @@ void UGP_MatadorRapierThrustAbility::BeginRapierPattern()
 	LockedThrustDirection = AvatarActor->GetActorForwardVector().GetSafeNormal2D();
 	SetRapierGlow(AvatarActor, 0.0f);
 	BP_OnRapierAimStarted(AvatarActor, AimDuration);
+	if (AGP_MatadorBossDecoyActor* DecoyActor = GPMatadorMelee::ResolveDecoyActor(AvatarActor))
+	{
+		DecoyActor->HandleRapierAimStarted(AimDuration);
+	}
 
 	if (UWorld* World = GetWorld())
 	{
@@ -584,6 +618,10 @@ void UGP_MatadorRapierThrustAbility::LockDirection()
 	}
 
 	BP_OnRapierDirectionLocked(AvatarActor, LockedThrustDirection, CommitDelay);
+	if (AGP_MatadorBossDecoyActor* DecoyActor = GPMatadorMelee::ResolveDecoyActor(AvatarActor))
+	{
+		DecoyActor->HandleRapierDirectionLocked(LockedThrustDirection, CommitDelay);
+	}
 	DrawRapierTelegraph(AvatarActor, LockedThrustDirection, RapierLockedTelegraphColor, FMath::Max(0.05f, CommitDelay));
 
 	if (UWorld* World = GetWorld())
@@ -617,6 +655,10 @@ void UGP_MatadorRapierThrustAbility::PerformThrust()
 
 	ApplySetByCallerDamage(AvatarActor, HitActors, FallbackBaseDamage, FallbackToughnessDamage, FallbackAttackPowerCoefficient);
 	BP_OnRapierThrust(AvatarActor, LockedThrustDirection);
+	if (AGP_MatadorBossDecoyActor* DecoyActor = GPMatadorMelee::ResolveDecoyActor(AvatarActor))
+	{
+		DecoyActor->HandleRapierThrust(LockedThrustDirection);
+	}
 
 	if (UWorld* World = GetWorld())
 	{
@@ -717,6 +759,7 @@ void UGP_MatadorCapeGustAbility::ActivateAbility(
 		return;
 	}
 
+	GPMatadorMelee::NotifyDecoyActionStarted(AvatarActor);
 	StopAIMovement(AvatarActor);
 	AGP_MatadorMageBossCharacter* MatadorBoss = Cast<AGP_MatadorMageBossCharacter>(AvatarActor);
 	const float TelegraphDelay = IsValid(MatadorBoss)
@@ -750,6 +793,10 @@ void UGP_MatadorCapeGustAbility::BeginCapePattern()
 	BurstIndex = 0;
 	BurstCount = 1;
 	BP_OnCapePrepareStarted(AvatarActor, PrepareDuration);
+	if (AGP_MatadorBossDecoyActor* DecoyActor = GPMatadorMelee::ResolveDecoyActor(AvatarActor))
+	{
+		DecoyActor->HandleCapePrepareStarted(PrepareDuration);
+	}
 
 	if (UWorld* World = GetWorld())
 	{
@@ -812,6 +859,10 @@ void UGP_MatadorCapeGustAbility::LockDirectionAndStartBursts()
 	BurstCount = HealthRatio <= LowHealthThreshold ? FMath::Max(1, LowHealthBurstCount) : 1;
 	BurstIndex = 0;
 	BP_OnCapeDirectionLocked(AvatarActor, LockedGustDirection);
+	if (AGP_MatadorBossDecoyActor* DecoyActor = GPMatadorMelee::ResolveDecoyActor(AvatarActor))
+	{
+		DecoyActor->HandleCapeDirectionLocked(LockedGustDirection);
+	}
 	DrawCapeTelegraph(AvatarActor, LockedGustDirection, CapeBurstTelegraphColor, 0.2f);
 	PerformGustBurst();
 }
@@ -840,6 +891,10 @@ void UGP_MatadorCapeGustAbility::PerformGustBurst()
 	ApplyKnockback(AvatarActor, HitActors);
 
 	BP_OnCapeGustBurst(AvatarActor, LockedGustDirection, BurstIndex, BurstCount);
+	if (AGP_MatadorBossDecoyActor* DecoyActor = GPMatadorMelee::ResolveDecoyActor(AvatarActor))
+	{
+		DecoyActor->HandleCapeGustBurst(LockedGustDirection, BurstIndex, BurstCount);
+	}
 	++BurstIndex;
 
 	if (BurstIndex < BurstCount)

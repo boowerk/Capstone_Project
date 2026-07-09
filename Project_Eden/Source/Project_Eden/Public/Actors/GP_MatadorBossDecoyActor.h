@@ -1,25 +1,24 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "AbilitySystemInterface.h"
-#include "GameFramework/Actor.h"
+#include "Characters/GP_EnemyCharacter.h"
 #include "GP_MatadorBossDecoyActor.generated.h"
 
 class UCapsuleComponent;
-class UAbilitySystemComponent;
+class UGP_MatadorDecoyPressureComponent;
 class UGP_MatadorBossStateComponent;
+class UAnimInstance;
 class UNiagaraSystem;
 class USkeletalMeshComponent;
 
 UCLASS(Blueprintable)
-class PROJECT_EDEN_API AGP_MatadorBossDecoyActor : public AActor, public IAbilitySystemInterface
+class PROJECT_EDEN_API AGP_MatadorBossDecoyActor : public AGP_EnemyCharacter
 {
 	GENERATED_BODY()
 
 public:
 	AGP_MatadorBossDecoyActor();
 
-	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	UFUNCTION(BlueprintCallable, Category = "Boss|Matador")
@@ -34,15 +33,44 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Boss|Matador")
 	void PlayBullReturnPresentation(int32 ChainBreakCount, int32 ChainBreakTarget);
 
+	UFUNCTION(BlueprintCallable, Category = "Boss|Matador|Rapier")
+	void HandleRapierAimStarted(float InAimDuration);
+
+	UFUNCTION(BlueprintCallable, Category = "Boss|Matador|Rapier")
+	void HandleRapierDirectionLocked(FVector LockedDirection, float InCommitDelay);
+
+	UFUNCTION(BlueprintCallable, Category = "Boss|Matador|Rapier")
+	void HandleRapierThrust(FVector LockedDirection);
+
+	UFUNCTION(BlueprintCallable, Category = "Boss|Matador|Cape")
+	void HandleCapePrepareStarted(float InPrepareDuration);
+
+	UFUNCTION(BlueprintCallable, Category = "Boss|Matador|Cape")
+	void HandleCapeDirectionLocked(FVector LockedDirection);
+
+	UFUNCTION(BlueprintCallable, Category = "Boss|Matador|Cape")
+	void HandleCapeGustBurst(FVector LockedDirection, int32 InBurstIndex, int32 InBurstCount);
+
 	UFUNCTION(BlueprintPure, Category = "Boss|Matador")
 	AActor* GetMainBossActor() const { return MainBossActor.Get(); }
 
 	UFUNCTION(BlueprintPure, Category = "Boss|Matador")
 	UGP_MatadorBossStateComponent* GetMatadorStateComponent() const { return MatadorStateComponent.Get(); }
 
+	UFUNCTION(BlueprintPure, Category = "Boss|Matador")
+	UGP_MatadorDecoyPressureComponent* GetPressureComponent() const { return PressureComponent; }
+
+	UFUNCTION(BlueprintPure, Category = "Boss|Matador")
+	USkeletalMeshComponent* GetDecoyMesh() const;
+
+	UFUNCTION(BlueprintPure, Category = "Boss|Matador")
+	bool IsMatadorBossDecoy() const { return bMatadorBossDecoy; }
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void OnConstruction(const FTransform& Transform) override;
+	virtual void UpdateAnimationSet() override;
+	virtual void HandlePostDamageTaken(AActor* InstigatorActor, float DamageAmount, FGameplayTag ElementTag) override;
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "Boss|Matador")
 	void BP_OnDecoyBroken();
@@ -56,11 +84,31 @@ protected:
 	UFUNCTION(BlueprintImplementableEvent, Category = "Boss|Matador")
 	void BP_OnDecoyBullReturned(int32 ChainBreakCount, int32 ChainBreakTarget);
 
+	UFUNCTION(BlueprintImplementableEvent, Category = "Boss|Matador|Rapier")
+	void BP_OnDecoyRapierAimStarted(float InAimDuration);
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "Boss|Matador|Rapier")
+	void BP_OnDecoyRapierDirectionLocked(FVector LockedDirection, float InCommitDelay);
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "Boss|Matador|Rapier")
+	void BP_OnDecoyRapierThrust(FVector LockedDirection);
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "Boss|Matador|Cape")
+	void BP_OnDecoyCapePrepareStarted(float InPrepareDuration);
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "Boss|Matador|Cape")
+	void BP_OnDecoyCapeDirectionLocked(FVector LockedDirection);
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "Boss|Matador|Cape")
+	void BP_OnDecoyCapeGustBurst(FVector LockedDirection, int32 InBurstIndex, int32 InBurstCount);
+
 private:
 	void ApplyDefaultVisualLayout();
+	void ApplyAnimationSetToDecoyMesh();
+	class UGP_MatadorDecoyAnimInstance* GetDecoyAnimInstance() const;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Matador", meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UCapsuleComponent> CollisionCapsule;
+	TObjectPtr<UGP_MatadorDecoyPressureComponent> PressureComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Matador", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USkeletalMeshComponent> DecoyMesh;
@@ -91,4 +139,10 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Matador|Visual", meta = (AllowPrivateAccess = "true", Units = "cm"))
 	FVector DecoyMeshRelativeLocation = FVector(0.0f, 0.0f, -100.0f);
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Matador|Visual", meta = (AllowPrivateAccess = "true"))
+	TSubclassOf<UAnimInstance> DecoyAnimClass;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Matador", meta = (AllowPrivateAccess = "true"))
+	bool bMatadorBossDecoy = true;
 };

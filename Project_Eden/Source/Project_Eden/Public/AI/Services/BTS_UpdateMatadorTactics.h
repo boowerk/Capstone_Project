@@ -26,10 +26,10 @@ protected:
 	float BullPatternWindow = 3.0f;
 
 	UPROPERTY(EditAnywhere, Category = "AI|Matador", meta = (ClampMin = "0.0", Units = "cm"))
-	float BullPatternMinRange = 450.0f;
+	float BullPatternMinRange = 0.0f;
 
 	UPROPERTY(EditAnywhere, Category = "AI|Matador", meta = (ClampMin = "0.0", Units = "cm"))
-	float BullPatternMaxRange = 2400.0f;
+	float BullPatternMaxRange = 5000.0f;
 
 	UPROPERTY(EditAnywhere, Category = "AI|Matador", meta = (ClampMin = "0.0", Units = "cm"))
 	float PreferredAirRange = 1100.0f;
