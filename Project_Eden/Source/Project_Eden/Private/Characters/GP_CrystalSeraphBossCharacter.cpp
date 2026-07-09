@@ -29,6 +29,7 @@
 #include "NavigationSystem.h"
 #include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
+#include "VFX/GP_BossDeathPresentationComponent.h"
 #include "VFX/GP_BossTelegraphVFXComponent.h"
 
 AGP_CrystalSeraphBossCharacter::AGP_CrystalSeraphBossCharacter()
@@ -37,6 +38,11 @@ AGP_CrystalSeraphBossCharacter::AGP_CrystalSeraphBossCharacter()
 	BossDisplayName = NSLOCTEXT("GPCrystalSeraphBoss", "BossDisplayName", "Crystal Seraph");
 
 	CrystalSeraphStateComponent = CreateDefaultSubobject<UGP_CrystalSeraphStateComponent>(TEXT("CrystalSeraphStateComponent"));
+	if (UGP_BossDeathPresentationComponent* DeathPresentationComponent = GetBossDeathPresentationComponent())
+	{
+		// Keep the clear presentation explicit so Blueprint renames do not break Crystal Seraph's shatter effect.
+		DeathPresentationComponent->SetPresentationStyle(EGPBossDeathPresentationStyle::CrystalSeraph);
+	}
 	// Pattern abilities explicitly start this component, so spawning the boss never fires a stray cue.
 	BossTelegraphVFXComponent = CreateDefaultSubobject<UGP_BossTelegraphVFXComponent>(TEXT("BossTelegraphVFXComponent"));
 	BossTelegraphVFXComponent->SetupAttachment(GetRootComponent());

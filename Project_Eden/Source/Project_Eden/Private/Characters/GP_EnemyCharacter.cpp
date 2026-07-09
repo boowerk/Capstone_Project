@@ -30,6 +30,7 @@
 #include "UI/GP_AttributeWidget.h"
 #include "UI/GP_WidgetComponent.h"
 #include "UObject/ConstructorHelpers.h"
+#include "VFX/GP_BossDeathPresentationComponent.h"
 #include "VFX/GP_BossTargetMarkerVFXComponent.h"
 
 AGP_EnemyCharacter::AGP_EnemyCharacter()
@@ -47,6 +48,10 @@ AGP_EnemyCharacter::AGP_EnemyCharacter()
 	DefaultEnemyDeathAbilityClass = UGP_EnemyDeathAbility::StaticClass();
 
 	BossTargetMarkerVFXComponent = CreateDefaultSubobject<UGP_BossTargetMarkerVFXComponent>(TEXT("BossTargetMarkerVFXComponent"));
+
+	// Bosses use this dormant component to convert the shared GAS death state into a boss-specific clear effect.
+	BossDeathPresentationComponent = CreateDefaultSubobject<UGP_BossDeathPresentationComponent>(TEXT("BossDeathPresentationComponent"));
+	BossDeathPresentationComponent->SetupAttachment(GetRootComponent());
 
 	WorldHealthBarComponent = CreateDefaultSubobject<UGP_WidgetComponent>(TEXT("WorldHealthBarComponent"));
 	WorldHealthBarComponent->SetupAttachment(GetRootComponent());
@@ -517,6 +522,11 @@ void AGP_EnemyCharacter::ApplyDeathState()
 	{
 		// Death must revoke selected-target presentation before delayed despawn can leave the boss corpse around.
 		BossTargetMarkerVFXComponent->HandleOwnerDeath();
+	}
+	if (IsValid(BossDeathPresentationComponent))
+	{
+		// Presentation is local-only and no-ops for regular enemies, keeping the GAS death invariant centralised here.
+		BossDeathPresentationComponent->PlayDeathPresentation(DeathInstigatorActor);
 	}
 
 	RefreshWorldHealthBarVisibility();

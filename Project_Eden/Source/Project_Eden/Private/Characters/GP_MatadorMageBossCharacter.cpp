@@ -21,6 +21,7 @@
 #include "NavigationSystem.h"
 #include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
+#include "VFX/GP_BossDeathPresentationComponent.h"
 #include "VFX/GP_BossTelegraphVFXComponent.h"
 
 AGP_MatadorMageBossCharacter::AGP_MatadorMageBossCharacter()
@@ -30,6 +31,11 @@ AGP_MatadorMageBossCharacter::AGP_MatadorMageBossCharacter()
 	BossDisplayName = NSLOCTEXT("GPMatadorMageBoss", "BossDisplayName", "Matador Mage");
 
 	MatadorStateComponent = CreateDefaultSubobject<UGP_MatadorBossStateComponent>(TEXT("MatadorStateComponent"));
+	if (UGP_BossDeathPresentationComponent* DeathPresentationComponent = GetBossDeathPresentationComponent())
+	{
+		// The Matador clear reads as a bull apparition and arena collapse, independent of the boss mesh animation set.
+		DeathPresentationComponent->SetPresentationStyle(EGPBossDeathPresentationStyle::Matador);
+	}
 	// The component stays dormant until an attack path explicitly honors the designer toggle.
 	BossTelegraphVFXComponent = CreateDefaultSubobject<UGP_BossTelegraphVFXComponent>(TEXT("BossTelegraphVFXComponent"));
 	BossTelegraphVFXComponent->SetupAttachment(GetRootComponent());
