@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-01T14:21:48+09:00
+updated: 2026-07-09T02:52:00+09:00
 status: active
 tags:
   - memoc
@@ -14,6 +14,16 @@ tags:
 Durable project decisions live here. Keep entries short, dated, and useful to future agents.
 
 ## Decision Log
+
+### 2026-07-09
+- Region events are a separate run-layer system, not a PCG graph mutation. `AGP_GameMode` only asks the placed/optional `AGP_RegionEventDirector` to roll events at zone boundaries; selected `AGP_RegionEventActor` instances own replicated presentation, optional enemy waves, and temporary/final region-state writes through `AGP_GameState`.
+- Event-spawned enemies count toward the active zone clear budget. This keeps presentation events from being ignorable combat noise and lets designers use a region event as a real side encounter during a city clear.
+- Concrete region-event examples are native actor classes selected by `UGP_RegionEventData.EventActorClass`. This keeps authored event pools in DataAssets while avoiding mandatory BP subclasses for common presentation-slice events.
+- Crystal corruption nodes are non-ASC objective actors. Shared player combat overlap handles them explicitly before normal GAS application, so existing player attacks can destroy crystals without turning objectives into enemy characters.
+
+### 2026-06-28
+- Regular enemy cadence belongs to the enemy pawn and shared tactics service, not a fixed BT Wait asset. Roll only after GAS accepts an attack, close `bCanAttack` until the per-archetype timer expires, and exempt bosses so their pattern cadence remains authoritative.
+- Footstep hearing is server-authoritative. Player movement reports hearing stimuli, while `AEnemyAIController` merges hearing and sight into the existing target-selection/BT pipeline instead of introducing a separate sound-only chase state.
 
 ### 2026-05-20
 - Use `UEFNSourceMesh` as the runtime animation-driving source and let `CharacterMesh0`/MaskMan retarget from it.
@@ -68,6 +78,3 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 - Reinterpret the RegionState system as biome-type selection, not gameplay life/death/corruption status. Values should represent biome categories; GameMode terms like `AliveRegionState` / `DeadRegionState` are legacy naming to rename or replace when implementation resumes.
 - Minimap correctness should not depend on level-authored PCG completion wiring. Keep a startup fallback full-map capture, allow later PCG-ready notifications to restart it, and make the HUD map image resolver tolerate production widget renames such as `MiniMapImage`.
 - The minimap map texture should be clipped by the UI material, not only hidden under ring art. Player cursor heading should default to controller/view yaw so camera-facing a target matches the visible minimap direction.
-
-### 2026-07-01
-- Resolve the `GA_Primary.uasset` merge conflict with `origin/main` because that asset was intentionally updated with `GP_Primary.cpp/.h` and `DA_Skill_Primary`; the feature-side asset change came from an unrelated enemy health-bar commit.

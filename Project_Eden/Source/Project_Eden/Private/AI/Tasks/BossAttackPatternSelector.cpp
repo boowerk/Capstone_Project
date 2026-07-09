@@ -197,10 +197,10 @@ TArray<FGPBossAttackPatternCandidate> FGPBossAttackPatternSelector::BuildCandida
 	if (Context.bCanUseBullPattern && !Context.bBullPatternActive && FGPBossAttackPatternRanges::IsWithinBullPatternRange(DistanceToTarget))
 	{
 		const float ChainPressure = static_cast<float>(ChainBreakCount) / static_cast<float>(ChainBreakTarget);
-		const float BullScore = 0.95f
+		const float BullScore = 1.65f
 			+ PhaseBonus
 			+ AirRangeFit * 0.35f
-			+ ChainPressure * 0.25f
+			+ ChainPressure * 0.3f
 			+ (bPressureMode ? 0.12f : 0.0f)
 			+ (Context.bShouldTeleport ? 0.1f : 0.0f);
 		AddCandidate(Candidates, GPTags::Ability::Enemy::Utility_MatadorBullPattern, BullScore, TEXT("MatadorBull"));
@@ -210,20 +210,21 @@ TArray<FGPBossAttackPatternCandidate> FGPBossAttackPatternSelector::BuildCandida
 	{
 		if (FGPBossAttackPatternRanges::IsWithinReach(DistanceToTarget, FGPBossAttackPatternRanges::MatadorCapeGustReach))
 		{
-			const float CapeScore = 0.72f
-				+ ClosePressure * 0.25f
+			const float CapeScore = 0.95f
+				+ ClosePressure * 0.35f
 				+ PhaseBonus
-				+ (HealthRatio <= 0.35f ? 0.25f : 0.0f);
+				+ (HealthRatio <= 0.35f ? 0.3f : 0.0f);
 			AddCandidate(Candidates, GPTags::Ability::Boss::Matador::CapeGust, CapeScore, TEXT("MatadorCapeGust"));
 		}
 
 		if (FGPBossAttackPatternRanges::IsWithinMatadorRapierRange(DistanceToTarget))
 		{
-			const float RapierRangeFit = 1.0f - FMath::Clamp(FMath::Abs(DistanceToTarget - 700.0f) / 700.0f, 0.0f, 1.0f);
-			const float RapierScore = 0.68f
-				+ RapierRangeFit * 0.28f
+			const float RapierIdealRange = 850.0f;
+			const float RapierRangeFit = 1.0f - FMath::Clamp(FMath::Abs(DistanceToTarget - RapierIdealRange) / RapierIdealRange, 0.0f, 1.0f);
+			const float RapierScore = 0.9f
+				+ RapierRangeFit * 0.35f
 				+ PhaseBonus
-				+ (bPressureMode ? 0.08f : 0.0f);
+				+ (bPressureMode ? 0.12f : 0.0f);
 			AddCandidate(Candidates, GPTags::Ability::Boss::Matador::RapierThrust, RapierScore, TEXT("MatadorRapier"));
 		}
 	}

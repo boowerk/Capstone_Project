@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "AI/Combat/EnemyAttackCadencePolicy.h"
 #include "AI/Data/EnemyArchetypeData.h"
 #include "Characters/GP_BaseCharacter.h"
 #include "GameplayTagContainer.h"
@@ -12,6 +13,7 @@ class UBehaviorTree;
 class UBlackboardData;
 class UEnemyAIRangeVisualizationComponent;
 class UEnemyArchetypeData;
+class UGP_BossDeathPresentationComponent;
 class UGP_BossTargetMarkerVFXComponent;
 class UGP_EnemyDeathAbility;
 class UGP_WidgetComponent;
@@ -63,6 +65,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Boss|VFX")
 	UGP_BossTargetMarkerVFXComponent* GetBossTargetMarkerVFXComponent() const { return BossTargetMarkerVFXComponent; }
 
+	UFUNCTION(BlueprintPure, Category = "Boss|Death Presentation")
+	UGP_BossDeathPresentationComponent* GetBossDeathPresentationComponent() const { return BossDeathPresentationComponent; }
+
 	// AIController calls this only when TargetActor is first acquired or changes to another valid player.
 	void NotifyBossTargetSelected(AActor* TargetActor);
 
@@ -87,11 +92,23 @@ public:
 	UFUNCTION(BlueprintPure, Category = "AI|Perception")
 	float GetPeripheralVisionAngleDegrees() const { return FMath::Clamp(PeripheralVisionAngleDegrees, 0.0f, 180.0f); }
 
+	UFUNCTION(BlueprintPure, Category = "AI|Perception")
+	float GetHearingRange() const { return FMath::Max(0.0f, HearingRange); }
+
 	UFUNCTION(BlueprintPure, Category = "AI|Archetype")
 	EGPEnemyCombatArchetype GetCombatArchetype() const { return CombatArchetype; }
 
 	UFUNCTION(BlueprintPure, Category = "AI|Combat")
 	FGameplayTag GetDefaultAttackAbilityTag() const { return DefaultAttackAbilityTag; }
+
+	// Regular-enemy BT tasks use this server-side gate instead of a fixed shared Wait node.
+	UFUNCTION(BlueprintPure, Category = "AI|Combat|Cadence")
+	bool IsBasicEnemyAttackReady() const;
+
+	// Returns the newly rolled delay so attack logs and tests can inspect the selected cadence.
+	float ScheduleNextBasicEnemyAttack();
+
+	const FGPEnemyAttackCadenceSettings& GetAttackCadenceSettings() const { return AttackCadenceSettings; }
 
 	UFUNCTION(BlueprintPure, Category = "Enemy|Death")
 	bool IsDead() const { return bIsDead; }
@@ -147,8 +164,16 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AI|Perception", meta = (ClampMin = "0.0", ClampMax = "180.0", Units = "deg"))
 	float PeripheralVisionAngleDegrees = 70.0f;
 
+	// Footstep noises inside this radius can acquire or refresh a player target even without line of sight.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AI|Perception", meta = (ClampMin = "0.0", Units = "cm"))
+	float HearingRange = 1600.0f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AI|Archetype")
 	EGPEnemyCombatArchetype CombatArchetype = EGPEnemyCombatArchetype::Melee;
+
+	// Each native archetype provides a different sub-three-second range; Blueprint children may fine-tune it.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AI|Combat|Cadence")
+	FGPEnemyAttackCadenceSettings AttackCadenceSettings;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AI|Debug")
 	bool bShowAIRangesInEditor = true;
@@ -252,6 +277,9 @@ private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|VFX", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UGP_BossTargetMarkerVFXComponent> BossTargetMarkerVFXComponent;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Death Presentation", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UGP_BossDeathPresentationComponent> BossDeathPresentationComponent;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Enemy|UI", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UGP_WidgetComponent> WorldHealthBarComponent;
 
@@ -267,6 +295,8 @@ private:
 	TObjectPtr<AActor> DeathInstigatorActor;
 
 	bool bDeathStateApplied = false;
+	float BasicEnemyAttackReadyTimeSeconds = 0.0f;
+	FRandomStream AttackCadenceRandomStream;
 
 	const FEnemyArchetypeTuning* ResolveEnemyArchetypeTuning() const;
 	int32 ResolvePersonalitySeed() const;
@@ -292,6 +322,7 @@ private:
 	void HandleMoveSpeedAttributeChanged(const FOnAttributeChangeData& ChangeData);
 	void BindMoveSpeedAttribute();
 	void UnbindMoveSpeedAttribute();
+	void InitializeBasicEnemyAttackCadence();
 
 	FDelegateHandle MoveSpeedAttributeDelegateHandle;
 };

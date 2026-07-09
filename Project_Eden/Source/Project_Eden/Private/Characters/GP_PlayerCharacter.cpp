@@ -8,6 +8,7 @@
 #include "HAL/IConsoleManager.h"
 #include "UObject/UnrealType.h"
 #include "Engine/OverlapResult.h"
+#include "Perception/AISense_Hearing.h"
 
 // Framework / Component Headers
 #include "GameFramework/PlayerController.h"
@@ -242,6 +243,56 @@ void AGP_PlayerCharacter::Tick(float DeltaSeconds)
 	UpdatePrimaryAttackAutoFacing(DeltaSeconds);
 	UpdatePrimaryAttackMovementAssist(DeltaSeconds);
 	UpdateCameraMotion(DeltaSeconds);
+	UpdateFootstepNoise();
+}
+
+void AGP_PlayerCharacter::UpdateFootstepNoise()
+{
+	if (!bEmitFootstepNoise || !HasAuthority())
+	{
+		return;
+	}
+
+	const UCharacterMovementComponent* MovementComponent = GetCharacterMovement();
+	const UWorld* World = GetWorld();
+	if (!IsValid(MovementComponent) || !IsValid(World))
+	{
+		return;
+	}
+
+	const float WorldTimeSeconds = World->GetTimeSeconds();
+	if (!FootstepNoisePolicy::ShouldReportNoise(
+		FootstepNoiseSettings,
+		GetVelocity().Size2D(),
+		MovementComponent->IsMovingOnGround(),
+		IsSprinting(),
+		WorldTimeSeconds,
+		LastFootstepNoiseTimeSeconds))
+	{
+		return;
+	}
+
+	const float Loudness = FootstepNoisePolicy::ResolveLoudness(FootstepNoiseSettings, IsSprinting(), bIsCrouched);
+	if (Loudness <= KINDA_SMALL_NUMBER)
+	{
+		return;
+	}
+
+	FVector FootstepLocation = GetActorLocation();
+	if (const UCapsuleComponent* Capsule = GetCapsuleComponent())
+	{
+		// Emit at floor height so the hearing debug stimulus matches the perceived source of the step.
+		FootstepLocation.Z -= Capsule->GetScaledCapsuleHalfHeight();
+	}
+
+	UAISense_Hearing::ReportNoiseEvent(
+		this,
+		FootstepLocation,
+		Loudness,
+		this,
+		FMath::Max(0.0f, FootstepNoiseSettings.MaximumNoiseRange),
+		FName(TEXT("Footstep")));
+	LastFootstepNoiseTimeSeconds = WorldTimeSeconds;
 }
 
 bool AGP_PlayerCharacter::AimPrimaryAttackAtBestTarget(float SearchRadius, float ForwardOffset, float Duration)

@@ -19,8 +19,8 @@ struct PROJECT_EDEN_API FGPBossAttackPatternRanges
 	static constexpr float BullPatternMinRange = 0.0f;
 	static constexpr float BullPatternMaxRange = 5000.0f;
 	static constexpr float MatadorRapierMinRange = 350.0f;
-	static constexpr float MatadorRapierMaxRange = 1050.0f;
-	static constexpr float MatadorCapeGustReach = 700.0f;
+	static constexpr float MatadorRapierMaxRange = 1400.0f;
+	static constexpr float MatadorCapeGustReach = 800.0f;
 	static constexpr float CrystalLaserMinRange = 450.0f;
 	static constexpr float CrystalLaserMaxRange = 2200.0f;
 	static constexpr float CrystalPrismMinRange = 500.0f;

@@ -3,11 +3,17 @@
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
 #include "AIController.h"
+#include "AI/Data/EnemyBlackboardKeys.h"
+#include "AI/Tasks/BossAttackExecution.h"
 #include "Actors/GP_MatadorBossDecoyActor.h"
+#include "Actors/GP_MatadorDecoyPressureComponent.h"
+#include "Animation/GP_MatadorDecoyAnimInstance.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "AssetRegistry/IAssetRegistry.h"
+#include "BehaviorTree/BlackboardComponent.h"
 #include "BrainComponent.h"
 #include "Characters/GP_EnemyCharacter.h"
+#include "Characters/GP_MatadorBossStateComponent.h"
 #include "Characters/GP_MatadorMageBossCharacter.h"
 #include "Characters/GP_PlayerCharacter.h"
 #include "AbilitySystem/GP_AttributeSet.h"
@@ -17,11 +23,94 @@
 #include "Engine/Blueprint.h"
 #include "EngineUtils.h"
 #include "Components/InputComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
+#include "GameplayAbilitySpec.h"
 #include "Kismet/GameplayStatics.h"
 #include "Misc/PackageName.h"
 #include "Modules/ModuleManager.h"
+
+namespace EncounterDebugReport
+{
+	bool HasBlackboardKey(const UBlackboardComponent* BlackboardComponent, const FName& KeyName)
+	{
+		return IsValid(BlackboardComponent) && BlackboardComponent->GetKeyID(KeyName) != FBlackboard::InvalidKey;
+	}
+
+	FString BoolText(bool bValue)
+	{
+		return bValue ? TEXT("true") : TEXT("false");
+	}
+
+	FString ActorText(const UObject* Object)
+	{
+		return IsValid(Object) ? GetNameSafe(Object) : TEXT("None");
+	}
+
+	FString VectorText(const FVector& Value)
+	{
+		return Value.ToCompactString();
+	}
+
+	FString EnumText(const UEnum* Enum, int64 Value)
+	{
+		if (!Enum)
+		{
+			return FString::FromInt(static_cast<int32>(Value));
+		}
+
+		return Enum->GetNameStringByValue(Value);
+	}
+
+	void AddBlackboardObject(TArray<FString>& Lines, const UBlackboardComponent* BlackboardComponent, const FName& KeyName)
+	{
+		if (HasBlackboardKey(BlackboardComponent, KeyName))
+		{
+			Lines.Add(FString::Printf(TEXT("  %s: %s"), *KeyName.ToString(), *ActorText(BlackboardComponent->GetValueAsObject(KeyName))));
+		}
+	}
+
+	void AddBlackboardBool(TArray<FString>& Lines, const UBlackboardComponent* BlackboardComponent, const FName& KeyName)
+	{
+		if (HasBlackboardKey(BlackboardComponent, KeyName))
+		{
+			Lines.Add(FString::Printf(TEXT("  %s: %s"), *KeyName.ToString(), *BoolText(BlackboardComponent->GetValueAsBool(KeyName))));
+		}
+	}
+
+	void AddBlackboardFloat(TArray<FString>& Lines, const UBlackboardComponent* BlackboardComponent, const FName& KeyName)
+	{
+		if (HasBlackboardKey(BlackboardComponent, KeyName))
+		{
+			Lines.Add(FString::Printf(TEXT("  %s: %.1f"), *KeyName.ToString(), BlackboardComponent->GetValueAsFloat(KeyName)));
+		}
+	}
+
+	void AddBlackboardInt(TArray<FString>& Lines, const UBlackboardComponent* BlackboardComponent, const FName& KeyName)
+	{
+		if (HasBlackboardKey(BlackboardComponent, KeyName))
+		{
+			Lines.Add(FString::Printf(TEXT("  %s: %d"), *KeyName.ToString(), BlackboardComponent->GetValueAsInt(KeyName)));
+		}
+	}
+
+	void AddBlackboardName(TArray<FString>& Lines, const UBlackboardComponent* BlackboardComponent, const FName& KeyName)
+	{
+		if (HasBlackboardKey(BlackboardComponent, KeyName))
+		{
+			Lines.Add(FString::Printf(TEXT("  %s: %s"), *KeyName.ToString(), *BlackboardComponent->GetValueAsName(KeyName).ToString()));
+		}
+	}
+
+	void AddBlackboardVector(TArray<FString>& Lines, const UBlackboardComponent* BlackboardComponent, const FName& KeyName)
+	{
+		if (HasBlackboardKey(BlackboardComponent, KeyName))
+		{
+			Lines.Add(FString::Printf(TEXT("  %s: %s"), *KeyName.ToString(), *VectorText(BlackboardComponent->GetValueAsVector(KeyName))));
+		}
+	}
+}
 
 AGP_EncounterDebugDirector::AGP_EncounterDebugDirector()
 {
@@ -555,6 +644,55 @@ AGP_EnemyCharacter* AGP_EncounterDebugDirector::GetSelectedEnemy() const
 	}
 
 	return SelectedEnemy.Get();
+}
+
+FString AGP_EncounterDebugDirector::GetSelectedEnemyDebugReport(EGPEncounterDebugReportMode ReportMode) const
+{
+	if (AGP_EncounterDebugDirector* RuntimeDirector = ResolveRuntimeDirectorForCall(); RuntimeDirector != this)
+	{
+		return RuntimeDirector->GetSelectedEnemyDebugReport(ReportMode);
+	}
+
+	AGP_EnemyCharacter* Enemy = SelectedEnemy.Get();
+	if (!IsValid(Enemy))
+	{
+		return TEXT("Selected Enemy\n<none>\n\nEnemy combo에서 몬스터를 선택하면 실시간 상태가 표시됩니다.");
+	}
+
+	return BuildEnemyDebugReport(Enemy, ReportMode);
+}
+
+FString AGP_EncounterDebugDirector::GetSelectedEnemyHeaderReport() const
+{
+	if (AGP_EncounterDebugDirector* RuntimeDirector = ResolveRuntimeDirectorForCall(); RuntimeDirector != this)
+	{
+		return RuntimeDirector->GetSelectedEnemyHeaderReport();
+	}
+
+	AGP_EnemyCharacter* Enemy = SelectedEnemy.Get();
+	return IsValid(Enemy) ? BuildEnemyHeaderReport(Enemy) : TEXT("No selected enemy\nSelect an enemy from the combo.");
+}
+
+FString AGP_EncounterDebugDirector::GetSelectedEnemySkillReport() const
+{
+	if (AGP_EncounterDebugDirector* RuntimeDirector = ResolveRuntimeDirectorForCall(); RuntimeDirector != this)
+	{
+		return RuntimeDirector->GetSelectedEnemySkillReport();
+	}
+
+	AGP_EnemyCharacter* Enemy = SelectedEnemy.Get();
+	return IsValid(Enemy) ? BuildEnemySkillReport(Enemy) : TEXT("No selected enemy");
+}
+
+FString AGP_EncounterDebugDirector::GetSelectedEnemyLinkedActorReport() const
+{
+	if (AGP_EncounterDebugDirector* RuntimeDirector = ResolveRuntimeDirectorForCall(); RuntimeDirector != this)
+	{
+		return RuntimeDirector->GetSelectedEnemyLinkedActorReport();
+	}
+
+	AGP_EnemyCharacter* Enemy = SelectedEnemy.Get();
+	return IsValid(Enemy) ? BuildEnemyLinkedActorReport(Enemy) : TEXT("No selected enemy");
 }
 
 bool AGP_EncounterDebugDirector::KillSelectedEnemy()
@@ -1119,6 +1257,361 @@ FGPEncounterDebugEnemySnapshot AGP_EncounterDebugDirector::BuildEnemySnapshot(AG
 	}
 
 	return Snapshot;
+}
+
+FString AGP_EncounterDebugDirector::BuildEnemyHeaderReport(AGP_EnemyCharacter* Enemy) const
+{
+	using namespace EncounterDebugReport;
+
+	const FGPEncounterDebugEnemySnapshot Snapshot = BuildEnemySnapshot(Enemy);
+	AAIController* AIController = IsValid(Enemy) ? Cast<AAIController>(Enemy->GetController()) : nullptr;
+	UBlackboardComponent* BlackboardComponent = IsValid(AIController) ? AIController->GetBlackboardComponent() : nullptr;
+	const UObject* TargetActor = IsValid(BlackboardComponent) && HasBlackboardKey(BlackboardComponent, EnemyBlackboardKeys::TargetActor)
+		? BlackboardComponent->GetValueAsObject(EnemyBlackboardKeys::TargetActor)
+		: nullptr;
+
+	const bool bCanAttack = IsValid(BlackboardComponent)
+		&& HasBlackboardKey(BlackboardComponent, EnemyBlackboardKeys::bCanAttack)
+		&& BlackboardComponent->GetValueAsBool(EnemyBlackboardKeys::bCanAttack);
+	const bool bReturning = IsValid(BlackboardComponent)
+		&& HasBlackboardKey(BlackboardComponent, EnemyBlackboardKeys::bShouldReturnHome)
+		&& BlackboardComponent->GetValueAsBool(EnemyBlackboardKeys::bShouldReturnHome);
+
+	TArray<FString> Lines;
+	Lines.Add(FString::Printf(TEXT("%s  |  HP %.0f%%  |  %.0fcm"), *Snapshot.Name, Snapshot.HealthPercent * 100.0f, Snapshot.DistanceToPlayer));
+	Lines.Add(FString::Printf(
+		TEXT("%s / %s / Stage %s / Target %s"),
+		Snapshot.bBoss ? TEXT("Boss") : TEXT("Mob"),
+		Snapshot.bDead ? TEXT("Dead") : TEXT("Alive"),
+		Snapshot.StageIndex >= 0 ? *FString::Printf(TEXT("%d"), Snapshot.StageIndex + 1) : TEXT("?"),
+		*ActorText(TargetActor)));
+	Lines.Add(FString::Printf(TEXT("AI Attack %s  Return %s  Ctrl %s"), *BoolText(bCanAttack), *BoolText(bReturning), *ActorText(AIController)));
+	return FString::Join(Lines, TEXT("\n"));
+}
+
+FString AGP_EncounterDebugDirector::BuildEnemySkillReport(AGP_EnemyCharacter* Enemy) const
+{
+	using namespace EncounterDebugReport;
+
+	AAIController* AIController = IsValid(Enemy) ? Cast<AAIController>(Enemy->GetController()) : nullptr;
+	UBlackboardComponent* BlackboardComponent = IsValid(AIController) ? AIController->GetBlackboardComponent() : nullptr;
+	TArray<FString> Lines;
+
+	if (IsValid(Enemy) && IsValid(BlackboardComponent)
+		&& (Enemy->IsBossEnemy() || IsValid(Enemy->FindComponentByClass<UGP_MatadorBossStateComponent>())))
+	{
+		const FGPBossAttackPatternContext PatternContext =
+			BossAttackExecution::BuildPatternContext(Enemy, BlackboardComponent, Enemy->GetDefaultAttackAbilityTag());
+		const TArray<FGPBossAttackPatternCandidate> Candidates = FGPBossAttackPatternSelector::BuildCandidates(PatternContext);
+		const FGPBossAttackPatternCandidate* BestCandidate = FGPBossAttackPatternSelector::SelectBestCandidate(Candidates);
+
+		Lines.Add(BestCandidate
+			? FString::Printf(TEXT("Next  %s  %.2f"), *BestCandidate->DebugName.ToString(), BestCandidate->Score)
+			: TEXT("Next  <none>"));
+
+		TArray<FString> TopCandidates;
+		for (int32 Index = 0; Index < FMath::Min(3, Candidates.Num()); ++Index)
+		{
+			TopCandidates.Add(FString::Printf(TEXT("%s %.2f"), *Candidates[Index].DebugName.ToString(), Candidates[Index].Score));
+		}
+		Lines.Add(FString::Printf(TEXT("Top   %s"), TopCandidates.Num() > 0 ? *FString::Join(TopCandidates, TEXT("  |  ")) : TEXT("<none>")));
+		Lines.Add(FString::Printf(
+			TEXT("Bull Ready %s  Active %s  Chain %d/%d"),
+			*BoolText(PatternContext.bCanUseBullPattern),
+			*BoolText(PatternContext.bBullPatternActive),
+			PatternContext.ChainBreakCount,
+			PatternContext.ChainBreakTarget));
+	}
+	else
+	{
+		Lines.Add(FString::Printf(TEXT("Default  %s"), IsValid(Enemy) ? *Enemy->GetDefaultAttackAbilityTag().ToString() : TEXT("<none>")));
+	}
+
+	if (UAbilitySystemComponent* ASC = IsValid(Enemy) ? Enemy->GetAbilitySystemComponent() : nullptr)
+	{
+		TArray<FString> ActiveAbilities;
+		FScopedAbilityListLock AbilityScopeLock(*ASC);
+		for (const FGameplayAbilitySpec& AbilitySpec : ASC->GetActivatableAbilities())
+		{
+			if (AbilitySpec.Ability && AbilitySpec.IsActive())
+			{
+				ActiveAbilities.Add(GetNameSafe(AbilitySpec.Ability));
+			}
+		}
+		Lines.Add(FString::Printf(TEXT("Active %s"), ActiveAbilities.Num() > 0 ? *FString::Join(ActiveAbilities, TEXT(", ")) : TEXT("<none>")));
+	}
+
+	return FString::Join(Lines, TEXT("\n"));
+}
+
+FString AGP_EncounterDebugDirector::BuildEnemyLinkedActorReport(AGP_EnemyCharacter* Enemy) const
+{
+	using namespace EncounterDebugReport;
+
+	TArray<FString> Lines;
+	UGP_MatadorBossStateComponent* MatadorState = IsValid(Enemy) ? Enemy->FindComponentByClass<UGP_MatadorBossStateComponent>() : nullptr;
+	AGP_MatadorBossDecoyActor* Decoy = Cast<AGP_MatadorBossDecoyActor>(Enemy);
+	AGP_MatadorMageBossCharacter* MatadorBoss = Cast<AGP_MatadorMageBossCharacter>(Enemy);
+
+	if (!MatadorState && IsValid(Decoy) && IsValid(Decoy->GetMainBossActor()))
+	{
+		MatadorState = Decoy->GetMainBossActor()->FindComponentByClass<UGP_MatadorBossStateComponent>();
+		MatadorBoss = Cast<AGP_MatadorMageBossCharacter>(Decoy->GetMainBossActor());
+	}
+
+	if (MatadorState)
+	{
+		const AActor* BossActor = IsValid(MatadorState->GetMainBossActor()) ? MatadorState->GetMainBossActor() : Cast<AActor>(MatadorBoss);
+		const AActor* DecoyActor = MatadorState->GetActiveDecoyActor();
+		const AActor* BullActor = MatadorState->GetActiveBullActor();
+		Lines.Add(FString::Printf(
+			TEXT("Boss %s  Chain %d/%d  Groggy %s"),
+			*ActorText(BossActor),
+			MatadorState->GetChainBreakCount(),
+			MatadorState->GetChainBreakTarget(),
+			*BoolText(MatadorState->IsGroggy())));
+		Lines.Add(FString::Printf(TEXT("Decoy %s"), *ActorText(DecoyActor)));
+		Lines.Add(FString::Printf(TEXT("Bull  %s"), *ActorText(BullActor)));
+
+		if (IsValid(MatadorBoss))
+		{
+			Lines.Add(FString::Printf(TEXT("Bull pending/active %s"), *BoolText(MatadorBoss->IsBullPatternActive())));
+		}
+	}
+
+	if (IsValid(Decoy))
+	{
+		if (UGP_MatadorDecoyPressureComponent* Pressure = Decoy->GetPressureComponent())
+		{
+			Lines.Add(FString::Printf(
+				TEXT("Decoy pressure %s  target %s"),
+				*EnumText(StaticEnum<EGPMatadorDecoyPressureState>(), static_cast<int64>(Pressure->GetPressureState())),
+				*ActorText(Pressure->GetCurrentTarget())));
+			Lines.Add(FString::Printf(
+				TEXT("Teleport %s  PostLock %s  Step %d"),
+				*BoolText(Pressure->IsTeleportRequested()),
+				*BoolText(Pressure->IsPostTeleportAttackLocked()),
+				Pressure->GetStepThrustIndex()));
+		}
+	}
+
+	if (Lines.IsEmpty())
+	{
+		Lines.Add(TEXT("No linked summon data for this enemy."));
+		Lines.Add(TEXT("Matador boss/decoy will show Boss, Decoy, Bull, pressure state here."));
+	}
+
+	return FString::Join(Lines, TEXT("\n"));
+}
+
+FString AGP_EncounterDebugDirector::BuildEnemyDebugReport(AGP_EnemyCharacter* Enemy, EGPEncounterDebugReportMode ReportMode) const
+{
+	using namespace EncounterDebugReport;
+
+	const bool bShowSummary = ReportMode == EGPEncounterDebugReportMode::Summary;
+	const bool bShowAI = ReportMode == EGPEncounterDebugReportMode::AI;
+	const bool bShowSkill = ReportMode == EGPEncounterDebugReportMode::Skill;
+	const bool bShowGAS = ReportMode == EGPEncounterDebugReportMode::GAS;
+	const bool bShowMatador = ReportMode == EGPEncounterDebugReportMode::Matador;
+	const bool bShowAll = ReportMode == EGPEncounterDebugReportMode::All;
+
+	TArray<FString> Lines;
+	Lines.Reserve(96);
+
+	const FGPEncounterDebugEnemySnapshot Snapshot = BuildEnemySnapshot(Enemy);
+	AAIController* AIController = IsValid(Enemy) ? Cast<AAIController>(Enemy->GetController()) : nullptr;
+	UBlackboardComponent* BlackboardComponent = IsValid(AIController) ? AIController->GetBlackboardComponent() : nullptr;
+
+	Lines.Add(FString::Printf(TEXT("[%s] %s"), *EnumText(StaticEnum<EGPEncounterDebugReportMode>(), static_cast<int64>(ReportMode)), *Snapshot.Name));
+	Lines.Add(FString::Printf(
+		TEXT("HP %.0f%% | Dist %.0f | %s | %s"),
+		Snapshot.HealthPercent * 100.0f,
+		Snapshot.DistanceToPlayer,
+		Snapshot.bBoss ? TEXT("Boss") : TEXT("Mob"),
+		Snapshot.bDead ? TEXT("Dead") : TEXT("Alive")));
+
+	if (bShowSummary || bShowAll)
+	{
+		Lines.Add(FString::Printf(TEXT("Class: %s"), *Snapshot.ClassName));
+		Lines.Add(FString::Printf(TEXT("Stage: %s | DebugSpawned: %s"), Snapshot.StageIndex >= 0 ? *FString::Printf(TEXT("%d"), Snapshot.StageIndex + 1) : TEXT("?"), *BoolText(Snapshot.bDebugSpawned)));
+		if (const UCharacterMovementComponent* Movement = IsValid(Enemy) ? Enemy->GetCharacterMovement() : nullptr)
+		{
+			Lines.Add(FString::Printf(TEXT("Move: Mode %d | Vel %.0f | Max %.0f"), static_cast<int32>(Movement->MovementMode), Movement->Velocity.Size(), Movement->MaxWalkSpeed));
+		}
+		Lines.Add(FString::Printf(TEXT("Target: %s"), *ActorText(IsValid(BlackboardComponent) && HasBlackboardKey(BlackboardComponent, EnemyBlackboardKeys::TargetActor)
+			? BlackboardComponent->GetValueAsObject(EnemyBlackboardKeys::TargetActor)
+			: nullptr)));
+		if (IsValid(BlackboardComponent))
+		{
+			Lines.Add(FString::Printf(
+				TEXT("AI: CanAttack=%s Chase=%s Return=%s LoS=%s"),
+				*BoolText(HasBlackboardKey(BlackboardComponent, EnemyBlackboardKeys::bCanAttack) && BlackboardComponent->GetValueAsBool(EnemyBlackboardKeys::bCanAttack)),
+				*BoolText(HasBlackboardKey(BlackboardComponent, EnemyBlackboardKeys::bShouldChase) && BlackboardComponent->GetValueAsBool(EnemyBlackboardKeys::bShouldChase)),
+				*BoolText(HasBlackboardKey(BlackboardComponent, EnemyBlackboardKeys::bShouldReturnHome) && BlackboardComponent->GetValueAsBool(EnemyBlackboardKeys::bShouldReturnHome)),
+				*BoolText(HasBlackboardKey(BlackboardComponent, EnemyBlackboardKeys::bHasLineOfSight) && BlackboardComponent->GetValueAsBool(EnemyBlackboardKeys::bHasLineOfSight))));
+		}
+	}
+
+	const bool bCanShowPattern = IsValid(Enemy) && IsValid(BlackboardComponent)
+		&& (Enemy->IsBossEnemy() || IsValid(Enemy->FindComponentByClass<UGP_MatadorBossStateComponent>()));
+	if (bCanShowPattern && (bShowSummary || bShowSkill || bShowAll))
+	{
+		const FGPBossAttackPatternContext PatternContext =
+			BossAttackExecution::BuildPatternContext(Enemy, BlackboardComponent, Enemy->GetDefaultAttackAbilityTag());
+		const TArray<FGPBossAttackPatternCandidate> Candidates = FGPBossAttackPatternSelector::BuildCandidates(PatternContext);
+		const FGPBossAttackPatternCandidate* BestCandidate = FGPBossAttackPatternSelector::SelectBestCandidate(Candidates);
+
+		Lines.Add(TEXT(""));
+		Lines.Add(TEXT("Skill"));
+		if (BestCandidate)
+		{
+			Lines.Add(FString::Printf(TEXT("Next: %s | %.2f"), *BestCandidate->DebugName.ToString(), BestCandidate->Score));
+			if (!bShowSummary)
+			{
+				Lines.Add(FString::Printf(TEXT("Tag: %s"), *BestCandidate->AbilityTag.ToString()));
+			}
+		}
+		else
+		{
+			Lines.Add(TEXT("Next: <none>"));
+		}
+		if (!bShowSummary)
+		{
+			Lines.Add(FString::Printf(TEXT("Candidates: %s"), *FGPBossAttackPatternSelector::DescribeCandidates(Candidates)));
+			Lines.Add(FString::Printf(
+				TEXT("BullReady=%s BullActive=%s Teleport=%s Chain=%d/%d"),
+				*BoolText(PatternContext.bCanUseBullPattern),
+				*BoolText(PatternContext.bBullPatternActive),
+				*BoolText(PatternContext.bShouldTeleport),
+				PatternContext.ChainBreakCount,
+				PatternContext.ChainBreakTarget));
+		}
+	}
+
+	if (bShowAI || bShowAll)
+	{
+		Lines.Add(TEXT(""));
+		Lines.Add(TEXT("AI / Blackboard"));
+		Lines.Add(FString::Printf(TEXT("Controller: %s"), *ActorText(AIController)));
+		Lines.Add(FString::Printf(TEXT("Brain: %s"), *ActorText(IsValid(AIController) ? AIController->GetBrainComponent() : nullptr)));
+		AddBlackboardObject(Lines, BlackboardComponent, EnemyBlackboardKeys::TargetActor);
+		AddBlackboardName(Lines, BlackboardComponent, EnemyBlackboardKeys::CombatState);
+		AddBlackboardName(Lines, BlackboardComponent, EnemyBlackboardKeys::EnemyMode);
+		AddBlackboardName(Lines, BlackboardComponent, EnemyBlackboardKeys::FocusTargetRule);
+		AddBlackboardFloat(Lines, BlackboardComponent, EnemyBlackboardKeys::DistanceToTarget);
+		AddBlackboardFloat(Lines, BlackboardComponent, EnemyBlackboardKeys::DistanceFromHome);
+		AddBlackboardVector(Lines, BlackboardComponent, EnemyBlackboardKeys::HomeLocation);
+		AddBlackboardVector(Lines, BlackboardComponent, EnemyBlackboardKeys::MoveToLocation);
+		AddBlackboardBool(Lines, BlackboardComponent, EnemyBlackboardKeys::bCanAttack);
+		AddBlackboardBool(Lines, BlackboardComponent, EnemyBlackboardKeys::bShouldChase);
+		AddBlackboardBool(Lines, BlackboardComponent, EnemyBlackboardKeys::bShouldReturnHome);
+		AddBlackboardBool(Lines, BlackboardComponent, EnemyBlackboardKeys::bShouldRetreat);
+		AddBlackboardBool(Lines, BlackboardComponent, EnemyBlackboardKeys::bShouldReposition);
+		AddBlackboardBool(Lines, BlackboardComponent, EnemyBlackboardKeys::bHasLineOfSight);
+		AddBlackboardFloat(Lines, BlackboardComponent, EnemyBlackboardKeys::HealthRatio);
+		AddBlackboardInt(Lines, BlackboardComponent, EnemyBlackboardKeys::BossPhase);
+		AddBlackboardBool(Lines, BlackboardComponent, EnemyBlackboardKeys::bShouldTeleport);
+		AddBlackboardBool(Lines, BlackboardComponent, EnemyBlackboardKeys::bCanUseBullPattern);
+		AddBlackboardBool(Lines, BlackboardComponent, EnemyBlackboardKeys::bBullPatternActive);
+		AddBlackboardInt(Lines, BlackboardComponent, EnemyBlackboardKeys::ChainBreakCount);
+		AddBlackboardBool(Lines, BlackboardComponent, EnemyBlackboardKeys::bIsGroggy);
+		AddBlackboardObject(Lines, BlackboardComponent, EnemyBlackboardKeys::DecoyActor);
+		AddBlackboardObject(Lines, BlackboardComponent, EnemyBlackboardKeys::MainBossActor);
+	}
+
+	if (bShowGAS || bShowAll)
+	{
+		if (UAbilitySystemComponent* ASC = IsValid(Enemy) ? Enemy->GetAbilitySystemComponent() : nullptr)
+		{
+			FGameplayTagContainer OwnedTags;
+			ASC->GetOwnedGameplayTags(OwnedTags);
+
+			Lines.Add(TEXT(""));
+			Lines.Add(TEXT("GAS"));
+			Lines.Add(FString::Printf(TEXT("Tags: %s"), OwnedTags.IsEmpty() ? TEXT("<none>") : *OwnedTags.ToStringSimple()));
+
+			TArray<FString> ActiveAbilities;
+			TArray<FString> GrantedAbilities;
+			FScopedAbilityListLock AbilityScopeLock(*ASC);
+			for (const FGameplayAbilitySpec& AbilitySpec : ASC->GetActivatableAbilities())
+			{
+				if (!AbilitySpec.Ability)
+				{
+					continue;
+				}
+
+				FString AbilityText = GetNameSafe(AbilitySpec.Ability);
+				const FGameplayTagContainer AssetTags = AbilitySpec.Ability->GetAssetTags();
+				if (!AssetTags.IsEmpty())
+				{
+					AbilityText += FString::Printf(TEXT(" [%s]"), *AssetTags.ToStringSimple());
+				}
+
+				GrantedAbilities.Add(AbilityText);
+				if (AbilitySpec.IsActive())
+				{
+					ActiveAbilities.Add(AbilityText);
+				}
+			}
+
+			Lines.Add(FString::Printf(TEXT("Active: %s"), ActiveAbilities.Num() > 0 ? *FString::Join(ActiveAbilities, TEXT(", ")) : TEXT("<none>")));
+			Lines.Add(FString::Printf(TEXT("Granted(%d): %s"), GrantedAbilities.Num(), GrantedAbilities.Num() > 0 ? *FString::Join(GrantedAbilities, TEXT(", ")) : TEXT("<none>")));
+		}
+	}
+
+	if (bShowSummary || bShowMatador || bShowAll)
+	{
+		if (UGP_MatadorBossStateComponent* MatadorState = IsValid(Enemy) ? Enemy->FindComponentByClass<UGP_MatadorBossStateComponent>() : nullptr)
+		{
+			Lines.Add(TEXT(""));
+			Lines.Add(TEXT("Matador Boss"));
+			Lines.Add(FString::Printf(TEXT("Chain: %d / %d"), MatadorState->GetChainBreakCount(), MatadorState->GetChainBreakTarget()));
+			Lines.Add(FString::Printf(TEXT("Guarded/Groggy: %s / %s"), *BoolText(MatadorState->IsGuarded()), *BoolText(MatadorState->IsGroggy())));
+			Lines.Add(FString::Printf(TEXT("Decoy: %s"), *ActorText(MatadorState->GetActiveDecoyActor())));
+			Lines.Add(FString::Printf(TEXT("Bull: %s"), *ActorText(MatadorState->GetActiveBullActor())));
+		}
+
+		if (AGP_MatadorMageBossCharacter* MatadorBoss = Cast<AGP_MatadorMageBossCharacter>(Enemy))
+		{
+			Lines.Add(FString::Printf(TEXT("BullActiveOrPending: %s"), *BoolText(MatadorBoss->IsBullPatternActive())));
+		}
+
+		if (AGP_MatadorBossDecoyActor* Decoy = Cast<AGP_MatadorBossDecoyActor>(Enemy))
+		{
+			Lines.Add(TEXT(""));
+			Lines.Add(TEXT("Matador Decoy"));
+			Lines.Add(FString::Printf(TEXT("MainBoss: %s"), *ActorText(Decoy->GetMainBossActor())));
+			if (UGP_MatadorDecoyPressureComponent* Pressure = Decoy->GetPressureComponent())
+			{
+				Lines.Add(FString::Printf(
+					TEXT("Pressure: %s | Active=%s"),
+					*EnumText(StaticEnum<EGPMatadorDecoyPressureState>(), static_cast<int64>(Pressure->GetPressureState())),
+					*BoolText(Pressure->IsPressureActive())));
+				Lines.Add(FString::Printf(TEXT("Target: %s"), *ActorText(Pressure->GetCurrentTarget())));
+				Lines.Add(FString::Printf(TEXT("Teleport/PostLock: %s / %s"), *BoolText(Pressure->IsTeleportRequested()), *BoolText(Pressure->IsPostTeleportAttackLocked())));
+				Lines.Add(FString::Printf(TEXT("StepThrustIndex: %d"), Pressure->GetStepThrustIndex()));
+			}
+
+			if (USkeletalMeshComponent* DecoyMesh = Decoy->GetDecoyMesh())
+			{
+				Lines.Add(FString::Printf(TEXT("AnimClass: %s"), *GetNameSafe(DecoyMesh->GetAnimClass())));
+				if (const UGP_MatadorDecoyAnimInstance* DecoyAnim = Cast<UGP_MatadorDecoyAnimInstance>(DecoyMesh->GetAnimInstance()))
+				{
+					Lines.Add(FString::Printf(
+						TEXT("ABP: %s | Walk=%s"),
+						*EnumText(StaticEnum<EGPMatadorDecoyPressureState>(), static_cast<int64>(DecoyAnim->GetPressureState())),
+						*BoolText(DecoyAnim->IsWalkingPressure())));
+					Lines.Add(FString::Printf(
+						TEXT("Presentation: %s %.2f/%.2f"),
+						*EnumText(StaticEnum<EGPMatadorDecoyPresentationState>(), static_cast<int64>(DecoyAnim->GetPresentationState())),
+						DecoyAnim->GetPresentationStateTime(),
+						DecoyAnim->GetPresentationStateDuration()));
+				}
+			}
+		}
+	}
+
+	return FString::Join(Lines, TEXT("\n"));
 }
 
 void AGP_EncounterDebugDirector::Log(const FString& Message) const

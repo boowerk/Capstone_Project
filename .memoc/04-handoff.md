@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-01T14:21:48+09:00
+updated: 2026-06-28T15:10:00+09:00
 status: active
 tags:
   - memoc
@@ -11,11 +11,45 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-07-01T14:21:48+09:00
+Last synced: 2026-07-09T02:52:00+09:00
 
-## Main Merge Handoff
+## Region Event System Handoff
 
-- `origin/main` (`fc34c45a`) is merged into `feature/vfx-skills`; main's `GA_Primary.uasset` resolved the only binary conflict. Editor build passed. PIE-check Primary Attack, F9 encounter panel, lobby travel, portal, Nav, and enemy spawns before merging this feature branch into main.
+- Commits `28c677a5`, `726bb5ad`, `ea6ae331`, `b25dbac2`, `e1472c42`, `def21134`, and `873eab0c` add a new region event foundation for PCG/zone presentation.
+- Commits `537c98b5`, `5a4ebe70`, `c298595f`, `c766d154`, `aea66ecb`, `f80f5fd5`, `30345aaf`, `907c5b19`, `1edaa439`, `7bb9c092`, and `c24402f5` add the concrete example events requested for final-presentation polish.
+- Runtime flow: place/configure `AGP_RegionEventDirector` with `EventPool`; `AGP_GameMode` finds it at BeginPlay, initializes it with `RegionCount`, and starts a weighted `ZoneStarted` event when a zone begins. `ZoneCompleted` rolls are available but disabled by default on GameMode because reward-style events should avoid spawning extra clear-blocking enemies unless intentionally enabled.
+- `UGP_RegionEventData` fields to author first: `EventId`, `DisplayName`, `EventType`, `Trigger`, `SelectionWeight`, `DurationSeconds`, `EventActorClass`, optional active/completed region state, and optional `EnemySpawns`.
+- Example `EventActorClass` values:
+  - `AGP_RedRiftRegionEventActor`: uses `EnemySpawns`; one initial base wave, then periodic waves.
+  - `AGP_CrystalCorruptionRegionEventActor`: spawns destructible crystal nodes and slows players inside radius until all nodes break.
+  - `AGP_ShrineRuinsRegionEventActor`: opens `AGP_PlayerController::ClientOpenRegionEventAugmentSelect()` when a player overlaps the shrine.
+  - `AGP_StructureDefenseRegionEventActor`: completes after `DefenseDurationSeconds`, while periodically spawning waves from `EnemySpawns`.
+- `AGP_RegionEventActor` owns BP hooks `BP_OnRegionEventInitialized`, `BP_OnRegionEventActivated`, `BP_OnRegionEventCompleted`, and `BP_OnRegionEventExpired`; create BP children for VFX/decal/UI polish. Event-spawned enemies are forwarded to GameMode and count toward the current zone clear.
+- Verified: `Project_EdenEditor Win64 Development` build succeeded and `ProjectEden.Game.RegionEvents.Selection` passed. PIE-check remains: for each Region Event DataAsset, set `EventActorClass`, add it to the director pool, enter a zone, and confirm event-specific behavior/spawn composition/multiplayer UI.
+
+## Basic Enemy Cadence and Hearing Handoff
+
+- Commits `24374376`, `f76cb69b`, `cbc771a8`, and `a1bbdc40` add per-archetype randomized attack cadence, shared BT enforcement, enemy hearing perception, and server-authoritative player footsteps.
+- Full editor build passed. `ProjectEden.AI.Enemy.AttackCadence` and `ProjectEden.AI.Perception.FootstepNoise` pass.
+- PIE-check several mixed basic enemies acquiring one player at once: first and repeated attacks should stagger, all intervals should stay below 3s, and moving behind a sight blocker inside HearingRange should acquire/refresh pursuit. Tune native/BP `Attack Cadence Settings`, `Hearing Range`, or player `Footstep Noise Settings` only if encounter feel needs adjustment.
+
+## Matador Boss Pattern/AnimBP Handoff
+
+- Current Matador design direction: the main boss body should mostly stay still as a guarded/vulnerable anchor. The active decoy performs visible combat patterns. The main body is pulled/teleported in only for groggy so the player can punish it.
+- Code already mostly matches this: `AGP_MatadorMageBossCharacter::Tick()` calls `StopMainBodyMovement()` and `UpdateDecoyFollow()` while not groggy; `UGP_MatadorMeleeAbilityBase::ResolvePatternActor()` returns the active decoy when present, so Rapier/Cape pattern presentation and hit origin should be decoy-centered; bull pattern always uses `EnsureMatadorDecoy()` and sends the bull toward/through the decoy flow.
+- Groggy flow already supports the intended punish target: `bTeleportToDecoyOnGroggy=true`, `GroggyDecoyTeleportDelay=0.35`, and `TeleportToPendingGroggyDecoyLocation()` move the main boss to the decoy position after chain break.
+- Important AnimBP rule: do not animate the main boss as the normal attacker for Rapier/Cape/Bull. Put Rapier aim/lock/thrust, Cape prepare/gust, and Bull lure/redirect presentation on the decoy mesh/AnimBP. Main boss AnimBP should focus on idle/hover/guarded, groggy start/loop/recover, hit react, death, and possibly a subtle remote command pose only if it does not imply the boss body is the active hit source.
+- Recommended assets: `ABP_MatadorBoss` for main body idle/groggy/punish states; `ABP_MatadorDecoy` for Rapier/Cape/Bull pattern performance; optional `ABP_Bull` only for visual bull run/redirect/hit presentation.
+- Minimal implementation order for main thread: 1) create/assign decoy AnimBP and montages for `RapierPattern` and `CapePattern`; 2) wire BP events from `UGP_MatadorMeleeAbilities` (`BP_OnRapierAimStarted`, `BP_OnRapierDirectionLocked`, `BP_OnRapierThrust`, `BP_OnCapePrepareStarted`, `BP_OnCapeDirectionLocked`, `BP_OnCapeGustBurst`) to decoy montage/VFX; 3) add main boss groggy start/loop/recover montage; 4) add bull/chain feedback on decoy and chain actor.
+- 2026-06-28 implementation update: `AGP_MatadorBossDecoyActor` now has decoy-side Rapier/Cape Blueprint events (`BP_OnDecoyRapierAimStarted`, `BP_OnDecoyRapierDirectionLocked`, `BP_OnDecoyRapierThrust`, `BP_OnDecoyCapePrepareStarted`, `BP_OnDecoyCapeDirectionLocked`, `BP_OnDecoyCapeGustBurst`), a `GetDecoyMesh()` getter, and optional `DecoyAnimClass`. Existing Rapier/Cape abilities call these events after their original ability BP events, so the current BP ability graphs remain compatible.
+- 2026-06-28 implementation update: Rapier/Cape ability activation now notifies `UGP_MatadorDecoyPressureComponent` as pattern-action locked until `EndAbility`, so out-of-range teleport requests can wait for the current GAS/timer action to finish. Decoy break also stops the pressure component before hiding/despawning.
+- 2026-06-28 asset check: MCP confirmed `BP_MatadorDecoy.DecoyMesh` currently uses `AnimationSingleNode` with `Male_Standing_Pose1` and no AnimClass. No blank ABP was auto-assigned because that would risk replacing the current visible pose with an un-authored ref pose. Next editor step is to create/assign a real `ABP_MatadorDecoy` to `DecoyAnimClass`.
+- 2026-06-29 correction: decoy pressure is not distance keeping. It should walk in until skill staging range, then only teleport near the same chased player after sustained escape. Reserved teleports keep `CurrentTarget` unless invalid, and candidate order is randomized around that target. Decoy visual `StaticMeshComponent`s are forced `NoCollision` so the player can approach the decoy.
+- 2026-06-29 follow-up: legacy `AGP_MatadorMageBossCharacter::UpdateDecoyFollow()` was still enforcing `DecoyFollowDesiredDistance=650` every tick, which made the decoy move away despite pressure movement. It now returns early while `UGP_MatadorDecoyPressureComponent::IsPressureActive()` is true.
+- 2026-06-29 follow-up: pressure should not body-hug because Matador attacks with skill patterns, not basic melee. Defaults/BP values were retuned to `MeleeEnterRange=700`, `MeleeExitRange=1600`, `TargetOutOfRangeTime=2.25`, teleport `700/850/1000`. This is a one-way approach stop range, not distance keeping: if the player gets closer, pressure does not move the decoy backward.
+- 2026-06-29 mesh note: Matador decoy has inherited `CharacterMesh0` plus explicit `DecoyMesh` because it inherits `AGP_EnemyCharacter`. `DecoyMesh` is the intended visible/animated mesh; inherited `GetMesh()` is now force-hidden/no-collision/no-overlap in `ApplyDefaultVisualLayout()` to prevent double visuals or phantom collision.
+- 2026-06-29 animation update: native `UGP_MatadorDecoyAnimInstance` now derives from `UGP_CharacterAnimInstance`, preserving existing locomotion variables while exposing `bIsWalkingPressure`, `PressureState`, `CurrentTarget`, teleport lock, and `StepThrustIndex` for `ABP_MatadorDecoy`. `ABP_MatadorDecoy` was reparented/saved to `GP_MatadorDecoyAnimInstance` by editor Python commandlet. Next editor step is to compile/open-check the graph and wire the walk/step-thrust presentation.
+- Verification target: in PIE, Rapier/Cape should visibly originate from the decoy, not the boss body. The boss body should remain mostly stationary until chain count reaches target, then move to the decoy/groggy location and become the punish target.
 
 ## Player Network Movement Handoff
 

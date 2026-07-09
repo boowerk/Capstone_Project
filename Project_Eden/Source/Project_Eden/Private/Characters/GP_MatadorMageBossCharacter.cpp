@@ -8,6 +8,7 @@
 #include "Actors/GP_BullChargeActor.h"
 #include "Actors/GP_ChainEffectActor.h"
 #include "Actors/GP_MatadorBossDecoyActor.h"
+#include "Actors/GP_MatadorDecoyPressureComponent.h"
 #include "AIController.h"
 #include "BehaviorTree/BehaviorTree.h"
 #include "BehaviorTree/BlackboardComponent.h"
@@ -21,6 +22,7 @@
 #include "NavigationSystem.h"
 #include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
+#include "VFX/GP_BossDeathPresentationComponent.h"
 #include "VFX/GP_BossTelegraphVFXComponent.h"
 
 AGP_MatadorMageBossCharacter::AGP_MatadorMageBossCharacter()
@@ -30,6 +32,11 @@ AGP_MatadorMageBossCharacter::AGP_MatadorMageBossCharacter()
 	BossDisplayName = NSLOCTEXT("GPMatadorMageBoss", "BossDisplayName", "Matador Mage");
 
 	MatadorStateComponent = CreateDefaultSubobject<UGP_MatadorBossStateComponent>(TEXT("MatadorStateComponent"));
+	if (UGP_BossDeathPresentationComponent* DeathPresentationComponent = GetBossDeathPresentationComponent())
+	{
+		// The Matador clear reads as a bull apparition and arena collapse, independent of the boss mesh animation set.
+		DeathPresentationComponent->SetPresentationStyle(EGPBossDeathPresentationStyle::Matador);
+	}
 	// The component stays dormant until an attack path explicitly honors the designer toggle.
 	BossTelegraphVFXComponent = CreateDefaultSubobject<UGP_BossTelegraphVFXComponent>(TEXT("BossTelegraphVFXComponent"));
 	BossTelegraphVFXComponent->SetupAttachment(GetRootComponent());
@@ -544,6 +551,14 @@ void AGP_MatadorMageBossCharacter::UpdateDecoyFollow(float DeltaSeconds)
 	if (!IsValid(DecoyActor) || !IsValid(TargetActor))
 	{
 		return;
+	}
+
+	if (const UGP_MatadorDecoyPressureComponent* PressureComponent = DecoyActor->GetPressureComponent())
+	{
+		if (PressureComponent->IsPressureActive())
+		{
+			return;
+		}
 	}
 
 	FVector FromTargetToDecoy = DecoyActor->GetActorLocation() - TargetActor->GetActorLocation();

@@ -1,10 +1,13 @@
 #include "Actors/GP_MatadorBossDecoyActor.h"
 
-#include "AbilitySystemBlueprintLibrary.h"
-#include "AbilitySystemComponent.h"
+#include "Actors/GP_MatadorDecoyPressureComponent.h"
+#include "Animation/GP_MatadorDecoyAnimInstance.h"
+#include "Animation/PDA_EnemyAnimationSet.h"
 #include "Characters/GP_MatadorBossStateComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraSystem.h"
@@ -16,19 +19,48 @@ AGP_MatadorBossDecoyActor::AGP_MatadorBossDecoyActor()
 	bReplicates = true;
 	SetReplicateMovement(true);
 
-	CollisionCapsule = CreateDefaultSubobject<UCapsuleComponent>(TEXT("CollisionCapsule"));
-	CollisionCapsule->InitCapsuleSize(34.0f, 100.0f);
-	CollisionCapsule->SetCollisionObjectType(ECC_WorldDynamic);
-	CollisionCapsule->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-	CollisionCapsule->SetCollisionResponseToAllChannels(ECR_Ignore);
-	CollisionCapsule->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
-	CollisionCapsule->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
-	SetRootComponent(CollisionCapsule);
+	PressureComponent = CreateDefaultSubobject<UGP_MatadorDecoyPressureComponent>(TEXT("PressureComponent"));
 
 	DecoyMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("DecoyMesh"));
-	DecoyMesh->SetupAttachment(CollisionCapsule);
+	DecoyMesh->SetupAttachment(GetCapsuleComponent());
 	DecoyMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	DecoyMesh->SetRelativeLocation(FVector(0.0f, 0.0f, -100.0f));
+	DecoyMesh->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
+
+	GetMesh()->SetHiddenInGame(true);
+	GetMesh()->SetVisibility(false, true);
+
+	bIsBossEnemy = false;
+	bGrantDefaultBossPatternAbilities = false;
+	bGrantDefaultEnemyAttackAbility = false;
+	bGrantDefaultEnemyDeathAbility = true;
+	bShowWorldHealthBar = false;
+	XPReward = 0.0f;
+	DeathDespawnDelay = 0.75f;
+	AutoPossessAI = EAutoPossessAI::Disabled;
+	AIControllerClass = nullptr;
+
+	if (UCapsuleComponent* Capsule = GetCapsuleComponent())
+	{
+		Capsule->InitCapsuleSize(34.0f, 100.0f);
+		Capsule->SetCollisionObjectType(ECC_WorldDynamic);
+		Capsule->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+		Capsule->SetCollisionResponseToAllChannels(ECR_Ignore);
+		Capsule->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
+	}
+
+	if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
+	{
+		MovementComponent->MaxWalkSpeed = 220.0f;
+		MovementComponent->bOrientRotationToMovement = false;
+		MovementComponent->bUseControllerDesiredRotation = false;
+	}
+
+	static ConstructorHelpers::FObjectFinder<UPDA_EnemyAnimationSet> DecoyAnimationSetFinder(TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_Matador/Animation/PDA_MatadorDecoyAnimationSet.PDA_MatadorDecoyAnimationSet"));
+	if (DecoyAnimationSetFinder.Succeeded())
+	{
+		EnemyAnimationSet = DecoyAnimationSetFinder.Object;
+	}
 
 	// SK_MaskMan is the requested default visual; designers can replace it in Blueprint per boss variant.
 	static ConstructorHelpers::FObjectFinder<USkeletalMesh> MaskManMeshFinder(TEXT("/Game/Characters/MaskMan/SK_MaskMan.SK_MaskMan"));
@@ -54,6 +86,11 @@ void AGP_MatadorBossDecoyActor::BeginPlay()
 	{
 		MatadorStateComponent->RegisterDecoyActor(this);
 	}
+
+	if (IsValid(PressureComponent))
+	{
+		PressureComponent->InitializePressure(MainBossActor.Get(), MatadorStateComponent.Get());
+	}
 }
 
 void AGP_MatadorBossDecoyActor::OnConstruction(const FTransform& Transform)
@@ -65,17 +102,46 @@ void AGP_MatadorBossDecoyActor::OnConstruction(const FTransform& Transform)
 
 void AGP_MatadorBossDecoyActor::ApplyDefaultVisualLayout()
 {
-	if (IsValid(CollisionCapsule))
+	if (USkeletalMeshComponent* InheritedMesh = GetMesh())
 	{
-		CollisionCapsule->SetCapsuleSize(
+		InheritedMesh->SetHiddenInGame(true);
+		InheritedMesh->SetVisibility(false, true);
+		InheritedMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		InheritedMesh->SetGenerateOverlapEvents(false);
+	}
+
+	if (UCapsuleComponent* Capsule = GetCapsuleComponent())
+	{
+		Capsule->SetCapsuleSize(
 			FMath::Max(1.0f, DecoyCapsuleRadius),
 			FMath::Max(1.0f, DecoyCapsuleHalfHeight),
 			true);
 	}
 
-	if (IsValid(DecoyMesh))
+	if (USkeletalMeshComponent* MeshComponent = GetDecoyMesh())
 	{
-		DecoyMesh->SetRelativeLocation(DecoyMeshRelativeLocation);
+		MeshComponent->SetRelativeLocation(DecoyMeshRelativeLocation);
+		MeshComponent->SetRelativeRotation(FRotator(0.0f, -90.0f, 0.0f));
+		if (IsValid(EnemyAnimationSet))
+		{
+			ApplyAnimationSetToDecoyMesh();
+		}
+		else if (DecoyAnimClass)
+		{
+			MeshComponent->SetAnimationMode(EAnimationMode::AnimationBlueprint);
+			MeshComponent->SetAnimInstanceClass(DecoyAnimClass);
+		}
+	}
+
+	TArray<UStaticMeshComponent*> StaticMeshComponents;
+	GetComponents<UStaticMeshComponent>(StaticMeshComponents);
+	for (UStaticMeshComponent* StaticMeshComponent : StaticMeshComponents)
+	{
+		if (IsValid(StaticMeshComponent))
+		{
+			StaticMeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			StaticMeshComponent->SetGenerateOverlapEvents(false);
+		}
 	}
 }
 
@@ -85,12 +151,6 @@ void AGP_MatadorBossDecoyActor::GetLifetimeReplicatedProps(TArray<FLifetimePrope
 
 	DOREPLIFETIME(AGP_MatadorBossDecoyActor, MainBossActor);
 	DOREPLIFETIME(AGP_MatadorBossDecoyActor, MatadorStateComponent);
-}
-
-UAbilitySystemComponent* AGP_MatadorBossDecoyActor::GetAbilitySystemComponent() const
-{
-	// Damage applied to the decoy intentionally resolves to the real boss ASC.
-	return UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(MainBossActor.Get());
 }
 
 void AGP_MatadorBossDecoyActor::InitializeDecoy(AActor* InMainBossActor, UGP_MatadorBossStateComponent* InStateComponent)
@@ -106,10 +166,20 @@ void AGP_MatadorBossDecoyActor::InitializeDecoy(AActor* InMainBossActor, UGP_Mat
 	{
 		MatadorStateComponent->RegisterDecoyActor(this);
 	}
+	if (IsValid(PressureComponent))
+	{
+		PressureComponent->InitializePressure(MainBossActor.Get(), MatadorStateComponent.Get());
+		PressureComponent->StartPressure();
+	}
 }
 
 void AGP_MatadorBossDecoyActor::PlayBreakPresentation()
 {
+	if (IsValid(PressureComponent))
+	{
+		PressureComponent->StopPressure();
+	}
+
 	BP_OnDecoyBroken();
 	BP_OnDecoyVanishRequested(FMath::Max(0.05f, BrokenLifeSpan));
 
@@ -126,15 +196,15 @@ void AGP_MatadorBossDecoyActor::PlayBreakPresentation()
 			ENCPoolMethod::AutoRelease);
 	}
 
-	if (IsValid(DecoyMesh))
+	if (USkeletalMeshComponent* MeshComponent = GetDecoyMesh())
 	{
-		DecoyMesh->SetHiddenInGame(true);
-		DecoyMesh->SetVisibility(false, true);
+		MeshComponent->SetHiddenInGame(true);
+		MeshComponent->SetVisibility(false, true);
 	}
 
-	if (IsValid(CollisionCapsule))
+	if (UCapsuleComponent* Capsule = GetCapsuleComponent())
 	{
-		CollisionCapsule->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Capsule->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	}
 
 	if (HasAuthority())
@@ -151,4 +221,100 @@ void AGP_MatadorBossDecoyActor::PlayBullRedirectPresentation(AActor* BullActor, 
 void AGP_MatadorBossDecoyActor::PlayBullReturnPresentation(int32 ChainBreakCount, int32 ChainBreakTarget)
 {
 	BP_OnDecoyBullReturned(ChainBreakCount, ChainBreakTarget);
+}
+
+void AGP_MatadorBossDecoyActor::HandleRapierAimStarted(float InAimDuration)
+{
+	if (UGP_MatadorDecoyAnimInstance* AnimInstance = GetDecoyAnimInstance())
+	{
+		AnimInstance->NotifyRapierAimStarted(InAimDuration);
+	}
+	BP_OnDecoyRapierAimStarted(InAimDuration);
+}
+
+void AGP_MatadorBossDecoyActor::HandleRapierDirectionLocked(FVector LockedDirection, float InCommitDelay)
+{
+	if (UGP_MatadorDecoyAnimInstance* AnimInstance = GetDecoyAnimInstance())
+	{
+		AnimInstance->NotifyRapierDirectionLocked(LockedDirection, InCommitDelay);
+	}
+	BP_OnDecoyRapierDirectionLocked(LockedDirection, InCommitDelay);
+}
+
+void AGP_MatadorBossDecoyActor::HandleRapierThrust(FVector LockedDirection)
+{
+	if (UGP_MatadorDecoyAnimInstance* AnimInstance = GetDecoyAnimInstance())
+	{
+		AnimInstance->NotifyRapierThrust(LockedDirection);
+	}
+	BP_OnDecoyRapierThrust(LockedDirection);
+}
+
+void AGP_MatadorBossDecoyActor::HandleCapePrepareStarted(float InPrepareDuration)
+{
+	if (UGP_MatadorDecoyAnimInstance* AnimInstance = GetDecoyAnimInstance())
+	{
+		AnimInstance->NotifyCapePrepareStarted(InPrepareDuration);
+	}
+	BP_OnDecoyCapePrepareStarted(InPrepareDuration);
+}
+
+void AGP_MatadorBossDecoyActor::HandleCapeDirectionLocked(FVector LockedDirection)
+{
+	if (UGP_MatadorDecoyAnimInstance* AnimInstance = GetDecoyAnimInstance())
+	{
+		AnimInstance->NotifyCapeDirectionLocked(LockedDirection);
+	}
+	BP_OnDecoyCapeDirectionLocked(LockedDirection);
+}
+
+void AGP_MatadorBossDecoyActor::HandleCapeGustBurst(FVector LockedDirection, int32 InBurstIndex, int32 InBurstCount)
+{
+	if (UGP_MatadorDecoyAnimInstance* AnimInstance = GetDecoyAnimInstance())
+	{
+		AnimInstance->NotifyCapeGustBurst(LockedDirection, InBurstIndex, InBurstCount);
+	}
+	BP_OnDecoyCapeGustBurst(LockedDirection, InBurstIndex, InBurstCount);
+}
+
+USkeletalMeshComponent* AGP_MatadorBossDecoyActor::GetDecoyMesh() const
+{
+	return IsValid(DecoyMesh) ? DecoyMesh.Get() : GetMesh();
+}
+
+void AGP_MatadorBossDecoyActor::UpdateAnimationSet()
+{
+	ApplyAnimationSetToDecoyMesh();
+	ApplyDefaultVisualLayout();
+}
+
+void AGP_MatadorBossDecoyActor::HandlePostDamageTaken(AActor* InstigatorActor, float DamageAmount, FGameplayTag ElementTag)
+{
+	AGP_BaseCharacter::HandlePostDamageTaken(InstigatorActor, DamageAmount, ElementTag);
+}
+
+void AGP_MatadorBossDecoyActor::ApplyAnimationSetToDecoyMesh()
+{
+	USkeletalMeshComponent* MeshComponent = GetDecoyMesh();
+	if (!IsValid(MeshComponent) || !IsValid(EnemyAnimationSet))
+	{
+		return;
+	}
+
+	if (IsValid(EnemyAnimationSet->CharacterMesh))
+	{
+		MeshComponent->SetSkeletalMeshAsset(EnemyAnimationSet->CharacterMesh);
+	}
+
+	if (EnemyAnimationSet->AnimBlueprintClass)
+	{
+		MeshComponent->SetAnimationMode(EAnimationMode::AnimationBlueprint);
+		MeshComponent->SetAnimInstanceClass(EnemyAnimationSet->AnimBlueprintClass);
+	}
+}
+
+UGP_MatadorDecoyAnimInstance* AGP_MatadorBossDecoyActor::GetDecoyAnimInstance() const
+{
+	USkeletalMeshComponent* MeshComponent = GetDecoyMesh();
+	return IsValid(MeshComponent) ? Cast<UGP_MatadorDecoyAnimInstance>(MeshComponent->GetAnimInstance()) : nullptr;
 }

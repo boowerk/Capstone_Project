@@ -25,6 +25,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
+#include "VFX/GP_BossDeathPresentationComponent.h"
 #include "VFX/GP_BossTelegraphVFXComponent.h"
 
 AGP_DarkArmorKnightBossCharacter::AGP_DarkArmorKnightBossCharacter()
@@ -36,6 +37,11 @@ AGP_DarkArmorKnightBossCharacter::AGP_DarkArmorKnightBossCharacter()
 	BossDisplayName = NSLOCTEXT("GPDarkArmorKnightBoss", "BossDisplayName", "Dark Armor Knight");
 
 	DarkKnightStateComponent = CreateDefaultSubobject<UGP_DarkArmorKnightStateComponent>(TEXT("DarkKnightStateComponent"));
+	if (UGP_BossDeathPresentationComponent* DeathPresentationComponent = GetBossDeathPresentationComponent())
+	{
+		// Dark Knight deaths emphasize armor fragments and black lightning instead of a generic corpse fade.
+		DeathPresentationComponent->SetPresentationStyle(EGPBossDeathPresentationStyle::DarkArmorKnight);
+	}
 	// Prefill every authored Dark Knight attack so Blueprint defaults expose one checkbox per pattern.
 	TelegraphVFXPatterns.Add(GPTags::Ability::Boss::DarkKnight::Basic, false);
 	TelegraphVFXPatterns.Add(GPTags::Ability::Boss::DarkKnight::Heavy, false);
