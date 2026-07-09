@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-09T16:46:33+09:00
+updated: 2026-07-09T22:01:14+09:00
 status: active
 tags:
   - memoc
@@ -11,10 +11,11 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-07-09T16:46:33+09:00
+Last synced: 2026-07-09T22:01:14+09:00
 
 ## Current Status
 
+- Region Event examples now have editor-ready test assets (`85f56480` through `76d4a7c9`) under `/Game/RegionEvents/Examples`: `BP_RE_Test_RedRift`, `BP_RE_Test_CrystalCorruption`, `BP_RE_Test_ShrineRuins`, `BP_RE_Test_StructureDefense`, four matching `DA_RE_Test_*` assets, and `BP_RE_Test_Director_AllExamples` with the four DataAssets in its EventPool. The generator commandlet is `-run=GP_CreateRegionEventExamples`. Build, `ProjectEden.Game.RegionEvents.ExampleAssets`, and `ProjectEden.Game.RegionEvents.Selection` pass. To smoke-test in PIE, place the test director BP in a map with enemy spawn zones; GameMode resolves placed directors automatically.
 - Boss death/clear presentation is current (`080f7aef` through `047c9475`). `UGP_BossDeathPresentationComponent` is owned by `AGP_EnemyCharacter` and plays local-only presentation actors from the shared GAS death state, no-oping for regular enemies. Crystal Seraph explicitly uses crystal shatter/falling shards, Dark Armor Knight uses armor fragments plus the black lightning Niagara fallback, Matador uses a bull apparition plus arena debris, and Sans BP names/display names auto-map to sinking hands plus a closing crack. Build, `ProjectEden.Combat.Boss.DeathPresentation`, and `ProjectEden.Combat.EnemyDeath.Lifecycle` pass. Optional editor polish: tune per-BP component settings/Niagara overrides when final art arrives.
 - Region Event system foundation is current (`28c677a5` through `873eab0c`): `UGP_RegionEventData` assets define event type/trigger/weight/duration, optional region-state writes, icon metadata, and enemy waves. `AGP_RegionEventActor` is a replicated runtime instance with BP hooks for initialized/activated/completed/expired presentation and optional enemy spawning. `AGP_RegionEventDirector` selects weighted events per zone/trigger, spawns event actors near `AGP_EnemySpawnVolume`, and forwards event-spawned enemies to `AGP_GameMode` so zone clears wait for them. GameMode finds a placed director or auto-spawns one when enabled, starts `ZoneStarted` events by default, and completes active zone events before applying final revived region state. Build and `ProjectEden.Game.RegionEvents.Selection` pass. Pending: author editor assets/pools and PIE-check the zone-start event flow.
 - Region Event examples are now native and BP/DataAsset-selectable (`537c98b5` through `c24402f5`). `UGP_RegionEventData.EventActorClass` can point to `AGP_RedRiftRegionEventActor` (immediate configured wave plus periodic waves), `AGP_CrystalCorruptionRegionEventActor` (spawns destructible `AGP_RegionEventCrystalNode`s, slows nearby players until all crystals break), `AGP_ShrineRuinsRegionEventActor` (opens the normal augment picker on the overlapping player's client), or `AGP_StructureDefenseRegionEventActor` (survive a timed defense while waves spawn). Player attacks can now damage region crystal nodes through the shared combat overlap helper. Build and `ProjectEden.Game.RegionEvents.Selection` pass; PIE-check each DataAsset's placement, spawn composition, and multiplayer UI behavior.
