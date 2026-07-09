@@ -12,6 +12,7 @@
 #include "Game/RegionEvents/GP_RedRiftRegionEventActor.h"
 #include "Game/RegionEvents/GP_RegionEventData.h"
 #include "Game/RegionEvents/GP_RegionEventDirector.h"
+#include "Game/RegionEvents/GP_RegionEventTestTriggerActor.h"
 #include "Game/RegionEvents/GP_ShrineRuinsRegionEventActor.h"
 #include "Game/RegionEvents/GP_StructureDefenseRegionEventActor.h"
 #include "Kismet2/BlueprintEditorUtils.h"
@@ -154,6 +155,18 @@ namespace GPRegionEventExamples
 		if (FBoolProperty* BoolProperty = IsValid(Object) ? FindFProperty<FBoolProperty>(Object->GetClass(), PropertyName) : nullptr)
 		{
 			BoolProperty->SetPropertyValue_InContainer(Object, bValue);
+			return true;
+		}
+
+		return false;
+	}
+
+	bool SetObjectProperty(UObject* Object, const FName PropertyName, UObject* Value)
+	{
+		FProperty* Property = IsValid(Object) ? FindFProperty<FProperty>(Object->GetClass(), PropertyName) : nullptr;
+		if (FObjectPropertyBase* ObjectProperty = CastField<FObjectPropertyBase>(Property))
+		{
+			ObjectProperty->SetObjectPropertyValue_InContainer(Object, Value);
 			return true;
 		}
 
@@ -324,9 +337,15 @@ bool UGP_RegionEventExampleSetupLibrary::CreateOrUpdateRegionEventExampleAssets(
 	UBlueprint* ShrineBlueprint = CreateOrLoadActorBlueprint(TEXT("BP_RE_Test_ShrineRuins"), AGP_ShrineRuinsRegionEventActor::StaticClass());
 	UBlueprint* DefenseBlueprint = CreateOrLoadActorBlueprint(TEXT("BP_RE_Test_StructureDefense"), AGP_StructureDefenseRegionEventActor::StaticClass());
 	UBlueprint* DirectorBlueprint = CreateOrLoadActorBlueprint(TEXT("BP_RE_Test_Director_AllExamples"), AGP_RegionEventDirector::StaticClass());
+	UBlueprint* RedRiftTriggerBlueprint = CreateOrLoadActorBlueprint(TEXT("BP_RE_TestTrigger_RedRift"), AGP_RegionEventTestTriggerActor::StaticClass());
+	UBlueprint* CrystalTriggerBlueprint = CreateOrLoadActorBlueprint(TEXT("BP_RE_TestTrigger_CrystalCorruption"), AGP_RegionEventTestTriggerActor::StaticClass());
+	UBlueprint* ShrineTriggerBlueprint = CreateOrLoadActorBlueprint(TEXT("BP_RE_TestTrigger_ShrineRuins"), AGP_RegionEventTestTriggerActor::StaticClass());
+	UBlueprint* DefenseTriggerBlueprint = CreateOrLoadActorBlueprint(TEXT("BP_RE_TestTrigger_StructureDefense"), AGP_RegionEventTestTriggerActor::StaticClass());
 
 	if (!IsValid(RedRiftBlueprint) || !IsValid(CrystalBlueprint) || !IsValid(ShrineBlueprint)
-		|| !IsValid(DefenseBlueprint) || !IsValid(DirectorBlueprint))
+		|| !IsValid(DefenseBlueprint) || !IsValid(DirectorBlueprint)
+		|| !IsValid(RedRiftTriggerBlueprint) || !IsValid(CrystalTriggerBlueprint)
+		|| !IsValid(ShrineTriggerBlueprint) || !IsValid(DefenseTriggerBlueprint))
 	{
 		return false;
 	}
@@ -399,6 +418,39 @@ bool UGP_RegionEventExampleSetupLibrary::CreateOrUpdateRegionEventExampleAssets(
 		MarkBlueprintDefaultsChanged(DirectorBlueprint);
 	}
 
+	struct FTriggerBlueprintConfig
+	{
+		UBlueprint* Blueprint = nullptr;
+		UGP_RegionEventData* Data = nullptr;
+	};
+
+	const FTriggerBlueprintConfig TriggerConfigs[] =
+	{
+		{ RedRiftTriggerBlueprint, RedRiftData },
+		{ CrystalTriggerBlueprint, CrystalData },
+		{ ShrineTriggerBlueprint, ShrineData },
+		{ DefenseTriggerBlueprint, DefenseData },
+	};
+
+	for (const FTriggerBlueprintConfig& TriggerConfig : TriggerConfigs)
+	{
+		UClass* TriggerClass = ResolveBlueprintGeneratedClass(TriggerConfig.Blueprint);
+		UObject* TriggerDefaults = IsValid(TriggerClass) ? TriggerClass->GetDefaultObject() : nullptr;
+		if (!IsValid(TriggerDefaults))
+		{
+			continue;
+		}
+
+		// These trigger BPs are intentionally standalone: drag one into a level and PIE starts that single event.
+		SetObjectProperty(TriggerDefaults, TEXT("EventData"), TriggerConfig.Data);
+		SetBoolProperty(TriggerDefaults, TEXT("bTriggerOnBeginPlay"), true);
+		SetBoolProperty(TriggerDefaults, TEXT("bTriggerOnPlayerOverlap"), false);
+		SetBoolProperty(TriggerDefaults, TEXT("bAutoActivateSpawnedEvent"), true);
+		SetFloatProperty(TriggerDefaults, TEXT("TriggerRadius"), 600.0f);
+		SetIntProperty(TriggerDefaults, TEXT("TestRegionId"), 0);
+		MarkBlueprintDefaultsChanged(TriggerConfig.Blueprint);
+	}
+
 	TArray<UObject*> AssetsToSave =
 	{
 		RedRiftBlueprint,
@@ -406,6 +458,10 @@ bool UGP_RegionEventExampleSetupLibrary::CreateOrUpdateRegionEventExampleAssets(
 		ShrineBlueprint,
 		DefenseBlueprint,
 		DirectorBlueprint,
+		RedRiftTriggerBlueprint,
+		CrystalTriggerBlueprint,
+		ShrineTriggerBlueprint,
+		DefenseTriggerBlueprint,
 		RedRiftData,
 		CrystalData,
 		ShrineData,
