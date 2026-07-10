@@ -3,10 +3,15 @@
 #include "Components/ExponentialHeightFogComponent.h"
 #include "Components/SkyAtmosphereComponent.h"
 #include "Engine/ExponentialHeightFog.h"
+#include "Engine/StaticMeshActor.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "Game/Corruption/GP_WorldCorruptionComponent.h"
 #include "Game/GP_GameState.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/MaterialInterface.h"
+#include "Materials/MaterialParameters.h"
+#include "Components/StaticMeshComponent.h"
 #include "TimerManager.h"
 
 AGP_CorruptionPresentationActor::AGP_CorruptionPresentationActor()
@@ -76,7 +81,8 @@ void AGP_CorruptionPresentationActor::TryResolveAndBind()
 
 	const bool bHasSkyTarget = !bAffectSkyAtmosphere || IsValid(SkyAtmosphereActor);
 	const bool bHasFogTarget = !bAffectHeightFog || IsValid(HeightFogActor);
-	if (BoundWorldCorruption.IsValid() && bHasSkyTarget && bHasFogTarget)
+	const bool bHasSkyboxTarget = !bAffectSkyboxMaterials || !SkyboxMaterialBindings.IsEmpty();
+	if (BoundWorldCorruption.IsValid() && bHasSkyTarget && bHasFogTarget && bHasSkyboxTarget)
 	{
 		if (UWorld* World = GetWorld())
 		{
@@ -143,6 +149,66 @@ void AGP_CorruptionPresentationActor::ResolveEnvironmentActors()
 	{
 		CaptureFogBaseline(HeightFogActor->GetComponent());
 	}
+	ResolveSkyboxMaterials();
+}
+
+void AGP_CorruptionPresentationActor::ResolveSkyboxMaterials()
+{
+	UWorld* World = GetWorld();
+	if (!bAffectSkyboxMaterials || !World || !SkyboxMaterialBindings.IsEmpty())
+	{
+		return;
+	}
+
+	for (TActorIterator<AStaticMeshActor> It(World); It; ++It)
+	{
+		UStaticMeshComponent* MeshComponent = It->GetStaticMeshComponent();
+		if (!IsValid(MeshComponent)
+			|| !IsValid(MeshComponent->GetStaticMesh())
+			|| !MeshComponent->GetStaticMesh()->GetName().Contains(TEXT("Skybox"), ESearchCase::IgnoreCase))
+		{
+			continue;
+		}
+
+		for (int32 MaterialIndex = 0; MaterialIndex < MeshComponent->GetNumMaterials(); ++MaterialIndex)
+		{
+			UMaterialInterface* OriginalMaterial = MeshComponent->GetMaterial(MaterialIndex);
+			if (!IsValid(OriginalMaterial))
+			{
+				continue;
+			}
+
+			FGPCorruptionSkyboxMaterialBinding Binding;
+			Binding.MeshComponent = MeshComponent;
+			Binding.OriginalMaterial = OriginalMaterial;
+			Binding.MaterialIndex = MaterialIndex;
+			Binding.bHasTintParameter = OriginalMaterial->GetVectorParameterValue(
+				FHashedMaterialParameterInfo(SkyboxTintParameterName),
+				Binding.BaseTint);
+			Binding.bHasBrightnessParameter = OriginalMaterial->GetScalarParameterValue(
+				FHashedMaterialParameterInfo(SkyboxBrightnessParameterName),
+				Binding.BaseBrightness);
+			if (!Binding.bHasTintParameter && !Binding.bHasBrightnessParameter)
+			{
+				continue;
+			}
+
+			Binding.DynamicMaterial = UMaterialInstanceDynamic::Create(OriginalMaterial, this);
+			if (!IsValid(Binding.DynamicMaterial))
+			{
+				continue;
+			}
+
+			MeshComponent->SetMaterial(MaterialIndex, Binding.DynamicMaterial);
+			SkyboxMaterialBindings.Add(MoveTemp(Binding));
+		}
+	}
+
+	if (!SkyboxMaterialBindings.IsEmpty())
+	{
+		// Newly streamed skybox materials must receive the current value even when corruption itself did not change.
+		AppliedCorruptionNormalized = -1.0f;
+	}
 }
 
 void AGP_CorruptionPresentationActor::CaptureSkyBaseline(USkyAtmosphereComponent* SkyComponent)
@@ -208,6 +274,33 @@ void AGP_CorruptionPresentationActor::ApplyCorruptionPresentation(float Normaliz
 		}
 	}
 
+	if (bAffectSkyboxMaterials)
+	{
+		const FLinearColor SkyboxColorMultiplier = FLinearColor::LerpUsingHSV(
+			FLinearColor::White,
+			CorruptedSkyboxTintMultiplier,
+			Alpha);
+		for (FGPCorruptionSkyboxMaterialBinding& Binding : SkyboxMaterialBindings)
+		{
+			if (!IsValid(Binding.DynamicMaterial))
+			{
+				continue;
+			}
+			if (Binding.bHasTintParameter)
+			{
+				Binding.DynamicMaterial->SetVectorParameterValue(
+					SkyboxTintParameterName,
+					Binding.BaseTint * SkyboxColorMultiplier);
+			}
+			if (Binding.bHasBrightnessParameter)
+			{
+				Binding.DynamicMaterial->SetScalarParameterValue(
+					SkyboxBrightnessParameterName,
+					Binding.BaseBrightness * FMath::Lerp(1.0f, CorruptedSkyboxBrightnessMultiplier, Alpha));
+			}
+		}
+	}
+
 	BP_OnCorruptionPresentationChanged(Alpha);
 }
 
@@ -234,4 +327,15 @@ void AGP_CorruptionPresentationActor::RestoreBaselinePresentation()
 			Fog->SetDirectionalInscatteringColor(BaseDirectionalInscatteringColor);
 		}
 	}
+
+	for (const FGPCorruptionSkyboxMaterialBinding& Binding : SkyboxMaterialBindings)
+	{
+		if (IsValid(Binding.MeshComponent)
+			&& Binding.MaterialIndex != INDEX_NONE
+			&& Binding.MeshComponent->GetMaterial(Binding.MaterialIndex) == Binding.DynamicMaterial)
+		{
+			Binding.MeshComponent->SetMaterial(Binding.MaterialIndex, Binding.OriginalMaterial);
+		}
+	}
+	SkyboxMaterialBindings.Reset();
 }

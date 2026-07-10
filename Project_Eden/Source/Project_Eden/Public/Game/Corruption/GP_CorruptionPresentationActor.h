@@ -8,7 +8,31 @@ class AExponentialHeightFog;
 class ASkyAtmosphere;
 class UExponentialHeightFogComponent;
 class UGP_WorldCorruptionComponent;
+class UMaterialInstanceDynamic;
+class UMaterialInterface;
 class USkyAtmosphereComponent;
+class UStaticMeshComponent;
+
+USTRUCT()
+struct FGPCorruptionSkyboxMaterialBinding
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TObjectPtr<UStaticMeshComponent> MeshComponent;
+
+	UPROPERTY()
+	TObjectPtr<UMaterialInterface> OriginalMaterial;
+
+	UPROPERTY()
+	TObjectPtr<UMaterialInstanceDynamic> DynamicMaterial;
+
+	int32 MaterialIndex = INDEX_NONE;
+	FLinearColor BaseTint = FLinearColor::White;
+	float BaseBrightness = 1.0f;
+	bool bHasTintParameter = false;
+	bool bHasBrightnessParameter = false;
+};
 
 /** Client-side visual adapter for the replicated corruption state. Safe to auto-spawn from GP_GameMode. */
 UCLASS(Blueprintable)
@@ -35,6 +59,9 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Corruption|Presentation")
 	bool bAffectHeightFog = true;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Corruption|Presentation")
+	bool bAffectSkyboxMaterials = true;
+
 	// Multiplies the clean sky luminance at maximum corruption.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Corruption|Presentation", meta = (EditCondition = "bAffectSkyAtmosphere"))
 	FLinearColor CorruptedSkyColorMultiplier = FLinearColor(0.55f, 0.16f, 0.22f, 1.0f);
@@ -50,6 +77,19 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Corruption|Presentation", meta = (EditCondition = "bAffectHeightFog", ClampMin = "0.0"))
 	float CorruptedFogDensityMultiplier = 2.5f;
+
+	// MainMap's Sci-Fi skybox exposes these two parameters on its material instances.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Corruption|Presentation", meta = (EditCondition = "bAffectSkyboxMaterials"))
+	FName SkyboxTintParameterName = TEXT("Tint");
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Corruption|Presentation", meta = (EditCondition = "bAffectSkyboxMaterials"))
+	FName SkyboxBrightnessParameterName = TEXT("Brightness");
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Corruption|Presentation", meta = (EditCondition = "bAffectSkyboxMaterials"))
+	FLinearColor CorruptedSkyboxTintMultiplier = FLinearColor(0.7f, 0.12f, 0.18f, 1.0f);
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Corruption|Presentation", meta = (EditCondition = "bAffectSkyboxMaterials", ClampMin = "0.0"))
+	float CorruptedSkyboxBrightnessMultiplier = 0.65f;
 
 	// Allows a BP child to drive custom skybox material parameters without coupling them to the domain component.
 	UFUNCTION(BlueprintImplementableEvent, Category = "World Corruption|Presentation")
@@ -67,6 +107,8 @@ private:
 	float AppliedCorruptionNormalized = -1.0f;
 	bool bSkyBaselineCaptured = false;
 	bool bFogBaselineCaptured = false;
+	UPROPERTY(Transient)
+	TArray<FGPCorruptionSkyboxMaterialBinding> SkyboxMaterialBindings;
 
 	FLinearColor BaseSkyLuminanceFactor = FLinearColor::White;
 	FLinearColor BaseSkyAerialLuminanceFactor = FLinearColor::White;
@@ -85,6 +127,7 @@ private:
 	void BindToWorldCorruption();
 	void UnbindFromWorldCorruption();
 	void ResolveEnvironmentActors();
+	void ResolveSkyboxMaterials();
 	void CaptureSkyBaseline(USkyAtmosphereComponent* SkyComponent);
 	void CaptureFogBaseline(UExponentialHeightFogComponent* FogComponent);
 	void ApplyCorruptionPresentation(float NormalizedCorruption);
