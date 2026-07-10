@@ -45,7 +45,21 @@ void UGP_EnemyCorruptionComponent::SetCorruptionRegionId(int32 InRegionId)
 void UGP_EnemyCorruptionComponent::HandleOwnerDeath(bool bWasBoss)
 {
 	AActor* OwnerActor = GetOwner();
-	if (!bWasBoss || bBossReductionApplied || !IsValid(OwnerActor) || !OwnerActor->HasAuthority())
+	if (bOwnerDead || !IsValid(OwnerActor) || !OwnerActor->HasAuthority())
+	{
+		return;
+	}
+	bOwnerDead = true;
+
+	if (UAbilitySystemComponent* ASC = ResolveOwnerASC(); ASC && ActiveCorruptionEffectHandle.IsValid())
+	{
+		// A corpse no longer needs a live scaling effect or world-state subscription during its despawn delay.
+		ASC->RemoveActiveGameplayEffect(ActiveCorruptionEffectHandle);
+		ActiveCorruptionEffectHandle.Invalidate();
+	}
+	UnbindFromWorldCorruption();
+
+	if (!bWasBoss || bBossReductionApplied)
 	{
 		return;
 	}
@@ -109,6 +123,11 @@ void UGP_EnemyCorruptionComponent::UnbindFromWorldCorruption()
 
 void UGP_EnemyCorruptionComponent::RefreshCorruptionEffect()
 {
+	if (bOwnerDead)
+	{
+		return;
+	}
+
 	UAbilitySystemComponent* ASC = ResolveOwnerASC();
 	UGP_WorldCorruptionComponent* Corruption = ResolveWorldCorruption();
 	if (!IsValid(ASC) || !IsValid(Corruption))

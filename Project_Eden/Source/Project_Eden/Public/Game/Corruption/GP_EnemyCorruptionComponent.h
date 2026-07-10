@@ -52,6 +52,7 @@ protected:
 private:
 	int32 CorruptionRegionId = INDEX_NONE;
 	float AppliedCorruptionNormalized = 0.0f;
+	bool bOwnerDead = false;
 	bool bBossReductionApplied = false;
 	FActiveGameplayEffectHandle ActiveCorruptionEffectHandle;
 	TWeakObjectPtr<UGP_WorldCorruptionComponent> BoundWorldCorruption;

@@ -132,10 +132,22 @@ void UGP_WorldCorruptionComponent::AddWorldCorruption(float DeltaCorruption)
 	}
 
 	// A world-wide change advances every region equally; their average remains the global value.
+	bool bAnyRegionChanged = false;
 	for (int32 RegionId = 0; RegionId < RegionCorruptions.Num(); ++RegionId)
 	{
-		RegionCorruptions[RegionId] = ClampCorruption(RegionCorruptions[RegionId] + DeltaCorruption);
+		const float NewRegionCorruption = ClampCorruption(RegionCorruptions[RegionId] + DeltaCorruption);
+		if (FMath::IsNearlyEqual(RegionCorruptions[RegionId], NewRegionCorruption))
+		{
+			continue;
+		}
+
+		RegionCorruptions[RegionId] = NewRegionCorruption;
+		bAnyRegionChanged = true;
 		BroadcastRegionCorruption(RegionId);
+	}
+	if (!bAnyRegionChanged)
+	{
+		return;
 	}
 	LocalRegionCorruptionsShadow = RegionCorruptions;
 	RecalculateWorldCorruption();
