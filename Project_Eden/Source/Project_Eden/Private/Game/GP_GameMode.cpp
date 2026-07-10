@@ -267,7 +267,7 @@ void AGP_GameMode::SpawnMarkerEnemies(AGP_EnemySpawnVolume* Zone, AGP_EnemySpawn
 			}
 
 			SpawnedEnemy->SpawnDefaultController();
-			RegisterZoneEnemy(SpawnedEnemy);
+			RegisterZoneEnemy(SpawnedEnemy, Zone->GetCorruptionRegionId());
 		}
 	}
 }
@@ -344,12 +344,12 @@ void AGP_GameMode::SpawnZoneEnemies(AGP_EnemySpawnVolume* Zone)
 			}
 
 			SpawnedEnemy->SpawnDefaultController();
-			RegisterZoneEnemy(SpawnedEnemy);
+			RegisterZoneEnemy(SpawnedEnemy, Zone->GetCorruptionRegionId());
 		}
 	}
 }
 
-void AGP_GameMode::RegisterZoneEnemy(AGP_EnemyCharacter* Enemy)
+void AGP_GameMode::RegisterZoneEnemy(AGP_EnemyCharacter* Enemy, int32 CorruptionRegionId)
 {
 	if (bRunFinished || !IsValid(Enemy))
 	{
@@ -360,6 +360,9 @@ void AGP_GameMode::RegisterZoneEnemy(AGP_EnemyCharacter* Enemy)
 	{
 		return;
 	}
+
+	// The explicit event/zone id lets enemies retain their regional strength even after progression advances.
+	Enemy->SetCorruptionRegionId(CorruptionRegionId != INDEX_NONE ? CorruptionRegionId : CurrentZoneIndex);
 
 	Enemy->OnEnemyDied.AddDynamic(this, &AGP_GameMode::HandleZoneEnemyDied);
 	++AliveZoneEnemies;
@@ -385,7 +388,7 @@ void AGP_GameMode::HandleZoneEnemyDied(AGP_EnemyCharacter* DeadEnemy)
 void AGP_GameMode::HandleRegionEventEnemySpawned(AGP_RegionEventActor* EventActor, AGP_EnemyCharacter* Enemy)
 {
 	// Event-spawned enemies join the current zone budget so events cannot be ignored during a city clear.
-	RegisterZoneEnemy(Enemy);
+	RegisterZoneEnemy(Enemy, IsValid(EventActor) ? EventActor->GetRegionId() : INDEX_NONE);
 }
 
 void AGP_GameMode::CompleteCurrentZone()

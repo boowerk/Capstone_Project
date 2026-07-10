@@ -127,7 +127,7 @@ private:
 	void StartRegionEventForZone(AGP_EnemySpawnVolume* Zone, EGPRegionEventTrigger Trigger);
 	void SpawnZoneEnemies(AGP_EnemySpawnVolume* Zone);
 	void SpawnMarkerEnemies(AGP_EnemySpawnVolume* Zone, AGP_EnemySpawnMarker* Marker);
-	void RegisterZoneEnemy(AGP_EnemyCharacter* Enemy);
+	void RegisterZoneEnemy(AGP_EnemyCharacter* Enemy, int32 CorruptionRegionId = INDEX_NONE);
 	void MaybeCompleteZone();
 	void CompleteCurrentZone();
 	void AdvanceZone();

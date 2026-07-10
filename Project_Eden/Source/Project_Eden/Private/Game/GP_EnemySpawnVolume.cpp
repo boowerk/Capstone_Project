@@ -20,6 +20,17 @@ AGP_EnemySpawnVolume::AGP_EnemySpawnVolume()
 	SpawnBox->ShapeColor = FColor(80, 200, 120);
 }
 
+int32 AGP_EnemySpawnVolume::GetCorruptionRegionId() const
+{
+	if (CorruptionRegionId != INDEX_NONE)
+	{
+		return CorruptionRegionId;
+	}
+
+	// Existing maps need no migration when RegionsToRevive already identifies their gameplay region.
+	return RegionsToRevive.IsEmpty() ? ZoneOrder : RegionsToRevive[0];
+}
+
 void AGP_EnemySpawnVolume::BeginPlay()
 {
 	Super::BeginPlay();
