@@ -1,6 +1,7 @@
 #include "Game/GP_GameMode.h"
 
 #include "Characters/GP_EnemyCharacter.h"
+#include "Game/Corruption/GP_WorldCorruptionComponent.h"
 #include "Game/GP_EnemySpawnMarker.h"
 #include "Game/GP_EnemySpawnVolume.h"
 #include "Game/GP_GameState.h"
@@ -48,6 +49,18 @@ void AGP_GameMode::InitializeRegionStates()
 	if (AGP_GameState* GPGameState = GetGPGameState())
 	{
 		GPGameState->InitRegionStates(RegionCount, DeadRegionState);
+
+		if (UGP_WorldCorruptionComponent* Corruption = GPGameState->GetWorldCorruptionComponent())
+		{
+			// The authoritative timer lives with GameState so seamless clients receive one shared progression value.
+			Corruption->InitializeCorruption(
+				RegionCount,
+				bEnableWorldCorruption ? InitialCorruption : 0.0f,
+				MaximumCorruption,
+				PassiveCorruptionIncreasePerMinute,
+				CorruptionUpdateInterval,
+				bEnableWorldCorruption);
+		}
 	}
 }
 

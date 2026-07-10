@@ -71,6 +71,23 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Region")
 	uint8 AliveRegionState = 0;
 
+	// Corruption progression is initialized together with the existing region state array.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Corruption")
+	bool bEnableWorldCorruption = true;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Corruption", meta = (EditCondition = "bEnableWorldCorruption", ClampMin = "0.0"))
+	float InitialCorruption = 15.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Corruption", meta = (EditCondition = "bEnableWorldCorruption", ClampMin = "1.0"))
+	float MaximumCorruption = 100.0f;
+
+	// The default adds two corruption points per real-time minute to every region.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Corruption", meta = (EditCondition = "bEnableWorldCorruption", ClampMin = "0.0"))
+	float PassiveCorruptionIncreasePerMinute = 2.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Corruption", meta = (EditCondition = "bEnableWorldCorruption", ClampMin = "0.1", Units = "s"))
+	float CorruptionUpdateInterval = 5.0f;
+
 	// Optional regional event coordinator. Place one in the map for authored pools, or provide a class to auto-spawn.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Region Events")
 	TSubclassOf<AGP_RegionEventDirector> RegionEventDirectorClass;
