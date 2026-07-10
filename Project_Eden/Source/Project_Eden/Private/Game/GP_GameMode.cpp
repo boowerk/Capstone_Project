@@ -1,6 +1,7 @@
 #include "Game/GP_GameMode.h"
 
 #include "Characters/GP_EnemyCharacter.h"
+#include "Game/Corruption/GP_CorruptionPresentationActor.h"
 #include "Game/Corruption/GP_WorldCorruptionComponent.h"
 #include "Game/GP_EnemySpawnMarker.h"
 #include "Game/GP_EnemySpawnVolume.h"
@@ -14,6 +15,7 @@ AGP_GameMode::AGP_GameMode()
 {
 	GameStateClass = AGP_GameState::StaticClass();
 	RegionEventDirectorClass = AGP_RegionEventDirector::StaticClass();
+	CorruptionPresentationClass = AGP_CorruptionPresentationActor::StaticClass();
 
 	// Match the lobby's seamless transition so arriving clients are carried
 	// into this map instead of being dropped during the load.
@@ -26,6 +28,7 @@ void AGP_GameMode::BeginPlay()
 
 	GatherZones();
 	ResolveRegionEventDirector();
+	SpawnCorruptionPresentation();
 
 	// Let placed BP actors bind to GameState delegates in their BeginPlay before
 	// the initial all-dead reset is broadcast on the server/listen host.
@@ -61,6 +64,31 @@ void AGP_GameMode::InitializeRegionStates()
 				CorruptionUpdateInterval,
 				bEnableWorldCorruption);
 		}
+	}
+}
+
+void AGP_GameMode::SpawnCorruptionPresentation()
+{
+	if (!bAutoSpawnCorruptionPresentation || !bEnableWorldCorruption || !*CorruptionPresentationClass)
+	{
+		return;
+	}
+
+	// Preserve an authored presentation actor or a seamless-travel carry-over instead of spawning a duplicate.
+	if (UGameplayStatics::GetActorOfClass(this, AGP_CorruptionPresentationActor::StaticClass()))
+	{
+		return;
+	}
+
+	if (UWorld* World = GetWorld())
+	{
+		FActorSpawnParameters SpawnParameters;
+		SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		World->SpawnActor<AGP_CorruptionPresentationActor>(
+			CorruptionPresentationClass,
+			FVector::ZeroVector,
+			FRotator::ZeroRotator,
+			SpawnParameters);
 	}
 }
 
