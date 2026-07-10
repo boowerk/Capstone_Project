@@ -165,6 +165,16 @@ namespace GPTags
 		}
 	}
 
+	// Corruption SetByCaller values keep enemy scaling inside the existing GAS attribute pipeline.
+	namespace Corruption
+	{
+		namespace Data
+		{
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(DamageIncreaseRate);
+			UE_DECLARE_GAMEPLAY_TAG_EXTERN(ArmorBonus);
+		}
+	}
+
 	// [3] State : 캐릭터 상태, 버프, 디버프
 	namespace State
 	{
