@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-09T22:01:14+09:00
+updated: 2026-07-10T12:55:00+09:00
 status: active
 tags:
   - memoc
@@ -11,9 +11,11 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-07-09T22:24:00+09:00
+Last synced: 2026-07-10T12:55:00+09:00
 
 ## Current Status
+
+- World corruption is implemented (`3a2a06d4` through `d764a5c6`). `AGP_GameState` owns replicated per-region values and their world average; `AGP_GameMode` passively increases them. Enemies receive an explicit/fallback corruption region and use one replaceable infinite GAS effect for `DamageIncreaseRate` and `Armor`; boss death cleanses that region once. The minimap, SkyAtmosphere, ExponentialHeightFog, and current Sci-Fi skybox `Tint`/`Brightness` react client-side through an auto-spawned presentation actor. Tuning/PIE instructions are in `docs/WorldCorruptionSystem.md`. Editor build, both `ProjectEden.Game.Corruption.*` tests, and `ProjectEden.UI.Minimap.CaptureStability` pass.
 
 - Region Event examples now have both director-flow and direct PIE test assets under `/Game/RegionEvents/Examples` (`85f56480` through `a7c5c0e5`). Director-flow assets remain `BP_RE_Test_RedRift`, `BP_RE_Test_CrystalCorruption`, `BP_RE_Test_ShrineRuins`, `BP_RE_Test_StructureDefense`, four matching `DA_RE_Test_*` assets, and `BP_RE_Test_Director_AllExamples`. Direct one-off test assets are `BP_RE_TestTrigger_RedRift`, `BP_RE_TestTrigger_CrystalCorruption`, `BP_RE_TestTrigger_ShrineRuins`, and `BP_RE_TestTrigger_StructureDefense`; place one in any PIE map to auto-start that single event without GameMode zone selection. The generator commandlet is `-run=GP_CreateRegionEventExamples`. Build, `ProjectEden.Game.RegionEvents.ExampleAssets`, and `ProjectEden.Game.RegionEvents.Selection` pass. Enemy-spawning examples still need valid navmesh near the trigger.
 - Boss death/clear presentation is current (`080f7aef` through `047c9475`). `UGP_BossDeathPresentationComponent` is owned by `AGP_EnemyCharacter` and plays local-only presentation actors from the shared GAS death state, no-oping for regular enemies. Crystal Seraph explicitly uses crystal shatter/falling shards, Dark Armor Knight uses armor fragments plus the black lightning Niagara fallback, Matador uses a bull apparition plus arena debris, and Sans BP names/display names auto-map to sinking hands plus a closing crack. Build, `ProjectEden.Combat.Boss.DeathPresentation`, and `ProjectEden.Combat.EnemyDeath.Lifecycle` pass. Optional editor polish: tune per-BP component settings/Niagara overrides when final art arrives.
