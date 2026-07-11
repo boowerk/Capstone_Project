@@ -258,13 +258,14 @@ namespace GPLandscapeTestEnvironment
 			PlayerStartLocation.X,
 			PlayerStartLocation.Y - 650.0f,
 			TestFloorZ + 220.0f);
+		// Repair legacy instances before applying the actor transform in unattended regeneration.
+		Sign->SetInstructionText(FText::FromString(TEXT("CORRUPTION: 0 / 50 / 100\nREGION EVENTS: WALK INTO ONE STATION")));
 		Sign->SetActorLocationAndRotation(
 			SignLocation,
 			MakeStationRotation(SignLocation, PlayerStartLocation),
 			false,
 			nullptr,
 			ETeleportType::TeleportPhysics);
-		Sign->SetInstructionText(FText::FromString(TEXT("CORRUPTION: 0 / 50 / 100\nREGION EVENTS: WALK INTO ONE STATION")));
 		Sign->MarkPackageDirty();
 		return true;
 	}
