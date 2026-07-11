@@ -21,6 +21,7 @@ bool FGPCorruptionTestZoneContractTest::RunTest(const FString& Parameters)
 
 	TestNotNull(TEXT("Test station owns a walk-in overlap box"), TestZone->GetTriggerBox());
 	TestEqual(TEXT("Default test station starts from clean corruption"), TestZone->GetTestCorruption(), 0.0f);
+	TestTrue(TEXT("Test station replicates so only the server applies corruption"), TestZone->GetIsReplicated());
 	if (const UBoxComponent* TriggerBox = TestZone->GetTriggerBox())
 	{
 		TestTrue(TEXT("Test station detects pawn overlaps"), TriggerBox->GetGenerateOverlapEvents());
