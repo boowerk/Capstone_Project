@@ -173,6 +173,30 @@ namespace GPRegionEventExamples
 		return false;
 	}
 
+	bool SetTextProperty(UObject* Object, const FName PropertyName, const FText& Value)
+	{
+		if (FTextProperty* TextProperty = IsValid(Object) ? FindFProperty<FTextProperty>(Object->GetClass(), PropertyName) : nullptr)
+		{
+			TextProperty->SetPropertyValue_InContainer(Object, Value);
+			return true;
+		}
+
+		return false;
+	}
+
+	bool SetLinearColorProperty(UObject* Object, const FName PropertyName, const FLinearColor& Value)
+	{
+		FStructProperty* StructProperty = IsValid(Object) ? FindFProperty<FStructProperty>(Object->GetClass(), PropertyName) : nullptr;
+		if (StructProperty && StructProperty->Struct == TBaseStructure<FLinearColor>::Get())
+		{
+			// Keep protected Blueprint presentation settings editable while assigning deterministic generated defaults.
+			*StructProperty->ContainerPtrToValuePtr<FLinearColor>(Object) = Value;
+			return true;
+		}
+
+		return false;
+	}
+
 	bool SetEventPool(UObject* Object, const TArray<UGP_RegionEventData*>& EventDataAssets)
 	{
 		FArrayProperty* ArrayProperty = IsValid(Object) ? FindFProperty<FArrayProperty>(Object->GetClass(), TEXT("EventPool")) : nullptr;
@@ -422,14 +446,17 @@ bool UGP_RegionEventExampleSetupLibrary::CreateOrUpdateRegionEventExampleAssets(
 	{
 		UBlueprint* Blueprint = nullptr;
 		UGP_RegionEventData* Data = nullptr;
+		FString StationTitle;
+		FLinearColor StationColor = FLinearColor::White;
+		int32 RegionId = 0;
 	};
 
 	const FTriggerBlueprintConfig TriggerConfigs[] =
 	{
-		{ RedRiftTriggerBlueprint, RedRiftData },
-		{ CrystalTriggerBlueprint, CrystalData },
-		{ ShrineTriggerBlueprint, ShrineData },
-		{ DefenseTriggerBlueprint, DefenseData },
+		{ RedRiftTriggerBlueprint, RedRiftData, TEXT("RED RIFT WAVE"), FLinearColor(1.0f, 0.03f, 0.01f, 1.0f), 0 },
+		{ CrystalTriggerBlueprint, CrystalData, TEXT("CRYSTAL CORRUPTION"), FLinearColor(0.28f, 0.65f, 1.0f, 1.0f), 1 },
+		{ ShrineTriggerBlueprint, ShrineData, TEXT("SHRINE RUINS"), FLinearColor(1.0f, 0.63f, 0.08f, 1.0f), 2 },
+		{ DefenseTriggerBlueprint, DefenseData, TEXT("STRUCTURE DEFENSE"), FLinearColor(0.08f, 1.0f, 0.38f, 1.0f), 3 },
 	};
 
 	for (const FTriggerBlueprintConfig& TriggerConfig : TriggerConfigs)
@@ -447,7 +474,9 @@ bool UGP_RegionEventExampleSetupLibrary::CreateOrUpdateRegionEventExampleAssets(
 		SetBoolProperty(TriggerDefaults, TEXT("bTriggerOnPlayerOverlap"), false);
 		SetBoolProperty(TriggerDefaults, TEXT("bAutoActivateSpawnedEvent"), true);
 		SetFloatProperty(TriggerDefaults, TEXT("TriggerRadius"), 600.0f);
-		SetIntProperty(TriggerDefaults, TEXT("TestRegionId"), 0);
+		SetIntProperty(TriggerDefaults, TEXT("TestRegionId"), TriggerConfig.RegionId);
+		SetTextProperty(TriggerDefaults, TEXT("StationTitle"), FText::FromString(TriggerConfig.StationTitle));
+		SetLinearColorProperty(TriggerDefaults, TEXT("StationColor"), TriggerConfig.StationColor);
 		MarkBlueprintDefaultsChanged(TriggerConfig.Blueprint);
 	}
 
