@@ -18,7 +18,6 @@
 #include "LandscapeProxy.h"
 #include "NavigationSystem.h"
 #include "NavMesh/NavMeshBoundsVolume.h"
-#include "StaticMeshCompiler.h"
 
 namespace GPLandscapeTestEnvironment
 {
@@ -58,6 +57,27 @@ namespace GPLandscapeTestEnvironment
 			if (Height.IsSet() && (!HighestHeight.IsSet() || Height.GetValue() > HighestHeight.GetValue()))
 			{
 				HighestHeight = Height;
+			}
+		}
+
+		if (!HighestHeight.IsSet())
+		{
+			TArray<FHitResult> SurfaceHits;
+			FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(LandscapeTestGround), true);
+			const FVector TraceStart(XY.X, XY.Y, 100000.0f);
+			const FVector TraceEnd(XY.X, XY.Y, -100000.0f);
+			const FCollisionObjectQueryParams ObjectQuery(ECC_WorldStatic);
+			if (World->LineTraceMultiByObjectType(SurfaceHits, TraceStart, TraceEnd, ObjectQuery, QueryParams))
+			{
+				for (const FHitResult& Hit : SurfaceHits)
+				{
+					if (Hit.ImpactNormal.Z > 0.55f
+						&& (!HighestHeight.IsSet() || Hit.ImpactPoint.Z > HighestHeight.GetValue()))
+					{
+						// Roads and other walkable static surfaces are valid station floors when Landscape editor data is unavailable.
+						HighestHeight = Hit.ImpactPoint.Z;
+					}
+				}
 			}
 		}
 
@@ -361,7 +381,7 @@ namespace GPLandscapeTestEnvironment
 		}
 
 		NavigationSystem->OnNavigationBoundsUpdated(NavBounds);
-		FStaticMeshCompilingManager::Get().FinishAllCompilation();
+		// Building navigation does not require waiting for every unrelated project mesh and distance field to compile.
 		FNavigationSystem::Build(*World);
 
 		bool bAllLocationsReachNav = true;
