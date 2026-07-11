@@ -5,17 +5,19 @@
 #include "ActorFactories/ActorFactory.h"
 #include "AI/NavigationSystemBase.h"
 #include "Builders/CubeBuilder.h"
+#include "Components/CapsuleComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "Components/TextRenderComponent.h"
+#include "Engine/CollisionProfile.h"
 #include "Engine/Level.h"
+#include "Engine/StaticMesh.h"
+#include "Engine/StaticMeshActor.h"
 #include "Engine/TextRenderActor.h"
 #include "Engine/World.h"
-#include "EngineUtils.h"
 #include "FileHelpers.h"
 #include "Game/Corruption/GP_CorruptionTestZoneActor.h"
 #include "Game/RegionEvents/GP_RegionEventTestTriggerActor.h"
 #include "GameFramework/PlayerStart.h"
-#include "LandscapeHeightfieldCollisionComponent.h"
-#include "LandscapeProxy.h"
 #include "NavigationSystem.h"
 #include "NavMesh/NavMeshBoundsVolume.h"
 
@@ -42,114 +44,13 @@ namespace GPLandscapeTestEnvironment
 		int32 RegionId = 0;
 	};
 
-	TOptional<float> FindLandscapeHeight(UWorld* World, const FVector2D& XY)
+	struct FTestFloorConfig
 	{
-		TOptional<float> HighestHeight;
-		for (TActorIterator<ALandscapeProxy> It(World); It; ++It)
-		{
-			const FVector QueryLocation(XY.X, XY.Y, It->GetActorLocation().Z);
-			TOptional<float> Height = It->GetHeightAtLocation(QueryLocation, EHeightfieldSource::Editor);
-			if (!Height.IsSet())
-			{
-				Height = It->GetHeightAtLocation(QueryLocation, EHeightfieldSource::Complex);
-			}
-
-			if (Height.IsSet() && (!HighestHeight.IsSet() || Height.GetValue() > HighestHeight.GetValue()))
-			{
-				HighestHeight = Height;
-			}
-		}
-
-		if (!HighestHeight.IsSet())
-		{
-			TArray<FHitResult> SurfaceHits;
-			FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(LandscapeTestGround), true);
-			const FVector TraceStart(XY.X, XY.Y, 100000.0f);
-			const FVector TraceEnd(XY.X, XY.Y, -100000.0f);
-			const FCollisionObjectQueryParams ObjectQuery(ECC_WorldStatic);
-			if (World->LineTraceMultiByObjectType(SurfaceHits, TraceStart, TraceEnd, ObjectQuery, QueryParams))
-			{
-				for (const FHitResult& Hit : SurfaceHits)
-				{
-					if (Hit.ImpactNormal.Z > 0.55f
-						&& (!HighestHeight.IsSet() || Hit.ImpactPoint.Z > HighestHeight.GetValue()))
-					{
-						// Roads and other walkable static surfaces are valid station floors when Landscape editor data is unavailable.
-						HighestHeight = Hit.ImpactPoint.Z;
-					}
-				}
-			}
-		}
-
-		return HighestHeight;
-	}
-
-	FVector FindBestGroundLocation(UWorld* World, const FVector& DesiredLocation)
-	{
-		constexpr float SearchStep = 200.0f;
-		constexpr int32 SearchRadiusInSteps = 4;
-		constexpr float FootprintRadius = 260.0f;
-		float BestScore = TNumericLimits<float>::Max();
-		TOptional<FVector> BestLocation;
-
-		for (int32 XStep = -SearchRadiusInSteps; XStep <= SearchRadiusInSteps; ++XStep)
-		{
-			for (int32 YStep = -SearchRadiusInSteps; YStep <= SearchRadiusInSteps; ++YStep)
-			{
-				const FVector2D CandidateXY(
-					DesiredLocation.X + static_cast<float>(XStep) * SearchStep,
-					DesiredLocation.Y + static_cast<float>(YStep) * SearchStep);
-				const FVector2D SampleOffsets[] =
-				{
-					FVector2D::ZeroVector,
-					FVector2D(FootprintRadius, 0.0f),
-					FVector2D(-FootprintRadius, 0.0f),
-					FVector2D(0.0f, FootprintRadius),
-					FVector2D(0.0f, -FootprintRadius),
-				};
-
-				float MinimumHeight = TNumericLimits<float>::Max();
-				float MaximumHeight = TNumericLimits<float>::Lowest();
-				bool bAllSamplesValid = true;
-				for (const FVector2D& SampleOffset : SampleOffsets)
-				{
-					const TOptional<float> Height = FindLandscapeHeight(World, CandidateXY + SampleOffset);
-					if (!Height.IsSet())
-					{
-						bAllSamplesValid = false;
-						break;
-					}
-
-					MinimumHeight = FMath::Min(MinimumHeight, Height.GetValue());
-					MaximumHeight = FMath::Max(MaximumHeight, Height.GetValue());
-				}
-
-				if (!bAllSamplesValid)
-				{
-					continue;
-				}
-
-				// Prefer nearby, flat terrain so wide trigger platforms do not visibly clip into sculpted slopes.
-				const float DistanceScore = FVector2D::Distance(CandidateXY, FVector2D(DesiredLocation));
-				const float RoughnessScore = (MaximumHeight - MinimumHeight) * 20.0f;
-				const float CandidateScore = DistanceScore + RoughnessScore;
-				if (CandidateScore < BestScore)
-				{
-					BestScore = CandidateScore;
-					BestLocation = FVector(CandidateXY.X, CandidateXY.Y, (MinimumHeight + MaximumHeight) * 0.5f);
-				}
-			}
-		}
-
-		if (BestLocation.IsSet())
-		{
-			return BestLocation.GetValue();
-		}
-
-		UE_LOG(LogTemp, Warning, TEXT("[LandscapeTestEnvironment] No Landscape height near %s; using PlayerStart Z fallback."),
-			*DesiredLocation.ToCompactString());
-		return DesiredLocation;
-	}
+		FName IdentityTag;
+		FName StableName;
+		FVector2D Offset;
+		FVector2D Size;
+	};
 
 	FRotator MakeStationRotation(const FVector& StationLocation, const FVector& PlayerStartLocation)
 	{
@@ -213,13 +114,62 @@ namespace GPLandscapeTestEnvironment
 		return Result;
 	}
 
-	bool ConfigureCorruptionStations(UWorld* World, const FVector& PlayerStartLocation, TArray<FVector>& OutStationLocations)
+	bool ConfigureTestFloors(UWorld* World, const FVector& PlayerStartLocation, float TestFloorZ)
+	{
+		UStaticMesh* CubeMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
+		if (!CubeMesh)
+		{
+			UE_LOG(LogTemp, Error, TEXT("[LandscapeTestEnvironment] Missing /Engine/BasicShapes/Cube."));
+			return false;
+		}
+
+		const FTestFloorConfig Configs[] =
+		{
+			{ TEXT("GP.Test.Floor.Corruption"), TEXT("TEST_Floor_Corruption"), FVector2D(0.0f, -1500.0f), FVector2D(5200.0f, 1800.0f) },
+			{ TEXT("GP.Test.Floor.Connector"), TEXT("TEST_Floor_Connector"), FVector2D(0.0f, 450.0f), FVector2D(800.0f, 2100.0f) },
+			{ TEXT("GP.Test.Floor.Events"), TEXT("TEST_Floor_Events"), FVector2D(0.0f, 3500.0f), FVector2D(20000.0f, 4000.0f) },
+		};
+
+		constexpr float FloorThickness = 20.0f;
+		for (const FTestFloorConfig& Config : Configs)
+		{
+			AStaticMeshActor* Floor = Cast<AStaticMeshActor>(FindOrSpawnTaggedActor(
+				World,
+				AStaticMeshActor::StaticClass(),
+				Config.IdentityTag,
+				Config.StableName));
+			if (!Floor || !Floor->GetStaticMeshComponent())
+			{
+				return false;
+			}
+
+			UStaticMeshComponent* FloorComponent = Floor->GetStaticMeshComponent();
+			FloorComponent->SetStaticMesh(CubeMesh);
+			FloorComponent->SetMobility(EComponentMobility::Static);
+			FloorComponent->SetCollisionProfileName(UCollisionProfile::BlockAll_ProfileName);
+			FloorComponent->SetGenerateOverlapEvents(false);
+			FloorComponent->SetCanEverAffectNavigation(true);
+			Floor->SetActorLocation(PlayerStartLocation + FVector(Config.Offset.X, Config.Offset.Y, TestFloorZ - PlayerStartLocation.Z - FloorThickness * 0.5f));
+			Floor->SetActorRotation(FRotator::ZeroRotator);
+			Floor->SetActorScale3D(FVector(Config.Size.X / 100.0f, Config.Size.Y / 100.0f, FloorThickness / 100.0f));
+			FloorComponent->MarkRenderStateDirty();
+			Floor->MarkPackageDirty();
+		}
+
+		return true;
+	}
+
+	bool ConfigureCorruptionStations(
+		UWorld* World,
+		const FVector& PlayerStartLocation,
+		float TestFloorZ,
+		TArray<FVector>& OutStationLocations)
 	{
 		const FCorruptionStationConfig Configs[] =
 		{
-			{ TEXT("GP.Test.Corruption.Clean"), TEXT("TEST_Corruption_Clean"), FVector2D(-2000.0f, -1800.0f), 0.0f, FLinearColor(0.03f, 1.0f, 0.22f, 1.0f) },
-			{ TEXT("GP.Test.Corruption.Mid"), TEXT("TEST_Corruption_Mid"), FVector2D(0.0f, -1800.0f), 50.0f, FLinearColor(1.0f, 0.42f, 0.03f, 1.0f) },
-			{ TEXT("GP.Test.Corruption.High"), TEXT("TEST_Corruption_High"), FVector2D(2000.0f, -1800.0f), 100.0f, FLinearColor(0.78f, 0.03f, 1.0f, 1.0f) },
+			{ TEXT("GP.Test.Corruption.Clean"), TEXT("TEST_Corruption_Clean"), FVector2D(-2000.0f, -1500.0f), 0.0f, FLinearColor(0.03f, 1.0f, 0.22f, 1.0f) },
+			{ TEXT("GP.Test.Corruption.Mid"), TEXT("TEST_Corruption_Mid"), FVector2D(0.0f, -1500.0f), 50.0f, FLinearColor(1.0f, 0.42f, 0.03f, 1.0f) },
+			{ TEXT("GP.Test.Corruption.High"), TEXT("TEST_Corruption_High"), FVector2D(2000.0f, -1500.0f), 100.0f, FLinearColor(0.78f, 0.03f, 1.0f, 1.0f) },
 		};
 
 		for (const FCorruptionStationConfig& Config : Configs)
@@ -234,8 +184,10 @@ namespace GPLandscapeTestEnvironment
 				return false;
 			}
 
-			const FVector DesiredLocation = PlayerStartLocation + FVector(Config.Offset.X, Config.Offset.Y, 0.0f);
-			const FVector GroundLocation = FindBestGroundLocation(World, DesiredLocation);
+			const FVector GroundLocation(
+				PlayerStartLocation.X + Config.Offset.X,
+				PlayerStartLocation.Y + Config.Offset.Y,
+				TestFloorZ + 1.0f);
 			Station->SetActorLocationAndRotation(
 				GroundLocation,
 				MakeStationRotation(GroundLocation, PlayerStartLocation),
@@ -250,14 +202,18 @@ namespace GPLandscapeTestEnvironment
 		return true;
 	}
 
-	bool ConfigureEventStations(UWorld* World, const FVector& PlayerStartLocation, TArray<FVector>& OutStationLocations)
+	bool ConfigureEventStations(
+		UWorld* World,
+		const FVector& PlayerStartLocation,
+		float TestFloorZ,
+		TArray<FVector>& OutStationLocations)
 	{
 		const FEventStationConfig Configs[] =
 		{
-			{ TEXT("GP.Test.Event.RedRift"), TEXT("TEST_Event_RedRift"), FVector2D(-7500.0f, 3000.0f), TEXT("/Game/RegionEvents/Examples/BP_RE_TestTrigger_RedRift.BP_RE_TestTrigger_RedRift_C"), 0 },
-			{ TEXT("GP.Test.Event.Crystal"), TEXT("TEST_Event_CrystalCorruption"), FVector2D(-2500.0f, 3000.0f), TEXT("/Game/RegionEvents/Examples/BP_RE_TestTrigger_CrystalCorruption.BP_RE_TestTrigger_CrystalCorruption_C"), 1 },
-			{ TEXT("GP.Test.Event.Shrine"), TEXT("TEST_Event_ShrineRuins"), FVector2D(2500.0f, 3000.0f), TEXT("/Game/RegionEvents/Examples/BP_RE_TestTrigger_ShrineRuins.BP_RE_TestTrigger_ShrineRuins_C"), 2 },
-			{ TEXT("GP.Test.Event.Defense"), TEXT("TEST_Event_StructureDefense"), FVector2D(7500.0f, 3000.0f), TEXT("/Game/RegionEvents/Examples/BP_RE_TestTrigger_StructureDefense.BP_RE_TestTrigger_StructureDefense_C"), 3 },
+			{ TEXT("GP.Test.Event.RedRift"), TEXT("TEST_Event_RedRift"), FVector2D(-7500.0f, 3500.0f), TEXT("/Game/RegionEvents/Examples/BP_RE_TestTrigger_RedRift.BP_RE_TestTrigger_RedRift_C"), 0 },
+			{ TEXT("GP.Test.Event.Crystal"), TEXT("TEST_Event_CrystalCorruption"), FVector2D(-2500.0f, 3500.0f), TEXT("/Game/RegionEvents/Examples/BP_RE_TestTrigger_CrystalCorruption.BP_RE_TestTrigger_CrystalCorruption_C"), 1 },
+			{ TEXT("GP.Test.Event.Shrine"), TEXT("TEST_Event_ShrineRuins"), FVector2D(2500.0f, 3500.0f), TEXT("/Game/RegionEvents/Examples/BP_RE_TestTrigger_ShrineRuins.BP_RE_TestTrigger_ShrineRuins_C"), 2 },
+			{ TEXT("GP.Test.Event.Defense"), TEXT("TEST_Event_StructureDefense"), FVector2D(7500.0f, 3500.0f), TEXT("/Game/RegionEvents/Examples/BP_RE_TestTrigger_StructureDefense.BP_RE_TestTrigger_StructureDefense_C"), 3 },
 		};
 
 		for (const FEventStationConfig& Config : Configs)
@@ -279,8 +235,10 @@ namespace GPLandscapeTestEnvironment
 				return false;
 			}
 
-			const FVector DesiredLocation = PlayerStartLocation + FVector(Config.Offset.X, Config.Offset.Y, 0.0f);
-			const FVector GroundLocation = FindBestGroundLocation(World, DesiredLocation);
+			const FVector GroundLocation(
+				PlayerStartLocation.X + Config.Offset.X,
+				PlayerStartLocation.Y + Config.Offset.Y,
+				TestFloorZ + 1.0f);
 			Station->SetActorLocationAndRotation(
 				GroundLocation,
 				MakeStationRotation(GroundLocation, PlayerStartLocation),
@@ -295,7 +253,7 @@ namespace GPLandscapeTestEnvironment
 		return true;
 	}
 
-	bool ConfigureInstructionSign(UWorld* World, const FVector& PlayerStartLocation)
+	bool ConfigureInstructionSign(UWorld* World, const FVector& PlayerStartLocation, float TestFloorZ)
 	{
 		const FName IdentityTag(TEXT("GP.Test.Instructions"));
 		const FName StableName(TEXT("TEST_Instructions"));
@@ -309,8 +267,10 @@ namespace GPLandscapeTestEnvironment
 			return false;
 		}
 
-		FVector SignLocation = FindBestGroundLocation(World, PlayerStartLocation + FVector(0.0f, -700.0f, 0.0f));
-		SignLocation.Z += 220.0f;
+		const FVector SignLocation(
+			PlayerStartLocation.X,
+			PlayerStartLocation.Y - 650.0f,
+			TestFloorZ + 220.0f);
 		Sign->SetActorLocationAndRotation(
 			SignLocation,
 			MakeStationRotation(SignLocation, PlayerStartLocation),
@@ -440,11 +400,16 @@ bool UGP_LandscapeTestEnvironmentSetupLibrary::CreateOrUpdateLandscapeTestEnviro
 	World->Modify();
 	World->PersistentLevel->Modify();
 	const FVector PlayerStartLocation = PlayerStart->GetActorLocation();
+	const float PlayerCapsuleHalfHeight = PlayerStart->GetCapsuleComponent()
+		? PlayerStart->GetCapsuleComponent()->GetScaledCapsuleHalfHeight()
+		: 92.0f;
+	const float TestFloorZ = PlayerStartLocation.Z - PlayerCapsuleHalfHeight;
 	TArray<FVector> CorruptionLocations;
 	TArray<FVector> EventLocations;
-	if (!ConfigureCorruptionStations(World, PlayerStartLocation, CorruptionLocations)
-		|| !ConfigureEventStations(World, PlayerStartLocation, EventLocations)
-		|| !ConfigureInstructionSign(World, PlayerStartLocation))
+	if (!ConfigureTestFloors(World, PlayerStartLocation, TestFloorZ)
+		|| !ConfigureCorruptionStations(World, PlayerStartLocation, TestFloorZ, CorruptionLocations)
+		|| !ConfigureEventStations(World, PlayerStartLocation, TestFloorZ, EventLocations)
+		|| !ConfigureInstructionSign(World, PlayerStartLocation, TestFloorZ))
 	{
 		return false;
 	}

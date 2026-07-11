@@ -45,8 +45,6 @@ public class Project_Eden : ModuleRules
 			PrivateDependencyModuleNames.AddRange(new string[]
 			{
 				"UnrealEd",
-				// Landscape editor height sampling keeps generated test stations seated on sculpted terrain.
-				"Landscape",
 				"AssetTools",
 				"AnimationDataController",
 				"AnimGraph",
