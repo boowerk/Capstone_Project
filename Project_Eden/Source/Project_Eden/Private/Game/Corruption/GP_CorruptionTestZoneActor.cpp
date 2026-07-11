@@ -14,7 +14,8 @@
 AGP_CorruptionTestZoneActor::AGP_CorruptionTestZoneActor()
 {
 	PrimaryActorTick.bCanEverTick = false;
-	bReplicates = false;
+	// Placed test stations must retain server authority semantics in multiplayer PIE.
+	bReplicates = true;
 
 	SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("SceneRoot"));
 	SetRootComponent(SceneRoot);

@@ -14,7 +14,8 @@
 AGP_RegionEventTestTriggerActor::AGP_RegionEventTestTriggerActor()
 {
 	PrimaryActorTick.bCanEverTick = false;
-	bReplicates = false;
+	// Replication prevents each client-side level instance from locally spawning duplicate test events.
+	bReplicates = true;
 
 	SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("SceneRoot"));
 	SetRootComponent(SceneRoot);
