@@ -5,18 +5,16 @@
 #include "ActorFactories/ActorFactory.h"
 #include "AI/NavigationSystemBase.h"
 #include "Builders/CubeBuilder.h"
+#include "Components/BoxComponent.h"
 #include "Components/CapsuleComponent.h"
-#include "Components/StaticMeshComponent.h"
 #include "Components/TextRenderComponent.h"
-#include "Engine/CollisionProfile.h"
 #include "Engine/Level.h"
-#include "Engine/StaticMesh.h"
-#include "Engine/StaticMeshActor.h"
 #include "Engine/TextRenderActor.h"
 #include "Engine/World.h"
 #include "FileHelpers.h"
 #include "Game/Corruption/GP_CorruptionTestZoneActor.h"
 #include "Game/RegionEvents/GP_RegionEventTestTriggerActor.h"
+#include "Game/Testing/GP_LandscapeTestFloorActor.h"
 #include "GameFramework/PlayerStart.h"
 #include "NavigationSystem.h"
 #include "NavMesh/NavMeshBoundsVolume.h"
@@ -116,13 +114,6 @@ namespace GPLandscapeTestEnvironment
 
 	bool ConfigureTestFloors(UWorld* World, const FVector& PlayerStartLocation, float TestFloorZ)
 	{
-		UStaticMesh* CubeMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
-		if (!CubeMesh)
-		{
-			UE_LOG(LogTemp, Error, TEXT("[LandscapeTestEnvironment] Missing /Engine/BasicShapes/Cube."));
-			return false;
-		}
-
 		const FTestFloorConfig Configs[] =
 		{
 			{ TEXT("GP.Test.Floor.Corruption"), TEXT("TEST_Floor_Corruption"), FVector2D(0.0f, -1500.0f), FVector2D(5200.0f, 1800.0f) },
@@ -133,26 +124,20 @@ namespace GPLandscapeTestEnvironment
 		constexpr float FloorThickness = 20.0f;
 		for (const FTestFloorConfig& Config : Configs)
 		{
-			AStaticMeshActor* Floor = Cast<AStaticMeshActor>(FindOrSpawnTaggedActor(
+			AGP_LandscapeTestFloorActor* Floor = Cast<AGP_LandscapeTestFloorActor>(FindOrSpawnTaggedActor(
 				World,
-				AStaticMeshActor::StaticClass(),
+				AGP_LandscapeTestFloorActor::StaticClass(),
 				Config.IdentityTag,
 				Config.StableName));
-			if (!Floor || !Floor->GetStaticMeshComponent())
+			if (!Floor || !Floor->GetNavigationFloor())
 			{
 				return false;
 			}
 
-			UStaticMeshComponent* FloorComponent = Floor->GetStaticMeshComponent();
-			FloorComponent->SetStaticMesh(CubeMesh);
-			FloorComponent->SetMobility(EComponentMobility::Static);
-			FloorComponent->SetCollisionProfileName(UCollisionProfile::BlockAll_ProfileName);
-			FloorComponent->SetGenerateOverlapEvents(false);
-			FloorComponent->SetCanEverAffectNavigation(true);
 			Floor->SetActorLocation(PlayerStartLocation + FVector(Config.Offset.X, Config.Offset.Y, TestFloorZ - PlayerStartLocation.Z - FloorThickness * 0.5f));
 			Floor->SetActorRotation(FRotator::ZeroRotator);
-			Floor->SetActorScale3D(FVector(Config.Size.X / 100.0f, Config.Size.Y / 100.0f, FloorThickness / 100.0f));
-			FloorComponent->MarkRenderStateDirty();
+			Floor->SetActorScale3D(FVector::OneVector);
+			Floor->ConfigureFloor(Config.Size, FloorThickness);
 			Floor->MarkPackageDirty();
 		}
 
@@ -345,12 +330,12 @@ namespace GPLandscapeTestEnvironment
 		NavigationSystem->Tick(0.0f);
 		for (AActor* Actor : World->PersistentLevel->Actors)
 		{
-			AStaticMeshActor* TestFloor = Cast<AStaticMeshActor>(Actor);
+			AGP_LandscapeTestFloorActor* TestFloor = Cast<AGP_LandscapeTestFloorActor>(Actor);
 			if (IsValid(TestFloor)
 				&& TestFloor->Tags.Contains(EnvironmentTag)
-				&& TestFloor->GetStaticMeshComponent())
+				&& TestFloor->GetNavigationFloor())
 			{
-				UStaticMeshComponent* FloorComponent = TestFloor->GetStaticMeshComponent();
+				UBoxComponent* FloorComponent = TestFloor->GetNavigationFloor();
 				if (FNavigationSystem::HasComponentData(*FloorComponent))
 				{
 					FNavigationSystem::UpdateComponentData(*FloorComponent);
