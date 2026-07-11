@@ -9,6 +9,7 @@
 #include "Game/RegionEvents/GP_RegionEventData.h"
 #include "Game/RegionEvents/GP_RegionEventTestTriggerActor.h"
 #include "Game/Testing/GP_LandscapeTestFloorActor.h"
+#include "Game/Testing/GP_LandscapeTestInstructionActor.h"
 #include "GameFramework/PlayerStart.h"
 #include "NavMesh/NavMeshBoundsVolume.h"
 #include "UObject/Package.h"
@@ -34,7 +35,9 @@ bool FGPLandscapeTestEnvironmentMapContractTest::RunTest(const FString& Paramete
 	}
 
 	int32 PlayerStartCount = 0;
+	float PlayerStartHeight = TNumericLimits<float>::Lowest();
 	int32 ManagedActorCount = 0;
+	int32 ManagedPresentationActorsOnRaisedDeck = 0;
 	int32 CorruptionStationCount = 0;
 	int32 EventStationCount = 0;
 	int32 TestFloorCount = 0;
@@ -54,6 +57,7 @@ bool FGPLandscapeTestEnvironmentMapContractTest::RunTest(const FString& Paramete
 		if (Actor->IsA<APlayerStart>())
 		{
 			++PlayerStartCount;
+			PlayerStartHeight = Actor->GetActorLocation().Z;
 		}
 
 		if (!Actor->Tags.Contains(EnvironmentTag))
@@ -62,6 +66,13 @@ bool FGPLandscapeTestEnvironmentMapContractTest::RunTest(const FString& Paramete
 		}
 
 		++ManagedActorCount;
+		// The isolated deck must stay above the generated landscape and its floating road meshes.
+		if (!Actor->IsA<ANavMeshBoundsVolume>()
+			&& Actor->GetActorLocation().Z >= 4900.0f
+			&& Actor->GetActorLocation().Z <= 5500.0f)
+		{
+			++ManagedPresentationActorsOnRaisedDeck;
+		}
 		if (AGP_CorruptionTestZoneActor* Station = Cast<AGP_CorruptionTestZoneActor>(Actor))
 		{
 			++CorruptionStationCount;
@@ -70,6 +81,7 @@ bool FGPLandscapeTestEnvironmentMapContractTest::RunTest(const FString& Paramete
 			TestFalse(TEXT("Corruption station does not auto-apply on BeginPlay"), Station->IsApplyOnBeginPlayEnabled());
 			TestTrue(TEXT("Corruption station applies on player overlap"), Station->IsApplyOnPlayerOverlapEnabled());
 			TestTrue(TEXT("Corruption station pauses passive increase"), Station->ShouldPausePassiveIncrease());
+			TestTrue(TEXT("Corruption station replicates for multiplayer PIE"), Station->GetIsReplicated());
 		}
 		else if (AGP_RegionEventTestTriggerActor* Trigger = Cast<AGP_RegionEventTestTriggerActor>(Actor))
 		{
@@ -83,6 +95,7 @@ bool FGPLandscapeTestEnvironmentMapContractTest::RunTest(const FString& Paramete
 			TestFalse(TEXT("Event station does not auto-trigger on BeginPlay"), Trigger->IsTriggerOnBeginPlay());
 			TestTrue(TEXT("Event station triggers on player overlap"), Trigger->IsTriggerOnPlayerOverlap());
 			TestFalse(TEXT("Event station has a visible title"), Trigger->GetStationTitle().IsEmpty());
+			TestTrue(TEXT("Event station replicates for multiplayer PIE"), Trigger->GetIsReplicated());
 		}
 		else if (AGP_LandscapeTestFloorActor* Floor = Cast<AGP_LandscapeTestFloorActor>(Actor))
 		{
@@ -97,14 +110,16 @@ bool FGPLandscapeTestEnvironmentMapContractTest::RunTest(const FString& Paramete
 		{
 			++NavigationBoundsCount;
 		}
-		else if (Actor->Tags.Contains(TEXT("GP.Test.Instructions")))
+		else if (Actor->IsA<AGP_LandscapeTestInstructionActor>())
 		{
 			++InstructionSignCount;
 		}
 	}
 
 	TestEqual(TEXT("Existing PlayerStart remains unique"), PlayerStartCount, 1);
+	TestTrue(TEXT("PlayerStart is placed on the raised test deck"), PlayerStartHeight >= 5000.0f);
 	TestEqual(TEXT("Managed test actor count is idempotent"), ManagedActorCount, 12);
+	TestEqual(TEXT("All playable test actors remain on the raised test deck"), ManagedPresentationActorsOnRaisedDeck, 11);
 	TestEqual(TEXT("Three corruption stations are placed"), CorruptionStationCount, 3);
 	TestTrue(TEXT("Corruption values include 0"), CorruptionValues.Contains(0));
 	TestTrue(TEXT("Corruption values include 50"), CorruptionValues.Contains(50));
