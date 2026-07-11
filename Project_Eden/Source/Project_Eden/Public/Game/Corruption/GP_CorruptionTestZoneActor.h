@@ -36,6 +36,21 @@ public:
 	UFUNCTION(BlueprintPure, Category = "World Corruption|Test")
 	UBoxComponent* GetTriggerBox() const { return TriggerBox; }
 
+	UFUNCTION(BlueprintPure, Category = "World Corruption|Test")
+	EGPCorruptionTestScope GetTestScope() const { return TestScope; }
+
+	UFUNCTION(BlueprintPure, Category = "World Corruption|Test")
+	bool IsApplyOnBeginPlayEnabled() const { return bApplyOnBeginPlay; }
+
+	UFUNCTION(BlueprintPure, Category = "World Corruption|Test")
+	bool IsApplyOnPlayerOverlapEnabled() const { return bApplyOnPlayerOverlap; }
+
+	UFUNCTION(BlueprintPure, Category = "World Corruption|Test")
+	bool ShouldPausePassiveIncrease() const { return bPausePassiveIncreaseWhenApplied; }
+
+	/** Configures the deterministic world-level station used by the landscape smoke-test map. */
+	void ConfigureWorldTestStation(float InCorruption, const FLinearColor& InStationColor);
+
 protected:
 	virtual void BeginPlay() override;
 

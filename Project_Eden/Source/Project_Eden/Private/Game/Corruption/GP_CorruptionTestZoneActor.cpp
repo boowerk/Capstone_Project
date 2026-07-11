@@ -80,6 +80,17 @@ void AGP_CorruptionTestZoneActor::BeginPlay()
 	}
 }
 
+void AGP_CorruptionTestZoneActor::ConfigureWorldTestStation(float InCorruption, const FLinearColor& InStationColor)
+{
+	TestScope = EGPCorruptionTestScope::World;
+	TestCorruption = FMath::Clamp(InCorruption, 0.0f, 100.0f);
+	bApplyOnBeginPlay = false;
+	bApplyOnPlayerOverlap = true;
+	bPausePassiveIncreaseWhenApplied = true;
+	StationColor = InStationColor;
+	RefreshStationPresentation();
+}
+
 bool AGP_CorruptionTestZoneActor::ApplyTestCorruption()
 {
 	if (!HasAuthority())

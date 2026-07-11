@@ -50,6 +50,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Region Event|Test")
 	FText GetStationTitle() const { return StationTitle; }
 
+	/** Converts a generated one-off trigger BP into a walk-in station for the shared landscape test map. */
+	void ConfigureAsOverlapTestStation(int32 InRegionId);
+
 protected:
 	virtual void BeginPlay() override;
 

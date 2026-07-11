@@ -91,6 +91,16 @@ void AGP_RegionEventTestTriggerActor::BeginPlay()
 	}
 }
 
+void AGP_RegionEventTestTriggerActor::ConfigureAsOverlapTestStation(int32 InRegionId)
+{
+	TestRegionId = FMath::Max(0, InRegionId);
+	bTriggerOnBeginPlay = false;
+	bTriggerOnPlayerOverlap = true;
+	bAutoActivateSpawnedEvent = true;
+	bShowStationVisuals = true;
+	RefreshStationPresentation();
+}
+
 AGP_RegionEventActor* AGP_RegionEventTestTriggerActor::TriggerRegionEvent()
 {
 	if (!HasAuthority())
