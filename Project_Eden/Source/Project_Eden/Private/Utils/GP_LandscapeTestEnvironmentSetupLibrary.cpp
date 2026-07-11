@@ -9,12 +9,12 @@
 #include "Components/CapsuleComponent.h"
 #include "Components/TextRenderComponent.h"
 #include "Engine/Level.h"
-#include "Engine/TextRenderActor.h"
 #include "Engine/World.h"
 #include "FileHelpers.h"
 #include "Game/Corruption/GP_CorruptionTestZoneActor.h"
 #include "Game/RegionEvents/GP_RegionEventTestTriggerActor.h"
 #include "Game/Testing/GP_LandscapeTestFloorActor.h"
+#include "Game/Testing/GP_LandscapeTestInstructionActor.h"
 #include "GameFramework/PlayerStart.h"
 #include "NavigationSystem.h"
 #include "NavigationPath.h"
@@ -244,12 +244,12 @@ namespace GPLandscapeTestEnvironment
 	{
 		const FName IdentityTag(TEXT("GP.Test.Instructions"));
 		const FName StableName(TEXT("TEST_Instructions"));
-		ATextRenderActor* Sign = Cast<ATextRenderActor>(FindOrSpawnTaggedActor(
+		AGP_LandscapeTestInstructionActor* Sign = Cast<AGP_LandscapeTestInstructionActor>(FindOrSpawnTaggedActor(
 			World,
-			ATextRenderActor::StaticClass(),
+			AGP_LandscapeTestInstructionActor::StaticClass(),
 			IdentityTag,
 			StableName));
-		if (!Sign || !Sign->GetTextRender())
+		if (!Sign)
 		{
 			return false;
 		}
@@ -264,10 +264,7 @@ namespace GPLandscapeTestEnvironment
 			false,
 			nullptr,
 			ETeleportType::TeleportPhysics);
-		Sign->GetTextRender()->SetText(FText::FromString(TEXT("CORRUPTION: 0 / 50 / 100\nREGION EVENTS: WALK INTO ONE STATION")));
-		Sign->GetTextRender()->SetHorizontalAlignment(EHorizTextAligment::EHTA_Center);
-		Sign->GetTextRender()->SetWorldSize(55.0f);
-		Sign->GetTextRender()->SetTextRenderColor(FColor::White);
+		Sign->SetInstructionText(FText::FromString(TEXT("CORRUPTION: 0 / 50 / 100\nREGION EVENTS: WALK INTO ONE STATION")));
 		Sign->MarkPackageDirty();
 		return true;
 	}
@@ -459,11 +456,25 @@ bool UGP_LandscapeTestEnvironmentSetupLibrary::CreateOrUpdateLandscapeTestEnviro
 	const float TestFloorZ = TestDeckElevation;
 	TArray<FVector> CorruptionLocations;
 	TArray<FVector> EventLocations;
-	if (!ConfigureTestFloors(World, PlayerStartLocation, TestFloorZ)
-		|| !ConfigureCorruptionStations(World, PlayerStartLocation, TestFloorZ, CorruptionLocations)
-		|| !ConfigureEventStations(World, PlayerStartLocation, TestFloorZ, EventLocations)
-		|| !ConfigureInstructionSign(World, PlayerStartLocation, TestFloorZ))
+	// Report the exact failed stage so unattended map generation never exits without an actionable reason.
+	if (!ConfigureTestFloors(World, PlayerStartLocation, TestFloorZ))
 	{
+		UE_LOG(LogTemp, Error, TEXT("[LandscapeTestEnvironment] Failed while configuring navigation floors."));
+		return false;
+	}
+	if (!ConfigureCorruptionStations(World, PlayerStartLocation, TestFloorZ, CorruptionLocations))
+	{
+		UE_LOG(LogTemp, Error, TEXT("[LandscapeTestEnvironment] Failed while configuring corruption stations."));
+		return false;
+	}
+	if (!ConfigureEventStations(World, PlayerStartLocation, TestFloorZ, EventLocations))
+	{
+		UE_LOG(LogTemp, Error, TEXT("[LandscapeTestEnvironment] Failed while configuring Region Event stations."));
+		return false;
+	}
+	if (!ConfigureInstructionSign(World, PlayerStartLocation, TestFloorZ))
+	{
+		UE_LOG(LogTemp, Error, TEXT("[LandscapeTestEnvironment] Failed while configuring the instruction sign."));
 		return false;
 	}
 
