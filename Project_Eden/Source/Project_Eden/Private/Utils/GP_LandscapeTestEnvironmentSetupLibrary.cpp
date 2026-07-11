@@ -17,11 +17,13 @@
 #include "Game/Testing/GP_LandscapeTestFloorActor.h"
 #include "GameFramework/PlayerStart.h"
 #include "NavigationSystem.h"
+#include "NavigationPath.h"
 #include "NavMesh/NavMeshBoundsVolume.h"
 
 namespace GPLandscapeTestEnvironment
 {
 	constexpr TCHAR LandscapeMapPath[] = TEXT("/Game/Maps/MainMap/L_LandscapeMap");
+	constexpr float TestDeckElevation = 5000.0f;
 	const FName EnvironmentTag(TEXT("GP.TestEnvironment"));
 
 	struct FCorruptionStationConfig
@@ -315,7 +317,11 @@ namespace GPLandscapeTestEnvironment
 		return NavBounds;
 	}
 
-	bool BuildAndValidateNavigation(UWorld* World, ANavMeshBoundsVolume* NavBounds, TArray<FVector>& EventLocations)
+	bool BuildAndValidateNavigation(
+		UWorld* World,
+		ANavMeshBoundsVolume* NavBounds,
+		const FVector& PlayerStartLocation,
+		TArray<FVector>& EventLocations)
 	{
 		FNavigationSystem::AddNavigationSystemToWorld(*World, FNavigationSystemRunMode::EditorMode);
 		UNavigationSystemV1* NavigationSystem = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
@@ -363,6 +369,17 @@ namespace GPLandscapeTestEnvironment
 		// Building navigation does not require waiting for every unrelated project mesh and distance field to compile.
 		FNavigationSystem::Build(*World);
 
+		FNavLocation ProjectedPlayerStart;
+		if (!NavigationSystem->ProjectPointToNavigation(
+			PlayerStartLocation,
+			ProjectedPlayerStart,
+			FVector(800.0f, 800.0f, 1800.0f)))
+		{
+			UE_LOG(LogTemp, Error, TEXT("[LandscapeTestEnvironment] No walkable navigation below PlayerStart %s."),
+				*PlayerStartLocation.ToCompactString());
+			return false;
+		}
+
 		bool bAllLocationsReachNav = true;
 		for (FVector& EventLocation : EventLocations)
 		{
@@ -373,6 +390,16 @@ namespace GPLandscapeTestEnvironment
 				FVector(800.0f, 800.0f, 1800.0f)))
 			{
 				EventLocation = ProjectedLocation.Location;
+				const UNavigationPath* Path = UNavigationSystemV1::FindPathToLocationSynchronously(
+					World,
+					ProjectedPlayerStart.Location,
+					ProjectedLocation.Location);
+				if (!IsValid(Path) || !Path->IsValid() || Path->IsPartial())
+				{
+					bAllLocationsReachNav = false;
+					UE_LOG(LogTemp, Error, TEXT("[LandscapeTestEnvironment] PlayerStart has no complete path to event station %s."),
+						*EventLocation.ToCompactString());
+				}
 			}
 			else
 			{
@@ -418,11 +445,18 @@ bool UGP_LandscapeTestEnvironmentSetupLibrary::CreateOrUpdateLandscapeTestEnviro
 
 	World->Modify();
 	World->PersistentLevel->Modify();
-	const FVector PlayerStartLocation = PlayerStart->GetActorLocation();
 	const float PlayerCapsuleHalfHeight = PlayerStart->GetCapsuleComponent()
 		? PlayerStart->GetCapsuleComponent()->GetScaledCapsuleHalfHeight()
 		: 92.0f;
-	const float TestFloorZ = PlayerStartLocation.Z - PlayerCapsuleHalfHeight;
+	const FVector OriginalPlayerStartLocation = PlayerStart->GetActorLocation();
+	const FVector PlayerStartLocation(
+		OriginalPlayerStartLocation.X,
+		OriginalPlayerStartLocation.Y,
+		TestDeckElevation + PlayerCapsuleHalfHeight);
+	PlayerStart->Modify();
+	PlayerStart->SetActorLocation(PlayerStartLocation);
+	PlayerStart->MarkPackageDirty();
+	const float TestFloorZ = TestDeckElevation;
 	TArray<FVector> CorruptionLocations;
 	TArray<FVector> EventLocations;
 	if (!ConfigureTestFloors(World, PlayerStartLocation, TestFloorZ)
@@ -436,7 +470,7 @@ bool UGP_LandscapeTestEnvironmentSetupLibrary::CreateOrUpdateLandscapeTestEnviro
 	TArray<FVector> AllTestLocations = CorruptionLocations;
 	AllTestLocations.Append(EventLocations);
 	ANavMeshBoundsVolume* NavBounds = ConfigureNavigationBounds(World, PlayerStartLocation, AllTestLocations);
-	if (!NavBounds || !BuildAndValidateNavigation(World, NavBounds, EventLocations))
+	if (!NavBounds || !BuildAndValidateNavigation(World, NavBounds, PlayerStartLocation, EventLocations))
 	{
 		return false;
 	}
