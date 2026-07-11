@@ -73,12 +73,16 @@ void AGP_ShrineRuinsRegionEventActor::TryRewardPlayer(AGP_PlayerCharacter* Playe
 		return;
 	}
 
-	RewardedPlayers.Add(PlayerCharacter);
-	if (AGP_PlayerController* PlayerController = Cast<AGP_PlayerController>(PlayerCharacter->GetController()))
+	AGP_PlayerController* PlayerController = Cast<AGP_PlayerController>(PlayerCharacter->GetController());
+	if (!IsValid(PlayerController))
 	{
-		// The controller opens the actual widget locally so multiplayer clients receive their own choices.
-		PlayerController->ClientOpenRegionEventAugmentSelect();
+		// Do not consume the one-shot shrine claim unless a controller can actually receive the reward UI.
+		return;
 	}
+
+	RewardedPlayers.Add(PlayerCharacter);
+	// The controller opens the actual widget locally so multiplayer clients receive their own choices.
+	PlayerController->ClientOpenRegionEventAugmentSelect();
 
 	if (bCompleteAfterFirstClaim)
 	{
