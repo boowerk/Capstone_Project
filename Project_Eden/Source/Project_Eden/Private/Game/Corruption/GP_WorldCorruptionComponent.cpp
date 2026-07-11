@@ -74,19 +74,10 @@ void UGP_WorldCorruptionComponent::InitializeCorruption(
 		BroadcastRegionCorruption(RegionId);
 	}
 
+	bPassiveIncreaseConfigured = bEnablePassiveIncrease && PassiveIncreasePerMinute > KINDA_SMALL_NUMBER;
+	bPassiveIncreasePaused = false;
 	StopPassiveIncrease();
-	if (bEnablePassiveIncrease && PassiveIncreasePerMinute > KINDA_SMALL_NUMBER)
-	{
-		if (UWorld* World = GetWorld())
-		{
-			World->GetTimerManager().SetTimer(
-				PassiveIncreaseTimerHandle,
-				this,
-				&ThisClass::HandlePassiveIncreaseTick,
-				PassiveTickInterval,
-				true);
-		}
-	}
+	StartPassiveIncrease();
 
 	if (AActor* OwnerActor = GetOwner())
 	{
@@ -185,6 +176,24 @@ void UGP_WorldCorruptionComponent::ReduceRegionCorruption(int32 RegionId, float 
 	AddRegionCorruption(RegionId, -FMath::Abs(ReductionAmount));
 }
 
+void UGP_WorldCorruptionComponent::SetPassiveIncreasePaused(bool bPaused)
+{
+	if (!HasServerAuthority() || bPassiveIncreasePaused == bPaused)
+	{
+		return;
+	}
+
+	bPassiveIncreasePaused = bPaused;
+	if (bPassiveIncreasePaused)
+	{
+		StopPassiveIncrease();
+	}
+	else
+	{
+		StartPassiveIncrease();
+	}
+}
+
 void UGP_WorldCorruptionComponent::OnRep_WorldCorruption()
 {
 	BroadcastWorldCorruption();
@@ -264,6 +273,24 @@ void UGP_WorldCorruptionComponent::BroadcastRegionCorruption(int32 RegionId)
 		RegionId,
 		GetRegionCorruption(RegionId),
 		GetRegionCorruptionNormalized(RegionId));
+}
+
+void UGP_WorldCorruptionComponent::StartPassiveIncrease()
+{
+	if (!bPassiveIncreaseConfigured || bPassiveIncreasePaused)
+	{
+		return;
+	}
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().SetTimer(
+			PassiveIncreaseTimerHandle,
+			this,
+			&ThisClass::HandlePassiveIncreaseTick,
+			PassiveTickInterval,
+			true);
+	}
 }
 
 void UGP_WorldCorruptionComponent::StopPassiveIncrease()

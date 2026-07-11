@@ -73,6 +73,13 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "World Corruption")
 	void ReduceRegionCorruption(int32 RegionId, float ReductionAmount);
 
+	// Test maps and scripted sequences can freeze passive growth without reinitializing replicated values.
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "World Corruption")
+	void SetPassiveIncreasePaused(bool bPaused);
+
+	UFUNCTION(BlueprintPure, Category = "World Corruption")
+	bool IsPassiveIncreasePaused() const { return bPassiveIncreasePaused; }
+
 	UPROPERTY(BlueprintAssignable, Category = "World Corruption")
 	FGPOnWorldCorruptionChanged OnWorldCorruptionChanged;
 
@@ -93,6 +100,8 @@ private:
 	TArray<float> LocalRegionCorruptionsShadow;
 	float PassiveIncreasePerMinute = 0.0f;
 	float PassiveTickInterval = 5.0f;
+	bool bPassiveIncreaseConfigured = false;
+	bool bPassiveIncreasePaused = false;
 	FTimerHandle PassiveIncreaseTimerHandle;
 
 	UFUNCTION()
@@ -108,6 +117,7 @@ private:
 	void RecalculateWorldCorruption();
 	void BroadcastWorldCorruption();
 	void BroadcastRegionCorruption(int32 RegionId);
+	void StartPassiveIncrease();
 	void StopPassiveIncrease();
 	bool HasServerAuthority() const;
 	float ClampCorruption(float Value) const;
