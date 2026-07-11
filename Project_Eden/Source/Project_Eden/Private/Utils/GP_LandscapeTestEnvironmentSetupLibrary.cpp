@@ -350,7 +350,22 @@ namespace GPLandscapeTestEnvironment
 				&& TestFloor->Tags.Contains(EnvironmentTag)
 				&& TestFloor->GetStaticMeshComponent())
 			{
-				FNavigationSystem::UpdateComponentData(*TestFloor->GetStaticMeshComponent());
+				UStaticMeshComponent* FloorComponent = TestFloor->GetStaticMeshComponent();
+				if (FNavigationSystem::HasComponentData(*FloorComponent))
+				{
+					FNavigationSystem::UpdateComponentData(*FloorComponent);
+				}
+				else
+				{
+					// Components spawned before the commandlet creates its nav system need an explicit first registration.
+					FNavigationSystem::RegisterComponent(*FloorComponent);
+				}
+
+				UE_LOG(LogTemp, Display, TEXT("[LandscapeTestEnvironment] Floor=%s Registered=%d NavRelevant=%d Bounds=%s"),
+					*TestFloor->GetActorLabel(),
+					FloorComponent->IsRegistered() ? 1 : 0,
+					FloorComponent->IsNavigationRelevant() ? 1 : 0,
+					*FloorComponent->Bounds.GetBox().ToString());
 			}
 		}
 		NavigationSystem->Tick(0.0f);
