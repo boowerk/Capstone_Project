@@ -2,19 +2,19 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-07-10T12:55:00+09:00
+updated: 2026-07-12T04:06:00+09:00
 status: active
 tags: [memoc, memoc/state]
 ---
 # Session Summary
 
 ## Status
-- World corruption complete: replicated regional/global state, passive growth, GAS enemy buffs, boss cleanse, minimap/sky/fog/Sci-Fi skybox response.
-- Native presentation auto-spawns. Tune GameMode `Run|Corruption`, SpawnVolume `CorruptionRegionId`, enemy `EnemyCorruptionComponent`.
-- Guide: `docs/WorldCorruptionSystem.md`.
+- `L_LandscapeMap` has a Z=5000 test deck: corruption 0/50/100 pads, four Region Event stations, connected nav floors, instructions, and PlayerStart.
+- Generator is idempotent and validates complete paths; commandlet-safe sign preserves repeat saves.
+- Guide: `docs/LandscapeCorruptionEventTestEnvironment.md`.
 
 ## Verified
-- Editor build and `ProjectEden.Game.Corruption.*`, `ProjectEden.UI.Minimap.CaptureStability` pass.
+- Editor build; generator twice; LandscapeTestEnvironment (1), RegionEvents (2), Corruption (3) tests; PIE visual pass.
 
 ## Handoff
-- PIE-check 0/100 visuals. Preserve modified MainMap DataAsset/map.
+- Preserve user-modified `DA_RegionEventData.uasset` and `L_MainMap.umap`.

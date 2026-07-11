@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-10T12:55:00+09:00
+updated: 2026-07-12T04:06:00+09:00
 status: active
 tags:
   - memoc
@@ -11,9 +11,11 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-07-10T12:55:00+09:00
+Last synced: 2026-07-12T04:06:00+09:00
 
 ## Current Status
+
+- `/Game/Maps/MainMap/L_LandscapeMap` now has an isolated Z=5000 smoke-test deck for world corruption and all four Region Event examples. It contains 3 walk-in corruption stations (0/50/100), 4 labeled overlap-triggered event stations, connected native navigation floors, a unique PlayerStart, instructions, and generated NavMesh with complete path validation. The idempotent `GP_CreateLandscapeTestEnvironment` commandlet uses a commandlet-safe native instruction sign, and map contracts cover actor count, raised placement, configuration, and replication. Build plus `ProjectEden.Game.LandscapeTestEnvironment`, `ProjectEden.Game.RegionEvents`, and `ProjectEden.Game.Corruption` pass; PIE was visually verified. Guide: `docs/LandscapeCorruptionEventTestEnvironment.md`.
 
 - World corruption is implemented (`3a2a06d4` through `d764a5c6`). `AGP_GameState` owns replicated per-region values and their world average; `AGP_GameMode` passively increases them. Enemies receive an explicit/fallback corruption region and use one replaceable infinite GAS effect for `DamageIncreaseRate` and `Armor`; boss death cleanses that region once. The minimap, SkyAtmosphere, ExponentialHeightFog, and current Sci-Fi skybox `Tint`/`Brightness` react client-side through an auto-spawned presentation actor. Tuning/PIE instructions are in `docs/WorldCorruptionSystem.md`. Editor build, both `ProjectEden.Game.Corruption.*` tests, and `ProjectEden.UI.Minimap.CaptureStability` pass.
 
