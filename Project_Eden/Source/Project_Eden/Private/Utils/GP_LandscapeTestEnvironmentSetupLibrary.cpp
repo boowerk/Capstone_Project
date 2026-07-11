@@ -341,6 +341,25 @@ namespace GPLandscapeTestEnvironment
 		}
 
 		NavigationSystem->OnNavigationBoundsUpdated(NavBounds);
+		// Bounds/component updates are queued; commandlets have no editor frame tick to flush them automatically.
+		NavigationSystem->Tick(0.0f);
+		for (AActor* Actor : World->PersistentLevel->Actors)
+		{
+			AStaticMeshActor* TestFloor = Cast<AStaticMeshActor>(Actor);
+			if (IsValid(TestFloor)
+				&& TestFloor->Tags.Contains(EnvironmentTag)
+				&& TestFloor->GetStaticMeshComponent())
+			{
+				FNavigationSystem::UpdateComponentData(*TestFloor->GetStaticMeshComponent());
+			}
+		}
+		NavigationSystem->Tick(0.0f);
+
+		const FBox NavActorBounds = NavBounds->GetComponentsBoundingBox(true);
+		const FBox RegisteredBounds = NavigationSystem->GetNavigableWorldBounds();
+		UE_LOG(LogTemp, Display, TEXT("[LandscapeTestEnvironment] Nav actor bounds=%s registered bounds=%s"),
+			*NavActorBounds.ToString(),
+			*RegisteredBounds.ToString());
 		// Building navigation does not require waiting for every unrelated project mesh and distance field to compile.
 		FNavigationSystem::Build(*World);
 
