@@ -42,6 +42,11 @@ bool FGPWorldCorruptionStateTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Regional values clamp to the configured maximum"), Corruption->GetRegionCorruption(0), 100.0f);
 	TestEqual(TEXT("Normalized values remain in the zero-to-one presentation range"), Corruption->GetRegionCorruptionNormalized(0), 1.0f);
 
+	Corruption->SetPassiveIncreasePaused(true);
+	TestTrue(TEXT("Test environments can pause passive growth without resetting values"), Corruption->IsPassiveIncreasePaused());
+	Corruption->SetPassiveIncreasePaused(false);
+	TestFalse(TEXT("Passive growth can be resumed after a test"), Corruption->IsPassiveIncreasePaused());
+
 	return true;
 }
 
