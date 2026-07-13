@@ -2,19 +2,20 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-07-12T04:06:00+09:00
+updated: 2026-07-14T04:14:00+09:00
 status: active
 tags: [memoc, memoc/state]
 ---
 # Session Summary
 
 ## Status
-- `L_LandscapeMap` has a Z=5000 test deck: corruption 0/50/100 pads, four Region Event stations, connected nav floors, instructions, and PlayerStart.
-- Generator is idempotent and validates complete paths; commandlet-safe sign preserves repeat saves.
-- Guide: `docs/LandscapeCorruptionEventTestEnvironment.md`.
+- `L_LandscapeMap` restored to pre-deck LFS `ba9e714a...`; sculpt/collision returned and test-deck actor count is zero.
+- Removed the destructive deck generator and obsolete assets/docs.
+- Added `ProjectEden.Game.LandscapeMap.Integrity` regression coverage.
 
 ## Verified
-- Editor build; generator twice; LandscapeTestEnvironment (1), RegionEvents (2), Corruption (3) tests; PIE visual pass.
+- Editor map load/PIE, Project_EdenEditor build, LandscapeMap integrity test pass.
 
 ## Handoff
-- Preserve user-modified `DA_RegionEventData.uasset` and `L_MainMap.umap`.
+- Original PlayerStart `(0,0,92)` is below the sculpt surface and may need relocation.
+- Preserve user changes in `TestMap`, `WorldEventTestMap`, `DA_RegionEventData`, and `L_MainMap`.
