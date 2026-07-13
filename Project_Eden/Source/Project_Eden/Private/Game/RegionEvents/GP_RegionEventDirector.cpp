@@ -605,8 +605,28 @@ bool AGP_RegionEventDirector::ResolveExplorationSpawnLocation(
 			}
 		}
 
-		if (bFoundGround && SpatialRegions->ResolveRegionIdAtLocation(CandidateLocation) == RegionId)
+		const float ReferenceDistance = FVector::Dist2D(ReferencePawn.GetActorLocation(), CandidateLocation);
+		bool bKeepsPartySafeDistance = true;
+		for (FConstPlayerControllerIterator PlayerIterator = World->GetPlayerControllerIterator(); PlayerIterator; ++PlayerIterator)
 		{
+			const APlayerController* PlayerController = PlayerIterator->Get();
+			const APawn* PartyPawn = IsValid(PlayerController) ? PlayerController->GetPawn() : nullptr;
+			if (IsValid(PartyPawn)
+				&& FVector::Dist2D(PartyPawn->GetActorLocation(), CandidateLocation) < MinimumDistance)
+			{
+				bKeepsPartySafeDistance = false;
+				break;
+			}
+		}
+
+		const bool bKeepsReferenceRange = ReferenceDistance >= MinimumDistance
+			&& ReferenceDistance <= MaximumDistance + 250.0f;
+		if (bFoundGround
+			&& bKeepsReferenceRange
+			&& bKeepsPartySafeDistance
+			&& SpatialRegions->ResolveRegionIdAtLocation(CandidateLocation) == RegionId)
+		{
+			// Nav projection can move a point; checking every player prevents instant co-op overlap and surprise attacks.
 			OutSpawnLocation = CandidateLocation;
 			return true;
 		}
