@@ -37,10 +37,17 @@ namespace
 		{
 			SeedIndexProperty->SetPropertyValue_InContainer(SeedActor, RegionId);
 		}
-		if (FByteProperty* StateProperty = FindFProperty<FByteProperty>(SeedActor->GetClass(), TEXT("State")))
+		FProperty* StateProperty = SeedActor->GetClass()->FindPropertyByName(TEXT("State"));
+		FNumericProperty* NumericStateProperty = CastField<FNumericProperty>(StateProperty);
+		if (FEnumProperty* EnumStateProperty = CastField<FEnumProperty>(StateProperty))
 		{
-			// Match the Blueprint byte contract so the runtime reflection path is exercised by the test.
-			StateProperty->SetPropertyValue_InContainer(SeedActor, AuthoredState);
+			NumericStateProperty = EnumStateProperty->GetUnderlyingProperty();
+		}
+		if (StateProperty && NumericStateProperty && NumericStateProperty->IsInteger())
+		{
+			// Set the actual Blueprint numeric storage; State may be byte, enum-backed byte, or an integer after migration.
+			void* StateAddress = StateProperty->ContainerPtrToValuePtr<void>(SeedActor);
+			NumericStateProperty->SetIntPropertyValue(StateAddress, static_cast<uint64>(AuthoredState));
 		}
 		return SeedActor;
 	}

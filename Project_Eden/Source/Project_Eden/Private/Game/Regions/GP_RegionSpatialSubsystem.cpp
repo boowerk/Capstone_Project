@@ -315,7 +315,14 @@ bool UGP_RegionSpatialSubsystem::TryResolveAuthoredState(
 	}
 	bOutHadStateProperty = true;
 
-	// Blueprint byte/enum variables can change representation across recompiles, so use only bounded integer reflection.
+	// State is currently a Blueprint byte, so read that common contract directly before handling migrated numeric types.
+	if (const FByteProperty* ByteProperty = CastField<FByteProperty>(StateProperty))
+	{
+		OutState = ByteProperty->GetPropertyValue_InContainer(&Actor);
+		return true;
+	}
+
+	// Enum properties wrap an underlying integer property rather than deriving from FNumericProperty themselves.
 	const FNumericProperty* NumericProperty = CastField<FNumericProperty>(StateProperty);
 	if (const FEnumProperty* EnumProperty = CastField<FEnumProperty>(StateProperty))
 	{
@@ -326,6 +333,7 @@ bool UGP_RegionSpatialSubsystem::TryResolveAuthoredState(
 		return false;
 	}
 
+	// Use the outer property's address because an enum's underlying field has no actor-container offset of its own.
 	const void* ValueAddress = StateProperty->ContainerPtrToValuePtr<void>(&Actor);
 	const int64 Value = NumericProperty->GetSignedIntPropertyValue(ValueAddress);
 	if (Value < 0 || Value > MAX_uint8)
