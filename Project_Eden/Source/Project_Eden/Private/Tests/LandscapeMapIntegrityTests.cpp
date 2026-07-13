@@ -16,6 +16,11 @@ namespace
 	constexpr int32 ExpectedLandscapeRegionCount = 15;
 	constexpr float MinimumPlayablePlayerStartZ = 800.0f;
 	constexpr double MinimumNavigationXYCoverage = 0.9;
+	constexpr float MinimumProductionExplorationDelay = 20.0f;
+	constexpr float MinimumProductionExplorationInterval = 3.0f;
+	constexpr float MinimumProductionRegionDwell = 8.0f;
+	constexpr float MinimumProductionGlobalCooldown = 60.0f;
+	constexpr float MinimumProductionSpawnDistance = 1000.0f;
 
 	bool HasClassInHierarchy(const AActor& Actor, const FName RequiredClassName)
 	{
@@ -66,6 +71,7 @@ bool FGPLandscapeMapIntegrityTest::RunTest(const FString& Parameters)
 	int32 NavigationBoundsCount = 0;
 	int32 RegionSeedActorCount = 0;
 	int32 RegionEventDirectorCount = 0;
+	AActor* RegionEventDirectorActor = nullptr;
 	float LowestPlayerStartZ = TNumericLimits<float>::Max();
 	FBox LandscapeBounds(EForceInit::ForceInit);
 	FBox NavigationBounds(EForceInit::ForceInit);
@@ -106,6 +112,7 @@ bool FGPLandscapeMapIntegrityTest::RunTest(const FString& Parameters)
 		if (HasClassInHierarchy(*Actor, RegionEventDirectorClassName))
 		{
 			++RegionEventDirectorCount;
+			RegionEventDirectorActor = Actor;
 		}
 
 		if (HasClassInHierarchy(*Actor, RegionSeedClassName))
@@ -192,6 +199,91 @@ bool FGPLandscapeMapIntegrityTest::RunTest(const FString& Parameters)
 			AddressableRegionIndices.Contains(ExpectedRegionId));
 	}
 	TestEqual(TEXT("Landscape contains one region event director"), RegionEventDirectorCount, 1);
+
+	if (IsValid(RegionEventDirectorActor))
+	{
+		// Guard the authored production cadence so temporary PIE acceleration cannot be saved into the shipping map.
+		const auto ReadFloat = [this, RegionEventDirectorActor](const FName PropertyName, float& OutValue)
+		{
+			const FFloatProperty* Property = FindFProperty<FFloatProperty>(RegionEventDirectorActor->GetClass(), PropertyName);
+			TestNotNull(*FString::Printf(TEXT("Director exposes %s"), *PropertyName.ToString()), Property);
+			if (!Property)
+			{
+				return false;
+			}
+
+			OutValue = Property->GetPropertyValue_InContainer(RegionEventDirectorActor);
+			return true;
+		};
+
+		float InitialDelay = 0.0f;
+		float EvaluationInterval = 0.0f;
+		float RegionDwell = 0.0f;
+		float BaseChance = 0.0f;
+		float FullCorruptionBonus = 0.0f;
+		float GlobalCooldown = 0.0f;
+		float MinimumSpawnDistance = 0.0f;
+		float MaximumSpawnDistance = 0.0f;
+		const bool bReadCadence =
+			ReadFloat(TEXT("InitialExplorationDelaySeconds"), InitialDelay)
+			&& ReadFloat(TEXT("ExplorationEvaluationIntervalSeconds"), EvaluationInterval)
+			&& ReadFloat(TEXT("RegionDwellSeconds"), RegionDwell)
+			&& ReadFloat(TEXT("BaseExplorationChance"), BaseChance)
+			&& ReadFloat(TEXT("FullCorruptionChanceBonus"), FullCorruptionBonus)
+			&& ReadFloat(TEXT("GlobalExplorationCooldownSeconds"), GlobalCooldown)
+			&& ReadFloat(TEXT("MinimumExplorationSpawnDistance"), MinimumSpawnDistance)
+			&& ReadFloat(TEXT("MaximumExplorationSpawnDistance"), MaximumSpawnDistance);
+
+		if (bReadCadence)
+		{
+			TestTrue(TEXT("Exploration waits before the first encounter"), InitialDelay >= MinimumProductionExplorationDelay);
+			TestTrue(TEXT("Exploration evaluation is not frame-like"), EvaluationInterval >= MinimumProductionExplorationInterval);
+			TestTrue(TEXT("Players must remain in a region before an encounter"), RegionDwell >= MinimumProductionRegionDwell);
+			TestTrue(TEXT("Base exploration chance stays restrained"), BaseChance > 0.0f && BaseChance <= 0.5f);
+			TestTrue(TEXT("Corruption chance bonus stays restrained"), FullCorruptionBonus >= 0.0f && FullCorruptionBonus <= 0.5f);
+			TestTrue(TEXT("Exploration encounters have a global cooldown"), GlobalCooldown >= MinimumProductionGlobalCooldown);
+			TestTrue(TEXT("Encounters spawn outside immediate combat range"), MinimumSpawnDistance >= MinimumProductionSpawnDistance);
+			TestTrue(TEXT("Exploration spawn distance range is valid"), MaximumSpawnDistance > MinimumSpawnDistance);
+		}
+
+		const FBoolProperty* EnableRegionEventsProperty =
+			FindFProperty<FBoolProperty>(RegionEventDirectorActor->GetClass(), TEXT("bEnableRegionEvents"));
+		const FBoolProperty* EnableExplorationEventsProperty =
+			FindFProperty<FBoolProperty>(RegionEventDirectorActor->GetClass(), TEXT("bEnableExplorationEvents"));
+		const FBoolProperty* DeterministicSeedProperty =
+			FindFProperty<FBoolProperty>(RegionEventDirectorActor->GetClass(), TEXT("bUseDeterministicRandomSeed"));
+		const FIntProperty* MaxActiveExplorationEventsProperty =
+			FindFProperty<FIntProperty>(RegionEventDirectorActor->GetClass(), TEXT("MaxActiveExplorationEvents"));
+		TestNotNull(TEXT("Director exposes region-event enablement"), EnableRegionEventsProperty);
+		TestNotNull(TEXT("Director exposes exploration-event enablement"), EnableExplorationEventsProperty);
+		TestNotNull(TEXT("Director exposes deterministic-seed mode"), DeterministicSeedProperty);
+		TestNotNull(TEXT("Director exposes exploration concurrency"), MaxActiveExplorationEventsProperty);
+		if (EnableRegionEventsProperty && EnableExplorationEventsProperty
+			&& DeterministicSeedProperty && MaxActiveExplorationEventsProperty)
+		{
+			// Production play keeps world events enabled, varied between runs, and limited to one readable objective.
+			TestTrue(TEXT("Region events are enabled in the production landscape"),
+				EnableRegionEventsProperty->GetPropertyValue_InContainer(RegionEventDirectorActor));
+			TestTrue(TEXT("Exploration events are enabled in the production landscape"),
+				EnableExplorationEventsProperty->GetPropertyValue_InContainer(RegionEventDirectorActor));
+			TestFalse(TEXT("Production exploration does not reuse a deterministic test sequence"),
+				DeterministicSeedProperty->GetPropertyValue_InContainer(RegionEventDirectorActor));
+			TestEqual(TEXT("Only one exploration objective can be active"),
+				MaxActiveExplorationEventsProperty->GetPropertyValue_InContainer(RegionEventDirectorActor),
+				1);
+		}
+
+		const FArrayProperty* ExplorationPoolProperty =
+			FindFProperty<FArrayProperty>(RegionEventDirectorActor->GetClass(), TEXT("ExplorationEventPool"));
+		TestNotNull(TEXT("Director exposes its exploration event pool"), ExplorationPoolProperty);
+		if (ExplorationPoolProperty)
+		{
+			FScriptArrayHelper ExplorationPool(
+				ExplorationPoolProperty,
+				ExplorationPoolProperty->ContainerPtrToValuePtr<void>(RegionEventDirectorActor));
+			TestEqual(TEXT("Landscape director resolves four production event definitions"), ExplorationPool.Num(), 4);
+		}
+	}
 	return true;
 }
 
