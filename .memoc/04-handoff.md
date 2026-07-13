@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-06-28T15:10:00+09:00
+updated: 2026-07-14T06:51:59+09:00
 status: active
 tags:
   - memoc
@@ -11,7 +11,18 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-07-09T02:52:00+09:00
+Last synced: 2026-07-14T06:51:59+09:00
+
+## Production Landscape Corruption/Event Handoff
+
+- `L_LandscapeMap` is ready to open and Play without test-deck setup: PlayerStart Z `860`, full Landscape NavMesh bounds, navigation invokers, 15 region seeds, and placed `BP_EventDirector` are present.
+- Production director values are `25s` initial delay, `5s` evaluation, `12s` dwell, `0.30` base chance, `0.35` full-corruption bonus, `80s` global cooldown, one active exploration event, `1400-2200cm` placement, and random seed mode off.
+- `/Game/RegionEvents/Runtime` contains four production definitions. They use native runtime event classes and stable `world_*` IDs rather than `/Examples` test Blueprints.
+- Exploration event enemies do not increment `AliveZoneEnemies`. Completed/expired events retire remaining enemies through GAS, while terminal-death delegates keep legacy zone accounting correct.
+- Spawn points are revalidated after NavMesh projection and must remain outside the minimum distance of every connected player's pawn.
+- No editor assignment is required. Optional art polish can replace each native marker/decal/VFX through BP children without changing event ownership or corruption rules.
+- Verified: full `Project_EdenEditor` build; 7 Region Event tests; Landscape integrity; Region spatial subsystem; player navigation invoker; corruption state. PIE Structure Defense spawned 12 AI across four waves, completed at 35s, then reported zero event and enemy actors.
+- Existing user work in `TestMap.umap`, `DA_RegionEventData.uasset`, and `L_MainMap.umap` remains intentionally unstaged/uncommitted.
 
 ## Region Event System Handoff
 

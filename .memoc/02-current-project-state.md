@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-14T04:14:00+09:00
+updated: 2026-07-14T06:51:59+09:00
 status: active
 tags:
   - memoc
@@ -11,11 +11,13 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-07-14T04:14:00+09:00
+Last synced: 2026-07-14T06:51:59+09:00
 
 ## Current Status
 
-- `/Game/Maps/MainMap/L_LandscapeMap` is restored byte-for-byte to the pre-test-deck sculpted Landscape LFS object (`ba9e714a...`, 11,416,959 bytes). The destructive production-map deck generator, generated floors/sign, old deck contract, and obsolete guide were removed. `ProjectEden.Game.LandscapeMap.Integrity` now requires a Landscape actor, sculpt components, heightfield collision, and zero `GP.TestEnvironment` actors. Editor load/PIE, full Editor build, and the integrity test pass (`0512bcf1`, `6042600a`, `8d88b067`).
+- `/Game/Maps/MainMap/L_LandscapeMap` retains the restored sculpt/collision and is immediate-play ready at LFS object `dc2e8205...` (11,425,665 bytes): PlayerStart is above terrain, full Landscape NavMesh bounds exist, 15 contiguous region seeds remain, and exactly one production event director is placed. `ProjectEden.Game.LandscapeMap.Integrity` guards all of these plus the absence of `GP.TestEnvironment` deck actors.
+
+- Corruption-aware exploration events are production-ready (`f8f088b7` through `05308541`). The placed director waits `25s`, evaluates every `5s` after `12s` regional dwell, uses `0.30 + corruption*0.35` chance, enforces an `80s` global cooldown, and places one event `1400-2200cm` from every player. Four production DataAssets provide Red Rift, Crystal Corruption, Shrine Ruins, and Structure Defense with authored corruption thresholds, success/failure deltas, discovery radii, and `150-180s` regional cooldowns. Exploration enemies are independent from linear-zone budgets and are retired through the shared GAS death path on completion/expiration. Full Editor build, seven Region Event tests, Landscape integrity, spatial-region, navigation-invoker, and corruption-state tests pass. PIE Structure Defense spawned four 3-enemy waves and retired all 12 enemies at completion.
 
 - World corruption is implemented (`3a2a06d4` through `d764a5c6`). `AGP_GameState` owns replicated per-region values and their world average; `AGP_GameMode` passively increases them. Enemies receive an explicit/fallback corruption region and use one replaceable infinite GAS effect for `DamageIncreaseRate` and `Armor`; boss death cleanses that region once. The minimap, SkyAtmosphere, ExponentialHeightFog, and current Sci-Fi skybox `Tint`/`Brightness` react client-side through an auto-spawned presentation actor. Tuning/PIE instructions are in `docs/WorldCorruptionSystem.md`. Editor build, both `ProjectEden.Game.Corruption.*` tests, and `ProjectEden.UI.Minimap.CaptureStability` pass.
 
