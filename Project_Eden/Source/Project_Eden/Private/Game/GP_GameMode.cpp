@@ -193,6 +193,8 @@ void AGP_GameMode::ResolveRegionEventDirector()
 		// The director is server orchestration; spawned event actors replicate their own presentation state.
 		RegionEventDirector->InitializeRegionEventDirector(RegionCount);
 		RegionEventDirector->OnRegionEventEnemySpawned.AddDynamic(this, &ThisClass::HandleRegionEventEnemySpawned);
+		// A blocking objective re-evaluates zone completion as soon as it succeeds or expires.
+		RegionEventDirector->OnRegionEventEnded.AddDynamic(this, &ThisClass::HandleRegionEventEnded);
 	}
 }
 
@@ -286,10 +288,7 @@ void AGP_GameMode::StartZone(int32 ZoneIndex)
 	SpawnZoneEnemies(Zone);
 	OnZoneStarted(ZoneIndex, Zone);
 
-	if (AliveZoneEnemies == 0)
-	{
-		CompleteCurrentZone();
-	}
+	MaybeCompleteZone();
 }
 
 void AGP_GameMode::HandleMarkerTriggered(AGP_EnemySpawnVolume* Zone, AGP_EnemySpawnMarker* Marker)
@@ -372,7 +371,13 @@ void AGP_GameMode::MaybeCompleteZone()
 {
 	// In marker mode the zone clears only once every marker has fired and nothing is left alive.
 	const bool bAllMarkersDone = (MarkersTotal == 0) || (MarkersTriggered >= MarkersTotal);
-	if (bAllMarkersDone && AliveZoneEnemies == 0)
+	const AGP_EnemySpawnVolume* CurrentZone = OrderedZones.IsValidIndex(CurrentZoneIndex)
+		? OrderedZones[CurrentZoneIndex]
+		: nullptr;
+	const bool bWaitingForRegionObjective = RegionEventDirector
+		&& IsValid(CurrentZone)
+		&& RegionEventDirector->HasBlockingEventForZone(CurrentZone);
+	if (bAllMarkersDone && AliveZoneEnemies == 0 && !bWaitingForRegionObjective)
 	{
 		CompleteCurrentZone();
 	}
@@ -465,6 +470,14 @@ void AGP_GameMode::HandleRegionEventEnemySpawned(AGP_RegionEventActor* EventActo
 {
 	// Event-spawned enemies join the current zone budget so events cannot be ignored during a city clear.
 	RegisterZoneEnemy(Enemy, IsValid(EventActor) ? EventActor->GetRegionId() : INDEX_NONE);
+}
+
+void AGP_GameMode::HandleRegionEventEnded(AGP_RegionEventDirector* Director, AGP_RegionEventActor* EventActor)
+{
+	(void)Director;
+	(void)EventActor;
+	// Enemy deaths and objective completion may arrive in either order; this single gate handles both safely.
+	MaybeCompleteZone();
 }
 
 void AGP_GameMode::CompleteCurrentZone()

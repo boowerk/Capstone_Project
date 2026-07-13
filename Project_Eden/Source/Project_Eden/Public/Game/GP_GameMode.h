@@ -160,5 +160,8 @@ private:
 	UFUNCTION()
 	void HandleRegionEventEnemySpawned(AGP_RegionEventActor* EventActor, AGP_EnemyCharacter* Enemy);
 
+	UFUNCTION()
+	void HandleRegionEventEnded(AGP_RegionEventDirector* Director, AGP_RegionEventActor* EventActor);
+
 	AGP_GameState* GetGPGameState() const;
 };
