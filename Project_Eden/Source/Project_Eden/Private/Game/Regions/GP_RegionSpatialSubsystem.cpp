@@ -16,8 +16,10 @@ namespace
 	{
 		int32 RegionId = INDEX_NONE;
 		FVector WorldLocation = FVector::ZeroVector;
+		uint8 AuthoredState = 0;
 		FString StableActorIdentifier;
 		bool bReadFromProperty = false;
+		bool bHasAuthoredState = false;
 	};
 }
 
@@ -90,6 +92,18 @@ void UGP_RegionSpatialSubsystem::RefreshRegionSeeds()
 		Candidate.WorldLocation = SeedActor->GetActorLocation();
 		Candidate.StableActorIdentifier = SeedActor->GetPathName();
 		Candidate.bReadFromProperty = bHadSeedIndexProperty;
+
+		bool bHadStateProperty = false;
+		Candidate.bHasAuthoredState = TryResolveAuthoredState(*SeedActor, Candidate.AuthoredState, bHadStateProperty);
+		if (bHadStateProperty && !Candidate.bHasAuthoredState)
+		{
+			// A schema change must fail closed instead of reinterpreting arbitrary Blueprint memory as a biome id.
+			UE_LOG(
+				LogRegionSpatial,
+				Warning,
+				TEXT("Region seed '%s' has an unsupported or out-of-range State property."),
+				*SeedActor->GetPathName());
+		}
 	}
 
 	// Property values beat legacy name fallbacks; actor paths then make duplicate handling deterministic.
@@ -122,6 +136,8 @@ void UGP_RegionSpatialSubsystem::RefreshRegionSeeds()
 		FCachedRegionSeed& CachedSeed = CachedSeeds.AddDefaulted_GetRef();
 		CachedSeed.RegionId = Candidate.RegionId;
 		CachedSeed.WorldLocation = Candidate.WorldLocation;
+		CachedSeed.AuthoredState = Candidate.AuthoredState;
+		CachedSeed.bHasAuthoredState = Candidate.bHasAuthoredState;
 		CachedSeedLocations.Add(Candidate.RegionId, Candidate.WorldLocation);
 		CachedRegionCount = FMath::Max(CachedRegionCount, Candidate.RegionId + 1);
 	}
@@ -179,6 +195,45 @@ bool UGP_RegionSpatialSubsystem::GetSeedLocation(int32 RegionId, FVector& OutWor
 
 	OutWorldLocation = FVector::ZeroVector;
 	return false;
+}
+
+bool UGP_RegionSpatialSubsystem::GetAuthoredRegionState(int32 RegionId, uint8& OutState)
+{
+	EnsureRegionSeedsCached();
+	for (const FCachedRegionSeed& Seed : CachedSeeds)
+	{
+		if (Seed.RegionId == RegionId && Seed.bHasAuthoredState)
+		{
+			OutState = Seed.AuthoredState;
+			return true;
+		}
+	}
+
+	OutState = 0;
+	return false;
+}
+
+bool UGP_RegionSpatialSubsystem::BuildAuthoredRegionStates(uint8 FallbackState, TArray<uint8>& OutStates)
+{
+	EnsureRegionSeedsCached();
+	OutStates.Init(FallbackState, CachedRegionCount);
+
+	bool bFoundAuthoredState = false;
+	for (const FCachedRegionSeed& Seed : CachedSeeds)
+	{
+		if (Seed.bHasAuthoredState && OutStates.IsValidIndex(Seed.RegionId))
+		{
+			// Sparse ids retain the legacy fallback while every valid seed keeps its serialized biome state.
+			OutStates[Seed.RegionId] = Seed.AuthoredState;
+			bFoundAuthoredState = true;
+		}
+	}
+
+	if (!bFoundAuthoredState)
+	{
+		OutStates.Reset();
+	}
+	return bFoundAuthoredState;
 }
 
 void UGP_RegionSpatialSubsystem::EnsureRegionSeedsCached()
@@ -243,6 +298,42 @@ bool UGP_RegionSpatialSubsystem::TryResolveSeedIndex(
 
 	// Packaged maps have no editor labels, so use the serialized actor object name as the final fallback.
 	return TryParseTrailingRegionId(Actor.GetName(), OutSeedIndex);
+}
+
+bool UGP_RegionSpatialSubsystem::TryResolveAuthoredState(
+	const AActor& Actor,
+	uint8& OutState,
+	bool& bOutHadStateProperty)
+{
+	OutState = 0;
+	bOutHadStateProperty = false;
+
+	const FProperty* StateProperty = Actor.GetClass()->FindPropertyByName(TEXT("State"));
+	if (StateProperty == nullptr)
+	{
+		return false;
+	}
+	bOutHadStateProperty = true;
+
+	// Blueprint byte/enum variables can change representation across recompiles, so use only bounded integer reflection.
+	const FNumericProperty* NumericProperty = CastField<FNumericProperty>(StateProperty);
+	if (const FEnumProperty* EnumProperty = CastField<FEnumProperty>(StateProperty))
+	{
+		NumericProperty = EnumProperty->GetUnderlyingProperty();
+	}
+	if (NumericProperty == nullptr || !NumericProperty->IsInteger())
+	{
+		return false;
+	}
+
+	const void* ValueAddress = StateProperty->ContainerPtrToValuePtr<void>(&Actor);
+	const int64 Value = NumericProperty->GetSignedIntPropertyValue(ValueAddress);
+	if (Value < 0 || Value > MAX_uint8)
+	{
+		return false;
+	}
+	OutState = static_cast<uint8>(Value);
+	return true;
 }
 
 bool UGP_RegionSpatialSubsystem::TryParseTrailingRegionId(const FString& Identifier, int32& OutRegionId)

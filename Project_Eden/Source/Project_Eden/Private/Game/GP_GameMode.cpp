@@ -7,6 +7,7 @@
 #include "Game/GP_EnemySpawnVolume.h"
 #include "Game/GP_GameState.h"
 #include "Game/GP_RunPortal.h"
+#include "Game/Regions/GP_RegionSpatialSubsystem.h"
 #include "Game/RegionEvents/GP_RegionEventActor.h"
 #include "Game/RegionEvents/GP_RegionEventDirector.h"
 #include "Kismet/GameplayStatics.h"
@@ -26,6 +27,8 @@ void AGP_GameMode::BeginPlay()
 {
 	Super::BeginPlay();
 
+	// Resolve map-authored seeds before the director and corruption state consume RegionCount.
+	ResolveRuntimeRegionConfiguration();
 	GatherZones();
 	ResolveRegionEventDirector();
 	SpawnCorruptionPresentation();
@@ -51,7 +54,16 @@ void AGP_GameMode::InitializeRegionStates()
 {
 	if (AGP_GameState* GPGameState = GetGPGameState())
 	{
-		GPGameState->InitRegionStates(RegionCount, DeadRegionState);
+		if (RuntimeInitialRegionStates.Num() == RegionCount)
+		{
+			// Landscape maps keep their serialized biome mosaic instead of being flattened to DeadRegionState.
+			GPGameState->InitRegionStatesFromArray(RuntimeInitialRegionStates);
+		}
+		else
+		{
+			// Maps without RegionSeed actors retain the original linear-run initialization contract.
+			GPGameState->InitRegionStates(RegionCount, DeadRegionState);
+		}
 
 		if (UGP_WorldCorruptionComponent* Corruption = GPGameState->GetWorldCorruptionComponent())
 		{
@@ -65,6 +77,42 @@ void AGP_GameMode::InitializeRegionStates()
 				bEnableWorldCorruption);
 		}
 	}
+}
+
+void AGP_GameMode::ResolveRuntimeRegionConfiguration()
+{
+	RuntimeInitialRegionStates.Reset();
+
+	UWorld* World = GetWorld();
+	UGP_RegionSpatialSubsystem* RegionSpatial = World
+		? World->GetSubsystem<UGP_RegionSpatialSubsystem>()
+		: nullptr;
+	if (!IsValid(RegionSpatial))
+	{
+		return;
+	}
+
+	const int32 AuthoredRegionCount = RegionSpatial->GetRegionCount();
+	if (AuthoredRegionCount <= 0 || RegionSpatial->GetSeedCount() <= 0)
+	{
+		return;
+	}
+
+	// The highest placed SeedIndex defines the addressable runtime array before any dependent system initializes.
+	RegionCount = AuthoredRegionCount;
+	if (!RegionSpatial->BuildAuthoredRegionStates(DeadRegionState, RuntimeInitialRegionStates))
+	{
+		// Unsupported legacy seed schemas still get the correct count and the established uniform fallback state.
+		RuntimeInitialRegionStates.Reset();
+	}
+
+	UE_LOG(
+		LogTemp,
+		Log,
+		TEXT("[GP_GameMode] Resolved %d runtime regions from %d placed seeds (authored states=%s)."),
+		RegionCount,
+		RegionSpatial->GetSeedCount(),
+		RuntimeInitialRegionStates.Num() == RegionCount ? TEXT("preserved") : TEXT("fallback"));
 }
 
 void AGP_GameMode::SpawnCorruptionPresentation()

@@ -117,6 +117,9 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<AGP_RegionEventDirector> RegionEventDirector;
 
+	// Populated from placed BP_RegionSeed actors when a map authors distinct biome states.
+	TArray<uint8> RuntimeInitialRegionStates;
+
 	int32 CurrentZoneIndex = INDEX_NONE;
 	int32 PendingZoneIndex = INDEX_NONE;
 	int32 AliveZoneEnemies = 0;
@@ -128,6 +131,7 @@ private:
 	FTimerHandle ReturnToLobbyTimerHandle;
 
 	void GatherZones();
+	void ResolveRuntimeRegionConfiguration();
 	void ResolveRegionEventDirector();
 	void InitializeRegionStates();
 	void SpawnCorruptionPresentation();

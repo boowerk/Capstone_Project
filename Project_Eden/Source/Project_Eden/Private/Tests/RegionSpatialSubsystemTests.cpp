@@ -3,6 +3,7 @@
 #include "Game/Regions/GP_RegionSpatialSubsystem.h"
 
 #include "Engine/World.h"
+#include "Game/GP_GameState.h"
 #include "GameFramework/Actor.h"
 #include "Misc/AutomationTest.h"
 #include "UObject/UnrealType.h"
@@ -19,6 +20,7 @@ namespace
 		UClass& RegionSeedClass,
 		const FName ActorName,
 		const int32 RegionId,
+		const uint8 AuthoredState,
 		const FVector& Location)
 	{
 		FActorSpawnParameters SpawnParameters;
@@ -34,6 +36,11 @@ namespace
 		if (FIntProperty* SeedIndexProperty = FindFProperty<FIntProperty>(SeedActor->GetClass(), TEXT("SeedIndex")))
 		{
 			SeedIndexProperty->SetPropertyValue_InContainer(SeedActor, RegionId);
+		}
+		if (FByteProperty* StateProperty = FindFProperty<FByteProperty>(SeedActor->GetClass(), TEXT("State")))
+		{
+			// Match the Blueprint byte contract so the runtime reflection path is exercised by the test.
+			StateProperty->SetPropertyValue_InContainer(SeedActor, AuthoredState);
 		}
 		return SeedActor;
 	}
@@ -61,24 +68,28 @@ bool FGPRegionSpatialSubsystemTest::RunTest(const FString& Parameters)
 		*RegionSeedClass,
 		TEXT("RegionSeed_2_Primary"),
 		2,
+		1,
 		FVector(0.0f, 0.0f, 5000.0f));
 	AActor* RegionSeven = SpawnRegionSeed(
 		*TestWorld,
 		*RegionSeedClass,
 		TEXT("RegionSeed_7_Primary"),
 		7,
+		5,
 		FVector(1000.0f, 0.0f, -5000.0f));
 	AActor* DuplicateSeven = SpawnRegionSeed(
 		*TestWorld,
 		*RegionSeedClass,
 		TEXT("RegionSeed_7_Secondary"),
 		7,
+		6,
 		FVector(1600.0f, 0.0f, 0.0f));
 	AActor* NegativeSeed = SpawnRegionSeed(
 		*TestWorld,
 		*RegionSeedClass,
 		TEXT("RegionSeed_Invalid"),
 		INDEX_NONE,
+		7,
 		FVector(500.0f, 0.0f, 0.0f));
 	TestNotNull(TEXT("Spawned region 2 seed"), RegionTwo);
 	TestNotNull(TEXT("Spawned region 7 seed"), RegionSeven);
@@ -110,6 +121,30 @@ bool FGPRegionSpatialSubsystemTest::RunTest(const FString& Parameters)
 		TEXT("Deterministic duplicate handling keeps the lexically first actor"),
 		RegionSevenLocation.Equals(FVector(1000.0f, 0.0f, -5000.0f), KINDA_SMALL_NUMBER));
 	TestFalse(TEXT("Missing RegionId has no seed location"), RegionSubsystem->GetSeedLocation(4, RegionSevenLocation));
+
+	uint8 RegionSevenState = 0;
+	TestTrue(TEXT("Authored seed state is available by RegionId"), RegionSubsystem->GetAuthoredRegionState(7, RegionSevenState));
+	TestEqual(TEXT("Deterministic duplicate handling also preserves the primary seed state"), RegionSevenState, static_cast<uint8>(5));
+	TestFalse(TEXT("Missing RegionId has no authored state"), RegionSubsystem->GetAuthoredRegionState(4, RegionSevenState));
+
+	TArray<uint8> InitialRegionStates;
+	TestTrue(
+		TEXT("Authored states can be expanded into an addressable runtime array"),
+		RegionSubsystem->BuildAuthoredRegionStates(/*FallbackState=*/3, InitialRegionStates));
+	TestEqual(TEXT("Initial state array matches the highest SeedIndex"), InitialRegionStates.Num(), 8);
+	TestEqual(TEXT("Region 2 keeps its authored biome state"), InitialRegionStates[2], static_cast<uint8>(1));
+	TestEqual(TEXT("Sparse regions retain the caller's legacy fallback"), InitialRegionStates[4], static_cast<uint8>(3));
+	TestEqual(TEXT("Region 7 keeps its authored biome state"), InitialRegionStates[7], static_cast<uint8>(5));
+
+	AGP_GameState* GameState = TestWorld->SpawnActor<AGP_GameState>();
+	if (TestNotNull(TEXT("Spawned authoritative GameState for array initialization"), GameState))
+	{
+		GameState->InitRegionStatesFromArray(InitialRegionStates);
+		TestEqual(TEXT("GameState keeps the authored region count"), GameState->GetRegionCount(), 8);
+		TestEqual(TEXT("GameState keeps an authored low-index state"), GameState->GetRegionState(2), static_cast<uint8>(1));
+		TestEqual(TEXT("GameState keeps a sparse fallback state"), GameState->GetRegionState(4), static_cast<uint8>(3));
+		TestEqual(TEXT("GameState keeps an authored high-index state"), GameState->GetRegionState(7), static_cast<uint8>(5));
+	}
 
 	int32 ParsedRegionId = INDEX_NONE;
 	TestTrue(
