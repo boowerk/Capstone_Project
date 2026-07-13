@@ -92,12 +92,18 @@ void AGP_RegionEventActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		World->GetTimerManager().ClearTimer(DormantWaitTimerHandle);
 	}
 
+	if (EndPlayReason == EEndPlayReason::Destroyed)
+	{
+		// Explicit gameplay destruction owns cleanup; world teardown must not trigger boss rewards or death presentation.
+		RetireSpawnedEnemies();
+	}
+
 	// Remove dynamic bindings explicitly because event enemies can outlive a successfully completed event actor.
 	for (AGP_EnemyCharacter* SpawnedEnemy : SpawnedEventEnemies)
 	{
 		if (IsValid(SpawnedEnemy))
 		{
-			SpawnedEnemy->OnEnemyDied.RemoveDynamic(this, &ThisClass::HandleSpawnedEventEnemyDied);
+			SpawnedEnemy->OnEnemyDeathStarted.RemoveDynamic(this, &ThisClass::HandleSpawnedEventEnemyDied);
 		}
 	}
 	SpawnedEventEnemies.Reset();
@@ -236,6 +242,7 @@ void AGP_RegionEventActor::CompleteRegionEvent()
 	ApplyCorruptionOutcome(/*bCompletedSuccessfully=*/true);
 
 	SetRuntimeState(EGPRegionEventRuntimeState::Completed);
+	RetireSpawnedEnemies();
 }
 
 void AGP_RegionEventActor::ExpireRegionEvent()
@@ -254,6 +261,7 @@ void AGP_RegionEventActor::ExpireRegionEvent()
 	StopWaitingForPlayerApproach();
 	ApplyCorruptionOutcome(/*bCompletedSuccessfully=*/false);
 	SetRuntimeState(EGPRegionEventRuntimeState::Expired);
+	RetireSpawnedEnemies();
 }
 
 int32 AGP_RegionEventActor::GetAliveSpawnedEnemyCount() const
@@ -319,6 +327,24 @@ void AGP_RegionEventActor::ApplyCorruptionOutcome(bool bCompletedSuccessfully) c
 	}
 }
 
+void AGP_RegionEventActor::RetireSpawnedEnemies()
+{
+	if (!HasAuthority() || !bRetireSpawnedEnemiesOnEnd || SpawnedEventEnemies.IsEmpty())
+	{
+		return;
+	}
+
+	// RequestDeath preserves GAS cleanup and health-bar teardown unlike raw Destroy().
+	const TArray<TObjectPtr<AGP_EnemyCharacter>> EnemiesToRetire = SpawnedEventEnemies;
+	for (AGP_EnemyCharacter* SpawnedEnemy : EnemiesToRetire)
+	{
+		if (IsValid(SpawnedEnemy) && !SpawnedEnemy->IsDead())
+		{
+			SpawnedEnemy->RequestDeath(this);
+		}
+	}
+}
+
 int32 AGP_RegionEventActor::SpawnConfiguredEnemies()
 {
 	if (!HasAuthority() || !IsValid(EventData))
@@ -366,7 +392,8 @@ int32 AGP_RegionEventActor::SpawnConfiguredEnemies()
 			// Assign the region before BeginPlay so corruption scaling never samples the wrong region for one frame.
 			SpawnedEnemy->SetCorruptionRegionId(RegionId);
 			SpawnedEventEnemies.AddUnique(SpawnedEnemy);
-			SpawnedEnemy->OnEnemyDied.AddDynamic(this, &ThisClass::HandleSpawnedEventEnemyDied);
+			// Terminal death covers both combat kills and scripted cleanup without coupling tracking to XP rewards.
+			SpawnedEnemy->OnEnemyDeathStarted.AddDynamic(this, &ThisClass::HandleSpawnedEventEnemyDied);
 			UGameplayStatics::FinishSpawningActor(SpawnedEnemy, SpawnTransform);
 			SpawnedEnemy->SpawnDefaultController();
 
@@ -595,14 +622,14 @@ void AGP_RegionEventActor::OnRep_RuntimeState(EGPRegionEventRuntimeState Previou
 	}
 }
 
-void AGP_RegionEventActor::HandleSpawnedEventEnemyDied(AGP_EnemyCharacter* DeadEnemy)
+void AGP_RegionEventActor::HandleSpawnedEventEnemyDied(AGP_EnemyCharacter* DeadEnemy, AActor* DeathInstigator)
 {
 	if (!HasAuthority() || !IsValid(DeadEnemy))
 	{
 		return;
 	}
 
-	DeadEnemy->OnEnemyDied.RemoveDynamic(this, &ThisClass::HandleSpawnedEventEnemyDied);
+	DeadEnemy->OnEnemyDeathStarted.RemoveDynamic(this, &ThisClass::HandleSpawnedEventEnemyDied);
 	SpawnedEventEnemies.Remove(DeadEnemy);
 	OnTrackedEnemyCountChanged();
 }

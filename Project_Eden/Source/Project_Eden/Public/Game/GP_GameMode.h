@@ -155,7 +155,7 @@ private:
 	void HandleMarkerTriggered(AGP_EnemySpawnVolume* Zone, AGP_EnemySpawnMarker* Marker);
 
 	UFUNCTION()
-	void HandleZoneEnemyDied(AGP_EnemyCharacter* DeadEnemy);
+	void HandleZoneEnemyDied(AGP_EnemyCharacter* DeadEnemy, AActor* DeathInstigator);
 
 	UFUNCTION()
 	void HandleRegionEventEnemySpawned(AGP_RegionEventActor* EventActor, AGP_EnemyCharacter* Enemy);

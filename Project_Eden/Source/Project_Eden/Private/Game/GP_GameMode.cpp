@@ -437,7 +437,7 @@ void AGP_GameMode::RegisterZoneEnemy(AGP_EnemyCharacter* Enemy, int32 Corruption
 		return;
 	}
 
-	if (Enemy->OnEnemyDied.IsAlreadyBound(this, &AGP_GameMode::HandleZoneEnemyDied))
+	if (Enemy->OnEnemyDeathStarted.IsAlreadyBound(this, &AGP_GameMode::HandleZoneEnemyDied))
 	{
 		return;
 	}
@@ -445,7 +445,8 @@ void AGP_GameMode::RegisterZoneEnemy(AGP_EnemyCharacter* Enemy, int32 Corruption
 	// The explicit event/zone id lets enemies retain their regional strength even after progression advances.
 	Enemy->SetCorruptionRegionId(CorruptionRegionId != INDEX_NONE ? CorruptionRegionId : CurrentZoneIndex);
 
-	Enemy->OnEnemyDied.AddDynamic(this, &AGP_GameMode::HandleZoneEnemyDied);
+	// The terminal death delegate also fires for scripted encounter cleanup, unlike the HP-zero reward delegate.
+	Enemy->OnEnemyDeathStarted.AddDynamic(this, &AGP_GameMode::HandleZoneEnemyDied);
 	++AliveZoneEnemies;
 
 	if (AGP_GameState* GPGameState = GetGPGameState())
@@ -454,7 +455,7 @@ void AGP_GameMode::RegisterZoneEnemy(AGP_EnemyCharacter* Enemy, int32 Corruption
 	}
 }
 
-void AGP_GameMode::HandleZoneEnemyDied(AGP_EnemyCharacter* DeadEnemy)
+void AGP_GameMode::HandleZoneEnemyDied(AGP_EnemyCharacter* DeadEnemy, AActor* DeathInstigator)
 {
 	AliveZoneEnemies = FMath::Max(0, AliveZoneEnemies - 1);
 

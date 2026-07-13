@@ -73,6 +73,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Region Event|Enemy")
 	int32 GetAliveSpawnedEnemyCount() const;
 
+	UFUNCTION(BlueprintPure, Category = "Region Event|Enemy")
+	bool ShouldRetireSpawnedEnemiesOnEnd() const { return bRetireSpawnedEnemiesOnEnd; }
+
 	UFUNCTION(BlueprintPure, Category = "Region Event|Flow")
 	bool IsBlockingZoneCompletion() const;
 
@@ -140,6 +143,10 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Region Event|Spawn")
 	FVector NavProjectionExtent = FVector(650.0f, 650.0f, 1200.0f);
 
+	// Timed objectives must retire their remaining wave enemies so repeated open-world events cannot leak AI actors.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Region Event|Enemy")
+	bool bRetireSpawnedEnemiesOnEnd = true;
+
 	UFUNCTION(BlueprintImplementableEvent, Category = "Region Event")
 	void BP_OnRegionEventInitialized();
 
@@ -191,6 +198,7 @@ private:
 	void TryActivateFromCurrentOverlaps();
 	void HandleDormantWaitTimeout();
 	void ApplyCorruptionOutcome(bool bCompletedSuccessfully) const;
+	void RetireSpawnedEnemies();
 	bool ShouldWaitForPlayerApproach() const;
 	float GetConfiguredApproachRadius() const;
 	float GetConfiguredDormantWaitTimeout() const;
@@ -204,7 +212,7 @@ private:
 	void OnRep_RuntimeState(EGPRegionEventRuntimeState PreviousState);
 
 	UFUNCTION()
-	void HandleSpawnedEventEnemyDied(AGP_EnemyCharacter* DeadEnemy);
+	void HandleSpawnedEventEnemyDied(AGP_EnemyCharacter* DeadEnemy, AActor* DeathInstigator);
 
 	UFUNCTION()
 	void HandleActivationOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
