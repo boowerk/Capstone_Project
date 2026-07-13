@@ -468,6 +468,12 @@ void AGP_GameMode::HandleZoneEnemyDied(AGP_EnemyCharacter* DeadEnemy)
 
 void AGP_GameMode::HandleRegionEventEnemySpawned(AGP_RegionEventActor* EventActor, AGP_EnemyCharacter* Enemy)
 {
+	if (RegionEventDirector && RegionEventDirector->IsExplorationEvent(EventActor))
+	{
+		// Open-world encounters own and retire their enemies; they must not mutate an unrelated linear-zone budget.
+		return;
+	}
+
 	// Event-spawned enemies join the current zone budget so events cannot be ignored during a city clear.
 	RegisterZoneEnemy(Enemy, IsValid(EventActor) ? EventActor->GetRegionId() : INDEX_NONE);
 }

@@ -233,6 +233,12 @@ AGP_RegionEventActor* AGP_RegionEventDirector::SpawnSelectedEvent(
 	EventActor->OnRegionEventStateChanged.AddDynamic(this, &ThisClass::HandleRegionEventStateChanged);
 	EventActor->OnRegionEventEnemySpawned.AddDynamic(this, &ThisClass::HandleRegionEventEnemySpawned);
 	EventActor->InitializeRegionEvent(RegionId, const_cast<UGP_RegionEventData*>(SelectedEvent));
+	ActiveEvents.Add(EventActor);
+	if (bExplorationEvent)
+	{
+		// Register ownership before overlap evaluation because configuration can activate and spawn enemies immediately.
+		ExplorationEvents.Add(EventActor);
+	}
 	if (bExplorationEvent)
 	{
 		// Exploration markers wait for the party, giving dynamic navigation time to build before enemies spawn.
@@ -242,12 +248,6 @@ AGP_RegionEventActor* AGP_RegionEventDirector::SpawnSelectedEvent(
 			: 55.0f;
 		EventActor->ConfigureExplorationActivation(ActivationRadius, DormantTimeout);
 	}
-	ActiveEvents.Add(EventActor);
-	if (bExplorationEvent)
-	{
-		ExplorationEvents.Add(EventActor);
-	}
-
 	OnRegionEventStarted.Broadcast(this, EventActor);
 	if (!bExplorationEvent && bAutoActivateSpawnedEvents)
 	{
@@ -320,6 +320,12 @@ bool AGP_RegionEventDirector::HasBlockingEventForRegion(int32 RegionId) const
 bool AGP_RegionEventDirector::HasBlockingEventForZone(const AGP_EnemySpawnVolume* Zone) const
 {
 	return HasBlockingEventForRegion(ResolveRegionIdForZone(Zone));
+}
+
+bool AGP_RegionEventDirector::IsExplorationEvent(AGP_RegionEventActor* EventActor) const
+{
+	const TWeakObjectPtr<AGP_RegionEventActor> EventKey(EventActor);
+	return IsValid(EventActor) && ExplorationEvents.Contains(EventKey);
 }
 
 int32 AGP_RegionEventDirector::ResolveRegionIdForZone(const AGP_EnemySpawnVolume* Zone) const

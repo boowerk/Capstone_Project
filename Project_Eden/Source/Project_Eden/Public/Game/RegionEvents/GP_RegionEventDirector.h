@@ -60,6 +60,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Region Event|Exploration")
 	int32 GetExplorationEventPoolCount() const { return ExplorationEventPool.Num(); }
 
+	// GameMode keeps exploration encounters independent from the legacy linear-zone enemy budget.
+	UFUNCTION(BlueprintPure, Category = "Region Event|Exploration")
+	bool IsExplorationEvent(AGP_RegionEventActor* EventActor) const;
+
 	UPROPERTY(BlueprintAssignable, Category = "Region Event")
 	FGPOnRegionEventStarted OnRegionEventStarted;
 
