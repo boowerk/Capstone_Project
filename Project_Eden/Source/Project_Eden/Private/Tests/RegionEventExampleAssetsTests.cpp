@@ -136,6 +136,10 @@ bool FRegionEventExampleAssetsTest::RunTest(const FString& Parameters)
 	UObject* CrystalTriggerDefaults = IsValid(CrystalTriggerClass) ? CrystalTriggerClass->GetDefaultObject() : nullptr;
 	UObject* ShrineTriggerDefaults = IsValid(ShrineTriggerClass) ? ShrineTriggerClass->GetDefaultObject() : nullptr;
 	UObject* DefenseTriggerDefaults = IsValid(DefenseTriggerClass) ? DefenseTriggerClass->GetDefaultObject() : nullptr;
+	const AGP_RegionEventTestTriggerActor* RedRiftTriggerActorDefaults = Cast<AGP_RegionEventTestTriggerActor>(RedRiftTriggerDefaults);
+	const AGP_RegionEventTestTriggerActor* CrystalTriggerActorDefaults = Cast<AGP_RegionEventTestTriggerActor>(CrystalTriggerDefaults);
+	const AGP_RegionEventTestTriggerActor* ShrineTriggerActorDefaults = Cast<AGP_RegionEventTestTriggerActor>(ShrineTriggerDefaults);
+	const AGP_RegionEventTestTriggerActor* DefenseTriggerActorDefaults = Cast<AGP_RegionEventTestTriggerActor>(DefenseTriggerDefaults);
 
 	// Direct test triggers are intended for designers: drop one BP in any PIE map and that single event starts immediately.
 	TestTrue(TEXT("Red Rift direct trigger starts on BeginPlay"), GetBoolProperty(RedRiftTriggerDefaults, TEXT("bTriggerOnBeginPlay")));
@@ -146,6 +150,14 @@ bool FRegionEventExampleAssetsTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Crystal direct trigger uses Crystal data"), GetObjectProperty(CrystalTriggerDefaults, TEXT("EventData")) == CrystalData);
 	TestTrue(TEXT("Shrine direct trigger uses Shrine data"), GetObjectProperty(ShrineTriggerDefaults, TEXT("EventData")) == ShrineData);
 	TestTrue(TEXT("Defense direct trigger uses Defense data"), GetObjectProperty(DefenseTriggerDefaults, TEXT("EventData")) == DefenseData);
+	TestTrue(TEXT("Red Rift trigger is server-authoritative in multiplayer PIE"),
+		IsValid(RedRiftTriggerActorDefaults) && RedRiftTriggerActorDefaults->GetIsReplicated());
+	TestTrue(TEXT("Crystal trigger is server-authoritative in multiplayer PIE"),
+		IsValid(CrystalTriggerActorDefaults) && CrystalTriggerActorDefaults->GetIsReplicated());
+	TestTrue(TEXT("Shrine trigger is server-authoritative in multiplayer PIE"),
+		IsValid(ShrineTriggerActorDefaults) && ShrineTriggerActorDefaults->GetIsReplicated());
+	TestTrue(TEXT("Defense trigger is server-authoritative in multiplayer PIE"),
+		IsValid(DefenseTriggerActorDefaults) && DefenseTriggerActorDefaults->GetIsReplicated());
 
 	return true;
 }

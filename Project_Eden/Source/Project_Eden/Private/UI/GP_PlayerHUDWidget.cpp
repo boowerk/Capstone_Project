@@ -23,6 +23,8 @@
 #include "Materials/MaterialInterface.h"
 #include "UObject/ConstructorHelpers.h"
 #include "UI/GP_MinimapSubsystem.h"
+#include "Game/Corruption/GP_WorldCorruptionComponent.h"
+#include "Game/GP_GameState.h"
 #include "UI/GP_SkillSlotHUDWidget.h"
 #include "Player/GP_PlayerState.h"
 #include "AbilitySystem/Abilities/GP_SkillData.h"
@@ -82,6 +84,7 @@ void UGP_PlayerHUDWidget::NativeConstruct()
 	RefreshPreview();
 	RefreshMinimapPlayerArrowRotation();
 	BindToMinimapSubsystem();
+	BindToWorldCorruption();
 	RefreshMinimapBackgroundFromSubsystem();
 	RefreshMinimapPresentation(0.0f);
 
@@ -111,8 +114,13 @@ void UGP_PlayerHUDWidget::NativeDestruct()
 	{
 		BoundMinimapSubsystem->OnRenderTargetChanged.RemoveDynamic(this, &ThisClass::HandleMinimapRenderTargetChanged);
 	}
+	if (BoundWorldCorruption.IsValid())
+	{
+		BoundWorldCorruption->OnWorldCorruptionChanged.RemoveDynamic(this, &ThisClass::HandleWorldCorruptionChanged);
+	}
 
 	BoundMinimapSubsystem.Reset();
+	BoundWorldCorruption.Reset();
 	EnemyMarkerPool.Reset();
 	MinimapMarkerCanvas = nullptr;
 	MinimapMaterialInstance = nullptr;
@@ -184,9 +192,47 @@ void UGP_PlayerHUDWidget::EnsureMinimapMaterial(UTextureRenderTarget2D* InRender
 
 void UGP_PlayerHUDWidget::RefreshMinimapPresentation(float DeltaSeconds)
 {
+	BindToWorldCorruption();
 	RefreshMinimapPlayerArrowRotation();
 	RefreshMinimapMapUV();
 	RefreshEnemyMinimapMarkers(DeltaSeconds);
+}
+
+void UGP_PlayerHUDWidget::BindToWorldCorruption()
+{
+	UWorld* World = GetWorld();
+	AGP_GameState* GameState = World ? World->GetGameState<AGP_GameState>() : nullptr;
+	UGP_WorldCorruptionComponent* Corruption = IsValid(GameState) ? GameState->GetWorldCorruptionComponent() : nullptr;
+	if (!IsValid(Corruption) || BoundWorldCorruption.Get() == Corruption)
+	{
+		return;
+	}
+
+	if (BoundWorldCorruption.IsValid())
+	{
+		BoundWorldCorruption->OnWorldCorruptionChanged.RemoveDynamic(this, &ThisClass::HandleWorldCorruptionChanged);
+	}
+	BoundWorldCorruption = Corruption;
+	Corruption->OnWorldCorruptionChanged.AddUniqueDynamic(this, &ThisClass::HandleWorldCorruptionChanged);
+	ApplyMinimapCorruptionTint(Corruption->GetWorldCorruptionNormalized());
+}
+
+void UGP_PlayerHUDWidget::HandleWorldCorruptionChanged(float Corruption, float NormalizedCorruption)
+{
+	ApplyMinimapCorruptionTint(NormalizedCorruption);
+}
+
+void UGP_PlayerHUDWidget::ApplyMinimapCorruptionTint(float NormalizedCorruption)
+{
+	if (UImage* BackgroundImage = ResolveMinimapBackgroundImage())
+	{
+		// UImage tint multiplies the existing one-shot map material without changing its UV or capture resource.
+		const FLinearColor Tint = FLinearColor::LerpUsingHSV(
+			MinimapCleanTint,
+			MinimapCorruptedTint,
+			FMath::Clamp(NormalizedCorruption, 0.0f, 1.0f));
+		BackgroundImage->SetColorAndOpacity(Tint);
+	}
 }
 
 void UGP_PlayerHUDWidget::RefreshMinimapMapUV()

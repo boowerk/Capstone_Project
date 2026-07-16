@@ -27,6 +27,7 @@
 #include "Net/UnrealNetwork.h"
 #include "Player/GP_PlayerState.h"
 #include "GameFramework/GameStateBase.h"
+#include "Game/Corruption/GP_EnemyCorruptionComponent.h"
 #include "UI/GP_AttributeWidget.h"
 #include "UI/GP_WidgetComponent.h"
 #include "UObject/ConstructorHelpers.h"
@@ -62,6 +63,9 @@ AGP_EnemyCharacter::AGP_EnemyCharacter()
 	WorldHealthBarComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	WorldHealthBarComponent->SetGenerateOverlapEvents(false);
 	WorldHealthBarComponent->SetCastShadow(false);
+
+	// Every native and Blueprint enemy inherits the same GAS-backed corruption scaling adapter.
+	EnemyCorruptionComponent = CreateDefaultSubobject<UGP_EnemyCorruptionComponent>(TEXT("EnemyCorruptionComponent"));
 
 	// Existing Blueprint enemies receive the shared health bar asset through their native parent automatically.
 	static ConstructorHelpers::FClassFinder<UGP_AttributeWidget> EnemyHealthBarFinder(TEXT("/Game/UI/WBP_EnemyHealthBar"));
@@ -210,6 +214,11 @@ void AGP_EnemyCharacter::BeginPlay()
 		GiveDefaultBossPatternAbilities();
 	}
 	InitializeAttributes();
+	if (IsValid(EnemyCorruptionComponent))
+	{
+		// Apply corruption after base attributes exist so the infinite effect remains an independent modifier.
+		EnemyCorruptionComponent->InitializeFromOwner();
+	}
 
 	const float AttributeMoveSpeed = GetAbilitySystemComponent()->GetNumericAttribute(UGP_AttributeSet::GetMoveSpeedAttribute());
 	if (AttributeMoveSpeed > KINDA_SMALL_NUMBER)
@@ -519,6 +528,11 @@ void AGP_EnemyCharacter::ApplyDeathState()
 	}
 
 	bDeathStateApplied = true;
+	if (IsValid(EnemyCorruptionComponent))
+	{
+		// Only bosses mutate world corruption; the component guards authority and duplicate death presentation calls.
+		EnemyCorruptionComponent->HandleOwnerDeath(bIsBossEnemy);
+	}
 	if (IsValid(BossTargetMarkerVFXComponent))
 	{
 		// Death must revoke selected-target presentation before delayed despawn can leave the boss corpse around.
@@ -576,6 +590,14 @@ void AGP_EnemyCharacter::ApplyDeathState()
 		{
 			SetLifeSpan(DeathDespawnDelay);
 		}
+	}
+}
+
+void AGP_EnemyCharacter::SetCorruptionRegionId(int32 RegionId)
+{
+	if (IsValid(EnemyCorruptionComponent))
+	{
+		EnemyCorruptionComponent->SetCorruptionRegionId(RegionId);
 	}
 }
 

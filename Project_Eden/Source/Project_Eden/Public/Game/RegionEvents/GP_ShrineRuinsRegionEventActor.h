@@ -15,6 +15,8 @@ class PROJECT_EDEN_API AGP_ShrineRuinsRegionEventActor : public AGP_RegionEventA
 public:
 	AGP_ShrineRuinsRegionEventActor();
 
+	virtual void ActivateRegionEvent() override;
+
 protected:
 	virtual void BeginPlay() override;
 
@@ -28,4 +30,7 @@ private:
 	UFUNCTION()
 	void HandleShrineOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
 		UPrimitiveComponent* OtherComponent, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+
+	void RewardOverlappingPlayers();
+	void TryRewardPlayer(AGP_PlayerCharacter* PlayerCharacter);
 };

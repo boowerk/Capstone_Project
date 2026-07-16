@@ -5,6 +5,7 @@
 #include "GP_GameMode.generated.h"
 
 class AGP_EnemyCharacter;
+class AGP_CorruptionPresentationActor;
 class AGP_EnemySpawnVolume;
 class AGP_GameState;
 class AGP_RunPortal;
@@ -71,6 +72,30 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Region")
 	uint8 AliveRegionState = 0;
 
+	// Corruption progression is initialized together with the existing region state array.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Corruption")
+	bool bEnableWorldCorruption = true;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Corruption", meta = (EditCondition = "bEnableWorldCorruption", ClampMin = "0.0"))
+	float InitialCorruption = 15.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Corruption", meta = (EditCondition = "bEnableWorldCorruption", ClampMin = "1.0"))
+	float MaximumCorruption = 100.0f;
+
+	// The default adds two corruption points per real-time minute to every region.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Corruption", meta = (EditCondition = "bEnableWorldCorruption", ClampMin = "0.0"))
+	float PassiveCorruptionIncreasePerMinute = 2.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Corruption", meta = (EditCondition = "bEnableWorldCorruption", ClampMin = "0.1", Units = "s"))
+	float CorruptionUpdateInterval = 5.0f;
+
+	// The replicated native actor works out of the box; assign a BP child to customize skybox material presentation.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Corruption|Presentation")
+	bool bAutoSpawnCorruptionPresentation = true;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Corruption|Presentation", meta = (EditCondition = "bAutoSpawnCorruptionPresentation"))
+	TSubclassOf<AGP_CorruptionPresentationActor> CorruptionPresentationClass;
+
 	// Optional regional event coordinator. Place one in the map for authored pools, or provide a class to auto-spawn.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Region Events")
 	TSubclassOf<AGP_RegionEventDirector> RegionEventDirectorClass;
@@ -110,12 +135,13 @@ private:
 	void GatherZones();
 	void ResolveRegionEventDirector();
 	void InitializeRegionStates();
+	void SpawnCorruptionPresentation();
 	void UnlockZone(int32 ZoneIndex);
 	void StartZone(int32 ZoneIndex);
 	void StartRegionEventForZone(AGP_EnemySpawnVolume* Zone, EGPRegionEventTrigger Trigger);
 	void SpawnZoneEnemies(AGP_EnemySpawnVolume* Zone);
 	void SpawnMarkerEnemies(AGP_EnemySpawnVolume* Zone, AGP_EnemySpawnMarker* Marker);
-	void RegisterZoneEnemy(AGP_EnemyCharacter* Enemy);
+	void RegisterZoneEnemy(AGP_EnemyCharacter* Enemy, int32 CorruptionRegionId = INDEX_NONE);
 	void MaybeCompleteZone();
 	void CompleteCurrentZone();
 	void AdvanceZone();

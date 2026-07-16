@@ -1,6 +1,8 @@
 #include "Game/GP_GameMode.h"
 
 #include "Characters/GP_EnemyCharacter.h"
+#include "Game/Corruption/GP_CorruptionPresentationActor.h"
+#include "Game/Corruption/GP_WorldCorruptionComponent.h"
 #include "Game/GP_EnemySpawnMarker.h"
 #include "Game/GP_EnemySpawnVolume.h"
 #include "Game/GP_GameState.h"
@@ -13,6 +15,7 @@ AGP_GameMode::AGP_GameMode()
 {
 	GameStateClass = AGP_GameState::StaticClass();
 	RegionEventDirectorClass = AGP_RegionEventDirector::StaticClass();
+	CorruptionPresentationClass = AGP_CorruptionPresentationActor::StaticClass();
 
 	// Match the lobby's seamless transition so arriving clients are carried
 	// into this map instead of being dropped during the load.
@@ -25,6 +28,7 @@ void AGP_GameMode::BeginPlay()
 
 	GatherZones();
 	ResolveRegionEventDirector();
+	SpawnCorruptionPresentation();
 
 	// Let placed BP actors bind to GameState delegates in their BeginPlay before
 	// the initial all-dead reset is broadcast on the server/listen host.
@@ -48,6 +52,43 @@ void AGP_GameMode::InitializeRegionStates()
 	if (AGP_GameState* GPGameState = GetGPGameState())
 	{
 		GPGameState->InitRegionStates(RegionCount, DeadRegionState);
+
+		if (UGP_WorldCorruptionComponent* Corruption = GPGameState->GetWorldCorruptionComponent())
+		{
+			// The authoritative timer lives with GameState so seamless clients receive one shared progression value.
+			Corruption->InitializeCorruption(
+				RegionCount,
+				bEnableWorldCorruption ? InitialCorruption : 0.0f,
+				MaximumCorruption,
+				PassiveCorruptionIncreasePerMinute,
+				CorruptionUpdateInterval,
+				bEnableWorldCorruption);
+		}
+	}
+}
+
+void AGP_GameMode::SpawnCorruptionPresentation()
+{
+	if (!bAutoSpawnCorruptionPresentation || !bEnableWorldCorruption || !*CorruptionPresentationClass)
+	{
+		return;
+	}
+
+	// Preserve an authored presentation actor or a seamless-travel carry-over instead of spawning a duplicate.
+	if (UGameplayStatics::GetActorOfClass(this, AGP_CorruptionPresentationActor::StaticClass()))
+	{
+		return;
+	}
+
+	if (UWorld* World = GetWorld())
+	{
+		FActorSpawnParameters SpawnParameters;
+		SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		World->SpawnActor<AGP_CorruptionPresentationActor>(
+			CorruptionPresentationClass,
+			FVector::ZeroVector,
+			FRotator::ZeroRotator,
+			SpawnParameters);
 	}
 }
 
@@ -255,7 +296,7 @@ void AGP_GameMode::SpawnMarkerEnemies(AGP_EnemySpawnVolume* Zone, AGP_EnemySpawn
 			}
 
 			SpawnedEnemy->SpawnDefaultController();
-			RegisterZoneEnemy(SpawnedEnemy);
+			RegisterZoneEnemy(SpawnedEnemy, Zone->GetCorruptionRegionId());
 		}
 	}
 }
@@ -332,12 +373,12 @@ void AGP_GameMode::SpawnZoneEnemies(AGP_EnemySpawnVolume* Zone)
 			}
 
 			SpawnedEnemy->SpawnDefaultController();
-			RegisterZoneEnemy(SpawnedEnemy);
+			RegisterZoneEnemy(SpawnedEnemy, Zone->GetCorruptionRegionId());
 		}
 	}
 }
 
-void AGP_GameMode::RegisterZoneEnemy(AGP_EnemyCharacter* Enemy)
+void AGP_GameMode::RegisterZoneEnemy(AGP_EnemyCharacter* Enemy, int32 CorruptionRegionId)
 {
 	if (bRunFinished || !IsValid(Enemy))
 	{
@@ -348,6 +389,9 @@ void AGP_GameMode::RegisterZoneEnemy(AGP_EnemyCharacter* Enemy)
 	{
 		return;
 	}
+
+	// The explicit event/zone id lets enemies retain their regional strength even after progression advances.
+	Enemy->SetCorruptionRegionId(CorruptionRegionId != INDEX_NONE ? CorruptionRegionId : CurrentZoneIndex);
 
 	Enemy->OnEnemyDied.AddDynamic(this, &AGP_GameMode::HandleZoneEnemyDied);
 	++AliveZoneEnemies;
@@ -380,7 +424,7 @@ void AGP_GameMode::HandleZoneEnemyDied(AGP_EnemyCharacter* DeadEnemy)
 void AGP_GameMode::HandleRegionEventEnemySpawned(AGP_RegionEventActor* EventActor, AGP_EnemyCharacter* Enemy)
 {
 	// Event-spawned enemies join the current zone budget so events cannot be ignored during a city clear.
-	RegisterZoneEnemy(Enemy);
+	RegisterZoneEnemy(Enemy, IsValid(EventActor) ? EventActor->GetRegionId() : INDEX_NONE);
 }
 
 void AGP_GameMode::CompleteCurrentZone()

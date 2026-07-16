@@ -18,6 +18,7 @@ class UCanvasPanel;
 class UAbilitySystemComponent;
 class UGP_AttributeSet;
 class UGP_MinimapSubsystem;
+class UGP_WorldCorruptionComponent;
 class UGP_SkillSlotHUDWidget;
 class AGP_PlayerState;
 class UGP_SkillData;
@@ -99,6 +100,8 @@ protected:
 private:
 	void RefreshPreview();
 	void BindToMinimapSubsystem();
+	void BindToWorldCorruption();
+	void ApplyMinimapCorruptionTint(float NormalizedCorruption);
 	UImage* ResolveMinimapBackgroundImage() const;
 	UWidget* ResolveMinimapPlayerArrowWidget() const;
 	void EnsureMinimapMaterial(UTextureRenderTarget2D* InRenderTarget);
@@ -117,6 +120,9 @@ private:
 
 	UFUNCTION()
 	void HandleMinimapRenderTargetChanged(UTextureRenderTarget2D* InRenderTarget);
+
+	UFUNCTION()
+	void HandleWorldCorruptionChanged(float Corruption, float NormalizedCorruption);
 	
 	UPROPERTY(BlueprintReadOnly, Category = "HUD", meta = (BindWidgetOptional, AllowPrivateAccess = "true"))
 	TObjectPtr<UGP_AttributeWidget> HealthBar;
@@ -199,6 +205,13 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EldenRing HUD|Minimap", meta = (AllowPrivateAccess = "true", ClampMin = "0.1", ClampMax = "0.5"))
 	float MinimapMarkerVisibleRadius = 0.47f;
 
+	// Tint only the captured map image; the brass frame, player arrow, and enemy markers remain readable.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EldenRing HUD|Minimap|Corruption", meta = (AllowPrivateAccess = "true"))
+	FLinearColor MinimapCleanTint = FLinearColor::White;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EldenRing HUD|Minimap|Corruption", meta = (AllowPrivateAccess = "true"))
+	FLinearColor MinimapCorruptedTint = FLinearColor(0.48f, 0.10f, 0.14f, 1.0f);
+
 	TWeakObjectPtr<UAbilitySystemComponent> BoundPlayerASC;
 	TWeakObjectPtr<UAbilitySystemComponent> BoundBossASC;
 	TWeakObjectPtr<AGP_PlayerState> BoundSkillPlayerState;
@@ -207,6 +220,7 @@ private:
 	bool bHasCachedMinimapPlayerArrowAngle = false;
 	float CachedMinimapPlayerArrowAngle = 0.0f;
 	TWeakObjectPtr<UGP_MinimapSubsystem> BoundMinimapSubsystem;
+	TWeakObjectPtr<UGP_WorldCorruptionComponent> BoundWorldCorruption;
 	TWeakObjectPtr<UTextureRenderTarget2D> BoundMinimapRenderTarget;
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInstanceDynamic> MinimapMaterialInstance;

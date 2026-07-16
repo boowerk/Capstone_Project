@@ -15,6 +15,7 @@ class UEnemyAIRangeVisualizationComponent;
 class UEnemyArchetypeData;
 class UGP_BossDeathPresentationComponent;
 class UGP_BossTargetMarkerVFXComponent;
+class UGP_EnemyCorruptionComponent;
 class UGP_EnemyDeathAbility;
 class UGP_WidgetComponent;
 class UPDA_EnemyAnimationSet;
@@ -115,6 +116,12 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Enemy|UI")
 	UGP_WidgetComponent* GetWorldHealthBarComponent() const { return WorldHealthBarComponent; }
+
+	UFUNCTION(BlueprintPure, Category = "World Corruption|Enemy")
+	UGP_EnemyCorruptionComponent* GetEnemyCorruptionComponent() const { return EnemyCorruptionComponent; }
+
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "World Corruption|Enemy")
+	void SetCorruptionRegionId(int32 RegionId);
 
 	// Public authority entry point also supports scripted kills while zero-health deaths arrive through AttributeSet.
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Enemy|Death")
@@ -282,6 +289,10 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Enemy|UI", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UGP_WidgetComponent> WorldHealthBarComponent;
+
+	// This adapter applies only the regional corruption contribution as a GAS effect.
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Corruption|Enemy", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UGP_EnemyCorruptionComponent> EnemyCorruptionComponent;
 
 	FVector BehaviorAnchorLocation = FVector::ZeroVector;
 	bool bHasBehaviorAnchorLocation = false;

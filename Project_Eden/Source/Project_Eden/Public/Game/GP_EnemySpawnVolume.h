@@ -46,6 +46,7 @@ public:
 	bool IsBossZone() const { return bIsBossZone; }
 	FText GetDisplayName() const { return DisplayName; }
 	const TArray<int32>& GetRegionsToRevive() const { return RegionsToRevive; }
+	int32 GetCorruptionRegionId() const;
 	const TArray<FGP_EnemySpawnEntry>& GetSpawns() const { return Spawns; }
 	const TArray<TObjectPtr<AGP_EnemySpawnMarker>>& GetMarkers() const { return Markers; }
 	int32 GetMarkerCount() const { return Markers.Num(); }
@@ -84,6 +85,10 @@ protected:
 	// clear light up its surrounding nature regions. Empty = revives nothing.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Zone|Region")
 	TArray<int32> RegionsToRevive;
+
+	// -1 automatically uses the first revived region, then ZoneOrder as a final fallback.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Zone|Corruption", meta = (ClampMin = "-1"))
+	int32 CorruptionRegionId = INDEX_NONE;
 
 	// Box-fallback composition (used when no markers exist, or for boss zones).
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Zone")
