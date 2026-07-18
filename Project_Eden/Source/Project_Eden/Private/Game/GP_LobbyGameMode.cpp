@@ -167,17 +167,52 @@ bool AGP_LobbyGameMode::HasExactPartySize(int32 ConnectedPlayerCount, int32 Requ
 	return ConnectedPlayerCount == RequiredPlayerCount;
 }
 
-void AGP_LobbyGameMode::ForceStartGame()
+bool AGP_LobbyGameMode::CanForceStart(const APlayerController* RequestingController) const
 {
+	const bool bExplicitlyEnabled =
+		FParse::Param(FCommandLine::Get(), TEXT("AllowLobbyForceStart"));
+	return IsForceStartRequestAllowed(
+		bExplicitlyEnabled,
+		IsValid(RequestingController) && RequestingController->HasAuthority(),
+		IsValid(RequestingController) && RequestingController->IsLocalController());
+}
+
+bool AGP_LobbyGameMode::TryForceStartGame(APlayerController* RequestingController)
+{
+	if (!CanForceStart(RequestingController))
+	{
+		// Remote clients and production builds must never bypass the exact
+		// three-player Ready contract through the debug RPC.
+		UE_LOG(
+			LogTemp,
+			Verbose,
+			TEXT("[Lobby] Rejected force-start request from %s."),
+			*GetNameSafe(RequestingController));
+		return false;
+	}
+
 	if (bTravelInitiated)
 	{
-		return;
+		return false;
 	}
 	bTravelInitiated = true;
-	// Skip the player-count and ready gates entirely so a lone player can start.
+	// Explicit local debug sessions may skip the count and Ready gates.
 	OnAllPlayersReady();
 	BroadcastLoading();
 	TravelToGame();
+	return true;
+}
+
+bool AGP_LobbyGameMode::IsForceStartRequestAllowed(
+	bool bExplicitlyEnabled,
+	bool bHasAuthority,
+	bool bIsLocalController)
+{
+#if UE_BUILD_SHIPPING
+	return false;
+#else
+	return bExplicitlyEnabled && bHasAuthority && bIsLocalController;
+#endif
 }
 
 void AGP_LobbyGameMode::TravelToGame()

@@ -5,6 +5,7 @@
 #include "GP_LobbyGameMode.generated.h"
 
 class AGP_LobbyPlayerState;
+class APlayerController;
 
 UCLASS()
 class PROJECT_EDEN_API AGP_LobbyGameMode : public AGameModeBase
@@ -25,10 +26,17 @@ public:
 	// defense in depth so an over-capacity lobby can never begin travel.
 	static bool HasExactPartySize(int32 ConnectedPlayerCount, int32 RequiredPlayerCount);
 
-	// Debug/solo: start the run immediately, ignoring player count and ready
-	// state. Server-authoritative; invoked via the lobby controller's exec.
-	UFUNCTION(BlueprintCallable, Category = "Lobby")
-	void ForceStartGame();
+	// Debug/solo starts are disabled in Shipping and require both an explicit
+	// launch flag and an authoritative local (listen/standalone) controller.
+	bool CanForceStart(const APlayerController* RequestingController) const;
+	bool TryForceStartGame(APlayerController* RequestingController);
+
+	// Pure policy seam used to keep every caller aligned with the same
+	// Shipping/authority/local-controller restrictions.
+	static bool IsForceStartRequestAllowed(
+		bool bExplicitlyEnabled,
+		bool bHasAuthority,
+		bool bIsLocalController);
 
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Lobby")
@@ -52,7 +60,7 @@ private:
 	void BroadcastLoading();
 	void TravelToGame();
 
-	// Last Ready, Blueprint callbacks, and debug ForceStart can arrive in the
-	// same frame; only the authoritative first path may initiate ServerTravel.
+	// Last Ready, Blueprint callbacks, and an allowed debug force-start can
+	// arrive in the same frame; only the first path may initiate ServerTravel.
 	bool bTravelInitiated = false;
 };
