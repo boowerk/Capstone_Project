@@ -2,9 +2,11 @@
 
 #include "Misc/AutomationTest.h"
 
+#include "Components/BoxComponent.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
 #include "Game/GP_GameMode.h"
+#include "GameFramework/Actor.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerStart.h"
@@ -21,18 +23,41 @@ bool FGPThreePlayerRuntimeStartTest::RunTest(const FString& Parameters)
 	{
 		return false;
 	}
+	// CreateWorld already owns a PersistentLevel and WorldSettings; only add the physics scene when absent.
+	if (!TestWorld->GetPhysicsScene())
+	{
+		TestWorld->CreatePhysicsScene(nullptr);
+	}
 
 	FActorSpawnParameters SpawnParameters;
 	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AActor* TestFloor = TestWorld->SpawnActor<AActor>(
+		FVector::ZeroVector,
+		FRotator::ZeroRotator,
+		SpawnParameters);
+	UBoxComponent* FloorCollision = TestFloor ? NewObject<UBoxComponent>(TestFloor) : nullptr;
+	if (TestFloor && FloorCollision)
+	{
+		// Supply real WorldStatic geometry so the runtime ground and capsule-fit checks execute in the test.
+		TestFloor->SetRootComponent(FloorCollision);
+		FloorCollision->InitBoxExtent(FVector(1500.0f, 1500.0f, 10.0f));
+		FloorCollision->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+		FloorCollision->SetCollisionObjectType(ECC_WorldStatic);
+		FloorCollision->SetCollisionResponseToAllChannels(ECR_Block);
+		FloorCollision->RegisterComponent();
+	}
+
 	AGP_GameMode* GameMode = TestWorld->SpawnActor<AGP_GameMode>(
 		FVector::ZeroVector,
 		FRotator::ZeroRotator,
 		SpawnParameters);
 	APlayerStart* AuthoredAnchor = TestWorld->SpawnActor<APlayerStart>(
-		FVector(0.0f, 0.0f, 200.0f),
+		FVector(0.0f, 0.0f, 108.0f),
 		FRotator::ZeroRotator,
 		SpawnParameters);
-	if (!TestNotNull(TEXT("Spawned gameplay GameMode"), GameMode)
+	if (!TestNotNull(TEXT("Spawned collision floor"), TestFloor)
+		|| !TestNotNull(TEXT("Registered collision floor component"), FloorCollision)
+		|| !TestNotNull(TEXT("Spawned gameplay GameMode"), GameMode)
 		|| !TestNotNull(TEXT("Spawned authored PlayerStart anchor"), AuthoredAnchor))
 	{
 		TestWorld->DestroyWorld(false);
@@ -85,6 +110,20 @@ bool FGPThreePlayerRuntimeStartTest::RunTest(const FString& Parameters)
 		Controllers.IsValidIndex(1)
 			&& AssignedStarts.IsValidIndex(1)
 			&& GameMode->ChoosePlayerStart(Controllers[1]) == AssignedStarts[1]);
+
+	TSet<APawn*> SpawnedPawns;
+	for (APlayerController* Controller : Controllers)
+	{
+		if (IsValid(Controller))
+		{
+			GameMode->RestartPlayer(Controller);
+			APawn* Pawn = Controller->GetPawn();
+			TestNotNull(TEXT("RestartPlayer creates a possessed Pawn"), Pawn);
+			TestTrue(TEXT("Spawned Pawn is owned by its assigned controller"), Pawn && Pawn->GetController() == Controller);
+			SpawnedPawns.Add(Pawn);
+		}
+	}
+	TestEqual(TEXT("Three controllers possess three distinct Pawns"), SpawnedPawns.Num(), 3);
 
 	int32 PlayerStartCount = 0;
 	int32 RuntimePlayerStartCount = 0;

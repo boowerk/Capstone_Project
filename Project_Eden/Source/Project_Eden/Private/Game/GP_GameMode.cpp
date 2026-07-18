@@ -12,6 +12,8 @@
 #include "Game/RegionEvents/GP_RegionEventDirector.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
+#include "GameFramework/Character.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerStart.h"
 #include "Kismet/GameplayStatics.h"
@@ -42,6 +44,13 @@ AActor* AGP_GameMode::ChoosePlayerStart_Implementation(AController* Player)
 
 	// Preserve the engine fallback for maps without an authored anchor or for unexpected extra players.
 	return Super::ChoosePlayerStart_Implementation(Player);
+}
+
+void AGP_GameMode::Logout(AController* Exiting)
+{
+	// Release the deterministic slot immediately so a reconnect does not wait for garbage collection.
+	PartyStartSlotByController.Remove(TWeakObjectPtr<AController>(Exiting));
+	Super::Logout(Exiting);
 }
 
 void AGP_GameMode::EnsurePartyPlayerStarts(AController* Player)
@@ -169,27 +178,54 @@ APlayerStart* AGP_GameMode::SpawnRuntimePartyPlayerStart(
 		Anchor.GetActorLocation()
 		+ WorldDirection.GetSafeNormal() * PartyPlayerStartSpacing * RadiusMultiplier;
 	const FRotator CandidateRotation = Anchor.GetActorRotation();
-
-	FHitResult GroundHit;
-	FCollisionQueryParams GroundQueryParams(SCENE_QUERY_STAT(GP_RuntimePartyStartGround), false);
-	GroundQueryParams.AddIgnoredActor(&Anchor);
-	const FVector TraceStart(CandidateLocation.X, CandidateLocation.Y, Anchor.GetActorLocation().Z + 1000.0f);
-	const FVector TraceEnd(CandidateLocation.X, CandidateLocation.Y, Anchor.GetActorLocation().Z - 2000.0f);
-	if (World->LineTraceSingleByObjectType(
-		GroundHit,
-		TraceStart,
-		TraceEnd,
-		FCollisionObjectQueryParams(ECC_WorldStatic),
-		GroundQueryParams)
-		&& GroundHit.ImpactNormal.Z >= 0.6f)
+	float MinimumWalkableNormalZ = 0.7f;
+	if (const ACharacter* CharacterToFit = Cast<ACharacter>(PawnToFit))
 	{
+		if (const UCharacterMovementComponent* Movement = CharacterToFit->GetCharacterMovement())
+		{
+			MinimumWalkableNormalZ = Movement->GetWalkableFloorZ();
+		}
+	}
+
+	const auto SnapToWalkableGround = [World, &Anchor, PawnToFit, MinimumWalkableNormalZ](FVector& InOutLocation)
+	{
+		FHitResult GroundHit;
+		FCollisionQueryParams GroundQueryParams(SCENE_QUERY_STAT(GP_RuntimePartyStartGround), false);
+		GroundQueryParams.AddIgnoredActor(&Anchor);
+		const FVector TraceStart(InOutLocation.X, InOutLocation.Y, Anchor.GetActorLocation().Z + 1000.0f);
+		const FVector TraceEnd(InOutLocation.X, InOutLocation.Y, Anchor.GetActorLocation().Z - 2000.0f);
+		if (!World->LineTraceSingleByObjectType(
+			GroundHit,
+			TraceStart,
+			TraceEnd,
+			FCollisionObjectQueryParams(ECC_WorldStatic),
+			GroundQueryParams)
+			|| GroundHit.ImpactNormal.Z < MinimumWalkableNormalZ)
+		{
+			return false;
+		}
+
 		const float PawnHalfHeight = PawnToFit ? PawnToFit->GetDefaultHalfHeight() : 96.0f;
-		CandidateLocation.Z = GroundHit.ImpactPoint.Z + PawnHalfHeight + 2.0f;
+		InOutLocation.Z = GroundHit.ImpactPoint.Z + PawnHalfHeight + 2.0f;
+		return true;
+	};
+
+	// Never register a start over void or on a slope the production character cannot walk on.
+	if (!SnapToWalkableGround(CandidateLocation))
+	{
+		return nullptr;
 	}
 
 	if (PawnToFit
 		&& World->EncroachingBlockingGeometry(PawnToFit, CandidateLocation, CandidateRotation)
 		&& !World->FindTeleportSpot(PawnToFit, CandidateLocation, CandidateRotation))
+	{
+		return nullptr;
+	}
+
+	// FindTeleportSpot may move XY as well as Z; validate its final surface instead of trusting the first trace.
+	if (!SnapToWalkableGround(CandidateLocation)
+		|| (PawnToFit && World->EncroachingBlockingGeometry(PawnToFit, CandidateLocation, CandidateRotation)))
 	{
 		return nullptr;
 	}

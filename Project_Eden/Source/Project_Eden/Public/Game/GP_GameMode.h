@@ -41,6 +41,7 @@ public:
 protected:
 	virtual void BeginPlay() override;
 	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
+	virtual void Logout(AController* Exiting) override;
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "Run|Zone")
 	void OnZoneStarted(int32 ZoneIndex, AGP_EnemySpawnVolume* Zone);
