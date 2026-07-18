@@ -2,17 +2,17 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-07-18T16:53:56+09:00
+updated: 2026-07-18T19:05:23+09:00
 status: active
 tags: [memoc, memoc/state]
 ---
 # Session Summary
 
 ## Status
-- `L_GameMap1` and `L_LandscapeMap` runtime vegetation work. Shared graph: default 128m, current grass 32m, cleanup 1.5, bounded samplers.
+- Pair-ID + Edge Landscape blending is wired, but visual smoothing is partial. Some Nearest-ID stairs remain because Edge is not saturated at every ownership seam.
 
 ## Verified
-- `L_LandscapeMap` Box `32cm` -> `64000,64000,8000`; PIE grass 1,911 at start, 1,803 after 400m move, 50 cells pooled. No cache/no-surface error.
+- Asset/compile/PIE validation passes. PNG forensics found seam Edge min `148/255`; `Edge*0.5` then leaves up to 41.8% material discontinuity.
 
 ## Handoff
-- Other maps need per-instance runtime/partition/bounds checks. Existing non-grass Bounds Modifier warnings remain.
+- Checkpoint committed; branch is one commit ahead. Next, regenerate Edge from R-boundary seeds: force both seam texels to 255, then distance-field falloff. Keep Pair Nearest and PCG legacy.

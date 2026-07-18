@@ -3,7 +3,7 @@ memoc: true
 type: worklog
 scope: project-memory
 created: 2026-07-18T05:39:52
-updated: 2026-07-18T05:39:52
+updated: 2026-07-18T19:05:23+09:00
 status: active
 tags:
   - memoc
@@ -39,7 +39,14 @@ created: 2026-07-18T05:39:52
 
 ## Follow-up
 
-- Unreal import/material wiring is still required; ID uses Nearest/NoMip and Edge uses linear filtering/mips with `Edge.R * 0.5` blend alpha.
+- Unreal wiring is complete for `L_LandscapeMap`, but Edge generation needs seam normalization. Force both texels across every R transition to 255 before outward distance falloff; retain Pair Nearest and the legacy PCG input.
+
+## Applied in Unreal
+
+- Imported Pair-ID and smooth Edge assets under `/Game/RegionSystem/Textures/RegionID/GameMap1_Smoothed`.
+- Added `MF_RS_GetRegionBlendData` and a default-false `UseSeparateEdgeTexture` path to `M_StateMask`; enabled it only for `MI_RegionLandscape_GameMap2`.
+- Extended `BP_RegionStateManager` and its placed map instance to push the Edge texture. Seven affected assets validated `VALID` with no errors or warnings; PIE showed no material, shader, or Blueprint runtime errors.
+- Visual inspection exposed residual stairs. PNG analysis confirmed Edge is present at every ownership seam but drops to 148/255; the current reciprocal `Edge*0.5` blend can therefore jump by up to 41.8% when Nearest R changes.
 
 ## Related
 

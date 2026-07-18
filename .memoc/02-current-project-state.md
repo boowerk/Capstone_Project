@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-18T16:53:56+09:00
+updated: 2026-07-18T19:05:23+09:00
 status: active
 tags:
   - memoc
@@ -11,7 +11,7 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-07-18T16:53:56+09:00
+Last synced: 2026-07-18T19:05:23+09:00
 
 ## Current Status
 
@@ -37,6 +37,7 @@ Last synced: 2026-07-18T16:53:56+09:00
 - Client-server player movement now resolves directional speed from the same clamped raw move input before falling back to server acceleration. This prevents server/client `MaxWalkSpeed` disagreement from causing movement corrections and camera-lag shake during network play. Editor build passed; PIE network visual confirmation remains recommended.
 - `/Game/Maps/MainMap/L_LandscapeMap` has 15 `BP_RegionSeed` actors normalized to labels/indices `RegionSeed_0` through `RegionSeed_14`; their X/Y positions now match the latest user-provided `SEEDS_WORLD` list. Existing Z heights were preserved. The placed `BP_RegionStateManager` override is `RegionCount=15` and `StateRT=/Game/RegionSystem/RenderTargets/RT_RegionState_15x1` (`15x1`). `L_GameMap` was not modified.
 - RegionState direction changed: treat state values as biome-type IDs rather than default/dead/corrupted gameplay status. Existing `AliveRegionState` / `DeadRegionState` naming in GameMode is legacy and should be renamed or replaced when this path is implemented.
+- `L_LandscapeMap` uses separate `T_GameMap1_RegionID_Pair` and `T_GameMap1_RegionEdge_Smooth`; the default-false compatibility path, GameMap2-only enablement, manager wiring, asset validation, compile, and PIE checks pass. Visual smoothing is incomplete: the generated Edge exists on every R ownership boundary but ranges down to `148/255` there. With `BoundaryAlpha=Edge*0.5`, Nearest R flips can retain up to 41.8% material discontinuity, producing long 1m-texel stairs. Regenerate Edge from R-boundary seeds, force both seam sides to 255, then build a symmetric distance falloff. Triple junctions retain a small single-neighbor limitation. PCG remains unchanged.
 - `/Game/Maps/MainMap/L_LandscapeMap` now contains a completed Landscape Sculpt terrain pass (`58c9391e`, `086dadc5`): broad western and central/eastern highlands, northern peaks, coastal ridges, cliff-like mesas, playable flattened zones, a west/central separating valley, internal low routes, erosion detail, and a lower southern bay. It intentionally remains material-, water-, road-, and foliage-free for later environment passes.
 - `UGP_BossTelegraphVFXComponent` keeps the master `Telegraph VFX On/Off` bool, while each non-Sans boss exposes a BP-editable `Telegraph VFX Patterns` tag->bool map. Crystal Seraph and Matador inherit one inactive native component; Dark Armor Knight reuses its existing BP-added component; Sans remains excluded. Master On alone does nothing: only checked pattern tags play the configured Niagara and wait for `TelegraphDuration` before existing GAS startup. Groggy/teleport utilities bypass it, Matador reserves delayed bull state, and Dark Knight charge skips the coordinator cue/delay only when Charge itself is checked. Editor build plus `ProjectEden.Combat.Boss.TelegraphVFXConfiguration` and the legacy charge test pass.
 - Minimap is now a one-shot PCG map pipeline (`a88bfee6`, `b3652834`, `e6806c69`): after PCG reports ready and stays idle for three polls, one orthographic full-map frame is captured from runtime PCG bounds, GPU-copied to the stable HUD RenderTarget, then SceneCapture and actor tick are disabled. `M_UI_Minimap_StaticMap` pans/zooms that fixed texture from C++ world-to-UV mapping; the player arrow and pooled `T_UI_Minimap_Point_Red` enemy Images remain separate UMG widgets.

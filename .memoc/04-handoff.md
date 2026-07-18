@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-18T16:53:56+09:00
+updated: 2026-07-18T19:05:23+09:00
 status: active
 tags:
   - memoc
@@ -11,7 +11,7 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-07-18T16:53:56+09:00
+Last synced: 2026-07-18T19:05:23+09:00
 
 ## PCG Vegetation Runtime Handoff
 
@@ -19,6 +19,13 @@ Last synced: 2026-07-18T16:53:56+09:00
 - `L_LandscapeMap` is verified with Box extent `64000,64000,8000`: PIE generated 1,911 grass instances at start and 1,803 after a 400m move, with 50 old cells pooled. Cache mode is `SerializeOnlyAtCook` with 289 entries.
 - `PCG_Vegetation_Global` is shared by several legacy maps. Their `BP_VegetationSpawner` instances may still inherit the Blueprint template defaults (`GenerateOnDemand`, non-partitioned, 32cm Box). Before expecting the same runtime behavior in another map, set that instance to Activated + GenerateAtRuntime + Partitioned and size its Box to the Landscape; then PIE-check bounded Surface Samplers there.
 - Existing non-grass branches emit `Bounds Modifier` multiple-input warnings in PIE. They did not block grass generation; inspect that graph wiring separately if warning cleanup is requested.
+
+## Landscape Region Boundary Blend Handoff
+
+- `L_LandscapeMap` and `MI_RegionLandscape_GameMap2` use the new Pair-ID + smooth Edge texture path. `BP_RegionStateManager.ApplyLandscapeMaterial` now pushes `RegionEdgeTexture` as well as `IdTexture`.
+- `M_StateMask` retains the exact legacy branch behind default-false `UseSeparateEdgeTexture`; the other five material instances remain off. The new blend function is `MF_RS_GetRegionBlendData`.
+- PCG is intentionally not migrated: `PCG_Vegetation_Global` still overrides the legacy `T_GameMap1_RegionID`, has no Edge override, and its file hash stayed `45FC9A77...C3BA19`.
+- Visual defect remains: all R seams have Edge coverage, but only 40.8% of sampled seam endpoints are 255 and the minimum is 148. Since reciprocal sides use `0.5*Edge`, 19.0% of boundary adjacencies retain over 10% discontinuity and the maximum is 41.8%. Fix the generator, not Pair filtering: seed both sides of every R transition at 255 and generate outward distance falloff; re-force seam saturation after filtering. Mips may require a wider saturated core. Single-G triple junction artifacts are a secondary local limitation.
 
 ## Region Event System Handoff
 
