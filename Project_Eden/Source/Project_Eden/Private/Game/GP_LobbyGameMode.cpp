@@ -108,7 +108,7 @@ void AGP_LobbyGameMode::CheckAllReady()
 	}
 
 	const int32 PlayerCount = GetNumPlayers();
-	if (PlayerCount < ExpectedPlayerCount)
+	if (!HasExactPartySize(PlayerCount, ExpectedPlayerCount))
 	{
 		if (IsLobbySmokeEnabled())
 		{
@@ -158,6 +158,13 @@ void AGP_LobbyGameMode::CheckAllReady()
 	OnAllPlayersReady();
 	BroadcastLoading();
 	TravelToGame();
+}
+
+bool AGP_LobbyGameMode::HasExactPartySize(int32 ConnectedPlayerCount, int32 RequiredPlayerCount)
+{
+	// Do not treat an over-capacity lobby as ready even if every player has
+	// toggled Ready; only the authored party size may begin the run.
+	return ConnectedPlayerCount == RequiredPlayerCount;
 }
 
 void AGP_LobbyGameMode::ForceStartGame()

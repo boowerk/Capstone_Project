@@ -21,6 +21,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Lobby")
 	void CheckAllReady();
 
+	// The session cap is the primary admission guard; this exact comparison is
+	// defense in depth so an over-capacity lobby can never begin travel.
+	static bool HasExactPartySize(int32 ConnectedPlayerCount, int32 RequiredPlayerCount);
+
 	// Debug/solo: start the run immediately, ignoring player count and ready
 	// state. Server-authoritative; invoked via the lobby controller's exec.
 	UFUNCTION(BlueprintCallable, Category = "Lobby")

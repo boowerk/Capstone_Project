@@ -52,6 +52,17 @@ bool FGPLobbyLandscapeTravelConfigurationTest::RunTest(const FString& Parameters
 			FString(ExpectedLandscapeMapName));
 	}
 
+	// Keep the ready gate fail-closed on both sides of the exact party size.
+	TestFalse(
+		TEXT("Two connected players cannot start the run"),
+		AGP_LobbyGameMode::HasExactPartySize(2, ExpectedPartySize));
+	TestTrue(
+		TEXT("Exactly three connected players satisfy the party-size gate"),
+		AGP_LobbyGameMode::HasExactPartySize(3, ExpectedPartySize));
+	TestFalse(
+		TEXT("Four connected players cannot bypass the party-size gate"),
+		AGP_LobbyGameMode::HasExactPartySize(4, ExpectedPartySize));
+
 	UClass* LobbyBlueprintClass = LoadClass<AGP_LobbyGameMode>(nullptr, LobbyBlueprintClassPath);
 	if (!TestNotNull(TEXT("Production lobby GameMode Blueprint loads"), LobbyBlueprintClass))
 	{
