@@ -352,15 +352,18 @@ void AGP_EnemyCharacter::FinishBehaviorAttackCommit(float RecoverySeconds)
 bool AGP_EnemyCharacter::IsBehaviorAttackCommitted() const
 {
 	const UWorld* World = GetWorld();
+	// 타깃이 파괴되어 weak pointer가 먼저 비어도 이미 시작한 몽타주/타이머 액션의 잠금 수명은 유지한다.
 	return !bIsDead
 		&& IsValid(World)
-		&& BehaviorAttackCommittedTarget.IsValid()
 		&& World->GetTimeSeconds() < BehaviorAttackCommitUntilTimeSeconds;
 }
 
 AActor* AGP_EnemyCharacter::GetBehaviorAttackCommittedTarget() const
 {
-	return IsBehaviorAttackCommitted() ? BehaviorAttackCommittedTarget.Get() : nullptr;
+	// 액션 commit과 타깃 생존 여부는 별도 계약이며, 파괴된 타깃은 호출자에게 노출하지 않는다.
+	return IsBehaviorAttackCommitted() && BehaviorAttackCommittedTarget.IsValid()
+		? BehaviorAttackCommittedTarget.Get()
+		: nullptr;
 }
 
 void AGP_EnemyCharacter::InitializeBasicEnemyAttackCadence()

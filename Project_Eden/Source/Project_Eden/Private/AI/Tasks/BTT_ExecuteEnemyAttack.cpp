@@ -193,6 +193,19 @@ void UBTT_ExecuteEnemyAttack::TickTask(
 	PhaseElapsedSeconds += DeltaSeconds;
 	TotalElapsedSeconds += DeltaSeconds;
 
+	if (bLatentAbortPending && IsExplicitAttackInterruptActive())
+	{
+		// 대기 중 새로 사망·그로기 상태가 들어오면 자연 종료를 기다리지 않고 즉시 상위 분기에 제어권을 돌린다.
+		CancelTrackedAbility();
+		ScheduleBasicAttackCadence();
+		if (AGP_EnemyCharacter* EnemyCharacter = ActiveEnemyCharacter.Get())
+		{
+			EnemyCharacter->FinishBehaviorAttackCommit(0.0f);
+		}
+		FinishLatentAbort(OwnerComp);
+		return;
+	}
+
 	if (ExecutionPhase == EEnemyAttackTaskPhase::FacingTarget)
 	{
 		TickFacingTarget(OwnerComp, DeltaSeconds);
@@ -214,6 +227,8 @@ void UBTT_ExecuteEnemyAttack::TickTask(
 				TEXT("[EnemyAI] Attack lifecycle timed out; releasing BT commit: Pawn=%s Tag=%s"),
 				*EnemyAIDebugUtils::DescribeActor(ActiveEnemyCharacter.Get()),
 				*ActiveAbilityTag.ToString());
+			// 타임아웃 뒤 실제 어빌리티만 남아 다음 BT 분기와 겹치지 않도록 명시적으로 중단한다.
+			CancelTrackedAbility();
 		}
 
 		if (TotalElapsedSeconds < AttackTimeoutSeconds
@@ -251,7 +266,7 @@ void UBTT_ExecuteEnemyAttack::TickTask(
 	if (ExecutionPhase == EEnemyAttackTaskPhase::Recovery
 		&& PhaseElapsedSeconds >= EffectiveRecoverySeconds)
 	{
-		FinishLatentTask(OwnerComp, EBTNodeResult::Succeeded);
+		FinishRecovery(OwnerComp);
 	}
 }
 
@@ -260,6 +275,15 @@ EBTNodeResult::Type UBTT_ExecuteEnemyAttack::AbortTask(
 	uint8* NodeMemory)
 {
 	RestoreFacingOwnership();
+	if (ShouldDeferAbortForCommittedAction())
+	{
+		// Blackboard observer/root reevaluation은 보류하되 태스크 tick은 계속 받아 실제 액션 종료를 관찰한다.
+		bLatentAbortPending = true;
+		return EBTNodeResult::InProgress;
+	}
+
+	// 사망·그로기·안전 타임아웃은 진행 중 GAS까지 함께 끊어 잔여 피해가 새 분기와 겹치지 않게 한다.
+	CancelTrackedAbility();
 	ScheduleBasicAttackCadence();
 	if (AGP_EnemyCharacter* EnemyCharacter = ActiveEnemyCharacter.Get())
 	{
@@ -420,6 +444,45 @@ bool UBTT_ExecuteEnemyAttack::IsTrackedExternalBossActionActive() const
 	return IsValid(MatadorBoss) && MatadorBoss->IsBullPatternActive();
 }
 
+bool UBTT_ExecuteEnemyAttack::IsExplicitAttackInterruptActive() const
+{
+	const AGP_EnemyCharacter* EnemyCharacter = ActiveEnemyCharacter.Get();
+	if (!IsValid(EnemyCharacter) || EnemyCharacter->IsDead())
+	{
+		return true;
+	}
+
+	const UAbilitySystemComponent* ASC = ActiveAbilitySystemComponent.Get();
+	// 보스 취약 상태는 전술 변화가 아니라 명시적 패턴 interrupt이므로 진행 중 공격보다 우선한다.
+	return IsValid(ASC)
+		&& (ASC->HasMatchingGameplayTag(GPTags::State::Status::Enemy::Groggy)
+			|| ASC->HasMatchingGameplayTag(GPTags::State::Status::Enemy::WingCoreExposed)
+			|| ASC->HasMatchingGameplayTag(GPTags::State::Status::Enemy::GuardBroken));
+}
+
+bool UBTT_ExecuteEnemyAttack::ShouldDeferAbortForCommittedAction() const
+{
+	const AGP_EnemyCharacter* EnemyCharacter = ActiveEnemyCharacter.Get();
+	return bAttackActivationAccepted
+		&& IsValid(EnemyCharacter)
+		&& EnemyAttackTransitionPolicy::ShouldPreserveCommittedAction(
+			EnemyCharacter->IsBehaviorAttackCommitted(),
+			IsExplicitAttackInterruptActive());
+}
+
+void UBTT_ExecuteEnemyAttack::CancelTrackedAbility()
+{
+	UAbilitySystemComponent* ASC = ActiveAbilitySystemComponent.Get();
+	if (!IsValid(ASC) || !ActiveAbilityTag.IsValid() || !IsTrackedAbilityActive())
+	{
+		return;
+	}
+
+	// 현재는 프로젝트의 단일 공격 태그 계약으로 취소하며, exact spec handle 추적은 별도 강화 항목으로 남긴다.
+	const FGameplayTagContainer ActiveTagContainer = ActiveAbilityTag.GetSingleTagContainer();
+	ASC->CancelAbilities(&ActiveTagContainer);
+}
+
 void UBTT_ExecuteEnemyAttack::CompleteBasicAttack(UBehaviorTreeComponent& OwnerComp)
 {
 	ScheduleBasicAttackCadence();
@@ -436,8 +499,20 @@ void UBTT_ExecuteEnemyAttack::CompleteBasicAttack(UBehaviorTreeComponent& OwnerC
 	PhaseElapsedSeconds = 0.0f;
 	if (EffectiveRecoverySeconds <= KINDA_SMALL_NUMBER)
 	{
-		FinishLatentTask(OwnerComp, EBTNodeResult::Succeeded);
+		FinishRecovery(OwnerComp);
 	}
+}
+
+void UBTT_ExecuteEnemyAttack::FinishRecovery(UBehaviorTreeComponent& OwnerComp)
+{
+	if (bLatentAbortPending)
+	{
+		// 액션과 회복까지 끝난 시점에 보류했던 상위 분기 변경을 다시 허용한다.
+		FinishLatentAbort(OwnerComp);
+		return;
+	}
+
+	FinishLatentTask(OwnerComp, EBTNodeResult::Succeeded);
 }
 
 void UBTT_ExecuteEnemyAttack::ScheduleBasicAttackCadence()
@@ -479,6 +554,7 @@ void UBTT_ExecuteEnemyAttack::ResetExecutionState()
 	bUseBossPatternSelector = false;
 	bPreviousOrientRotationToMovement = false;
 	bPreviousUseControllerDesiredRotation = false;
+	bLatentAbortPending = false;
 }
 
 FString UBTT_ExecuteEnemyAttack::GetStaticDescription() const

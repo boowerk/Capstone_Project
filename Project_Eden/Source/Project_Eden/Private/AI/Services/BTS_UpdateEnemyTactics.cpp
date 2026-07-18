@@ -11,6 +11,7 @@
 #include "AI/Tasks/EnemyBTTaskCommon.h"
 #include "AIController.h"
 #include "AbilitySystem/GP_AttributeSet.h"
+#include "AbilitySystemComponent.h"
 #include "BehaviorTree/BehaviorTreeComponent.h"
 #include "BehaviorTree/BehaviorTreeTypes.h"
 #include "BehaviorTree/BlackboardComponent.h"
@@ -196,6 +197,12 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 
 	AEnemyAIController* EnemyAIController = Cast<AEnemyAIController>(AIController);
 	AGP_EnemyCharacter* EnemyCharacter = Cast<AGP_EnemyCharacter>(ControlledPawn);
+	const bool bActionCommitted = IsValid(EnemyCharacter) && EnemyCharacter->IsBehaviorAttackCommitted();
+	const UAbilitySystemComponent* EnemyASC = IsValid(EnemyCharacter) ? EnemyCharacter->GetAbilitySystemComponent() : nullptr;
+	const bool bExplicitAttackInterrupt = IsValid(EnemyASC)
+		&& (EnemyASC->HasMatchingGameplayTag(GPTags::State::Status::Enemy::Groggy)
+			|| EnemyASC->HasMatchingGameplayTag(GPTags::State::Status::Enemy::WingCoreExposed)
+			|| EnemyASC->HasMatchingGameplayTag(GPTags::State::Status::Enemy::GuardBroken));
 	const float EffectiveMaxChaseDistanceFromHome = IsValid(EnemyCharacter) ? EnemyCharacter->GetReturnHomeDistance() : MaxChaseDistanceFromHome;
 	const float EffectiveReturnHomeAcceptanceRadius = IsValid(EnemyCharacter) ? EnemyCharacter->GetReturnHomeAcceptanceRadius() : ReturnHomeAcceptanceRadius;
 	const FVector HomeLocation = EnemyBTTaskCommon::GetBehaviorAnchorLocation(ControlledPawn);
@@ -224,7 +231,12 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 		EffectiveReturnHomeAcceptanceRadius,
 		EffectiveMaxChaseDistanceFromHome * FMath::Clamp(ReturnHomeReengageDistanceRatio, 0.0f, 1.0f));
 	LeashObservation.ReturnHomeAcceptanceRadius = EffectiveReturnHomeAcceptanceRadius;
-	const bool bShouldReturnHome = EnemyLeashPolicy::ShouldReturnHome(LeashObservation);
+	const bool bLeashRequestsReturnHome = EnemyLeashPolicy::ShouldReturnHome(LeashObservation);
+	const bool bPreserveCommittedAction = EnemyAttackTransitionPolicy::ShouldPreserveCommittedAction(
+		bActionCommitted,
+		bExplicitAttackInterrupt);
+	// 바깥 경계를 넘은 틱에도 현재 공격을 끝낸 뒤 귀환을 시작해 몽타주와 이동 분기가 겹치지 않게 한다.
+	const bool bShouldReturnHome = bLeashRequestsReturnHome && !bPreserveCommittedAction;
 	const bool bReengagingDuringReturn = LeashObservation.bCurrentlyReturningHome
 		&& !bShouldReturnHome
 		&& LeashObservation.bHasVisibleTarget
@@ -247,9 +259,35 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 	BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldReturnHome, bShouldReturnHome);
 	if (!bShouldReturnHome && !IsValid(TargetActor) && IsValid(EnemyAIController))
 	{
-		// After returning home, perception may need an explicit rescore before the player can become TargetActor again.
-		EnemyAIController->RequestTargetActorReevaluation();
+		if (bPreserveCommittedAction)
+		{
+			// 공격 도중에는 다른 플레이어를 재선택하지 않고, 살아 있는 원래 타깃만 조용히 다시 연결한다.
+			TargetActor = IsValid(EnemyCharacter) ? EnemyCharacter->GetBehaviorAttackCommittedTarget() : nullptr;
+			if (IsValid(TargetActor))
+			{
+				BlackboardComponent->SetValueAsObject(EnemyBlackboardKeys::TargetActor, TargetActor);
+			}
+		}
+		else
+		{
+			// After returning home, perception may need an explicit rescore before the player can become TargetActor again.
+			EnemyAIController->RequestTargetActorReevaluation();
+		}
 		TargetActor = Cast<AActor>(BlackboardComponent->GetValueAsObject(EnemyBlackboardKeys::TargetActor));
+	}
+
+	if (bPreserveCommittedAction && !IsValid(TargetActor))
+	{
+		// Disconnect/파괴로 타깃 키가 비어도 진행 중 액션은 Combat 분기를 소유하고 이동을 계속 잠근다.
+		BTS_UpdateEnemyTactics_Internal::SetCombatStateTag(BlackboardComponent, GPTags::AI::State::Combat);
+		BlackboardComponent->SetValueAsFloat(EnemyBlackboardKeys::DistanceToTarget, 0.0f);
+		BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bHasLineOfSight, false);
+		BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldRetreat, false);
+		BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bCanAttack, true);
+		BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldReposition, false);
+		BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldChase, false);
+		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldReturnHome, false);
+		return;
 	}
 
 	if (bShouldReturnHome)
@@ -391,7 +429,7 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 	AttackObservation.bHasLineOfSight = bHasLineOfSight;
 	AttackObservation.bInsideAttackBand = bInsideAttackBand;
 	AttackObservation.bAttackCadenceReady = bAttackCadenceReady;
-	AttackObservation.bActionCommitted = IsValid(EnemyCharacter) && EnemyCharacter->IsBehaviorAttackCommitted();
+	AttackObservation.bActionCommitted = bPreserveCommittedAction;
 	const EEnemyAttackTransitionIntent AttackIntent = EnemyAttackTransitionPolicy::ResolveIntent(AttackObservation);
 	bool bCanAttack = AttackIntent == EEnemyAttackTransitionIntent::Attack;
 	const bool bShouldCombatHold = AttackIntent == EEnemyAttackTransitionIntent::CombatHold;

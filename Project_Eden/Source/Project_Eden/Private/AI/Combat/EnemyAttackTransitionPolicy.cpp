@@ -36,6 +36,14 @@ namespace EnemyAttackTransitionPolicy
 			MaximumYawStep);
 	}
 
+	bool ShouldPreserveCommittedAction(
+		bool bActionCommitted,
+		bool bExplicitInterrupt)
+	{
+		// 전술 관측 변화는 다음 액션 선택에만 반영하고 이미 승인된 공격의 수명은 바꾸지 않는다.
+		return bActionCommitted && !bExplicitInterrupt;
+	}
+
 	EEnemyAttackTransitionIntent ResolveIntent(const FEnemyAttackTransitionObservation& Observation)
 	{
 		if (Observation.bActionCommitted)

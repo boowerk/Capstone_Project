@@ -90,11 +90,15 @@ private:
 	bool ActivateBasicAttack();
 	bool IsTrackedAbilityActive() const;
 	bool IsTrackedExternalBossActionActive() const;
+	bool IsExplicitAttackInterruptActive() const;
+	bool ShouldDeferAbortForCommittedAction() const;
 	bool IsFacingCommittedTarget() const;
 	void TickFacingTarget(UBehaviorTreeComponent& OwnerComp, float DeltaSeconds);
 	void BeginFacingOwnership(APawn* ControlledPawn);
 	void RestoreFacingOwnership();
+	void CancelTrackedAbility();
 	void CompleteBasicAttack(UBehaviorTreeComponent& OwnerComp);
+	void FinishRecovery(UBehaviorTreeComponent& OwnerComp);
 	void ScheduleBasicAttackCadence();
 	void ResetExecutionState();
 
@@ -115,4 +119,5 @@ private:
 	bool bPreviousOrientRotationToMovement = false;
 	bool bPreviousUseControllerDesiredRotation = false;
 	bool bOwnsFacingRotation = false;
+	bool bLatentAbortPending = false;
 };

@@ -37,6 +37,11 @@ namespace EnemyAttackTransitionPolicy
 		float DeltaSeconds);
 
 	// 공격 의도와 실행 준비 시간을 분리해 쿨다운만으로 Chase가 열리지 않게 한다.
+	// 타깃 소실·leash 재평가는 시작한 액션을 끊지 않고, 사망·그로기 같은 명시적 interrupt만 우선한다.
+	PROJECT_EDEN_API bool ShouldPreserveCommittedAction(
+		bool bActionCommitted,
+		bool bExplicitInterrupt);
+
 	PROJECT_EDEN_API EEnemyAttackTransitionIntent ResolveIntent(
 		const FEnemyAttackTransitionObservation& Observation);
 }

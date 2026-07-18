@@ -245,8 +245,8 @@ void UGP_EnemyAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 		{
 			PlayMontageTask->OnCompleted.AddDynamic(this, &ThisClass::OnMontageCompleted);
 			PlayMontageTask->OnBlendOut.AddDynamic(this, &ThisClass::OnMontageCompleted);
-			PlayMontageTask->OnInterrupted.AddDynamic(this, &ThisClass::OnMontageCompleted);
-			PlayMontageTask->OnCancelled.AddDynamic(this, &ThisClass::OnMontageCompleted);
+			PlayMontageTask->OnInterrupted.AddDynamic(this, &ThisClass::OnMontageCancelled);
+			PlayMontageTask->OnCancelled.AddDynamic(this, &ThisClass::OnMontageCancelled);
 			PlayMontageTask->ReadyForActivation();
 		}
 
@@ -269,6 +269,12 @@ void UGP_EnemyAttack::OnMontageCompleted()
 	FinishAttackAbility(false);
 }
 
+void UGP_EnemyAttack::OnMontageCancelled()
+{
+	// 사망·그로기·BT 안전 타임아웃으로 끊긴 몽타주는 아직 오지 않은 타격 notify를 보정하지 않는다.
+	FinishAttackAbility(true);
+}
+
 void UGP_EnemyAttack::OnAttackEventReceived(FGameplayEventData Payload)
 {
 	PerformAttackHit();
@@ -289,12 +295,18 @@ void UGP_EnemyAttack::FinishAttackAbility(bool bWasCancelled)
 	bHasFinishedAttackAbility = true;
 
 	// 이벤트 노티파이를 빠뜨린 경우에도 최소한의 공격 판정은 보장
-	if (!bHasAppliedAttackHit)
+	// 정상 종료에서만 누락 notify를 보정하고, 명시적으로 취소된 공격은 추가 피해 없이 끝낸다.
+	if (ShouldApplyFallbackHit(bHasAppliedAttackHit, bWasCancelled))
 	{
 		PerformAttackHit();
 	}
 
 	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, bWasCancelled);
+}
+
+bool UGP_EnemyAttack::ShouldApplyFallbackHit(bool bAlreadyApplied, bool bWasCancelled)
+{
+	return !bAlreadyApplied && !bWasCancelled;
 }
 
 void UGP_EnemyAttack::PerformAttackHit()

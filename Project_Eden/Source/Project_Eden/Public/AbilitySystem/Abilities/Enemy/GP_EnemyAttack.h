@@ -48,15 +48,21 @@ private:
 	void OnMontageCompleted();
 
 	UFUNCTION()
+	void OnMontageCancelled();
+
+	UFUNCTION()
 	void OnAttackEventReceived(FGameplayEventData Payload);
 
 	UFUNCTION()
 	void OnActionEndEventReceived(FGameplayEventData Payload);
 
 	void FinishAttackAbility(bool bWasCancelled);
+	static bool ShouldApplyFallbackHit(bool bAlreadyApplied, bool bWasCancelled);
 
 	bool bHasAppliedAttackHit = false;
 	bool bHasFinishedAttackAbility = false;
+
+	friend class FEnemyAttackCancellationPolicyTest;
 
 	// Per-actor ability instance state. Prevents the same configured attack montage repeating twice in a row.
 	TObjectPtr<UAnimMontage> LastSelectedAttackMontage = nullptr;

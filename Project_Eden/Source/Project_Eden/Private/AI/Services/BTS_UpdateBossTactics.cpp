@@ -476,10 +476,9 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 		|| bCrystalSeraphGroggy
 		|| bDarkKnightGroggy
 		|| (bIsCrystalSeraphBoss && bWingCoreExposed);
-	if (bBossActionCommitted && bHasTarget && !bReturningHome && !bBossInVulnerabilityState)
+	if (bBossActionCommitted && !bBossInVulnerabilityState)
 	{
-		// Service ticks must not restart the BT while the selected pattern still
-		// owns its telegraph, impact, or recovery window.
+		// Target loss and leash changes are deferred until the selected pattern releases its telegraph, impact, and recovery.
 		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanAttack, true);
 		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldRetreat, false);
 		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldReposition, false);

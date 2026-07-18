@@ -1,6 +1,10 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "AI/Combat/EnemyAttackTransitionPolicy.h"
+#include "AbilitySystem/Abilities/Enemy/GP_EnemyAttack.h"
+#include "Characters/GP_EnemyCharacter.h"
+#include "Engine/TargetPoint.h"
+#include "Engine/World.h"
 #include "Misc/AutomationTest.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -50,6 +54,81 @@ bool FEnemyAttackTransitionPolicyTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("A non-committed enemy can choose Retreat"),
 		EnemyAttackTransitionPolicy::ResolveIntent(Observation) == EEnemyAttackTransitionIntent::None);
 
+	TestTrue(
+		TEXT("Target loss and leash reevaluation preserve an accepted action"),
+		EnemyAttackTransitionPolicy::ShouldPreserveCommittedAction(true, false));
+	TestFalse(
+		TEXT("Death or vulnerability interrupts an accepted action"),
+		EnemyAttackTransitionPolicy::ShouldPreserveCommittedAction(true, true));
+	TestFalse(
+		TEXT("An action that never committed cannot defer a branch change"),
+		EnemyAttackTransitionPolicy::ShouldPreserveCommittedAction(false, false));
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEnemyAttackCommitTargetLifetimeTest,
+	"ProjectEden.AI.Enemy.AttackCommitTargetLifetime",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEnemyAttackCommitTargetLifetimeTest::RunTest(const FString& Parameters)
+{
+	UWorld* TestWorld = UWorld::CreateWorld(EWorldType::Game, false);
+	if (!TestNotNull(TEXT("Created attack commit test world"), TestWorld))
+	{
+		return false;
+	}
+
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AGP_EnemyCharacter* Enemy = TestWorld->SpawnActor<AGP_EnemyCharacter>(
+		FVector::ZeroVector,
+		FRotator::ZeroRotator,
+		SpawnParameters);
+	ATargetPoint* Target = TestWorld->SpawnActor<ATargetPoint>(
+		FVector(300.0f, 0.0f, 0.0f),
+		FRotator::ZeroRotator,
+		SpawnParameters);
+	if (!TestNotNull(TEXT("Spawned enemy"), Enemy)
+		|| !TestNotNull(TEXT("Spawned committed target"), Target))
+	{
+		TestWorld->DestroyWorld(false);
+		return false;
+	}
+
+	Enemy->BeginBehaviorAttackCommit(Target, 8.0f);
+	TestTrue(TEXT("Attack commit starts with a live target"), Enemy->IsBehaviorAttackCommitted());
+	TestTrue(TEXT("Live committed target remains addressable"), Enemy->GetBehaviorAttackCommittedTarget() == Target);
+
+	// Disconnect/destruction invalidates the target pointer before the running montage or timer action necessarily ends.
+	TestWorld->DestroyActor(Target);
+	TestTrue(TEXT("Destroyed target does not release the accepted action"), Enemy->IsBehaviorAttackCommitted());
+	TestNull(TEXT("Destroyed target is never returned to attack code"), Enemy->GetBehaviorAttackCommittedTarget());
+
+	Enemy->FinishBehaviorAttackCommit(0.0f);
+	TestFalse(TEXT("Explicit completion releases the action"), Enemy->IsBehaviorAttackCommitted());
+	TestWorld->DestroyWorld(false);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEnemyAttackCancellationPolicyTest,
+	"ProjectEden.AI.Enemy.AttackCancellation",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEnemyAttackCancellationPolicyTest::RunTest(const FString& Parameters)
+{
+	// 정상 montage 종료만 누락 notify를 보정하고, interrupt/cancel은 새 피해를 만들지 않는다.
+	TestTrue(
+		TEXT("Normal completion applies a missing fallback hit"),
+		UGP_EnemyAttack::ShouldApplyFallbackHit(false, false));
+	TestFalse(
+		TEXT("Cancelled completion never applies a missing hit"),
+		UGP_EnemyAttack::ShouldApplyFallbackHit(false, true));
+	TestFalse(
+		TEXT("An already applied hit is never duplicated"),
+		UGP_EnemyAttack::ShouldApplyFallbackHit(true, false));
 	return true;
 }
 
