@@ -30,6 +30,10 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "AI|Tactics", meta = (ClampMin = "0.0"))
 	float AttackWindowFloor = 125.0f;
 
+	// 공격 밴드에 들어온 뒤에는 이만큼 더 벗어나야 Chase/Reposition으로 전환한다.
+	UPROPERTY(EditAnywhere, Category = "AI|Tactics", meta = (ClampMin = "0.0", Units = "cm"))
+	float AttackRangeExitHysteresis = 100.0f;
+
 	// Melee enemies should still attack when the player gets closer than the ideal range.
 	UPROPERTY(EditAnywhere, Category = "AI|Tactics")
 	bool bAllowAttacksInsidePreferredRange = true;

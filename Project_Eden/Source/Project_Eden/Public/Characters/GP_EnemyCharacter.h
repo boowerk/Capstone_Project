@@ -111,6 +111,15 @@ public:
 
 	const FGPEnemyAttackCadenceSettings& GetAttackCadenceSettings() const { return AttackCadenceSettings; }
 
+	// 서비스가 적별 거리 히스테리시스를 유지하도록 마지막 공격 밴드 판정을 캐릭터에 저장한다.
+	bool UpdateBehaviorAttackBandLatch(
+		float DistanceToTarget,
+		float MinAttackRange,
+		float MaxAttackRange,
+		bool bAllowAttacksInsidePreferredRange,
+		float ExitHysteresis);
+	void ResetBehaviorAttackBandLatch();
+
 	UFUNCTION(BlueprintPure, Category = "Enemy|Death")
 	bool IsDead() const { return bIsDead; }
 
@@ -299,6 +308,7 @@ private:
 
 	bool bDeathStateApplied = false;
 	float BasicEnemyAttackReadyTimeSeconds = 0.0f;
+	bool bBehaviorAttackBandLatched = false;
 	FRandomStream AttackCadenceRandomStream;
 
 	const FEnemyArchetypeTuning* ResolveEnemyArchetypeTuning() const;

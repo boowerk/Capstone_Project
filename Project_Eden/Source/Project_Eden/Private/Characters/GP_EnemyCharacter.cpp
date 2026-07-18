@@ -1,5 +1,6 @@
 #include "Characters/GP_EnemyCharacter.h"
 
+#include "AI/Combat/EnemyAttackTransitionPolicy.h"
 #include "AI/Controllers/EnemyAIController.h"
 #include "AIController.h"
 #include "AI/Data/EnemyArchetypeData.h"
@@ -281,6 +282,29 @@ float AGP_EnemyCharacter::ScheduleNextBasicEnemyAttack()
 		BasicEnemyAttackReadyTimeSeconds = World->GetTimeSeconds() + SelectedDelay;
 	}
 	return SelectedDelay;
+}
+
+bool AGP_EnemyCharacter::UpdateBehaviorAttackBandLatch(
+	float DistanceToTarget,
+	float MinAttackRange,
+	float MaxAttackRange,
+	bool bAllowAttacksInsidePreferredRange,
+	float ExitHysteresis)
+{
+	bBehaviorAttackBandLatched = EnemyAttackTransitionPolicy::IsInsideAttackBand(
+		DistanceToTarget,
+		MinAttackRange,
+		MaxAttackRange,
+		bAllowAttacksInsidePreferredRange,
+		bBehaviorAttackBandLatched,
+		ExitHysteresis);
+	return bBehaviorAttackBandLatched;
+}
+
+void AGP_EnemyCharacter::ResetBehaviorAttackBandLatch()
+{
+	// 타깃을 잃거나 귀환하면 다음 교전은 좁은 진입 범위에서 새로 시작한다.
+	bBehaviorAttackBandLatched = false;
 }
 
 void AGP_EnemyCharacter::InitializeBasicEnemyAttackCadence()

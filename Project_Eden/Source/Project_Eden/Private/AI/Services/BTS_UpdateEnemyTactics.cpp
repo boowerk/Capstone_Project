@@ -1,5 +1,6 @@
 #include "AI/Services/BTS_UpdateEnemyTactics.h"
 
+#include "AI/Combat/EnemyAttackTransitionPolicy.h"
 #include "AI/Controllers/EnemyAIController.h"
 #include "AI/Data/EnemyBlackboardKeys.h"
 #include "AI/Data/EnemyLLMEvaluation.h"
@@ -175,7 +176,7 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 	BlackboardComponent->SetValueAsFloat(EnemyBlackboardKeys::HealthRatio, HealthRatio);
 
 	AEnemyAIController* EnemyAIController = Cast<AEnemyAIController>(AIController);
-	const AGP_EnemyCharacter* EnemyCharacter = Cast<AGP_EnemyCharacter>(ControlledPawn);
+	AGP_EnemyCharacter* EnemyCharacter = Cast<AGP_EnemyCharacter>(ControlledPawn);
 	const float EffectiveMaxChaseDistanceFromHome = IsValid(EnemyCharacter) ? EnemyCharacter->GetReturnHomeDistance() : MaxChaseDistanceFromHome;
 	const float EffectiveReturnHomeAcceptanceRadius = IsValid(EnemyCharacter) ? EnemyCharacter->GetReturnHomeAcceptanceRadius() : ReturnHomeAcceptanceRadius;
 	const FVector HomeLocation = EnemyBTTaskCommon::GetBehaviorAnchorLocation(ControlledPawn);
@@ -234,6 +235,11 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 
 	if (bShouldReturnHome)
 	{
+		if (IsValid(EnemyCharacter))
+		{
+			EnemyCharacter->ResetBehaviorAttackBandLatch();
+		}
+
 		BTS_UpdateEnemyTactics_Internal::SetCombatStateTag(BlackboardComponent, GPTags::AI::State::Patrol);
 		BlackboardComponent->SetValueAsVector(EnemyBlackboardKeys::MoveToLocation, HomeLocation);
 		BlackboardComponent->SetValueAsFloat(EnemyBlackboardKeys::DistanceToTarget, 0.0f);
@@ -277,6 +283,11 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 
 	if (!IsValid(TargetActor))
 	{
+		if (IsValid(EnemyCharacter))
+		{
+			EnemyCharacter->ResetBehaviorAttackBandLatch();
+		}
+
 		// No target means all combat branch keys collapse to false; decorators can abort immediately.
 		// 이동 중이 아니면 Idle, 순찰 MoveTo가 진행 중이면 Patrol 태그로 BT 논리 상태를 나눈다.
 		BTS_UpdateEnemyTactics_Internal::SetCombatStateTag(
@@ -333,18 +344,41 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 	const float AttackWindow = FMath::Max(AttackWindowFloor, FMath::Lerp(MinAttackWindow, MaxAttackWindow, Aggression));
 	const float MinAttackRange = FMath::Max(0.0f, PreferredRange - AttackWindow);
 	const float MaxAttackRange = PreferredRange + AttackWindow;
-	const bool bInsideAttackBand = DistanceToTarget <= MaxAttackRange && (bAllowAttacksInsidePreferredRange || DistanceToTarget >= MinAttackRange);
-	const bool bTooClose = !bAllowAttacksInsidePreferredRange && DistanceToTarget < MinAttackRange;
+	const bool bIsBasicRangedArchetype = IsValid(EnemyCharacter)
+		&& !EnemyCharacter->IsBossEnemy()
+		&& EnemyCharacter->GetCombatArchetype() != EGPEnemyCombatArchetype::Melee;
+	const bool bAllowAttacksInsideEffectiveRange = bAllowAttacksInsidePreferredRange && !bIsBasicRangedArchetype;
+	const bool bInsideAttackBand = IsValid(EnemyCharacter) && !EnemyCharacter->IsBossEnemy()
+		? EnemyCharacter->UpdateBehaviorAttackBandLatch(
+			DistanceToTarget,
+			MinAttackRange,
+			MaxAttackRange,
+			bAllowAttacksInsideEffectiveRange,
+			AttackRangeExitHysteresis)
+		: EnemyAttackTransitionPolicy::IsInsideAttackBand(
+			DistanceToTarget,
+			MinAttackRange,
+			MaxAttackRange,
+			bAllowAttacksInsideEffectiveRange,
+			bPreviousCanAttack,
+			AttackRangeExitHysteresis);
+	const bool bTooClose = !bAllowAttacksInsideEffectiveRange && DistanceToTarget < MinAttackRange;
 	const bool bTooFar = DistanceToTarget > MaxAttackRange;
 	const bool bAttackCadenceReady = !IsValid(EnemyCharacter) || EnemyCharacter->IsBasicEnemyAttackReady();
 
 	bool bShouldRetreat = bModeForcesRetreat || (HealthRatio <= RetreatThreshold);
-	// Closing bCanAttack forces the shared BT to leave its old fixed Wait node while this enemy's own cadence runs.
-	bool bCanAttack = !bShouldRetreat && bHasLineOfSight && bInsideAttackBand && bAttackCadenceReady;
+	FEnemyAttackTransitionObservation AttackObservation;
+	AttackObservation.bShouldRetreat = bShouldRetreat;
+	AttackObservation.bHasLineOfSight = bHasLineOfSight;
+	AttackObservation.bInsideAttackBand = bInsideAttackBand;
+	AttackObservation.bAttackCadenceReady = bAttackCadenceReady;
+	const EEnemyAttackTransitionIntent AttackIntent = EnemyAttackTransitionPolicy::ResolveIntent(AttackObservation);
+	bool bCanAttack = AttackIntent == EEnemyAttackTransitionIntent::Attack;
+	const bool bShouldCombatHold = AttackIntent == EEnemyAttackTransitionIntent::CombatHold;
 	bool bShouldReposition = false;
 	bool bShouldChase = false;
 
-	if (!bShouldRetreat && !bCanAttack)
+	if (!bShouldRetreat && !bCanAttack && !bShouldCombatHold)
 	{
 		const bool bCoverDrivenReposition = CoverPreference >= CoverRepositionThreshold && !bHasLineOfSight;
 		const bool bRangeDrivenReposition = bTooClose || (bModePrefersHold && !bTooFar);
@@ -367,12 +401,12 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 	}
 
 	// When the AI still has a live target, patrol should be the "no target" fallback, not the "I saw the player" fallback.
-	if (bFallbackToChaseWhenTargetExists && !bShouldRetreat && !bCanAttack && !bShouldReposition)
+	if (bFallbackToChaseWhenTargetExists && !bShouldRetreat && !bCanAttack && !bShouldCombatHold && !bShouldReposition)
 	{
 		bShouldChase = true;
 	}
 
-	// 추격만 별도 상태로 분리하고, 공격/후퇴/재배치는 모두 교전 상태로 BT에 전달한다.
+	// 쿨다운 홀드는 이동 분기를 열지 않은 채 Combat 상태를 유지해 미세 추격을 막는다.
 	const FGameplayTag CombatStateTag = bShouldChase
 		? GPTags::AI::State::Chasing
 		: GPTags::AI::State::Combat;
