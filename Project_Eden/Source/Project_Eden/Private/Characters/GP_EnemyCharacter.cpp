@@ -38,6 +38,17 @@ AGP_EnemyCharacter::AGP_EnemyCharacter()
 {
 	PrimaryActorTick.bCanEverTick = false;
 
+	// Blueprint-only regular enemies (including FurnaceWalker) otherwise inherit
+	// CharacterMovement's unspecified turn defaults.  Keep their body aligned
+	// with the chase path at a responsive, but not snapping, rate.  Enemy
+	// subclasses can still override this in their own constructors.
+	if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
+	{
+		MovementComponent->bOrientRotationToMovement = true;
+		MovementComponent->bUseControllerDesiredRotation = false;
+		MovementComponent->RotationRate = FRotator(0.0f, 540.0f, 0.0f);
+	}
+
 	AbilitySystemComponent = CreateDefaultSubobject<UGP_AbilitySystemComponent>(TEXT("AbilitySystemComponent"));
 	AbilitySystemComponent->SetIsReplicated(true);
 	AbilitySystemComponent->SetReplicationMode(EGameplayEffectReplicationMode::Minimal);
