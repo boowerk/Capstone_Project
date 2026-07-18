@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-18T15:59:36+09:00
+updated: 2026-07-18T19:49:02+09:00
 status: active
 tags:
   - memoc
@@ -11,7 +11,15 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-07-18T15:59:36+09:00
+Last synced: 2026-07-18T19:49:02+09:00
+
+## Three-Player Network/Lobby Handoff
+
+- Commits `5e0a4fcb` through `4ca8c603` establish the fixed three-player contract: lobby smoke count, duplicate-travel guard, three collision/ground-safe runtime starts, server/client gameplay readiness probes, a `3/0/1` GameSession cap in both maps, exact-three Ready gating, and local-debug-host-only ForceStart.
+- `729d334d` removes the unused `BP_ProjectileMaster_ScaffoldBackup` that caused ten Blueprint compiler errors. WindowsServer Cook/Stage/Pak/Archive then completed with ExitCode 0 and no Blueprint errors.
+- Confirmed baseline before the user stopped live server testing: packaged dedicated server plus three clients produced Ready `3`, all-ready `1`, ServerTravel `1`, three stable starts, server gameplay-ready `1`, client gameplay-ready `3`, and failure matches `0`. Server state was exactly three controllers/Pawns/owned gameplay classes at 260 cm separation; every client reported HUD, ASC, input, and mappings `2/2`.
+- Current verification: Editor/Development Server builds pass and the combined AI, Dark Knight, lobby, and network automation regression is 30/30. Per user request, do not launch more live server/multi-client tests unless explicitly asked; implement server-compatible functionality and use builds/local automation.
+- Preserve existing user edits in `TestMap.umap`, `DA_RegionEventData.uasset`, and `L_MainMap.umap`; all commits above excluded them.
 
 ## Graduation Demo AI Transition Handoff
 
@@ -28,7 +36,7 @@ Last synced: 2026-07-18T15:59:36+09:00
 - `faa6c536` changes the native and production Blueprint lobby destination to `MainMap/L_LandscapeMap` and adds `ProjectEden.Game.Lobby.LandscapeTravelConfiguration`.
 - `166b5e93` keeps the existing dedicated-server Cook maps and adds `/Game/Maps/MainMap/L_LandscapeMap` through `COOK_MAPS`, preventing the dynamic ServerTravel destination from being omitted by discovery.
 - Verified: `Project_EdenEditor Win64 Development` build, lobby travel configuration automation, Landscape integrity automation, exact Cook-map declarations, UAT `COOK_MAPS` consumption, and destination package existence.
-- Remaining release gates: two-player listen PIE Ready travel; Development Server Cook/package; cooked Landscape dependency load; packaged server-client Lobby-to-Landscape travel. QA status is conditional until these pass.
+- Cook/package and the three-client Lobby-to-Landscape baseline now pass. Further live server testing is intentionally omitted per user request; retain only manual presentation gates and local build/automation checks unless asked otherwise.
 - Existing user work in `TestMap.umap`, `DA_RegionEventData.uasset`, and `L_MainMap.umap` remains intentionally unstaged/uncommitted.
 
 ## Production Landscape Corruption/Event Handoff

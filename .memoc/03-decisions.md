@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-18T15:59:36+09:00
+updated: 2026-07-18T19:49:02+09:00
 status: active
 tags:
   - memoc
@@ -16,6 +16,8 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 ## Decision Log
 
 ### 2026-07-18
+- Treat Project Eden as a fixed three-player network game, not a minimum-three session: server admission is `3` players, `0` spectators, and `1` player per connection; only an exact three-player Ready party may travel.
+- Keep ForceStart as an opt-in development escape hatch only. Shipping and remote clients always reject it; a non-Shipping local listen/standalone host must launch with `-AllowLobbyForceStart`.
 - Once an enemy attack is committed, let it finish through ordinary target loss, disconnect, or leash reevaluation; only explicit incapacitating states such as death or groggy may interrupt it immediately. Never synthesize a fallback hit when a cancelled montage did not reach its hit event.
 - While Matador's bull actor is live, the boss body stays stationary and the shared tactics service keeps the Attack branch committed. The bull actor owns an 18-second absolute lifecycle cap, while the BT task owns a 20-second external-action stuck cap and force-cleans the pattern on timeout/interruption.
 - The July demo uses Dark Armor Knight as the representative boss and prioritizes basic melee/ranged enemies. Flying enemies and Motion/Pose Warping remain gated behind runtime proof; Motion Warping is only a post-P0 Dark Knight Charge pilot with a retained manual swept-movement fallback.
