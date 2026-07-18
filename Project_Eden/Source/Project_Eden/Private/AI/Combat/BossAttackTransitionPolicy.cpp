@@ -65,6 +65,16 @@ namespace BossAttackTransitionPolicy
 		return FMath::Max(0.0f, DefaultCommitSeconds);
 	}
 
+	bool ShouldCompleteExternalAction(
+		bool bExternalActionActive,
+		float TotalElapsedSeconds,
+		float ExternalActionTimeoutSeconds)
+	{
+		// 정상 신호 해제는 즉시 완료하고, 살아 있는 신호는 일반 GAS timeout과 분리된 상한까지 존중한다.
+		return !bExternalActionActive
+			|| FMath::Max(0.0f, TotalElapsedSeconds) >= FMath::Max(0.1f, ExternalActionTimeoutSeconds);
+	}
+
 	bool CanRequestDarkKnightPattern(
 		bool bGuardBroken,
 		bool bMeleeReady,

@@ -101,6 +101,20 @@ bool FBossAttackTransitionTimingTest::RunTest(const FString& Parameters)
 		TEXT("Unknown active abilities keep the task's configured fallback"),
 		BossAttackTransitionPolicy::ResolvePostAbilityCommitSeconds(FGameplayTag(), 0.45f),
 		0.45f);
+	TestFalse(
+		TEXT("A live bull remains committed after the generic eight-second timeout"),
+		BossAttackTransitionPolicy::ShouldCompleteExternalAction(true, 9.0f, 20.0f));
+	TestTrue(
+		TEXT("Bull signal release completes the external action immediately"),
+		BossAttackTransitionPolicy::ShouldCompleteExternalAction(false, 9.0f, 20.0f));
+	TestTrue(
+		TEXT("A stuck bull is released only at its external action cap"),
+		BossAttackTransitionPolicy::ShouldCompleteExternalAction(true, 20.0f, 20.0f));
+
+	const UBTT_ExecuteEnemyAttack* AttackTaskDefaults = GetDefault<UBTT_ExecuteEnemyAttack>();
+	TestTrue(
+		TEXT("BT stuck cap remains later than the bull actor absolute cap"),
+		IsValid(AttackTaskDefaults) && AttackTaskDefaults->GetExternalBossActionTimeoutSeconds() >= 20.0f);
 
 	// Ranged candidates must open the common Attack branch even when no melee
 	// pattern can reach the current target.
@@ -221,6 +235,14 @@ bool FMatadorBullLifecycleCleanupTest::RunTest(const FString& Parameters)
 	TestNull(TEXT("Absolute cap clears a stuck bull pointer"), State->GetActiveBullActor());
 	TestFalse(
 		TEXT("Absolute cap clears a stuck bull tag"),
+		ASC->HasMatchingGameplayTag(GPTags::State::Status::Enemy::MatadorMeleeActive));
+
+	AGP_BullChargeActor* ForceEndedBull = SpawnRegisteredBull();
+	TestNotNull(TEXT("Spawned force-ended bull"), ForceEndedBull);
+	Matador->ForceEndBullPattern();
+	TestNull(TEXT("BT fallback cleanup clears the active bull pointer"), State->GetActiveBullActor());
+	TestFalse(
+		TEXT("BT fallback cleanup clears the active bull tag"),
 		ASC->HasMatchingGameplayTag(GPTags::State::Status::Enemy::MatadorMeleeActive));
 
 	TestWorld->DestroyWorld(false);

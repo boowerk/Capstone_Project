@@ -287,6 +287,8 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 		BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldReposition, false);
 		BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldChase, false);
 		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldReturnHome, false);
+		// Targetless external actions must not inherit a stale boss teleport request while their task is abort-deferred.
+		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldTeleport, false);
 		return;
 	}
 

@@ -201,6 +201,16 @@ void UBTS_UpdateMatadorTactics::ApplyMatadorTactics(UBehaviorTreeComponent& Owne
 		MatadorTactics::SetBool(BlackboardComponent, EnemyBlackboardKeys::bShouldReposition, false);
 		MatadorTactics::SetBool(BlackboardComponent, EnemyBlackboardKeys::bShouldChase, false);
 	}
+	else if (bBullActive)
+	{
+		// 황소 actor가 패턴을 소유하는 동안 본체는 이동·재배치·teleport 없이 같은 Attack 분기를 유지한다.
+		AIController->StopMovement();
+		MatadorTactics::SetBool(BlackboardComponent, EnemyBlackboardKeys::bCanAttack, true);
+		MatadorTactics::SetBool(BlackboardComponent, EnemyBlackboardKeys::bShouldRetreat, false);
+		MatadorTactics::SetBool(BlackboardComponent, EnemyBlackboardKeys::bShouldReposition, false);
+		MatadorTactics::SetBool(BlackboardComponent, EnemyBlackboardKeys::bShouldChase, false);
+		MatadorTactics::SetBool(BlackboardComponent, EnemyBlackboardKeys::bShouldTeleport, false);
+	}
 	else if (bActionCommitted
 		|| bCanUseBullPattern
 		|| bCanUseMeleePattern

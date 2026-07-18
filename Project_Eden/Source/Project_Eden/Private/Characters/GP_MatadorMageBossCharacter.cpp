@@ -343,6 +343,34 @@ void AGP_MatadorMageBossCharacter::ExecutePendingBullPattern()
 	SpawnBullPattern(TargetActor);
 }
 
+void AGP_MatadorMageBossCharacter::ForceEndBullPattern()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	// Telegraph reservation과 live actor를 함께 지워 BT stuck cap과 명시적 interrupt가 같은 정리 계약을 사용한다.
+	GetWorldTimerManager().ClearTimer(BullTelegraphTimerHandle);
+	bBullPatternPending = false;
+	PendingBullPatternTarget.Reset();
+
+	if (!IsValid(MatadorStateComponent))
+	{
+		return;
+	}
+
+	if (AActor* ActiveBullActor = MatadorStateComponent->GetActiveBullActor(); IsValid(ActiveBullActor))
+	{
+		ActiveBullActor->Destroy();
+	}
+	if (MatadorStateComponent->GetActiveBullActor() != nullptr)
+	{
+		// Destroy가 지연되거나 stale pointer만 남은 경우에도 selector signal과 loose tag는 즉시 해제한다.
+		MatadorStateComponent->RegisterActiveBullActor(nullptr);
+	}
+}
+
 void AGP_MatadorMageBossCharacter::RequestEnterGroggy()
 {
 	if (HasAuthority() && IsValid(MatadorStateComponent))

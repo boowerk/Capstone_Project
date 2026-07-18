@@ -30,6 +30,11 @@ class PROJECT_EDEN_API UBTT_ExecuteEnemyAttack : public UBTTaskNode
 public:
 	UBTT_ExecuteEnemyAttack();
 
+	float GetExternalBossActionTimeoutSeconds() const
+	{
+		return FMath::Max(0.1f, ExternalBossActionTimeoutSeconds);
+	}
+
 protected:
 	// 공유 BT는 이 태그를 가진 적 공격 어빌리티를 실행한다.
 	UPROPERTY(EditAnywhere, Category = "AI")
@@ -67,6 +72,10 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "AI|Transition", meta = (ClampMin = "0.1", Units = "s"))
 	float AttackTimeoutSeconds = 8.0f;
 
+	// Bull처럼 GAS 종료 뒤 actor가 계속 소유하는 패턴의 별도 최종 방어 cap이다.
+	UPROPERTY(EditAnywhere, Category = "AI|Boss|Transition", meta = (ClampMin = "0.1", Units = "s"))
+	float ExternalBossActionTimeoutSeconds = 20.0f;
+
 	// 공격 전 한 프레임 스냅 대신 제한된 각속도로 목표를 바라본다.
 	UPROPERTY(EditAnywhere, Category = "AI|Transition|Facing", meta = (ClampMin = "0.0", Units = "deg/s"))
 	float AttackFacingTurnRateDegreesPerSecond = 540.0f;
@@ -96,7 +105,7 @@ private:
 	void TickFacingTarget(UBehaviorTreeComponent& OwnerComp, float DeltaSeconds);
 	void BeginFacingOwnership(APawn* ControlledPawn);
 	void RestoreFacingOwnership();
-	void CancelTrackedAbility();
+	void CancelTrackedAttackAction();
 	void CompleteBasicAttack(UBehaviorTreeComponent& OwnerComp);
 	void FinishRecovery(UBehaviorTreeComponent& OwnerComp);
 	void ScheduleBasicAttackCadence();

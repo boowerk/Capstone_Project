@@ -168,6 +168,16 @@ bool UBTT_ExecuteEnemyAttack::ActivateBasicAttack()
 
 	if (bActivated)
 	{
+		const bool bTracksExternalBullAction = ActiveAbilityTag.MatchesTagExact(
+			GPTags::Ability::Enemy::Utility_MatadorBullPattern);
+		if (bTracksExternalBullAction && IsValid(EnemyCharacter))
+		{
+			// 일반 8초 commit을 actor 18초 cap보다 긴 20초 방어 구간으로 갱신한다.
+			EnemyCharacter->BeginBehaviorAttackCommit(
+				CommittedTargetActor.Get(),
+				GetExternalBossActionTimeoutSeconds());
+		}
+
 		bAttackActivationAccepted = true;
 		ExecutionPhase = IsTrackedAbilityActive()
 			? EEnemyAttackTaskPhase::AwaitingAbilityEnd
@@ -196,7 +206,7 @@ void UBTT_ExecuteEnemyAttack::TickTask(
 	if (bLatentAbortPending && IsExplicitAttackInterruptActive())
 	{
 		// 대기 중 새로 사망·그로기 상태가 들어오면 자연 종료를 기다리지 않고 즉시 상위 분기에 제어권을 돌린다.
-		CancelTrackedAbility();
+		CancelTrackedAttackAction();
 		ScheduleBasicAttackCadence();
 		if (AGP_EnemyCharacter* EnemyCharacter = ActiveEnemyCharacter.Get())
 		{
@@ -214,12 +224,17 @@ void UBTT_ExecuteEnemyAttack::TickTask(
 
 	if (ExecutionPhase == EEnemyAttackTaskPhase::AwaitingAbilityEnd)
 	{
-		if (IsTrackedAbilityActive() && TotalElapsedSeconds < AttackTimeoutSeconds)
+		const bool bTracksExternalBullAction = ActiveAbilityTag.MatchesTagExact(
+			GPTags::Ability::Enemy::Utility_MatadorBullPattern);
+		const float EffectiveLifecycleTimeoutSeconds = bTracksExternalBullAction
+			? GetExternalBossActionTimeoutSeconds()
+			: AttackTimeoutSeconds;
+		if (IsTrackedAbilityActive() && TotalElapsedSeconds < EffectiveLifecycleTimeoutSeconds)
 		{
 			return;
 		}
 
-		if (TotalElapsedSeconds >= AttackTimeoutSeconds)
+		if (TotalElapsedSeconds >= EffectiveLifecycleTimeoutSeconds)
 		{
 			UE_LOG(
 				LogEnemyAI,
@@ -228,10 +243,10 @@ void UBTT_ExecuteEnemyAttack::TickTask(
 				*EnemyAIDebugUtils::DescribeActor(ActiveEnemyCharacter.Get()),
 				*ActiveAbilityTag.ToString());
 			// 타임아웃 뒤 실제 어빌리티만 남아 다음 BT 분기와 겹치지 않도록 명시적으로 중단한다.
-			CancelTrackedAbility();
+			CancelTrackedAttackAction();
 		}
 
-		if (TotalElapsedSeconds < AttackTimeoutSeconds
+		if (TotalElapsedSeconds < EffectiveLifecycleTimeoutSeconds
 			&& bUseBossPatternSelector
 			&& CurrentFallbackCommitSeconds > KINDA_SMALL_NUMBER)
 		{
@@ -251,8 +266,29 @@ void UBTT_ExecuteEnemyAttack::TickTask(
 		const bool bHasExternalActionSignal = ActiveAbilityTag.MatchesTagExact(
 			GPTags::Ability::Enemy::Utility_MatadorBullPattern);
 		const bool bExternalActionActive = IsTrackedExternalBossActionActive();
-		if ((bHasExternalActionSignal && !bExternalActionActive)
-			|| (!bHasExternalActionSignal && PhaseElapsedSeconds >= CurrentFallbackCommitSeconds)
+		if (bHasExternalActionSignal)
+		{
+			if (BossAttackTransitionPolicy::ShouldCompleteExternalAction(
+				bExternalActionActive,
+				TotalElapsedSeconds,
+				GetExternalBossActionTimeoutSeconds()))
+			{
+				if (bExternalActionActive)
+				{
+					UE_LOG(
+						LogEnemyAI,
+						Warning,
+						TEXT("[EnemyAI] External boss action reached stuck cap; releasing BT commit: Pawn=%s Tag=%s"),
+						*EnemyAIDebugUtils::DescribeActor(ActiveEnemyCharacter.Get()),
+						*ActiveAbilityTag.ToString());
+					CancelTrackedAttackAction();
+				}
+				CompleteBasicAttack(OwnerComp);
+			}
+			return;
+		}
+
+		if (PhaseElapsedSeconds >= CurrentFallbackCommitSeconds
 			|| TotalElapsedSeconds >= AttackTimeoutSeconds)
 		{
 			CompleteBasicAttack(OwnerComp);
@@ -283,7 +319,7 @@ EBTNodeResult::Type UBTT_ExecuteEnemyAttack::AbortTask(
 	}
 
 	// 사망·그로기·안전 타임아웃은 진행 중 GAS까지 함께 끊어 잔여 피해가 새 분기와 겹치지 않게 한다.
-	CancelTrackedAbility();
+	CancelTrackedAttackAction();
 	ScheduleBasicAttackCadence();
 	if (AGP_EnemyCharacter* EnemyCharacter = ActiveEnemyCharacter.Get())
 	{
@@ -470,8 +506,17 @@ bool UBTT_ExecuteEnemyAttack::ShouldDeferAbortForCommittedAction() const
 			IsExplicitAttackInterruptActive());
 }
 
-void UBTT_ExecuteEnemyAttack::CancelTrackedAbility()
+void UBTT_ExecuteEnemyAttack::CancelTrackedAttackAction()
 {
+	if (ActiveAbilityTag.MatchesTagExact(GPTags::Ability::Enemy::Utility_MatadorBullPattern))
+	{
+		if (AGP_MatadorMageBossCharacter* MatadorBoss = Cast<AGP_MatadorMageBossCharacter>(ActiveControlledPawn.Get()))
+		{
+			// GAS가 이미 끝난 뒤에도 살아 있는 actor/pending telegraph까지 같은 interrupt에서 정리한다.
+			MatadorBoss->ForceEndBullPattern();
+		}
+	}
+
 	UAbilitySystemComponent* ASC = ActiveAbilitySystemComponent.Get();
 	if (!IsValid(ASC) || !ActiveAbilityTag.IsValid() || !IsTrackedAbilityActive())
 	{
