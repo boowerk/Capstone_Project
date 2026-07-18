@@ -32,82 +32,140 @@ namespace EnemyProductionAnimationTests
 		return DefaultSet.IsNull() ? nullptr : DefaultSet.LoadSynchronous();
 	}
 
-	// Resolve the same data paths as UGP_EnemyAttack so this contract catches
-	// production classes that would otherwise fall back to an instant hit.
-	UAnimMontage* ResolveFirstAttackMontage(const AGP_EnemyCharacter* Enemy)
+	// Resolve the same candidate pool as UGP_EnemyAttack. The primary montage is
+	// selectable only when the light-attack array has no valid entries.
+	TArray<const UAnimMontage*> ResolveSelectableAttackMontages(const AGP_EnemyCharacter* Enemy)
 	{
+		TArray<const UAnimMontage*> Montages;
 		if (!IsValid(Enemy))
 		{
-			return nullptr;
+			return Montages;
 		}
 
 		if (const UPDA_EnemyAnimationSet* EnemySet = ResolveEnemyAnimationSet(Enemy))
 		{
-			for (UAnimMontage* Montage : EnemySet->LightAttackMontages)
+			for (const UAnimMontage* Montage : EnemySet->LightAttackMontages)
 			{
 				if (IsValid(Montage))
 				{
-					return Montage;
+					Montages.AddUnique(Montage);
 				}
 			}
-			return EnemySet->PrimaryAttackMontage.Get();
+			if (Montages.IsEmpty() && IsValid(EnemySet->PrimaryAttackMontage))
+			{
+				Montages.Add(EnemySet->PrimaryAttackMontage);
+			}
+			return Montages;
 		}
 
 		if (const UPDA_CharacterAnimationSet* LegacySet = Enemy->AnimationSet)
 		{
-			for (UAnimMontage* Montage : LegacySet->LightAttackMontages)
+			for (const UAnimMontage* Montage : LegacySet->LightAttackMontages)
 			{
 				if (IsValid(Montage))
 				{
-					return Montage;
+					Montages.AddUnique(Montage);
 				}
 			}
-			return LegacySet->PrimaryAttackMontage.Get();
+			if (Montages.IsEmpty() && IsValid(LegacySet->PrimaryAttackMontage))
+			{
+				Montages.Add(LegacySet->PrimaryAttackMontage);
+			}
 		}
-		return nullptr;
+		return Montages;
 	}
 
-	bool HasGameplayEventNotify(const UAnimMontage* Montage, const FGameplayTag& EventTag)
+	struct FAttackNotifyContract
 	{
+		int32 AttackHitCount = 0;
+		int32 ActionEndCount = 0;
+		float AttackHitTime = 0.0f;
+		float ActionEndTime = 0.0f;
+	};
+
+	FAttackNotifyContract InspectAttackNotifyContract(const UAnimMontage* Montage)
+	{
+		FAttackNotifyContract Contract;
 		if (!IsValid(Montage))
 		{
-			return false;
+			return Contract;
 		}
 
+		// Count exact gameplay-event notifies on each runtime-selectable montage.
 		for (const FAnimNotifyEvent& NotifyEvent : Montage->Notifies)
 		{
 			const UGP_AnimNotify_SendGameplayEvent* GameplayEventNotify =
 				Cast<UGP_AnimNotify_SendGameplayEvent>(NotifyEvent.Notify);
-			if (IsValid(GameplayEventNotify)
-				&& GameplayEventNotify->GameplayEventTag.MatchesTagExact(EventTag))
+			if (!IsValid(GameplayEventNotify))
 			{
-				return true;
+				continue;
+			}
+
+			if (GameplayEventNotify->GameplayEventTag.MatchesTagExact(GPTags::Event::Enemy::AttackHit))
+			{
+				++Contract.AttackHitCount;
+				Contract.AttackHitTime = NotifyEvent.GetTriggerTime();
+			}
+			else if (GameplayEventNotify->GameplayEventTag.MatchesTagExact(GPTags::Event::Enemy::ActionEnd))
+			{
+				++Contract.ActionEndCount;
+				Contract.ActionEndTime = NotifyEvent.GetTriggerTime();
 			}
 		}
-		return false;
+		return Contract;
 	}
 
-	bool AnimationSetHasGameplayEvent(
-		const UPDA_EnemyAnimationSet* AnimationSet,
-		const FGameplayTag& EventTag)
+	void ValidateSelectableAttackMontage(
+		FAutomationTestBase& Test,
+		const UAnimMontage* Montage,
+		const USkeletalMesh* Mesh,
+		const FString& Context,
+		bool bRequireGameplayEventContract)
 	{
-		if (!IsValid(AnimationSet))
+		Test.TestNotNull(FString::Printf(TEXT("%s montage loads"), *Context), Montage);
+		if (!IsValid(Montage))
 		{
-			return false;
+			return;
 		}
 
-		if (HasGameplayEventNotify(AnimationSet->PrimaryAttackMontage, EventTag))
+		if (IsValid(Mesh))
 		{
-			return true;
+			Test.TestTrue(
+				FString::Printf(TEXT("%s matches the mesh skeleton"), *Context),
+				Montage->GetSkeleton() == Mesh->GetSkeleton());
 		}
-		for (const UAnimMontage* Montage : AnimationSet->LightAttackMontages)
+
+		if (!bRequireGameplayEventContract)
 		{
-			if (HasGameplayEventNotify(Montage, EventTag))
-			{
-				return true;
-			}
+			return;
 		}
-		return false;
+
+		const FAttackNotifyContract Contract = InspectAttackNotifyContract(Montage);
+		Test.TestEqual(
+			FString::Printf(TEXT("%s has exactly one AttackHit notify"), *Context),
+			Contract.AttackHitCount,
+			1);
+		Test.TestEqual(
+			FString::Printf(TEXT("%s has exactly one ActionEnd notify"), *Context),
+			Contract.ActionEndCount,
+			1);
+
+		if (Contract.AttackHitCount == 1 && Contract.ActionEndCount == 1)
+		{
+			const float PlayLength = Montage->GetPlayLength();
+			const FString TimingContext = FString::Printf(
+				TEXT("%s (Hit=%.3fs, End=%.3fs, Length=%.3fs)"),
+				*Context,
+				Contract.AttackHitTime,
+				Contract.ActionEndTime,
+				PlayLength);
+			Test.TestTrue(
+				FString::Printf(TEXT("%s AttackHit occurs before ActionEnd"), *TimingContext),
+				Contract.AttackHitTime < Contract.ActionEndTime);
+			Test.TestTrue(
+				FString::Printf(TEXT("%s ActionEnd stays inside montage playback"), *TimingContext),
+				Contract.ActionEndTime <= PlayLength + KINDA_SMALL_NUMBER);
+		}
 	}
 
 	void ValidateEnemyAnimationContract(
@@ -143,24 +201,18 @@ namespace EnemyProductionAnimationTests
 			FString::Printf(TEXT("%s has an animation blueprint class"), *Context),
 			IsValid(AnimBlueprintClass));
 
-		UAnimMontage* AttackMontage = ResolveFirstAttackMontage(Enemy);
-		Test.TestNotNull(FString::Printf(TEXT("%s has a visible attack montage"), *Context), AttackMontage);
-		if (IsValid(Mesh) && IsValid(AttackMontage))
+		const TArray<const UAnimMontage*> AttackMontages = ResolveSelectableAttackMontages(Enemy);
+		Test.TestTrue(
+			FString::Printf(TEXT("%s has at least one runtime-selectable attack montage"), *Context),
+			!AttackMontages.IsEmpty());
+		for (const UAnimMontage* AttackMontage : AttackMontages)
 		{
-			Test.TestTrue(
-				FString::Printf(TEXT("%s attack montage matches the mesh skeleton"), *Context),
-				AttackMontage->GetSkeleton() == Mesh->GetSkeleton());
-		}
-		if (IsValid(EnemySet))
-		{
-			// GAS must receive authored frames; otherwise montage completion
-			// falls back to a late, visually disconnected hit.
-			Test.TestTrue(
-				FString::Printf(TEXT("%s has an enemy attack-hit notify"), *Context),
-				AnimationSetHasGameplayEvent(EnemySet, GPTags::Event::Enemy::AttackHit));
-			Test.TestTrue(
-				FString::Printf(TEXT("%s has an enemy action-end notify"), *Context),
-				AnimationSetHasGameplayEvent(EnemySet, GPTags::Event::Enemy::ActionEnd));
+			ValidateSelectableAttackMontage(
+				Test,
+				AttackMontage,
+				Mesh,
+				FString::Printf(TEXT("%s / %s"), *Context, *GetNameSafe(AttackMontage)),
+				IsValid(EnemySet));
 		}
 	}
 
