@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-18T15:40:59+09:00
+updated: 2026-07-18T16:53:56+09:00
 status: active
 tags:
   - memoc
@@ -11,11 +11,12 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-07-18T15:40:59+09:00
+Last synced: 2026-07-18T16:53:56+09:00
 
 ## Current Status
 
-- `L_GameMap1` runtime vegetation is working. `PCG_Vegetation_Global` uses hierarchical generation with default `GRID128` (128m), the grass branch `GRID64` (64m), cleanup multiplier `1.5`, and bounded Surface Samplers. The placed `BP_VegetationSpawner` keeps Activated/GenerateAtRuntime/Partitioned, its Box covers the 1008m Landscape (`51200,51200,5000` extent), and `PCGWorldActor` Landscape Cache is `SerializeOnlyAtCook` with 256 entries. PIE generated 7,135 grass instances at origin, moved the active cells after a 400m pawn teleport, and logged no PCG warning/error. Root cause was `NeverSerialize`, which made `SurfaceSampler_1` receive no Landscape surface in PIE.
+- Runtime vegetation uses the shared hierarchical `PCG_Vegetation_Global` graph with default `GRID128` (128m), current grass `GRID32` (32m), cleanup multiplier `1.5`, and bounded Surface Samplers. `L_GameMap1` has map-sized PCG bounds (`51200,51200,5000`) and its Landscape Cache is `SerializeOnlyAtCook`; its earlier `GRID64` PIE pass generated 7,135 grass instances and followed a 400m pawn move without PCG errors. The original blocker there was `NeverSerialize`.
+- `L_LandscapeMap` runtime vegetation is also working. Its `BP_VegetationSpawner` is Activated/GenerateAtRuntime/Partitioned, the Box extent is `64000,64000,8000`, and `PCGWorldActor` uses `SerializeOnlyAtCook` with 289 cache entries. The map-specific blocker was the inherited `32,32,32cm` Box, which reduced the sampling area to almost zero. PIE generated 1,911 grass instances at the start and 1,803 after a 400m pawn move; 50 old runtime cells pooled. No Landscape Cache or `No surfaces found` error occurred.
 
 - `/Game/Maps/MainMap/L_LandscapeMap` is restored byte-for-byte to the pre-test-deck sculpted Landscape LFS object (`ba9e714a...`, 11,416,959 bytes). The destructive production-map deck generator, generated floors/sign, old deck contract, and obsolete guide were removed. `ProjectEden.Game.LandscapeMap.Integrity` now requires a Landscape actor, sculpt components, heightfield collision, and zero `GP.TestEnvironment` actors. Editor load/PIE, full Editor build, and the integrity test pass (`0512bcf1`, `6042600a`, `8d88b067`).
 

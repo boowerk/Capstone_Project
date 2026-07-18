@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-18T15:40:59+09:00
+updated: 2026-07-18T16:53:56+09:00
 status: active
 tags:
   - memoc
@@ -11,12 +11,14 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-07-18T15:40:59+09:00
+Last synced: 2026-07-18T16:53:56+09:00
 
 ## PCG Vegetation Runtime Handoff
 
-- `L_GameMap1` is verified: runtime grass generates on 64m cells and follows the pawn; default vegetation runs on 128m cells. The previous Landscape Cache/`SurfaceSampler_1` errors are resolved.
+- `L_GameMap1` was verified at grass `GRID64`; the shared graph's current authored grass value is `GRID32`, while the default remains `GRID128`. Its previous Landscape Cache/`SurfaceSampler_1` errors are resolved.
+- `L_LandscapeMap` is verified with Box extent `64000,64000,8000`: PIE generated 1,911 grass instances at start and 1,803 after a 400m move, with 50 old cells pooled. Cache mode is `SerializeOnlyAtCook` with 289 entries.
 - `PCG_Vegetation_Global` is shared by several legacy maps. Their `BP_VegetationSpawner` instances may still inherit the Blueprint template defaults (`GenerateOnDemand`, non-partitioned, 32cm Box). Before expecting the same runtime behavior in another map, set that instance to Activated + GenerateAtRuntime + Partitioned and size its Box to the Landscape; then PIE-check bounded Surface Samplers there.
+- Existing non-grass branches emit `Bounds Modifier` multiple-input warnings in PIE. They did not block grass generation; inspect that graph wiring separately if warning cleanup is requested.
 
 ## Region Event System Handoff
 
