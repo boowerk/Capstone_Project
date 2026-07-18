@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-18T19:49:02+09:00
+updated: 2026-07-18T20:41:47+09:00
 status: active
 tags:
   - memoc
@@ -11,13 +11,14 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-07-18T19:49:02+09:00
+Last synced: 2026-07-18T20:41:47+09:00
 
 ## Current Status
 
 - The product contract is now exactly three network players (`5e0a4fcb` through `4ca8c603`). `AGP_ThreePlayerGameSession` fixes players/spectators/split-screen to `3/0/1` in lobby and gameplay, exact-three Ready is required, the one authored Landscape PlayerStart expands into three collision/ground-validated stable slots, and debug ForceStart is disabled in Shipping and limited to an explicit `-AllowLobbyForceStart` local host.
 - Verification is current: Editor and Development Server builds pass; WindowsServer Cook/Stage/Pak/Archive passed after `729d334d` removed the unused broken projectile scaffold backup; the completed baseline used one packaged dedicated server plus three clients and reached three unique owned Pawns with HUD/ASC/input ready. The final local AI/Dark Knight/lobby/network regression is 30/30. The user requested no further live server tests unless explicitly asked; keep future verification to server-compatible implementation, builds, and local automation.
 - Graduation-demo enemy transition polish is current (`80f64845` through `a0c674e1`). Regular enemies use range hysteresis, smooth facing, GAS-lifetime attack commits, and recovery/cadence sequencing; target loss or leash reevaluation no longer opens movement during a committed attack, while death/groggy-style interrupts cancel immediately. Matador holds its body stationary while a live bull owns the pattern, cleans the bull state on every destroy path, and uses independent actor/task stuck caps of 18/20 seconds. `Project_EdenEditor` builds and all 21 `ProjectEden.AI` tests pass.
+- Dark Armor Knight pattern grants are repaired at `b7eb11d6`. The production Blueprint had serialized an empty `DarkKnightAbilityClasses` override, so BT selected valid attacks but GAS rejected every candidate as ungranted. Configured replacements now win by exact tag, while missing Basic/Heavy/Charge/DarkWave/GroundCrack/Groggy specs receive idempotent native fallbacks on authority. The production BP contract test verifies one spec per tag and a real Basic `Started=1`; Editor build, all 6 Dark Knight combat tests, and all 21 AI tests pass.
 - Release confidence remains conditional on manual P0 checks that automation cannot prove: every selectable montage's contact/ActionEnd timing, FurnaceWalker/Cyclops duplicate-slot runtime evaluation, and Dark Knight impact/charge travel. Keep flying enemies out of the scripted demo unless their chase/altitude/attack loop passes PIE.
 
 - The Project Eden Codex team workflow is initialized: `[EDEN-MAIN]` is the sole writer/integrator, while permanent DESIGN, CLIENT, WORLD, and QA threads perform read-only analysis and cross-review. Work is split into minimal functional units and committed using the repository's `type(scope): short summary` convention. The durable protocol is in `docs/AgentTeamWorkflow.md`.

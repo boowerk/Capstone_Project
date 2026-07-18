@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-18T19:49:02+09:00
+updated: 2026-07-18T20:41:47+09:00
 status: active
 tags:
   - memoc
@@ -11,7 +11,7 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-07-18T19:49:02+09:00
+Last synced: 2026-07-18T20:41:47+09:00
 
 ## Three-Player Network/Lobby Handoff
 
@@ -26,7 +26,7 @@ Last synced: 2026-07-18T19:49:02+09:00
 - Commits `80f64845` through `a0c674e1` stabilize attack range transitions, smooth facing, latch actions through GAS, preserve committed targets, restore boss recovery, and close Matador bull lifecycle gaps.
 - Latest focused fixes are `42e8cec8` (committed attacks survive target-loss/leash root reevaluation; explicit interrupts and cancellation policy), `668f7f37` (bull destroy cleanup plus 18-second absolute cap), and `a0c674e1` (stationary live-bull tactics hold plus 20-second BT stuck cap).
 - Verified: `Project_EdenEditor Win64 Development` build and all 21 `ProjectEden.AI` automation tests. Existing missing Fab/UEFN assets and duplicate DefaultSlot startup warnings are not resolved by these commits.
-- P0 before July 22/27: record three Idle→Move→Aim→Hit→Recovery cycles for each included enemy; confirm one hit and one ActionEnd per selectable montage; verify FurnaceWalker/Cyclops slot evaluation and capsule drift; visually align Dark Knight impacts and prove Charge travel/hit/recovery; run two-player listen/server-client travel and combat synchronization.
+- P0 before July 22/27: record three Idle→Move→Aim→Hit→Recovery cycles for each included enemy; confirm one hit and one ActionEnd per selectable montage; verify FurnaceWalker/Cyclops slot evaluation and capsule drift; visually align Dark Knight impacts and prove Charge travel/hit/recovery. Do not run additional live network sessions unless the user explicitly asks; the product contract remains three players.
 - Script the demo in `EventMap` rather than the corrupt `TestMap` or randomized production landscape events. Use Dark Armor Knight plus melee/ranged basics; exclude flying unless its chase/altitude/re-entry loop passes PIE.
 - Remaining engineering risks are exact GAS ability-spec tracking when duplicate attack-tag grants exist and simulated-proxy montage/yaw/root-motion behavior. Do not start the Motion Warping pilot until every P0 gate above is green.
 - Preserve existing user edits in `TestMap.umap`, `DA_RegionEventData.uasset`, and `L_MainMap.umap`.
@@ -99,6 +99,7 @@ Last synced: 2026-07-18T19:49:02+09:00
 - Commits `b439e0f5` and `dfb86b4b` add the requested Easy Impact Frames lightning to the replicated charge actor. It auto-plays at the boss transform during the existing 0.9s warning, then `StartCharge()` begins root-motion movement. Editor build and `ProjectEden.Combat.DarkArmorKnight.ChargeTelegraphVFX` pass; PIE-check effect scale and whether 0.9s matches the visual strike finish.
 - Commits `b451bf12` and `3e5dbf35` correct telegraph selection to per-pattern opt-in. `Telegraph VFX On/Off` is only the master switch; edit each boss Class Defaults `Telegraph VFX Patterns` map to check the exact tags that should use the cue. Crystal Seraph and Matador still inherit `BossTelegraphVFXComponent`; Dark Knight still reuses `GP_BossTelegraphVFX`. Dark Knight charge skips its own coordinator cue/delay only if the Charge tag is checked. Build, configuration/exclusion automation, and legacy charge automation pass; PIE-check timing and placement on selected attacks.
 - Full editor build plus `ProjectEden.AI.Boss.PatternSelector.DarkArmorKnight` and `ProjectEden.Combat.DarkArmorKnight.GuardLifecycle` pass. Commandlet still reports the unrelated corrupt `Content/Maps/DemoMap/TestMap.umap` and missing Fab fence meshes.
+- Commit `b7eb11d6` repairs the production BP's serialized empty Dark Knight ability array. Server-authoritative grant now keeps configured exact-tag replacements and fills only missing Basic/Heavy/Charge/DarkWave/GroundCrack/Groggy native specs. The production BP grant/Basic activation contract, all 6 Dark Knight combat tests, and all 21 AI tests pass; manual montage contact and Charge travel/timing remain P0.
 - Editor work: place `BP_DarkArmorKnight`; assign/tune its Anim Class and mesh/capsule transform for `SK_KnightBoss`. For final art, create BP children of DarkWave/GroundCrack/Charge actors, replace their primitive component meshes/materials/VFX, then assign those classes on the boss. Optional Dark Knight Blackboard mirror keys are not required for runtime truth.
 
 ## Minimap Handoff
