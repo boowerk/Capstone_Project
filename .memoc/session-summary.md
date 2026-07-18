@@ -2,17 +2,17 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-07-18T19:05:23+09:00
+updated: 2026-07-18T19:25:11+09:00
 status: active
 tags: [memoc, memoc/state]
 ---
 # Session Summary
 
 ## Status
-- Pair-ID + Edge Landscape blending is wired, but visual smoothing is partial. Some Nearest-ID stairs remain because Edge is not saturated at every ownership seam.
+- Long Landscape region stairs are fixed by overlaying an R-seam repair mask onto the preserved smooth Edge. Pair, material graph, map, and PCG wiring are unchanged.
 
 ## Verified
-- Asset/compile/PIE validation passes. PNG forensics found seam Edge min `148/255`; `Edge*0.5` then leaves up to 41.8% material discontinuity.
+- All 7,443 R transitions are `255/255`; calculated discontinuity fell from 41.8% to 0. Edge asset is VALID and PIE target errors are 0. Worst old boundary is visually continuous.
 
 ## Handoff
-- Checkpoint committed; branch is one commit ahead. Next, regenerate Edge from R-boundary seeds: force both seam texels to 255, then distance-field falloff. Keep Pair Nearest and PCG legacy.
+- Edge fix is committed; branch is two commits ahead. A thin dotted boundary line remains as separate follow-up. External generator is non-Git; script SHA-256 starts `23E357A0`.

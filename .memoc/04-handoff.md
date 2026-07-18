@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-18T19:05:23+09:00
+updated: 2026-07-18T19:25:11+09:00
 status: active
 tags:
   - memoc
@@ -11,7 +11,7 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-07-18T19:05:23+09:00
+Last synced: 2026-07-18T19:25:11+09:00
 
 ## PCG Vegetation Runtime Handoff
 
@@ -25,7 +25,7 @@ Last synced: 2026-07-18T19:05:23+09:00
 - `L_LandscapeMap` and `MI_RegionLandscape_GameMap2` use the new Pair-ID + smooth Edge texture path. `BP_RegionStateManager.ApplyLandscapeMaterial` now pushes `RegionEdgeTexture` as well as `IdTexture`.
 - `M_StateMask` retains the exact legacy branch behind default-false `UseSeparateEdgeTexture`; the other five material instances remain off. The new blend function is `MF_RS_GetRegionBlendData`.
 - PCG is intentionally not migrated: `PCG_Vegetation_Global` still overrides the legacy `T_GameMap1_RegionID`, has no Edge override, and its file hash stayed `45FC9A77...C3BA19`.
-- Visual defect remains: all R seams have Edge coverage, but only 40.8% of sampled seam endpoints are 255 and the minimum is 148. Since reciprocal sides use `0.5*Edge`, 19.0% of boundary adjacencies retain over 10% discontinuity and the maximum is 41.8%. Fix the generator, not Pair filtering: seed both sides of every R transition at 255 and generate outward distance falloff; re-force seam saturation after filtering. Mips may require a wider saturated core. Single-G triple junction artifacts are a secondary local limitation.
+- Long ownership stairs are fixed. The external non-Git generator (`generate_from_existing_region_id.py`, SHA-256 `23E357A0...`) overlays a 2px saturated chamfer core and 8px falloff on the preserved source Edge. All 7,443 R transitions are 255/255 with calculated discontinuity 0; Edge PNG SHA-256 is `A97DF949...`. The Unreal Edge texture was reimported without changing settings, validates `VALID`, and PIE target errors are zero. Direct inspection at the former 148/255 worst boundary shows continuous region material; a thin dotted boundary line remains as a separate follow-up, along with single-neighbor triple junction and distant-mip polish.
 
 ## Region Event System Handoff
 

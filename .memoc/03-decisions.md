@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-18T18:41:33+09:00
+updated: 2026-07-18T19:25:11+09:00
 status: active
 tags:
   - memoc
@@ -16,6 +16,7 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 ## Decision Log
 
 ### 2026-07-18
+- Repair Landscape Edge seams without changing topology: preserve the filtered source mask, overlay a 2px fully saturated chamfer core with falloff to 8px from every R ownership transition, and keep Pair Nearest plus `BoundaryAlpha=Edge*0.5`.
 - Roll out smooth RegionID boundaries to Landscape first: keep `M_StateMask.UseSeparateEdgeTexture` default false, enable it only on `MI_RegionLandscape_GameMap2`, and leave PCG on the legacy RegionID texture until a separate migration is requested.
 - Runtime vegetation uses hierarchical grids with `GRID128` for the graph default and the current shared grass node at `GRID32`; `L_GameMap1`'s earlier 7,135-instance verification was performed before that authored grass change, at `GRID64`. Keep engine-default 2x generation radii, cleanup multiplier `1.5`, and bounded Surface Samplers.
 - Keep the PCG Landscape Cache at `SerializeOnlyAtCook`: it works in PIE, serializes automatically while cooking, and avoids permanently embedding the cache in the editor map. `NeverSerialize` is invalid for Landscape-backed runtime PCG.

@@ -3,7 +3,7 @@ memoc: true
 type: worklog
 scope: project-memory
 created: 2026-07-18T05:39:52
-updated: 2026-07-18T19:05:23+09:00
+updated: 2026-07-18T19:25:11+09:00
 status: active
 tags:
   - memoc
@@ -39,7 +39,7 @@ created: 2026-07-18T05:39:52
 
 ## Follow-up
 
-- Unreal wiring is complete for `L_LandscapeMap`, but Edge generation needs seam normalization. Force both texels across every R transition to 255 before outward distance falloff; retain Pair Nearest and the legacy PCG input.
+- Long ownership stairs are resolved. Remaining follow-up is the thin dotted boundary line plus optional triple-junction and distant-mip polish.
 
 ## Applied in Unreal
 
@@ -47,6 +47,8 @@ created: 2026-07-18T05:39:52
 - Added `MF_RS_GetRegionBlendData` and a default-false `UseSeparateEdgeTexture` path to `M_StateMask`; enabled it only for `MI_RegionLandscape_GameMap2`.
 - Extended `BP_RegionStateManager` and its placed map instance to push the Edge texture. Seven affected assets validated `VALID` with no errors or warnings; PIE showed no material, shader, or Blueprint runtime errors.
 - Visual inspection exposed residual stairs. PNG analysis confirmed Edge is present at every ownership seam but drops to 148/255; the current reciprocal `Edge*0.5` blend can therefore jump by up to 41.8% when Nearest R changes.
+- Added a 2px fully saturated chamfer seam core with falloff to 8px, composited by maximum over the preserved smooth source Edge. All 7,443 transitions now meet at 255/255 with calculated discontinuity 0.
+- Reimported only the Unreal Edge texture. Its grayscale/Bilinear/mipped/clamped settings and `VALID` result remain intact; PIE target errors are zero and the former worst boundary no longer shows a large material stair.
 
 ## Related
 
