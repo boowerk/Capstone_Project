@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-14T06:51:59+09:00
+updated: 2026-07-18T12:25:02+09:00
 status: active
 tags:
   - memoc
@@ -11,11 +11,13 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-07-14T06:51:59+09:00
+Last synced: 2026-07-18T12:25:02+09:00
 
 ## Current Status
 
 - The Project Eden Codex team workflow is initialized: `[EDEN-MAIN]` is the sole writer/integrator, while permanent DESIGN, CLIENT, WORLD, and QA threads perform read-only analysis and cross-review. Work is split into minimal functional units and committed using the repository's `type(scope): short summary` convention. The durable protocol is in `docs/AgentTeamWorkflow.md`.
+
+- The graduation slice now has a guarded lobby entry contract. Commit `faa6c536` routes both native and production Blueprint lobby defaults to `MainMap/L_LandscapeMap`; Editor build, `ProjectEden.Game.Lobby.LandscapeTravelConfiguration`, and `ProjectEden.Game.LandscapeMap.Integrity` pass. Commit `166b5e93` adds the same map to the dedicated-server `COOK_MAPS` list. DESIGN/CLIENT/WORLD approved the configuration; QA remains conditional until real Cook/package and two-player seamless-travel gates pass.
 
 - `/Game/Maps/MainMap/L_LandscapeMap` retains the restored sculpt/collision and is immediate-play ready at LFS object `dc2e8205...` (11,425,665 bytes): PlayerStart is above terrain, full Landscape NavMesh bounds exist, 15 contiguous region seeds remain, and exactly one production event director is placed. `ProjectEden.Game.LandscapeMap.Integrity` guards all of these plus the absence of `GP.TestEnvironment` deck actors.
 
@@ -223,7 +225,7 @@ Last synced: 2026-05-23T00:00:00
 
 ## Open Tasks
 
-- Complete the read-only cross-role review for `EDEN-20260718-001`, choose the graduation Vertical Slice and cut line, then implement the first P0 unit through the main thread as a separately verified functional commit.
+- Run the first integration gate: two-player listen PIE from Lobby Ready through seamless travel to `L_LandscapeMap`, then Development Server Cook/package and packaged server-client travel. Do not mark the slice release-ready until connection, pawn/input/HUD recovery, and cooked map dependencies pass.
 - PIE-check boss target marker VFX in a multi-player/session setup: first target acquisition and target swaps should flash on the selected player's torso only.
 - PIE-check Crystal Seraph before/after target acquisition and after tactical teleports; `[Patrol] Fallback move location selected` must not spam and `[Leash] Return home finished` must remain reachable.
 - PIE-check Crystal Seraph's visible fall, grounded hit gate, and return-to-hover timing; tune `GroggyDuration` / `FinalPhaseGroggyDuration` on the boss Blueprint if needed.

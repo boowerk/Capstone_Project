@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-14T06:51:59+09:00
+updated: 2026-07-18T12:25:02+09:00
 status: active
 tags:
   - memoc
@@ -11,7 +11,15 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-07-14T06:51:59+09:00
+Last synced: 2026-07-18T12:25:02+09:00
+
+## Graduation Slice Lobby Entry Handoff
+
+- `faa6c536` changes the native and production Blueprint lobby destination to `MainMap/L_LandscapeMap` and adds `ProjectEden.Game.Lobby.LandscapeTravelConfiguration`.
+- `166b5e93` keeps the existing dedicated-server Cook maps and adds `/Game/Maps/MainMap/L_LandscapeMap` through `COOK_MAPS`, preventing the dynamic ServerTravel destination from being omitted by discovery.
+- Verified: `Project_EdenEditor Win64 Development` build, lobby travel configuration automation, Landscape integrity automation, exact Cook-map declarations, UAT `COOK_MAPS` consumption, and destination package existence.
+- Remaining release gates: two-player listen PIE Ready travel; Development Server Cook/package; cooked Landscape dependency load; packaged server-client Lobby-to-Landscape travel. QA status is conditional until these pass.
+- Existing user work in `TestMap.umap`, `DA_RegionEventData.uasset`, and `L_MainMap.umap` remains intentionally unstaged/uncommitted.
 
 ## Production Landscape Corruption/Event Handoff
 

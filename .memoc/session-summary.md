@@ -2,7 +2,7 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-07-14T06:51:59+09:00
+updated: 2026-07-18T12:25:02+09:00
 status: active
 tags: [memoc, memoc/state]
 ---
@@ -10,11 +10,11 @@ tags: [memoc, memoc/state]
 
 ## Status
 - `[EDEN-MAIN]` is the sole writer; DESIGN, CLIENT, WORLD, and QA role threads are active as read-only reviewers.
-- `EDEN-20260718-001` is evaluating the graduation Vertical Slice and cut line.
+- `faa6c536` routes ready parties to `L_LandscapeMap`; `166b5e93` includes it in server Cook maps.
 
 ## Verified
-- Baseline SHA is `3bc5d5ef`; `main` is 17 commits ahead of `origin/main`.
+- Editor build, lobby configuration test, Landscape integrity test, and Cook-map contract pass.
 
 ## Handoff
-- Split work into minimal functional commits using `type(scope): short summary`.
+- Next gates: two-player seamless listen travel, Development Cook/package, then packaged server-client travel.
 - Preserve user changes in `TestMap`, `DA_RegionEventData`, and `L_MainMap`.
