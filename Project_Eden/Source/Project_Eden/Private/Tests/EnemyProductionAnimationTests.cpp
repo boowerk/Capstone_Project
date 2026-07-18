@@ -7,6 +7,7 @@
 #include "Characters/GP_EnemyCharacter.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/SkeletalMesh.h"
+#include "Engine/World.h"
 #include "Game/RegionEvents/GP_RegionEventData.h"
 #include "GameplayTags/GP_Tags.h"
 #include "Misc/AutomationTest.h"
@@ -162,6 +163,51 @@ namespace EnemyProductionAnimationTests
 				AnimationSetHasGameplayEvent(EnemySet, GPTags::Event::Enemy::ActionEnd));
 		}
 	}
+
+	void ValidateBasicMeshPresentation(
+		FAutomationTestBase& Test,
+		UWorld* TestWorld,
+		const UClass* EnemyClass,
+		const FString& Context,
+		float ExpectedRelativeZ,
+		float ExpectedUniformScale)
+	{
+		FActorSpawnParameters SpawnParameters;
+		SpawnParameters.SpawnCollisionHandlingOverride =
+			ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		AGP_EnemyCharacter* Enemy = IsValid(TestWorld) && IsValid(EnemyClass)
+			? TestWorld->SpawnActor<AGP_EnemyCharacter>(
+				const_cast<UClass*>(EnemyClass),
+				FVector::ZeroVector,
+				FRotator::ZeroRotator,
+				SpawnParameters)
+			: nullptr;
+		Test.TestNotNull(FString::Printf(TEXT("%s runtime actor spawns"), *Context), Enemy);
+		if (!IsValid(Enemy))
+		{
+			return;
+		}
+
+		// A bare transient world does not advance the actor initialization
+		// lifecycle, so invoke the same virtual hook used by PostInitializeComponents.
+		Enemy->UpdateAnimationSet();
+		const USkeletalMeshComponent* MeshComponent = IsValid(Enemy) ? Enemy->GetMesh() : nullptr;
+		Test.TestNotNull(FString::Printf(TEXT("%s presentation mesh exists"), *Context), MeshComponent);
+		if (!IsValid(MeshComponent))
+		{
+			return;
+		}
+
+		// These values mirror the proven production Blueprint using the same
+		// mesh, keeping feet, silhouette size, capsule, and health bar aligned.
+		Test.TestTrue(
+			FString::Printf(TEXT("%s mesh ground offset matches production"), *Context),
+			FMath::IsNearlyEqual(MeshComponent->GetRelativeLocation().Z, ExpectedRelativeZ));
+		const FVector RelativeScale = MeshComponent->GetRelativeScale3D();
+		Test.TestTrue(
+			FString::Printf(TEXT("%s mesh scale matches production"), *Context),
+			RelativeScale.Equals(FVector(ExpectedUniformScale), KINDA_SMALL_NUMBER));
+	}
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -173,16 +219,36 @@ bool FEnemyProductionAnimationContractTest::RunTest(const FString& Parameters)
 {
 	using namespace EnemyProductionAnimationTests;
 
-	const TCHAR* BasicEnemyClassPaths[] =
+	UWorld* TestWorld = UWorld::CreateWorld(EWorldType::Game, false);
+	if (!TestNotNull(TEXT("Created production enemy presentation test world"), TestWorld))
 	{
-		TEXT("/Game/Characters/EnemyCharacter/Basic/BP_BasicEnemy_Melee.BP_BasicEnemy_Melee_C"),
-		TEXT("/Game/Characters/EnemyCharacter/Basic/BP_BasicEnemy_Ranged.BP_BasicEnemy_Ranged_C"),
-		TEXT("/Game/Characters/EnemyCharacter/Basic/BP_BasicEnemy_Flying.BP_BasicEnemy_Flying_C")
+		return false;
+	}
+
+	struct FBasicEnemyPresentationCase
+	{
+		const TCHAR* ClassPath;
+		float ExpectedRelativeZ;
+		float ExpectedUniformScale;
 	};
-	for (const TCHAR* ClassPath : BasicEnemyClassPaths)
+
+	const FBasicEnemyPresentationCase BasicEnemyCases[] =
 	{
-		const UClass* EnemyClass = LoadClass<AGP_EnemyCharacter>(nullptr, ClassPath);
-		ValidateEnemyAnimationContract(*this, EnemyClass, ClassPath);
+		{ TEXT("/Game/Characters/EnemyCharacter/Basic/BP_BasicEnemy_Melee.BP_BasicEnemy_Melee_C"), -89.0f, 1.9f },
+		{ TEXT("/Game/Characters/EnemyCharacter/Basic/BP_BasicEnemy_Ranged.BP_BasicEnemy_Ranged_C"), -88.0f, 1.5425f },
+		{ TEXT("/Game/Characters/EnemyCharacter/Basic/BP_BasicEnemy_Flying.BP_BasicEnemy_Flying_C"), -88.0f, 1.5425f }
+	};
+	for (const FBasicEnemyPresentationCase& BasicEnemyCase : BasicEnemyCases)
+	{
+		const UClass* EnemyClass = LoadClass<AGP_EnemyCharacter>(nullptr, BasicEnemyCase.ClassPath);
+		ValidateEnemyAnimationContract(*this, EnemyClass, BasicEnemyCase.ClassPath);
+		ValidateBasicMeshPresentation(
+			*this,
+			TestWorld,
+			EnemyClass,
+			BasicEnemyCase.ClassPath,
+			BasicEnemyCase.ExpectedRelativeZ,
+			BasicEnemyCase.ExpectedUniformScale);
 	}
 
 	const TCHAR* ProductionEventPaths[] =
@@ -208,6 +274,7 @@ bool FEnemyProductionAnimationContractTest::RunTest(const FString& Parameters)
 		}
 	}
 
+	TestWorld->DestroyWorld(false);
 	return !HasAnyErrors();
 }
 

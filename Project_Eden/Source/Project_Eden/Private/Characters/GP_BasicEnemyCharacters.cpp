@@ -54,6 +54,29 @@ namespace GPBasicEnemyDefaults
 		return SharedAssets;
 	}
 
+	void ConfigureTemplateMeshPresentation(
+		USkeletalMeshComponent* MeshComponent,
+		USkeletalMesh* FallbackMesh,
+		float RelativeZ,
+		float UniformScale)
+	{
+		if (!IsValid(MeshComponent))
+		{
+			return;
+		}
+
+		if (IsValid(FallbackMesh))
+		{
+			MeshComponent->SetSkeletalMesh(FallbackMesh);
+		}
+
+		// Enemy animation sets supply the runtime mesh and AnimBP, while the
+		// component transform must mirror the corresponding production enemy.
+		MeshComponent->SetRelativeLocation(FVector(0.0f, 0.0f, RelativeZ));
+		MeshComponent->SetRelativeRotation(FRotator(0.0f, -90.0f, 0.0f));
+		MeshComponent->SetRelativeScale3D(FVector(UniformScale));
+	}
+
 	FEnemyArchetypeTuning MakeTuning(
 		EEnemyMode Mode,
 		float Aggression,
@@ -85,10 +108,8 @@ AGP_MeleeEnemyCharacter::AGP_MeleeEnemyCharacter()
 	// locomotion, enemy hit notifies, and a visible attack wind-up.
 	DefaultEnemyAnimationSet = TSoftObjectPtr<UPDA_EnemyAnimationSet>(FSoftObjectPath(
 		TEXT("/Game/Characters/EnemyCharacter/Monsters/FurnaceWalker/PDA_FW_EnemyAnimationSet.PDA_FW_EnemyAnimationSet")));
-	if (GetMesh() != nullptr && SharedAssets.MaskManMesh != nullptr)
-	{
-		GetMesh()->SetSkeletalMesh(SharedAssets.MaskManMesh);
-	}
+	GPBasicEnemyDefaults::ConfigureTemplateMeshPresentation(
+		GetMesh(), SharedAssets.MaskManMesh, -89.0f, 1.9f);
 
 	CombatArchetype = EGPEnemyCombatArchetype::Melee;
 	// Melee enemies recover quickly, but still vary enough that a surrounding group does not swing in unison.
@@ -124,6 +145,15 @@ AGP_MeleeEnemyCharacter::AGP_MeleeEnemyCharacter()
 	}
 }
 
+void AGP_MeleeEnemyCharacter::UpdateAnimationSet()
+{
+	Super::UpdateAnimationSet();
+
+	// Blueprint children can retain an older serialized component offset, so
+	// reapply the Furnace Walker presentation after resolving the runtime set.
+	GPBasicEnemyDefaults::ConfigureTemplateMeshPresentation(GetMesh(), nullptr, -89.0f, 1.9f);
+}
+
 AGP_RangedEnemyCharacter::AGP_RangedEnemyCharacter()
 {
 	const GPBasicEnemyDefaults::FSharedTemplateAssets& SharedAssets = GPBasicEnemyDefaults::GetSharedTemplateAssets();
@@ -133,10 +163,8 @@ AGP_RangedEnemyCharacter::AGP_RangedEnemyCharacter()
 	// attack montage, avoiding the retarget-only MaskMan player graph.
 	DefaultEnemyAnimationSet = TSoftObjectPtr<UPDA_EnemyAnimationSet>(FSoftObjectPath(
 		TEXT("/Game/Characters/EnemyCharacter/Monsters/CyclopsSpecter/PDA_CS_EnemyAnimationSet.PDA_CS_EnemyAnimationSet")));
-	if (GetMesh() != nullptr && SharedAssets.MaskManMesh != nullptr)
-	{
-		GetMesh()->SetSkeletalMesh(SharedAssets.MaskManMesh);
-	}
+	GPBasicEnemyDefaults::ConfigureTemplateMeshPresentation(
+		GetMesh(), SharedAssets.MaskManMesh, -88.0f, 1.5425f);
 
 	CombatArchetype = EGPEnemyCombatArchetype::Ranged;
 	// Ranged attacks leave a wider breathing window after each projectile than melee attacks.
@@ -172,6 +200,14 @@ AGP_RangedEnemyCharacter::AGP_RangedEnemyCharacter()
 	}
 }
 
+void AGP_RangedEnemyCharacter::UpdateAnimationSet()
+{
+	Super::UpdateAnimationSet();
+
+	// Keep every generic ranged spawn aligned to the production Cyclops mesh.
+	GPBasicEnemyDefaults::ConfigureTemplateMeshPresentation(GetMesh(), nullptr, -88.0f, 1.5425f);
+}
+
 AGP_FlyingEnemyCharacter::AGP_FlyingEnemyCharacter()
 {
 	const GPBasicEnemyDefaults::FSharedTemplateAssets& SharedAssets = GPBasicEnemyDefaults::GetSharedTemplateAssets();
@@ -181,10 +217,8 @@ AGP_FlyingEnemyCharacter::AGP_FlyingEnemyCharacter()
 	// authoritative ranged timing contract as the grounded archetype.
 	DefaultEnemyAnimationSet = TSoftObjectPtr<UPDA_EnemyAnimationSet>(FSoftObjectPath(
 		TEXT("/Game/Characters/EnemyCharacter/Monsters/CyclopsSpecter/PDA_CS_EnemyAnimationSet.PDA_CS_EnemyAnimationSet")));
-	if (GetMesh() != nullptr && SharedAssets.MaskManMesh != nullptr)
-	{
-		GetMesh()->SetSkeletalMesh(SharedAssets.MaskManMesh);
-	}
+	GPBasicEnemyDefaults::ConfigureTemplateMeshPresentation(
+		GetMesh(), SharedAssets.MaskManMesh, -88.0f, 1.5425f);
 
 	CombatArchetype = EGPEnemyCombatArchetype::Flying;
 	// Flying enemies use short, irregular bursts to distinguish them from grounded ranged enemies.
@@ -222,6 +256,15 @@ AGP_FlyingEnemyCharacter::AGP_FlyingEnemyCharacter()
 		MovementComponent->DefaultWaterMovementMode = MOVE_Flying;
 		MovementComponent->bOrientRotationToMovement = true;
 	}
+}
+
+void AGP_FlyingEnemyCharacter::UpdateAnimationSet()
+{
+	Super::UpdateAnimationSet();
+
+	// Flying reuses the same spectral mesh contract until its dedicated P1
+	// locomotion set is authored, including the proven component transform.
+	GPBasicEnemyDefaults::ConfigureTemplateMeshPresentation(GetMesh(), nullptr, -88.0f, 1.5425f);
 }
 
 void AGP_FlyingEnemyCharacter::BeginPlay()
