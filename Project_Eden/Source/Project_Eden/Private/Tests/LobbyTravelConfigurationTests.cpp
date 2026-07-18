@@ -9,6 +9,7 @@
 
 namespace
 {
+	constexpr int32 ExpectedPartySize = 3;
 	constexpr TCHAR ExpectedLandscapeMapName[] = TEXT("MainMap/L_LandscapeMap");
 	constexpr TCHAR LandscapeMapPackagePath[] = TEXT("/Game/Maps/MainMap/L_LandscapeMap");
 	constexpr TCHAR LobbyBlueprintClassPath[] =
@@ -29,10 +30,22 @@ bool FGPLobbyLandscapeTravelConfigurationTest::RunTest(const FString& Parameters
 		return false;
 	}
 
+	const FIntProperty* ExpectedPlayerCountProperty =
+		FindFProperty<FIntProperty>(AGP_LobbyGameMode::StaticClass(), TEXT("ExpectedPlayerCount"));
+	if (!TestNotNull(TEXT("Lobby GameMode exposes the ready-party size"), ExpectedPlayerCountProperty))
+	{
+		return false;
+	}
+
 	const AGP_LobbyGameMode* NativeLobbyDefaults = GetDefault<AGP_LobbyGameMode>();
 	TestNotNull(TEXT("Native lobby defaults are available"), NativeLobbyDefaults);
 	if (NativeLobbyDefaults)
 	{
+		// Keep the native ready gate aligned with the three-player product contract.
+		TestEqual(
+			TEXT("Native lobby requires exactly three connected players"),
+			ExpectedPlayerCountProperty->GetPropertyValue_InContainer(NativeLobbyDefaults),
+			ExpectedPartySize);
 		TestEqual(
 			TEXT("Native lobby routes ready parties to the Landscape slice"),
 			GameMapNameProperty->GetPropertyValue_InContainer(NativeLobbyDefaults),
@@ -52,7 +65,12 @@ bool FGPLobbyLandscapeTravelConfigurationTest::RunTest(const FString& Parameters
 		return false;
 	}
 
-	// Blueprint에 직렬화된 이전 경로가 native 기본값을 다시 덮어쓰는 회귀를 함께 막습니다.
+	// Guard against production Blueprint defaults silently overriding either
+	// the three-player ready gate or the reviewed travel destination.
+	TestEqual(
+		TEXT("Production lobby Blueprint requires exactly three connected players"),
+		ExpectedPlayerCountProperty->GetPropertyValue_InContainer(LobbyBlueprintDefaults),
+		ExpectedPartySize);
 	TestEqual(
 		TEXT("Production lobby Blueprint routes ready parties to the Landscape slice"),
 		GameMapNameProperty->GetPropertyValue_InContainer(LobbyBlueprintDefaults),
