@@ -12,6 +12,7 @@
 #include "Characters/GP_CrystalSeraphStateComponent.h"
 #include "Characters/GP_DarkArmorKnightBossCharacter.h"
 #include "Characters/GP_DarkArmorKnightStateComponent.h"
+#include "Characters/GP_EnemyCharacter.h"
 #include "Characters/GP_MatadorBossStateComponent.h"
 #include "Characters/GP_MatadorMageBossCharacter.h"
 #include "GameFramework/Actor.h"
@@ -193,6 +194,8 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 	APawn* ControlledPawn = IsValid(AIController) ? AIController->GetPawn() : nullptr;
 	AActor* TargetActor = Cast<AActor>(BlackboardComponent->GetValueAsObject(EnemyBlackboardKeys::TargetActor));
 	const bool bHasTarget = IsValid(TargetActor);
+	const AGP_EnemyCharacter* EnemyCharacter = Cast<AGP_EnemyCharacter>(ControlledPawn);
+	const bool bBossActionCommitted = IsValid(EnemyCharacter) && EnemyCharacter->IsBehaviorAttackCommitted();
 	const bool bReturningHome = BTS_UpdateBossTactics_Internal::GetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldReturnHome);
 	const bool bShouldReposition = BTS_UpdateBossTactics_Internal::GetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldReposition);
 	const bool bHasLineOfSight = BTS_UpdateBossTactics_Internal::GetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bHasLineOfSight);
@@ -463,7 +466,20 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 		|| bCanUseSweepAttack
 		|| bCanUseHeavyAttack;
 
-	if (bMatadorForceRangeReposition)
+	const bool bBossInVulnerabilityState = bMatadorGroggy
+		|| bCrystalSeraphGroggy
+		|| bDarkKnightGroggy
+		|| (bIsCrystalSeraphBoss && bWingCoreExposed);
+	if (bBossActionCommitted && bHasTarget && !bReturningHome && !bBossInVulnerabilityState)
+	{
+		// Service ticks must not restart the BT while the selected pattern still
+		// owns its telegraph, impact, or recovery window.
+		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanAttack, true);
+		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldRetreat, false);
+		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldReposition, false);
+		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldChase, false);
+	}
+	else if (bMatadorForceRangeReposition)
 	{
 		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanAttack, false);
 		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldRetreat, true);
@@ -478,7 +494,7 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldReposition, false);
 		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldChase, false);
 	}
-	else if (bMatadorGroggy || bCrystalSeraphGroggy || bDarkKnightGroggy || (bIsCrystalSeraphBoss && bWingCoreExposed))
+	else if (bBossInVulnerabilityState)
 	{
 		// Vulnerability windows are stationary and must not fall through to the shared Chase branch.
 		BTS_UpdateBossTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bCanAttack, false);

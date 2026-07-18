@@ -10,6 +10,7 @@ class AGP_EnemyCharacter;
 class APawn;
 class UAbilitySystemComponent;
 class UBehaviorTreeComponent;
+class UBlackboardComponent;
 class UCharacterMovementComponent;
 
 enum class EEnemyAttackTaskPhase : uint8
@@ -54,6 +55,14 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "AI|Transition", meta = (ClampMin = "0.0", Units = "s"))
 	float AttackRecoverySeconds = 0.18f;
 
+	// Boss abilities without a longer external action use this short hold after activation.
+	UPROPERTY(EditAnywhere, Category = "AI|Boss|Transition", meta = (ClampMin = "0.0", Units = "s"))
+	float BossDefaultPostAbilityCommitSeconds = 0.0f;
+
+	// Telegraphed boss patterns receive a slightly more readable recovery beat.
+	UPROPERTY(EditAnywhere, Category = "AI|Boss|Transition", meta = (ClampMin = "0.0", Units = "s"))
+	float BossAttackRecoverySeconds = 0.3f;
+
 	// 누락된 ActionEnd나 종료 콜백이 BT를 영구 정지시키지 않게 하는 안전 타임아웃이다.
 	UPROPERTY(EditAnywhere, Category = "AI|Transition", meta = (ClampMin = "0.1", Units = "s"))
 	float AttackTimeoutSeconds = 8.0f;
@@ -80,6 +89,7 @@ protected:
 private:
 	bool ActivateBasicAttack();
 	bool IsTrackedAbilityActive() const;
+	bool IsTrackedExternalBossActionActive() const;
 	bool IsFacingCommittedTarget() const;
 	void TickFacingTarget(UBehaviorTreeComponent& OwnerComp, float DeltaSeconds);
 	void BeginFacingOwnership(APawn* ControlledPawn);
@@ -93,12 +103,15 @@ private:
 	TWeakObjectPtr<AGP_EnemyCharacter> ActiveEnemyCharacter;
 	TWeakObjectPtr<APawn> ActiveControlledPawn;
 	TWeakObjectPtr<AActor> CommittedTargetActor;
+	TWeakObjectPtr<UBlackboardComponent> ActiveBlackboardComponent;
 	TWeakObjectPtr<UCharacterMovementComponent> FacingMovementComponent;
 	FGameplayTag ActiveAbilityTag;
 	float PhaseElapsedSeconds = 0.0f;
 	float TotalElapsedSeconds = 0.0f;
+	float CurrentFallbackCommitSeconds = 0.0f;
 	bool bAttackActivationAccepted = false;
 	bool bCadenceScheduled = false;
+	bool bUseBossPatternSelector = false;
 	bool bPreviousOrientRotationToMovement = false;
 	bool bPreviousUseControllerDesiredRotation = false;
 	bool bOwnsFacingRotation = false;

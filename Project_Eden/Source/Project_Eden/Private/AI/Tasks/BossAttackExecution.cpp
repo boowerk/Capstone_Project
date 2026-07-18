@@ -231,8 +231,14 @@ namespace BossAttackExecution
 		const APawn* ControlledPawn,
 		UBlackboardComponent* BlackboardComponent,
 		const FGameplayTag& DefaultAttackAbilityTag,
-		const AActor* TargetActor)
+		const AActor* TargetActor,
+		FGameplayTag* OutActivatedAbilityTag)
 	{
+		if (OutActivatedAbilityTag != nullptr)
+		{
+			*OutActivatedAbilityTag = FGameplayTag();
+		}
+
 		const FGPBossAttackPatternContext PatternContext = BuildPatternContext(ControlledPawn, BlackboardComponent, DefaultAttackAbilityTag);
 		const TArray<FGPBossAttackPatternCandidate> Candidates = FGPBossAttackPatternSelector::BuildCandidates(PatternContext);
 
@@ -251,12 +257,11 @@ namespace BossAttackExecution
 
 			if (TryActivateAbilityByTag(ASC, Candidate.AbilityTag))
 			{
-				if ((Cast<AGP_CrystalSeraphBossCharacter>(ControlledPawn) != nullptr
-						|| Cast<AGP_DarkArmorKnightBossCharacter>(ControlledPawn) != nullptr)
-					&& HasBlackboardKey(BlackboardComponent, EnemyBlackboardKeys::bCanAttack))
+				if (OutActivatedAbilityTag != nullptr)
 				{
-					// Leave the common BT Attack branch immediately; the tactics service will reopen it after the cadence expires.
-					BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bCanAttack, false);
+					// The BT task needs the concrete choice to follow any
+					// actor-owned telegraph after GAS activation returns.
+					*OutActivatedAbilityTag = Candidate.AbilityTag;
 				}
 
 				UE_LOG(

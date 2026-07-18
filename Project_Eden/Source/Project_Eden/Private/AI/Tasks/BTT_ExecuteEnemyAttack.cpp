@@ -1,5 +1,6 @@
 #include "AI/Tasks/BTT_ExecuteEnemyAttack.h"
 
+#include "AI/Combat/BossAttackTransitionPolicy.h"
 #include "AI/Combat/EnemyAttackTransitionPolicy.h"
 #include "AI/Tasks/EnemyBTTaskCommon.h"
 #include "AbilitySystem/GP_AbilitySystemComponent.h"
@@ -11,6 +12,7 @@
 #include "AIController.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "Characters/GP_EnemyCharacter.h"
+#include "Characters/GP_MatadorMageBossCharacter.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameplayTags/GP_Tags.h"
@@ -73,7 +75,7 @@ EBTNodeResult::Type UBTT_ExecuteEnemyAttack::ExecuteTask(UBehaviorTreeComponent&
 	}
 
 	AGP_EnemyCharacter* EnemyCharacter = Cast<AGP_EnemyCharacter>(ControlledPawn);
-	const bool bUseBossPatternSelector = BossAttackExecution::ShouldUseBossPatternSelector(ControlledPawn, BlackboardComponent);
+	bUseBossPatternSelector = BossAttackExecution::ShouldUseBossPatternSelector(ControlledPawn, BlackboardComponent);
 	if (!bUseBossPatternSelector && IsValid(EnemyCharacter) && !EnemyCharacter->IsBasicEnemyAttackReady())
 	{
 		// 서비스와 태스크 사이의 짧은 레이스에서도 cadence를 우회한 중복 공격은 허용하지 않는다.
@@ -93,33 +95,11 @@ EBTNodeResult::Type UBTT_ExecuteEnemyAttack::ExecuteTask(UBehaviorTreeComponent&
 		return EBTNodeResult::Failed;
 	}
 
-	if (bUseBossPatternSelector)
-	{
-		if (bFaceTargetBeforeAttack && IsValid(TargetActor))
-		{
-			FVector LookDirection = TargetActor->GetActorLocation() - ControlledPawn->GetActorLocation();
-			LookDirection.Z = 0.0f;
-			if (!LookDirection.IsNearlyZero())
-			{
-				// 보스는 다음 원자 커밋에서 패턴 수명과 함께 회전 소유권을 전환한다.
-				ControlledPawn->SetActorRotation(LookDirection.Rotation());
-			}
-		}
-
-		// Some merged boss BT assets still reference this generic task; route boss pawns through the shared pattern selector.
-		UE_LOG(
-			LogEnemyAI,
-			Log,
-			TEXT("[BossAI] Generic attack task routed through boss pattern selector: Pawn=%s Target=%s"),
-			*GetNameSafe(ControlledPawn),
-			*EnemyAIDebugUtils::DescribeActor(TargetActor));
-		return BossAttackExecution::ExecuteBestPattern(ASC, ControlledPawn, BlackboardComponent, EffectiveAttackAbilityTag, TargetActor);
-	}
-
 	ActiveAbilitySystemComponent = ASC;
 	ActiveEnemyCharacter = EnemyCharacter;
 	ActiveControlledPawn = ControlledPawn;
 	CommittedTargetActor = TargetActor;
+	ActiveBlackboardComponent = BlackboardComponent;
 	ActiveAbilityTag = EffectiveAttackAbilityTag;
 	if (IsValid(EnemyCharacter))
 	{
@@ -154,14 +134,36 @@ bool UBTT_ExecuteEnemyAttack::ActivateBasicAttack()
 	}
 
 	bool bActivated = false;
-	if (UGP_AbilitySystemComponent* GPASC = Cast<UGP_AbilitySystemComponent>(ASC))
+	if (bUseBossPatternSelector)
+	{
+		FGameplayTag ActivatedBossPatternTag;
+		const EBTNodeResult::Type BossResult = BossAttackExecution::ExecuteBestPattern(
+			ASC,
+			ActiveControlledPawn.Get(),
+			ActiveBlackboardComponent.Get(),
+			ActiveAbilityTag,
+			CommittedTargetActor.Get(),
+			&ActivatedBossPatternTag);
+		bActivated = BossResult == EBTNodeResult::Succeeded && ActivatedBossPatternTag.IsValid();
+		if (bActivated)
+		{
+			// Track the concrete choice instead of the generic BT default tag.
+			ActiveAbilityTag = ActivatedBossPatternTag;
+			CurrentFallbackCommitSeconds = BossAttackTransitionPolicy::ResolvePostAbilityCommitSeconds(
+				ActiveAbilityTag,
+				BossDefaultPostAbilityCommitSeconds);
+		}
+	}
+	else if (UGP_AbilitySystemComponent* GPASC = Cast<UGP_AbilitySystemComponent>(ASC))
 	{
 		bActivated = GPASC->TryActivateAbilityByTag(ActiveAbilityTag);
+		CurrentFallbackCommitSeconds = InstantAttackCommitSeconds;
 	}
 	else
 	{
 		// Keep non-project ability system components compatible with the same gameplay tag contract.
 		bActivated = ASC->TryActivateAbilitiesByTag(ActiveAbilityTag.GetSingleTagContainer());
+		CurrentFallbackCommitSeconds = InstantAttackCommitSeconds;
 	}
 
 	if (bActivated)
@@ -213,21 +215,41 @@ void UBTT_ExecuteEnemyAttack::TickTask(
 				*EnemyAIDebugUtils::DescribeActor(ActiveEnemyCharacter.Get()),
 				*ActiveAbilityTag.ToString());
 		}
+
+		if (TotalElapsedSeconds < AttackTimeoutSeconds
+			&& bUseBossPatternSelector
+			&& CurrentFallbackCommitSeconds > KINDA_SMALL_NUMBER)
+		{
+			// Some boss abilities finish GAS after the cast but leave an
+			// authoritative projectile, beam, or delayed impact in progress.
+			ExecutionPhase = EEnemyAttackTaskPhase::FallbackCommit;
+			PhaseElapsedSeconds = 0.0f;
+			return;
+		}
+
 		CompleteBasicAttack(OwnerComp);
 		return;
 	}
 
 	if (ExecutionPhase == EEnemyAttackTaskPhase::FallbackCommit)
 	{
-		if (PhaseElapsedSeconds >= InstantAttackCommitSeconds)
+		const bool bHasExternalActionSignal = ActiveAbilityTag.MatchesTagExact(
+			GPTags::Ability::Enemy::Utility_MatadorBullPattern);
+		const bool bExternalActionActive = IsTrackedExternalBossActionActive();
+		if ((bHasExternalActionSignal && !bExternalActionActive)
+			|| (!bHasExternalActionSignal && PhaseElapsedSeconds >= CurrentFallbackCommitSeconds)
+			|| TotalElapsedSeconds >= AttackTimeoutSeconds)
 		{
 			CompleteBasicAttack(OwnerComp);
 		}
 		return;
 	}
 
+	const float EffectiveRecoverySeconds = bUseBossPatternSelector
+		? BossAttackRecoverySeconds
+		: AttackRecoverySeconds;
 	if (ExecutionPhase == EEnemyAttackTaskPhase::Recovery
-		&& PhaseElapsedSeconds >= AttackRecoverySeconds)
+		&& PhaseElapsedSeconds >= EffectiveRecoverySeconds)
 	{
 		FinishLatentTask(OwnerComp, EBTNodeResult::Succeeded);
 	}
@@ -385,18 +407,34 @@ bool UBTT_ExecuteEnemyAttack::IsTrackedAbilityActive() const
 	return false;
 }
 
+bool UBTT_ExecuteEnemyAttack::IsTrackedExternalBossActionActive() const
+{
+	if (!ActiveAbilityTag.MatchesTagExact(GPTags::Ability::Enemy::Utility_MatadorBullPattern))
+	{
+		return false;
+	}
+
+	const AGP_MatadorMageBossCharacter* MatadorBoss = Cast<AGP_MatadorMageBossCharacter>(ActiveControlledPawn.Get());
+	// Bull completion is observable on authoritative Matador state, so the task
+	// releases as soon as the coordinator finishes instead of waiting a fixed cap.
+	return IsValid(MatadorBoss) && MatadorBoss->IsBullPatternActive();
+}
+
 void UBTT_ExecuteEnemyAttack::CompleteBasicAttack(UBehaviorTreeComponent& OwnerComp)
 {
 	ScheduleBasicAttackCadence();
+	const float EffectiveRecoverySeconds = bUseBossPatternSelector
+		? BossAttackRecoverySeconds
+		: AttackRecoverySeconds;
 	if (AGP_EnemyCharacter* EnemyCharacter = ActiveEnemyCharacter.Get())
 	{
 		// cadence는 공격 시작이 아니라 실제 종료 뒤부터 계산해 긴 몽타주와 다음 공격이 겹치지 않게 한다.
-		EnemyCharacter->FinishBehaviorAttackCommit(AttackRecoverySeconds);
+		EnemyCharacter->FinishBehaviorAttackCommit(EffectiveRecoverySeconds);
 	}
 
 	ExecutionPhase = EEnemyAttackTaskPhase::Recovery;
 	PhaseElapsedSeconds = 0.0f;
-	if (AttackRecoverySeconds <= KINDA_SMALL_NUMBER)
+	if (EffectiveRecoverySeconds <= KINDA_SMALL_NUMBER)
 	{
 		FinishLatentTask(OwnerComp, EBTNodeResult::Succeeded);
 	}
@@ -431,11 +469,14 @@ void UBTT_ExecuteEnemyAttack::ResetExecutionState()
 	ActiveEnemyCharacter.Reset();
 	ActiveControlledPawn.Reset();
 	CommittedTargetActor.Reset();
+	ActiveBlackboardComponent.Reset();
 	ActiveAbilityTag = FGameplayTag();
 	PhaseElapsedSeconds = 0.0f;
 	TotalElapsedSeconds = 0.0f;
+	CurrentFallbackCommitSeconds = 0.0f;
 	bAttackActivationAccepted = false;
 	bCadenceScheduled = false;
+	bUseBossPatternSelector = false;
 	bPreviousOrientRotationToMovement = false;
 	bPreviousUseControllerDesiredRotation = false;
 }
@@ -443,7 +484,8 @@ void UBTT_ExecuteEnemyAttack::ResetExecutionState()
 FString UBTT_ExecuteEnemyAttack::GetStaticDescription() const
 {
 	return FString::Printf(
-		TEXT("Attack tag: %s\nWait for GAS end, recovery %.2fs"),
+		TEXT("Attack tag: %s\nWait for GAS/external action, recovery %.2fs (boss %.2fs)"),
 		*AttackAbilityTag.ToString(),
-		AttackRecoverySeconds);
+		AttackRecoverySeconds,
+		BossAttackRecoverySeconds);
 }
