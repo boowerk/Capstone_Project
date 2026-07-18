@@ -12,6 +12,7 @@
 #include "GameplayTags/GP_Tags.h"
 #include "Misc/AutomationTest.h"
 #include "NiagaraSystem.h"
+#include "TimerManager.h"
 #include "VFX/GP_BossTelegraphVFXComponent.h"
 
 namespace DarkArmorKnightBossTests
@@ -222,6 +223,65 @@ bool FDarkArmorKnightChargeTelegraphVFXTest::RunTest(const FString& Parameters)
 			FString(TEXT("/Game/Niagara/Vefects/Easy_Impact_Frames/VFX/Extras/Particles/NS_Extra_Lightning_Example_VFX.NS_Extra_Lightning_Example_VFX")));
 	}
 
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FDarkArmorKnightChargeMovementFallbackTest,
+	"ProjectEden.Combat.DarkArmorKnight.ChargeMovementFallback",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FDarkArmorKnightChargeMovementFallbackTest::RunTest(const FString& Parameters)
+{
+	UWorld* TestWorld = UWorld::CreateWorld(EWorldType::Game, false);
+	if (!TestNotNull(TEXT("Created charge-fallback test world"), TestWorld))
+	{
+		return false;
+	}
+
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AGP_DarkArmorKnightBossCharacter* Boss = TestWorld->SpawnActor<AGP_DarkArmorKnightBossCharacter>(
+		FVector::ZeroVector,
+		FRotator::ZeroRotator,
+		Params);
+	ATargetPoint* Target = TestWorld->SpawnActor<ATargetPoint>(
+		FVector(3000.0f, 0.0f, 0.0f),
+		FRotator::ZeroRotator,
+		Params);
+	AGP_DarkKnightChargeActor* Charge = TestWorld->SpawnActor<AGP_DarkKnightChargeActor>(
+		FVector::ZeroVector,
+		FRotator::ZeroRotator,
+		Params);
+	if (!TestNotNull(TEXT("Spawned native Dark Knight"), Boss)
+		|| !TestNotNull(TEXT("Spawned distant charge target"), Target)
+		|| !TestNotNull(TEXT("Spawned charge coordinator"), Charge))
+	{
+		TestWorld->DestroyWorld(false);
+		return false;
+	}
+
+	// The native test actor deliberately has no AnimInstance/montage playback,
+	// reproducing the product failure mode without editing production assets.
+	TestFalse(
+		TEXT("Native test boss cannot start the charge montage"),
+		Boss->PlayPatternMontage(GPTags::Ability::Boss::DarkKnight::Charge));
+	const FVector StartLocation = Boss->GetActorLocation();
+	Charge->InitializeCharge(Boss, Target);
+	// Transient automation worlds do not advance gameplay timers like PIE.
+	TestWorld->GetTimerManager().ClearTimer(Charge->TelegraphTimerHandle);
+	Charge->StartCharge();
+	Charge->Tick(0.1f);
+
+	const float TravelDistance = FVector::Dist2D(StartLocation, Boss->GetActorLocation());
+	TestTrue(
+		TEXT("Failed charge montage falls back to visible swept travel"),
+		TravelDistance >= 200.0f);
+	TestTrue(
+		TEXT("Fallback charge remains active before reaching its target or cap"),
+		IsValid(Charge) && !Charge->IsActorBeingDestroyed());
+
+	TestWorld->DestroyWorld(false);
 	return true;
 }
 
