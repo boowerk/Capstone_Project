@@ -105,6 +105,8 @@ public:
 	// Regular-enemy BT tasks use this server-side gate instead of a fixed shared Wait node.
 	UFUNCTION(BlueprintPure, Category = "AI|Combat|Cadence")
 	bool IsBasicEnemyAttackReady() const;
+	bool IsBasicEnemyAttackInProgress() const { return bBasicEnemyAttackInProgress; }
+	void SetBasicEnemyAttackInProgress(bool bInProgress) { bBasicEnemyAttackInProgress = bInProgress; }
 
 	// Returns the newly rolled delay so attack logs and tests can inspect the selected cadence.
 	float ScheduleNextBasicEnemyAttack();
@@ -298,6 +300,7 @@ private:
 	TObjectPtr<AActor> DeathInstigatorActor;
 
 	bool bDeathStateApplied = false;
+	bool bBasicEnemyAttackInProgress = false;
 	float BasicEnemyAttackReadyTimeSeconds = 0.0f;
 	FRandomStream AttackCadenceRandomStream;
 

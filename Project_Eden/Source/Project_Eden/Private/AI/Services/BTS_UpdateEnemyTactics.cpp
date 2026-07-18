@@ -315,6 +315,17 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 			false);
 		return;
 	}
+	if (IsValid(EnemyCharacter) && EnemyCharacter->IsBasicEnemyAttackInProgress())
+	{
+		BTS_UpdateEnemyTactics_Internal::SetCombatStateTag(BlackboardComponent, GPTags::AI::State::Combat);
+		BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldRetreat, false);
+		// Keep the branch which activated this ability selected. Closing this condition aborts
+		// the attack branch and leaves the regular enemy locked in its attack state.
+		BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bCanAttack, bPreviousCanAttack);
+		BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldReposition, false);
+		BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldChase, false);
+		return;
+	}
 
 	const float DistanceToTarget = FVector::Distance(ControlledPawn->GetActorLocation(), TargetActor->GetActorLocation());
 	const bool bHasLineOfSight = AIController->LineOfSightTo(TargetActor);

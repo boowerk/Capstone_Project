@@ -1,16 +1,21 @@
 #include "AbilitySystem/Abilities/Enemy/GP_EnemyAttack.h"
 #include "AIController.h"
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
+#include "Abilities/Tasks/AbilityTask_WaitDelay.h"
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
 #include "Animation/PDA_CharacterAnimationSet.h"
 #include "Animation/PDA_EnemyAnimationSet.h"
 #include "Animation/AnimMontage.h"
 #include "Animation/AnimSequence.h"
 #include "Characters/GP_EnemyCharacter.h"
+#include "Components/CapsuleComponent.h"
+#include "GameFramework/Character.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/Pawn.h"
 #include "GameplayEffect.h"
 #include "GameplayTags/GP_Tags.h"
 #include "UObject/ConstructorHelpers.h"
+#include "Utils/GP_BlueprintLibrary.h"
 
 namespace GP_EnemyAttack_Internal
 {
@@ -179,6 +184,25 @@ void UGP_EnemyAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
+	if (AGP_EnemyCharacter* EnemyCharacter = Cast<AGP_EnemyCharacter>(AvatarActor))
+	{
+		EnemyCharacter->SetBasicEnemyAttackInProgress(true);
+		if (const UPDA_EnemyAnimationSet* Set = EnemyCharacter->GetEnemyAnimationSet(); IsValid(Set) && Set->bUseAbilityForwardStep)
+		{
+			AbilityForwardStepDirection = AvatarActor->GetActorForwardVector().GetSafeNormal2D();
+			AbilityForwardStepDistance = Set->AbilityForwardStepDistance;
+			AbilityForwardStepDurationSeconds = FMath::Max(Set->AbilityForwardStepDurationSeconds, KINDA_SMALL_NUMBER);
+			AbilityForwardStepPushSpeed = Set->AbilityForwardStepPushSpeed;
+			if (AbilityForwardStepDistance > KINDA_SMALL_NUMBER && !AbilityForwardStepDirection.IsNearlyZero())
+			{
+				if (UAbilityTask_WaitDelay* Task = UAbilityTask_WaitDelay::WaitDelay(this, FMath::Max(0.0f, Set->AbilityForwardStepDelaySeconds)))
+				{
+					Task->OnFinish.AddDynamic(this, &ThisClass::BeginAbilityForwardStep);
+					Task->ReadyForActivation();
+				}
+			}
+		}
+	}
 
 	// 공격 시작 시 이동을 잠깐 멈춰 몽타주와 타격 방향이 어긋나지 않도록 한다.
 	if (APawn* AvatarPawn = Cast<APawn>(AvatarActor))
@@ -261,7 +285,7 @@ void UGP_EnemyAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 
 	// 몽타주가 없으면 즉시 판정 후 종료
 	PerformAttackHit();
-	EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
+	FinishAttackAbility(false);
 }
 
 void UGP_EnemyAttack::OnMontageCompleted()
@@ -269,9 +293,28 @@ void UGP_EnemyAttack::OnMontageCompleted()
 	FinishAttackAbility(false);
 }
 
+void UGP_EnemyAttack::EndAbility(
+	const FGameplayAbilitySpecHandle Handle,
+	const FGameplayAbilityActorInfo* ActorInfo,
+	const FGameplayAbilityActivationInfo ActivationInfo,
+	bool bReplicateEndAbility,
+	bool bWasCancelled)
+{
+	EndAbilityForwardStep();
+	if (AGP_EnemyCharacter* EnemyCharacter = Cast<AGP_EnemyCharacter>(GetAvatarActorFromActorInfo()))
+	{
+		EnemyCharacter->SetBasicEnemyAttackInProgress(false);
+	}
+
+	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
+}
+
 void UGP_EnemyAttack::OnAttackEventReceived(FGameplayEventData Payload)
 {
 	PerformAttackHit();
+	// AttackHit is authored at the strike/recovery boundary. Keep advancing through
+	// the preparation and strike, then stop before the recoil animation begins.
+	EndAbilityForwardStep();
 }
 
 void UGP_EnemyAttack::OnActionEndEventReceived(FGameplayEventData Payload)
@@ -295,6 +338,63 @@ void UGP_EnemyAttack::FinishAttackAbility(bool bWasCancelled)
 	}
 
 	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, bWasCancelled);
+}
+
+void UGP_EnemyAttack::BeginAbilityForwardStep()
+{
+	ACharacter* Character = Cast<ACharacter>(GetAvatarActorFromActorInfo());
+	AbilityForwardStepMovementComponent = IsValid(Character) ? Character->GetCharacterMovement() : nullptr;
+	if (bHasFinishedAttackAbility || !IsValid(AbilityForwardStepMovementComponent) || AbilityForwardStepDirection.IsNearlyZero()) return;
+	AbilityForwardStepCapsuleComponent = Character->GetCapsuleComponent();
+	if (IsValid(AbilityForwardStepCapsuleComponent))
+	{
+		AbilityForwardStepPreviousPawnResponse = AbilityForwardStepCapsuleComponent->GetCollisionResponseToChannel(ECC_Pawn);
+		AbilityForwardStepCapsuleComponent->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
+		AbilityForwardStepCapsuleComponent->SetGenerateOverlapEvents(true);
+	}
+	AbilityForwardStepPushedActors.Reset();
+	bAbilityForwardStepActive = true;
+	TickAbilityForwardStep();
+	GetWorld()->GetTimerManager().SetTimer(AbilityForwardStepTimerHandle, this, &ThisClass::TickAbilityForwardStep, 0.02f, true);
+}
+
+void UGP_EnemyAttack::TickAbilityForwardStep()
+{
+	if (!bAbilityForwardStepActive || !IsValid(AbilityForwardStepMovementComponent)) { EndAbilityForwardStep(); return; }
+	AbilityForwardStepMovementComponent->RequestDirectMove(AbilityForwardStepDirection * (AbilityForwardStepDistance / AbilityForwardStepDurationSeconds), false);
+	PushOverlappingForwardStepTargets();
+}
+
+void UGP_EnemyAttack::EndAbilityForwardStep()
+{
+	if (!bAbilityForwardStepActive) return;
+	bAbilityForwardStepActive = false;
+	if (IsValid(AbilityForwardStepMovementComponent)) AbilityForwardStepMovementComponent->StopMovementImmediately();
+	if (IsValid(AbilityForwardStepCapsuleComponent))
+	{
+		AbilityForwardStepCapsuleComponent->SetCollisionResponseToChannel(ECC_Pawn, AbilityForwardStepPreviousPawnResponse);
+	}
+	AbilityForwardStepCapsuleComponent = nullptr;
+	AbilityForwardStepPushedActors.Reset();
+	if (UWorld* World = GetWorld()) World->GetTimerManager().ClearTimer(AbilityForwardStepTimerHandle);
+}
+
+void UGP_EnemyAttack::PushOverlappingForwardStepTargets()
+{
+	ACharacter* SourceCharacter = Cast<ACharacter>(GetAvatarActorFromActorInfo());
+	if (!IsValid(SourceCharacter) || !SourceCharacter->HasAuthority() || !IsValid(AbilityForwardStepCapsuleComponent)) return;
+
+	TArray<AActor*> OverlappingActors;
+	AbilityForwardStepCapsuleComponent->GetOverlappingActors(OverlappingActors, ACharacter::StaticClass());
+	for (AActor* TargetActor : OverlappingActors)
+	{
+		ACharacter* TargetCharacter = Cast<ACharacter>(TargetActor);
+		if (!IsValid(TargetCharacter) || TargetCharacter == SourceCharacter || AbilityForwardStepPushedActors.Contains(TargetCharacter)) continue;
+		if (!UGP_BlueprintLibrary::CanApplyCombatEffect(SourceCharacter, TargetCharacter)) continue;
+
+		TargetCharacter->LaunchCharacter(AbilityForwardStepDirection * FMath::Max(0.0f, AbilityForwardStepPushSpeed), true, false);
+		AbilityForwardStepPushedActors.Add(TargetCharacter);
+	}
 }
 
 void UGP_EnemyAttack::PerformAttackHit()

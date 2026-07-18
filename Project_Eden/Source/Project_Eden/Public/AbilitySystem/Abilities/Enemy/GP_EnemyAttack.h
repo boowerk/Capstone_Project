@@ -7,6 +7,8 @@
 
 class UGameplayEffect;
 class UAnimMontage;
+class UCharacterMovementComponent;
+class UCapsuleComponent;
 struct FGameplayEventData;
 
 UCLASS()
@@ -22,6 +24,13 @@ public:
 		const FGameplayAbilityActorInfo* ActorInfo,
 		const FGameplayAbilityActivationInfo ActivationInfo,
 		const FGameplayEventData* TriggerEventData) override;
+
+	virtual void EndAbility(
+		const FGameplayAbilitySpecHandle Handle,
+		const FGameplayAbilityActorInfo* ActorInfo,
+		const FGameplayAbilityActivationInfo ActivationInfo,
+		bool bReplicateEndAbility,
+		bool bWasCancelled) override;
 
 protected:
 	// Derived enemy archetypes can replace the shared overlap hit while keeping montage and gameplay-event timing.
@@ -54,6 +63,10 @@ private:
 	void OnActionEndEventReceived(FGameplayEventData Payload);
 
 	void FinishAttackAbility(bool bWasCancelled);
+	UFUNCTION() void BeginAbilityForwardStep();
+	void TickAbilityForwardStep();
+	void EndAbilityForwardStep();
+	void PushOverlappingForwardStepTargets();
 
 	bool bHasAppliedAttackHit = false;
 	bool bHasFinishedAttackAbility = false;
@@ -63,4 +76,14 @@ private:
 
 	// -1 = left, 1 = right, 0 = unknown. Used to prefer left/right alternation for named attack montages.
 	int8 LastSelectedAttackSide = 0;
+	FVector AbilityForwardStepDirection = FVector::ZeroVector;
+	float AbilityForwardStepDistance = 0.0f;
+	float AbilityForwardStepDurationSeconds = 0.0f;
+	float AbilityForwardStepPushSpeed = 0.0f;
+	bool bAbilityForwardStepActive = false;
+	TObjectPtr<UCharacterMovementComponent> AbilityForwardStepMovementComponent = nullptr;
+	TObjectPtr<UCapsuleComponent> AbilityForwardStepCapsuleComponent = nullptr;
+	ECollisionResponse AbilityForwardStepPreviousPawnResponse = ECR_Block;
+	TSet<TWeakObjectPtr<AActor>> AbilityForwardStepPushedActors;
+	FTimerHandle AbilityForwardStepTimerHandle;
 };
