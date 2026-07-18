@@ -372,6 +372,7 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 	AttackObservation.bHasLineOfSight = bHasLineOfSight;
 	AttackObservation.bInsideAttackBand = bInsideAttackBand;
 	AttackObservation.bAttackCadenceReady = bAttackCadenceReady;
+	AttackObservation.bActionCommitted = IsValid(EnemyCharacter) && EnemyCharacter->IsBehaviorAttackCommitted();
 	const EEnemyAttackTransitionIntent AttackIntent = EnemyAttackTransitionPolicy::ResolveIntent(AttackObservation);
 	bool bCanAttack = AttackIntent == EEnemyAttackTransitionIntent::Attack;
 	const bool bShouldCombatHold = AttackIntent == EEnemyAttackTransitionIntent::CombatHold;

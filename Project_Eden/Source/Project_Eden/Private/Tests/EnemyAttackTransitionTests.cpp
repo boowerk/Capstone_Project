@@ -43,7 +43,11 @@ bool FEnemyAttackTransitionPolicyTest::RunTest(const FString& Parameters)
 		EnemyAttackTransitionPolicy::ResolveIntent(Observation) == EEnemyAttackTransitionIntent::Attack);
 
 	Observation.bShouldRetreat = true;
-	TestTrue(TEXT("Retreat still interrupts a committed action"),
+	TestTrue(TEXT("A committed action finishes before a tactical retreat"),
+		EnemyAttackTransitionPolicy::ResolveIntent(Observation) == EEnemyAttackTransitionIntent::Attack);
+
+	Observation.bActionCommitted = false;
+	TestTrue(TEXT("A non-committed enemy can choose Retreat"),
 		EnemyAttackTransitionPolicy::ResolveIntent(Observation) == EEnemyAttackTransitionIntent::None);
 
 	return true;

@@ -120,6 +120,12 @@ public:
 		float ExitHysteresis);
 	void ResetBehaviorAttackBandLatch();
 
+	// BT 공격 태스크가 실제 액션 종료까지 이동 분기와 타깃 교체를 잠그는 서버 전용 계약이다.
+	void BeginBehaviorAttackCommit(AActor* TargetActor, float MaximumDurationSeconds);
+	void FinishBehaviorAttackCommit(float RecoverySeconds);
+	bool IsBehaviorAttackCommitted() const;
+	AActor* GetBehaviorAttackCommittedTarget() const;
+
 	UFUNCTION(BlueprintPure, Category = "Enemy|Death")
 	bool IsDead() const { return bIsDead; }
 
@@ -309,6 +315,8 @@ private:
 	bool bDeathStateApplied = false;
 	float BasicEnemyAttackReadyTimeSeconds = 0.0f;
 	bool bBehaviorAttackBandLatched = false;
+	float BehaviorAttackCommitUntilTimeSeconds = 0.0f;
+	TWeakObjectPtr<AActor> BehaviorAttackCommittedTarget;
 	FRandomStream AttackCadenceRandomStream;
 
 	const FEnemyArchetypeTuning* ResolveEnemyArchetypeTuning() const;

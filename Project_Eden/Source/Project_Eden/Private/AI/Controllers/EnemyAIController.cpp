@@ -759,6 +759,16 @@ void AEnemyAIController::RefreshTargetActorFromPerception()
 		return;
 	}
 
+	if (const AGP_EnemyCharacter* EnemyPawn = Cast<AGP_EnemyCharacter>(GetPawn()))
+	{
+		if (AActor* CommittedTargetActor = EnemyPawn->GetBehaviorAttackCommittedTarget())
+		{
+			// 공격 전조가 시작된 뒤에는 평가 점수가 바뀌어도 같은 플레이어를 끝까지 바라본다.
+			SetBlackboardTargetActor(CommittedTargetActor);
+			return;
+		}
+	}
+
 	SetBlackboardTargetActor(SelectBestTargetActorFromPerception());
 }
 

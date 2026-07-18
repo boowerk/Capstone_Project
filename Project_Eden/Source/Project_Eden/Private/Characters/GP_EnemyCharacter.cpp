@@ -307,6 +307,55 @@ void AGP_EnemyCharacter::ResetBehaviorAttackBandLatch()
 	bBehaviorAttackBandLatched = false;
 }
 
+void AGP_EnemyCharacter::BeginBehaviorAttackCommit(AActor* TargetActor, float MaximumDurationSeconds)
+{
+	if (!HasAuthority() || bIsDead || !IsValid(TargetActor))
+	{
+		return;
+	}
+
+	const UWorld* World = GetWorld();
+	if (!IsValid(World))
+	{
+		return;
+	}
+
+	// 잘못된 몽타주/이벤트도 AI를 영구 정지시키지 않도록 태스크의 안전 타임아웃까지만 잠근다.
+	BehaviorAttackCommittedTarget = TargetActor;
+	BehaviorAttackCommitUntilTimeSeconds = World->GetTimeSeconds() + FMath::Max(0.0f, MaximumDurationSeconds);
+}
+
+void AGP_EnemyCharacter::FinishBehaviorAttackCommit(float RecoverySeconds)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	const UWorld* World = GetWorld();
+	BehaviorAttackCommitUntilTimeSeconds = IsValid(World)
+		? World->GetTimeSeconds() + FMath::Max(0.0f, RecoverySeconds)
+		: 0.0f;
+	if (RecoverySeconds <= KINDA_SMALL_NUMBER)
+	{
+		BehaviorAttackCommittedTarget.Reset();
+	}
+}
+
+bool AGP_EnemyCharacter::IsBehaviorAttackCommitted() const
+{
+	const UWorld* World = GetWorld();
+	return !bIsDead
+		&& IsValid(World)
+		&& BehaviorAttackCommittedTarget.IsValid()
+		&& World->GetTimeSeconds() < BehaviorAttackCommitUntilTimeSeconds;
+}
+
+AActor* AGP_EnemyCharacter::GetBehaviorAttackCommittedTarget() const
+{
+	return IsBehaviorAttackCommitted() ? BehaviorAttackCommittedTarget.Get() : nullptr;
+}
+
 void AGP_EnemyCharacter::InitializeBasicEnemyAttackCadence()
 {
 	if (bIsBossEnemy || !HasAuthority())
@@ -551,6 +600,9 @@ void AGP_EnemyCharacter::ApplyDeathState()
 	}
 
 	bDeathStateApplied = true;
+	// 사망은 모든 행동 커밋보다 우선하며 지연된 BT 재평가가 타깃을 다시 잡지 못하게 한다.
+	BehaviorAttackCommitUntilTimeSeconds = 0.0f;
+	BehaviorAttackCommittedTarget.Reset();
 	if (IsValid(EnemyCorruptionComponent))
 	{
 		// Only bosses mutate world corruption; the component guards authority and duplicate death presentation calls.

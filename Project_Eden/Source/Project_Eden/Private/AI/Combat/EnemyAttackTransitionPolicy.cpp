@@ -24,15 +24,15 @@ namespace EnemyAttackTransitionPolicy
 
 	EEnemyAttackTransitionIntent ResolveIntent(const FEnemyAttackTransitionObservation& Observation)
 	{
+		if (Observation.bActionCommitted)
+		{
+			// 이미 시작한 공격은 전술 성향·거리·시야·쿨다운의 일시 변화보다 우선한다.
+			return EEnemyAttackTransitionIntent::Attack;
+		}
+
 		if (Observation.bShouldRetreat)
 		{
 			return EEnemyAttackTransitionIntent::None;
-		}
-
-		if (Observation.bActionCommitted)
-		{
-			// 이미 시작한 공격은 일시적인 거리·시야·쿨다운 변화보다 우선한다.
-			return EEnemyAttackTransitionIntent::Attack;
 		}
 
 		if (!Observation.bHasLineOfSight || !Observation.bInsideAttackBand)
