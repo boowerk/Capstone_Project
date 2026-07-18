@@ -1,5 +1,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
+#include "Abilities/GameplayAbility.h"
+#include "AbilitySystem/GP_AbilitySystemComponent.h"
 #include "AbilitySystem/GP_AttributeSet.h"
 #include "AbilitySystemComponent.h"
 #include "AI/Tasks/BossAttackPatternSelector.h"
@@ -32,6 +34,27 @@ namespace DarkArmorKnightBossTests
 		return Test.TestTrue(
 			FString::Printf(TEXT("%s expected %s. Candidates=%s"), CaseName, *ExpectedTag.ToString(), *FGPBossAttackPatternSelector::DescribeCandidates(Candidates)),
 			Selected && Selected->AbilityTag.MatchesTagExact(ExpectedTag));
+	}
+
+	int32 CountGrantedAbilitiesWithExactTag(
+		const UAbilitySystemComponent* AbilitySystemComponent,
+		const FGameplayTag& AbilityTag)
+	{
+		int32 MatchingAbilityCount = 0;
+		if (!IsValid(AbilitySystemComponent))
+		{
+			return MatchingAbilityCount;
+		}
+
+		for (const FGameplayAbilitySpec& AbilitySpec : AbilitySystemComponent->GetActivatableAbilities())
+		{
+			const UGameplayAbility* Ability = AbilitySpec.Ability;
+			if (IsValid(Ability) && Ability->GetAssetTags().HasTagExact(AbilityTag))
+			{
+				++MatchingAbilityCount;
+			}
+		}
+		return MatchingAbilityCount;
 	}
 }
 
@@ -73,6 +96,94 @@ bool FDarkArmorKnightPatternSelectorTest::RunTest(const FString& Parameters)
 	Context.bIsGuarding = true;
 	const TArray<FGPBossAttackPatternCandidate> GuardCandidates = FGPBossAttackPatternSelector::BuildCandidates(Context);
 	TestTrue(TEXT("Guard stance suppresses overlapping attacks"), GuardCandidates.IsEmpty());
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FDarkArmorKnightAbilityGrantContractTest,
+	"ProjectEden.Combat.DarkArmorKnight.ProductionAbilityGrantContract",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FDarkArmorKnightAbilityGrantContractTest::RunTest(const FString& Parameters)
+{
+	using namespace DarkArmorKnightBossTests;
+
+	UWorld* TestWorld = UWorld::CreateWorld(EWorldType::Game, false);
+	if (!TestNotNull(TEXT("Created production ability grant test world"), TestWorld))
+	{
+		return false;
+	}
+
+	UClass* ProductionBossClass = LoadClass<AGP_DarkArmorKnightBossCharacter>(
+		nullptr,
+		TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_DarkArmorKnight/BP_DarkArmorKnight.BP_DarkArmorKnight_C"));
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AGP_DarkArmorKnightBossCharacter* Boss = IsValid(ProductionBossClass)
+		? TestWorld->SpawnActor<AGP_DarkArmorKnightBossCharacter>(
+			ProductionBossClass,
+			FVector::ZeroVector,
+			FRotator::ZeroRotator,
+			Params)
+		: nullptr;
+	ATargetPoint* Target = TestWorld->SpawnActor<ATargetPoint>(
+		FVector(300.0f, 0.0f, 0.0f),
+		FRotator::ZeroRotator,
+		Params);
+	if (!TestNotNull(TEXT("Loaded production Dark Knight Blueprint"), ProductionBossClass)
+		|| !TestNotNull(TEXT("Spawned production Dark Knight Blueprint"), Boss)
+		|| !TestNotNull(TEXT("Spawned ability target"), Target))
+	{
+		TestWorld->DestroyWorld(false);
+		return false;
+	}
+
+	UGP_AbilitySystemComponent* ASC = Cast<UGP_AbilitySystemComponent>(Boss->GetAbilitySystemComponent());
+	UGP_DarkArmorKnightStateComponent* State = Boss->GetDarkKnightStateComponent();
+	if (!TestNotNull(TEXT("Production Dark Knight owns the project ASC"), ASC)
+		|| !TestNotNull(TEXT("Production Dark Knight owns its state component"), State))
+	{
+		TestWorld->DestroyWorld(false);
+		return false;
+	}
+
+	ASC->InitAbilityActorInfo(Boss, Boss);
+	State->InitializeDarkKnightState(Boss);
+	// Call twice to lock idempotency as well as recovery from the production Blueprint's serialized empty array.
+	Boss->GrantDarkKnightAbilities();
+	Boss->GrantDarkKnightAbilities();
+
+	const FGameplayTag RequiredAbilityTags[] =
+	{
+		GPTags::Ability::Boss::DarkKnight::Basic,
+		GPTags::Ability::Boss::DarkKnight::Heavy,
+		GPTags::Ability::Boss::DarkKnight::Charge,
+		GPTags::Ability::Boss::DarkKnight::DarkWave,
+		GPTags::Ability::Boss::DarkKnight::GroundCrack,
+		GPTags::Ability::Boss::DarkKnight::Groggy,
+	};
+	for (const FGameplayTag& RequiredAbilityTag : RequiredAbilityTags)
+	{
+		TestEqual(
+			FString::Printf(TEXT("%s has exactly one granted spec"), *RequiredAbilityTag.ToString()),
+			CountGrantedAbilitiesWithExactTag(ASC, RequiredAbilityTag),
+			1);
+	}
+
+	// Keep the routing assertion independent of animation evaluation; this test proves GAS reaches the authored hit timer.
+	Boss->PreAttackMontage = nullptr;
+	Boss->TelegraphVFXPatterns.FindOrAdd(GPTags::Ability::Boss::DarkKnight::Basic) = false;
+	Boss->BeginBehaviorAttackCommit(Target, 8.0f);
+	const bool bBasicActivated = ASC->TryActivateAbilityByTag(GPTags::Ability::Boss::DarkKnight::Basic);
+	TestTrue(TEXT("Production Dark Knight activates Basic by exact tag"), bBasicActivated);
+	TestTrue(
+		TEXT("Basic tag activation reaches the attack implementation"),
+		Boss->LastPatternUseTimes.Contains(GPTags::Ability::Boss::DarkKnight::Basic));
+	TestTrue(TEXT("Basic activation schedules its authored impact"), !Boss->PatternTimerHandles.IsEmpty());
+
+	Boss->FinishBehaviorAttackCommit(0.0f);
+	Boss->ClearPatternTimers();
+	TestWorld->DestroyWorld(false);
 	return true;
 }
 

@@ -89,6 +89,8 @@ private:
 #if WITH_DEV_AUTOMATION_TESTS
 	// Exposes lifecycle state only to the deterministic groggy interrupt test.
 	friend class FDarkArmorKnightGroggyInterruptTest;
+	// Verifies the production Blueprint cannot serialize away gameplay-critical GAS patterns.
+	friend class FDarkArmorKnightAbilityGrantContractTest;
 #endif
 
 	void GrantDarkKnightAbilities();

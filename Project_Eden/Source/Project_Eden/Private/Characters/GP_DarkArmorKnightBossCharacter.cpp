@@ -28,6 +28,57 @@
 #include "VFX/GP_BossDeathPresentationComponent.h"
 #include "VFX/GP_BossTelegraphVFXComponent.h"
 
+namespace
+{
+	bool HasGrantedAbilityWithExactTag(
+		const UAbilitySystemComponent* AbilitySystemComponent,
+		const FGameplayTag& AbilityTag)
+	{
+		if (!IsValid(AbilitySystemComponent) || !AbilityTag.IsValid())
+		{
+			return false;
+		}
+
+		for (const FGameplayAbilitySpec& AbilitySpec : AbilitySystemComponent->GetActivatableAbilities())
+		{
+			const UGameplayAbility* Ability = AbilitySpec.Ability;
+			if (IsValid(Ability) && Ability->GetAssetTags().HasTagExact(AbilityTag))
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	void GrantConfiguredAbilityWithoutTagOverlap(
+		UAbilitySystemComponent* AbilitySystemComponent,
+		const TSubclassOf<UGameplayAbility>& AbilityClass)
+	{
+		if (!IsValid(AbilitySystemComponent)
+			|| !*AbilityClass
+			|| AbilitySystemComponent->FindAbilitySpecFromClass(AbilityClass) != nullptr)
+		{
+			return;
+		}
+
+		const UGameplayAbility* AbilityDefaults = AbilityClass->GetDefaultObject<UGameplayAbility>();
+		if (IsValid(AbilityDefaults))
+		{
+			for (const FGameplayTag& AbilityTag : AbilityDefaults->GetAssetTags())
+			{
+				if (HasGrantedAbilityWithExactTag(AbilitySystemComponent, AbilityTag))
+				{
+					// Tag activation must resolve to one spec even when a Blueprint replaces a native pattern class.
+					return;
+				}
+			}
+		}
+
+		AbilitySystemComponent->GiveAbility(FGameplayAbilitySpec(AbilityClass));
+	}
+}
+
 AGP_DarkArmorKnightBossCharacter::AGP_DarkArmorKnightBossCharacter()
 {
 	bIsBossEnemy = true;
@@ -550,12 +601,36 @@ void AGP_DarkArmorKnightBossCharacter::GrantDarkKnightAbilities()
 	{
 		return;
 	}
+
+	// Give designer-authored replacements first so their exact tags suppress the native fallback.
 	for (const TSubclassOf<UGameplayAbility>& AbilityClass : DarkKnightAbilityClasses)
 	{
-		if (*AbilityClass && ASC->FindAbilitySpecFromClass(AbilityClass) == nullptr)
+		GrantConfiguredAbilityWithoutTagOverlap(ASC, AbilityClass);
+	}
+
+	struct FRequiredDarkKnightAbility
+	{
+		FGameplayTag AbilityTag;
+		TSubclassOf<UGameplayAbility> NativeClass;
+	};
+
+	const FRequiredDarkKnightAbility RequiredAbilities[] =
+	{
+		{ GPTags::Ability::Boss::DarkKnight::Basic, UGP_DarkKnightBasicAbility::StaticClass() },
+		{ GPTags::Ability::Boss::DarkKnight::Heavy, UGP_DarkKnightHeavyAbility::StaticClass() },
+		{ GPTags::Ability::Boss::DarkKnight::Charge, UGP_DarkKnightChargeAbility::StaticClass() },
+		{ GPTags::Ability::Boss::DarkKnight::DarkWave, UGP_DarkKnightDarkWaveAbility::StaticClass() },
+		{ GPTags::Ability::Boss::DarkKnight::GroundCrack, UGP_DarkKnightGroundCrackAbility::StaticClass() },
+		{ GPTags::Ability::Boss::DarkKnight::Groggy, UGP_DarkKnightGroggyAbility::StaticClass() },
+	};
+
+	for (const FRequiredDarkKnightAbility& RequiredAbility : RequiredAbilities)
+	{
+		if (!HasGrantedAbilityWithExactTag(ASC, RequiredAbility.AbilityTag))
 		{
-			// Native grants make the C++ boss playable before polished GameplayAbility Blueprint children exist.
-			ASC->GiveAbility(FGameplayAbilitySpec(AbilityClass));
+			// Blueprint arrays can retain an empty serialized override after native defaults change, so gameplay-critical
+			// patterns are restored by tag while preserving any configured replacement that was granted above.
+			ASC->GiveAbility(FGameplayAbilitySpec(RequiredAbility.NativeClass));
 		}
 	}
 }
