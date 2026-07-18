@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-18T20:41:47+09:00
+updated: 2026-07-18T21:24:21+09:00
 status: active
 tags:
   - memoc
@@ -11,7 +11,7 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-07-18T20:41:47+09:00
+Last synced: 2026-07-18T21:24:21+09:00
 
 ## Three-Player Network/Lobby Handoff
 
@@ -100,6 +100,7 @@ Last synced: 2026-07-18T20:41:47+09:00
 - Commits `b451bf12` and `3e5dbf35` correct telegraph selection to per-pattern opt-in. `Telegraph VFX On/Off` is only the master switch; edit each boss Class Defaults `Telegraph VFX Patterns` map to check the exact tags that should use the cue. Crystal Seraph and Matador still inherit `BossTelegraphVFXComponent`; Dark Knight still reuses `GP_BossTelegraphVFX`. Dark Knight charge skips its own coordinator cue/delay only if the Charge tag is checked. Build, configuration/exclusion automation, and legacy charge automation pass; PIE-check timing and placement on selected attacks.
 - Full editor build plus `ProjectEden.AI.Boss.PatternSelector.DarkArmorKnight` and `ProjectEden.Combat.DarkArmorKnight.GuardLifecycle` pass. Commandlet still reports the unrelated corrupt `Content/Maps/DemoMap/TestMap.umap` and missing Fab fence meshes.
 - Commit `b7eb11d6` repairs the production BP's serialized empty Dark Knight ability array. Server-authoritative grant now keeps configured exact-tag replacements and fills only missing Basic/Heavy/Charge/DarkWave/GroundCrack/Groggy native specs. The production BP grant/Basic activation contract, all 6 Dark Knight combat tests, and all 21 AI tests pass; manual montage contact and Charge travel/timing remain P0.
+- Commit `0a22e69e` fixes the boss stopping outside melee reach. Basic/Heavy use exact `350/420cm` damage ranges, Dark Wave is capped to its authored `520cm` slash, and Charge/GroundCrack stay ranged. The service continues Chase when no ready pattern can reach; the selector and execution context use the same ranges; GAS rejects an out-of-range committed target before cadence reservation. Delayed impacts intentionally do not recheck distance, preserving the player's wind-up dodge window. Editor build, Dark Knight 6/6, and AI 21/21 pass; no live server test was run.
 - Editor work: place `BP_DarkArmorKnight`; assign/tune its Anim Class and mesh/capsule transform for `SK_KnightBoss`. For final art, create BP children of DarkWave/GroundCrack/Charge actors, replace their primitive component meshes/materials/VFX, then assign those classes on the boss. Optional Dark Knight Blackboard mirror keys are not required for runtime truth.
 
 ## Minimap Handoff
