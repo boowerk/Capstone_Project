@@ -98,6 +98,11 @@ void AGP_LobbyGameMode::OnPlayerReadyChanged(AGP_LobbyPlayerState* PlayerState, 
 
 void AGP_LobbyGameMode::CheckAllReady()
 {
+	if (bTravelInitiated)
+	{
+		return;
+	}
+
 	const int32 PlayerCount = GetNumPlayers();
 	if (PlayerCount < ExpectedPlayerCount)
 	{
@@ -145,6 +150,7 @@ void AGP_LobbyGameMode::CheckAllReady()
 			ExpectedPlayerCount,
 			*GameMapName);
 	}
+	bTravelInitiated = true;
 	OnAllPlayersReady();
 	BroadcastLoading();
 	TravelToGame();
@@ -152,6 +158,11 @@ void AGP_LobbyGameMode::CheckAllReady()
 
 void AGP_LobbyGameMode::ForceStartGame()
 {
+	if (bTravelInitiated)
+	{
+		return;
+	}
+	bTravelInitiated = true;
 	// Skip the player-count and ready gates entirely so a lone player can start.
 	OnAllPlayersReady();
 	BroadcastLoading();

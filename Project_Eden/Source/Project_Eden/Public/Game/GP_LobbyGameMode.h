@@ -47,4 +47,8 @@ private:
 	void BroadcastRefreshPlayerList();
 	void BroadcastLoading();
 	void TravelToGame();
+
+	// Last Ready, Blueprint callbacks, and debug ForceStart can arrive in the
+	// same frame; only the authoritative first path may initiate ServerTravel.
+	bool bTravelInitiated = false;
 };
