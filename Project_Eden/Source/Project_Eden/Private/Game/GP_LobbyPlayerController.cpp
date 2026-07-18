@@ -43,7 +43,11 @@ void AGP_LobbyPlayerController::BeginPlay()
 #if !UE_BUILD_SHIPPING
 void AGP_LobbyPlayerController::BeginLobbySmokeAutoReady()
 {
+	const UWorld* World = GetWorld();
+	// Seamless travel 뒤 목적지 컨트롤러에서 테스트 준비 RPC가 다시 실행되지 않도록 로비에서만 허용한다.
 	if (!IsLocalController()
+		|| !IsValid(World)
+		|| !World->GetMapName().Contains(TEXT("LobbyMap"))
 		|| !FParse::Param(FCommandLine::Get(), TEXT("LobbySmokeAutoReady")))
 	{
 		return;
