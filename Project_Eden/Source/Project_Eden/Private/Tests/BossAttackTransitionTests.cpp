@@ -30,6 +30,21 @@ bool FBossAttackTransitionTimingTest::RunTest(const FString& Parameters)
 		TEXT("Unknown active abilities keep the task's configured fallback"),
 		BossAttackTransitionPolicy::ResolvePostAbilityCommitSeconds(FGameplayTag(), 0.45f),
 		0.45f);
+
+	// Ranged candidates must open the common Attack branch even when no melee
+	// pattern can reach the current target.
+	TestTrue(
+		TEXT("Charge at 1200cm can request the Dark Knight attack branch"),
+		BossAttackTransitionPolicy::CanRequestDarkKnightPattern(false, false, true, false, false));
+	TestTrue(
+		TEXT("Dark Wave at 2000cm can request the Dark Knight attack branch"),
+		BossAttackTransitionPolicy::CanRequestDarkKnightPattern(false, false, false, true, false));
+	TestTrue(
+		TEXT("Ground Crack can independently request the Dark Knight attack branch"),
+		BossAttackTransitionPolicy::CanRequestDarkKnightPattern(false, false, false, false, true));
+	TestFalse(
+		TEXT("Dark Knight chases when no reachable pattern is ready"),
+		BossAttackTransitionPolicy::CanRequestDarkKnightPattern(false, false, false, false, false));
 	return true;
 }
 

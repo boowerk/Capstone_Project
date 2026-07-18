@@ -64,4 +64,20 @@ namespace BossAttackTransitionPolicy
 		// task falls through to the short designer-configured recovery only.
 		return FMath::Max(0.0f, DefaultCommitSeconds);
 	}
+
+	bool CanRequestDarkKnightPattern(
+		bool bGuardBroken,
+		bool bMeleeReady,
+		bool bChargeReady,
+		bool bDarkWaveReady,
+		bool bGroundCrackReady)
+	{
+		// Guard break enters the groggy pattern through the same selector, while
+		// every attack category must independently be able to open the branch.
+		return bGuardBroken
+			|| bMeleeReady
+			|| bChargeReady
+			|| bDarkWaveReady
+			|| bGroundCrackReady;
+	}
 }

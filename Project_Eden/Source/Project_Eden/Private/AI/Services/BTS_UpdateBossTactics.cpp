@@ -1,6 +1,7 @@
 #include "AI/Services/BTS_UpdateBossTactics.h"
 
 #include "AI/Controllers/EnemyAIController.h"
+#include "AI/Combat/BossAttackTransitionPolicy.h"
 #include "AI/Data/EnemyBlackboardKeys.h"
 #include "AI/Data/EnemyLLMEvaluation.h"
 #include "AI/Tasks/BossAttackPatternSelector.h"
@@ -357,7 +358,12 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 	const bool bDarkKnightCrackReady = bDarkKnightCadenceReady
 		&& DistanceToTarget <= DarkKnightBoss->GetGroundCrackMaxRange()
 		&& DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::GroundCrack);
-	const bool bDarkKnightCanAttackAtCurrentRange = bDarkKnightGuardBroken || bDarkKnightMeleeReady;
+	const bool bDarkKnightCanAttackAtCurrentRange = BossAttackTransitionPolicy::CanRequestDarkKnightPattern(
+		bDarkKnightGuardBroken,
+		bDarkKnightMeleeReady,
+		bDarkKnightChargeReady,
+		bDarkKnightWaveReady,
+		bDarkKnightCrackReady);
 	const bool bCanUseDarkKnightPattern = bIsDarkKnightBoss
 		&& bHasTarget
 		&& !bReturningHome

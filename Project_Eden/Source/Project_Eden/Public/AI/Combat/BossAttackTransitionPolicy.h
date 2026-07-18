@@ -12,4 +12,13 @@ namespace BossAttackTransitionPolicy
 	PROJECT_EDEN_API float ResolvePostAbilityCommitSeconds(
 		const FGameplayTag& PatternTag,
 		float DefaultCommitSeconds);
+
+	// The BT attack branch opens when any currently-reachable Dark Knight
+	// pattern is ready, rather than requiring a melee candidate.
+	PROJECT_EDEN_API bool CanRequestDarkKnightPattern(
+		bool bGuardBroken,
+		bool bMeleeReady,
+		bool bChargeReady,
+		bool bDarkWaveReady,
+		bool bGroundCrackReady);
 }

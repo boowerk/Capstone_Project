@@ -50,7 +50,9 @@ bool FDarkArmorKnightPatternSelectorTest::RunTest(const FString& Parameters)
 	Context.bCanUseDarkKnightBasic = false;
 	Context.bCanUseDarkKnightSweep = true;
 	Context.LastHitDirection = TEXT("Side");
-	ExpectPattern(*this, Context, GPTags::Ability::Boss::DarkKnight::Sweep, TEXT("Flank pressure selects circular sweep"));
+	const TArray<FGPBossAttackPatternCandidate> RetiredSweepCandidates = FGPBossAttackPatternSelector::BuildCandidates(Context);
+	// Sweep is reserved as animation wind-up and must not re-enter the damage selector.
+	TestTrue(TEXT("Retired sweep tag does not create a selectable pattern"), RetiredSweepCandidates.IsEmpty());
 
 	Context = FGPBossAttackPatternContext();
 	Context.bIsDarkArmorKnight = true;
