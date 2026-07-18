@@ -2,19 +2,16 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-07-18T12:25:02+09:00
+updated: 2026-07-18T15:59:36+09:00
 status: active
-tags: [memoc, memoc/state]
+tags:
+  - memoc
+  - memoc/state
+created: 2026-07-18T07:01:20
 ---
 # Session Summary
 
-## Status
-- `[EDEN-MAIN]` is the sole writer; DESIGN, CLIENT, WORLD, and QA role threads are active as read-only reviewers.
-- `faa6c536` routes ready parties to `L_LandscapeMap`; `166b5e93` includes it in server Cook maps.
-
-## Verified
-- Editor build, lobby configuration test, Landscape integrity test, and Cook-map contract pass.
-
-## Handoff
-- Next gates: two-player seamless listen travel, Development Cook/package, then packaged server-client travel.
-- Preserve user changes in `TestMap`, `DA_RegionEventData`, and `L_MainMap`.
+- AI transition slice complete through `a0c674e1`; Editor build and `ProjectEden.AI` 21/21 pass.
+- Attacks finish across target loss/leash; death/groggy interrupts. Live Matador bull holds the body still; actor/task caps are 18/20s.
+- P0: montage/slot/contact PIE, Dark Knight charge/timing, and two-client travel/combat. Flying stays out until PIE.
+- Preserve dirty `TestMap`, `DA_RegionEventData`, and `L_MainMap`.

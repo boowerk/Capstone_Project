@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-18T12:25:02+09:00
+updated: 2026-07-18T15:59:36+09:00
 status: active
 tags:
   - memoc
@@ -11,7 +11,17 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-07-18T12:25:02+09:00
+Last synced: 2026-07-18T15:59:36+09:00
+
+## Graduation Demo AI Transition Handoff
+
+- Commits `80f64845` through `a0c674e1` stabilize attack range transitions, smooth facing, latch actions through GAS, preserve committed targets, restore boss recovery, and close Matador bull lifecycle gaps.
+- Latest focused fixes are `42e8cec8` (committed attacks survive target-loss/leash root reevaluation; explicit interrupts and cancellation policy), `668f7f37` (bull destroy cleanup plus 18-second absolute cap), and `a0c674e1` (stationary live-bull tactics hold plus 20-second BT stuck cap).
+- Verified: `Project_EdenEditor Win64 Development` build and all 21 `ProjectEden.AI` automation tests. Existing missing Fab/UEFN assets and duplicate DefaultSlot startup warnings are not resolved by these commits.
+- P0 before July 22/27: record three Idle→Move→Aim→Hit→Recovery cycles for each included enemy; confirm one hit and one ActionEnd per selectable montage; verify FurnaceWalker/Cyclops slot evaluation and capsule drift; visually align Dark Knight impacts and prove Charge travel/hit/recovery; run two-player listen/server-client travel and combat synchronization.
+- Script the demo in `EventMap` rather than the corrupt `TestMap` or randomized production landscape events. Use Dark Armor Knight plus melee/ranged basics; exclude flying unless its chase/altitude/re-entry loop passes PIE.
+- Remaining engineering risks are exact GAS ability-spec tracking when duplicate attack-tag grants exist and simulated-proxy montage/yaw/root-motion behavior. Do not start the Motion Warping pilot until every P0 gate above is green.
+- Preserve existing user edits in `TestMap.umap`, `DA_RegionEventData.uasset`, and `L_MainMap.umap`.
 
 ## Graduation Slice Lobby Entry Handoff
 

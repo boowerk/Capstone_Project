@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-18T12:25:02+09:00
+updated: 2026-07-18T15:59:36+09:00
 status: active
 tags:
   - memoc
@@ -11,9 +11,12 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-07-18T12:25:02+09:00
+Last synced: 2026-07-18T15:59:36+09:00
 
 ## Current Status
+
+- Graduation-demo enemy transition polish is current (`80f64845` through `a0c674e1`). Regular enemies use range hysteresis, smooth facing, GAS-lifetime attack commits, and recovery/cadence sequencing; target loss or leash reevaluation no longer opens movement during a committed attack, while death/groggy-style interrupts cancel immediately. Matador holds its body stationary while a live bull owns the pattern, cleans the bull state on every destroy path, and uses independent actor/task stuck caps of 18/20 seconds. `Project_EdenEditor` builds and all 21 `ProjectEden.AI` tests pass.
+- Release confidence remains conditional on manual P0 checks that automation cannot prove: every selectable montage's contact/ActionEnd timing, FurnaceWalker/Cyclops duplicate-slot runtime evaluation, Dark Knight impact/charge travel, and two-player server/client synchronization. Keep flying enemies out of the scripted demo unless their chase/altitude/attack loop passes PIE.
 
 - The Project Eden Codex team workflow is initialized: `[EDEN-MAIN]` is the sole writer/integrator, while permanent DESIGN, CLIENT, WORLD, and QA threads perform read-only analysis and cross-review. Work is split into minimal functional units and committed using the repository's `type(scope): short summary` convention. The durable protocol is in `docs/AgentTeamWorkflow.md`.
 

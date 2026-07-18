@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-18T12:25:02+09:00
+updated: 2026-07-18T15:59:36+09:00
 status: active
 tags:
   - memoc
@@ -16,6 +16,9 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 ## Decision Log
 
 ### 2026-07-18
+- Once an enemy attack is committed, let it finish through ordinary target loss, disconnect, or leash reevaluation; only explicit incapacitating states such as death or groggy may interrupt it immediately. Never synthesize a fallback hit when a cancelled montage did not reach its hit event.
+- While Matador's bull actor is live, the boss body stays stationary and the shared tactics service keeps the Attack branch committed. The bull actor owns an 18-second absolute lifecycle cap, while the BT task owns a 20-second external-action stuck cap and force-cleans the pattern on timeout/interruption.
+- The July demo uses Dark Armor Knight as the representative boss and prioritizes basic melee/ranged enemies. Flying enemies and Motion/Pose Warping remain gated behind runtime proof; Motion Warping is only a post-P0 Dark Knight Charge pilot with a retained manual swept-movement fallback.
 - Use the current `[EDEN-MAIN]` Codex thread as the single implementation and integration authority. Permanent DESIGN, CLIENT, WORLD, and QA threads provide read-only analysis and cross-review; the main thread relays messages because separate threads do not automatically share context.
 - Split implementation into the smallest independently reviewable functional units. One unit normally becomes one `type(scope): short summary` commit with its directly related tests; unrelated changes stay in separate commits.
 - Keep AI/GAS/network architecture and bulk-log specialists temporary rather than permanent, selecting a model and reasoning level from the bounded ticket risk.
