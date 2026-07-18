@@ -30,8 +30,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Lobby")
 	int32 ExpectedPlayerCount = 3;
 
+	// 준비된 파티가 검증된 오픈월드 졸업작품 슬라이스로 함께 이동하도록 기본 목적지를 고정합니다.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Lobby")
-	FString GameMapName = TEXT("DemoMap/ServerTest");
+	FString GameMapName = TEXT("MainMap/L_LandscapeMap");
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "Lobby")
 	void OnAllPlayersReady();
