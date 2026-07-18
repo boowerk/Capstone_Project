@@ -136,6 +136,60 @@ bool FDarkArmorKnightGuardLifecycleTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FDarkArmorKnightCommittedTargetResolutionTest,
+	"ProjectEden.Combat.DarkArmorKnight.CommittedTargetResolution",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FDarkArmorKnightCommittedTargetResolutionTest::RunTest(const FString& Parameters)
+{
+	UWorld* TestWorld = UWorld::CreateWorld(EWorldType::Game, false);
+	if (!TestNotNull(TEXT("Created committed-target test world"), TestWorld))
+	{
+		return false;
+	}
+
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AGP_DarkArmorKnightBossCharacter* Boss = TestWorld->SpawnActor<AGP_DarkArmorKnightBossCharacter>(
+		FVector::ZeroVector,
+		FRotator::ZeroRotator,
+		Params);
+	ATargetPoint* CommittedTarget = TestWorld->SpawnActor<ATargetPoint>(
+		FVector(0.0f, 500.0f, 0.0f),
+		FRotator::ZeroRotator,
+		Params);
+	ATargetPoint* ExplicitTarget = TestWorld->SpawnActor<ATargetPoint>(
+		FVector(0.0f, -500.0f, 0.0f),
+		FRotator::ZeroRotator,
+		Params);
+	if (!TestNotNull(TEXT("Spawned Dark Knight"), Boss)
+		|| !TestNotNull(TEXT("Spawned committed target"), CommittedTarget)
+		|| !TestNotNull(TEXT("Spawned explicit target"), ExplicitTarget))
+	{
+		TestWorld->DestroyWorld(false);
+		return false;
+	}
+
+	// Ability activation does not pass event target data, so the actor must
+	// recover the exact target that the latent BT task committed.
+	Boss->BeginBehaviorAttackCommit(CommittedTarget, 8.0f);
+	TestTrue(TEXT("Basic attack resolves a missing explicit target"), Boss->ExecuteBasicAttack(nullptr));
+	TestTrue(
+		TEXT("Missing explicit target keeps the committed player direction"),
+		FMath::IsNearlyEqual(Boss->GetActorRotation().Yaw, 90.0f, 1.0f));
+
+	Boss->SetActorRotation(FRotator::ZeroRotator);
+	TestTrue(TEXT("Explicit counter-style target still takes priority"), Boss->ExecuteBasicAttack(ExplicitTarget));
+	TestTrue(
+		TEXT("Explicit target overrides the committed fallback"),
+		FMath::IsNearlyEqual(Boss->GetActorRotation().Yaw, -90.0f, 1.0f));
+
+	Boss->FinishBehaviorAttackCommit(0.0f);
+	TestWorld->DestroyWorld(false);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FDarkArmorKnightChargeTelegraphVFXTest,
 	"ProjectEden.Combat.DarkArmorKnight.ChargeTelegraphVFX",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

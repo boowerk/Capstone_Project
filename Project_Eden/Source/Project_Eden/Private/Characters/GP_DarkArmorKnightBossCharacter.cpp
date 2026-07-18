@@ -549,6 +549,12 @@ AActor* AGP_DarkArmorKnightBossCharacter::ResolvePatternTarget(AActor* ExplicitT
 	{
 		return ExplicitTarget;
 	}
+	if (AActor* CommittedTarget = GetBehaviorAttackCommittedTarget())
+	{
+		// Preserve the BT target from telegraph through impact so multiplayer
+		// fallback selection cannot snap the pattern toward player index zero.
+		return CommittedTarget;
+	}
 	if (const AAIController* AIController = Cast<AAIController>(GetController()))
 	{
 		if (IsValid(AIController->GetFocusActor()))
