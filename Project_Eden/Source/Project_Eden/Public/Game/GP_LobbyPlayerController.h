@@ -30,6 +30,15 @@ protected:
 	TSubclassOf<UGP_LobbyWidget> LobbyWidgetClass;
 
 private:
+#if !UE_BUILD_SHIPPING
+	// Headless QA uses the real Ready RPC; this retry only waits for the
+	// replicated PlayerState when -LobbySmokeAutoReady is explicitly supplied.
+	void BeginLobbySmokeAutoReady();
+	void TryLobbySmokeAutoReady();
+	FTimerHandle LobbySmokeReadyTimerHandle;
+	int32 LobbySmokeReadyAttempts = 0;
+#endif
+
 	UPROPERTY()
 	TObjectPtr<UGP_LobbyWidget> LobbyWidget;
 };

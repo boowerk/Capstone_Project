@@ -4,7 +4,21 @@
 #include "Game/GP_LobbyPlayerController.h"
 #include "Game/GP_LobbyPlayerState.h"
 #include "GameFramework/PlayerController.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #include "UI/GP_LobbyWidget.h"
+
+namespace
+{
+	bool IsLobbySmokeEnabled()
+	{
+#if !UE_BUILD_SHIPPING
+		return FParse::Param(FCommandLine::Get(), TEXT("LobbySmokeAutoReady"));
+#else
+		return false;
+#endif
+	}
+}
 
 AGP_LobbyGameMode::AGP_LobbyGameMode()
 {
@@ -67,6 +81,17 @@ void AGP_LobbyGameMode::BroadcastLoading()
 
 void AGP_LobbyGameMode::OnPlayerReadyChanged(AGP_LobbyPlayerState* PlayerState, bool bIsReady)
 {
+	if (IsLobbySmokeEnabled())
+	{
+		UE_LOG(
+			LogTemp,
+			Display,
+			TEXT("[LobbySmoke] server-ready player=%s ready=%s players=%d expected=%d"),
+			*GetNameSafe(PlayerState),
+			bIsReady ? TEXT("true") : TEXT("false"),
+			GetNumPlayers(),
+			ExpectedPlayerCount);
+	}
 	BroadcastRefreshPlayerList();
 	CheckAllReady();
 }
@@ -76,18 +101,50 @@ void AGP_LobbyGameMode::CheckAllReady()
 	const int32 PlayerCount = GetNumPlayers();
 	if (PlayerCount < ExpectedPlayerCount)
 	{
+		if (IsLobbySmokeEnabled())
+		{
+			UE_LOG(
+				LogTemp,
+				Display,
+				TEXT("[LobbySmoke] ready-gate=player-count players=%d expected=%d"),
+				PlayerCount,
+				ExpectedPlayerCount);
+		}
 		return;
 	}
 
+	int32 ReadyPlayerCount = 0;
 	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
 	{
 		const AGP_LobbyPlayerState* LPS = It->Get()->GetPlayerState<AGP_LobbyPlayerState>();
 		if (!LPS || !LPS->IsReady())
 		{
+			if (IsLobbySmokeEnabled())
+			{
+				UE_LOG(
+					LogTemp,
+					Display,
+					TEXT("[LobbySmoke] ready-gate=readiness ready=%d players=%d expected=%d"),
+					ReadyPlayerCount,
+					PlayerCount,
+					ExpectedPlayerCount);
+			}
 			return;
 		}
+		++ReadyPlayerCount;
 	}
 
+	if (IsLobbySmokeEnabled())
+	{
+		UE_LOG(
+			LogTemp,
+			Display,
+			TEXT("[LobbySmoke] all-ready ready=%d players=%d expected=%d destination=%s"),
+			ReadyPlayerCount,
+			PlayerCount,
+			ExpectedPlayerCount,
+			*GameMapName);
+	}
 	OnAllPlayersReady();
 	BroadcastLoading();
 	TravelToGame();

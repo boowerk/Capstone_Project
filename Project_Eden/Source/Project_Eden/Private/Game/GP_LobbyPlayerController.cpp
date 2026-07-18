@@ -3,11 +3,19 @@
 #include "Blueprint/UserWidget.h"
 #include "Engine/World.h"
 #include "Game/GP_LobbyGameMode.h"
+#include "Game/GP_LobbyPlayerState.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
+#include "TimerManager.h"
 #include "UI/GP_LobbyWidget.h"
 
 void AGP_LobbyPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
+
+#if !UE_BUILD_SHIPPING
+	BeginLobbySmokeAutoReady();
+#endif
 
 	if (!IsLocalController() || !LobbyWidgetClass)
 	{
@@ -31,6 +39,62 @@ void AGP_LobbyPlayerController::BeginPlay()
 		SetShowMouseCursor(true);
 	}
 }
+
+#if !UE_BUILD_SHIPPING
+void AGP_LobbyPlayerController::BeginLobbySmokeAutoReady()
+{
+	if (!IsLocalController()
+		|| !FParse::Param(FCommandLine::Get(), TEXT("LobbySmokeAutoReady")))
+	{
+		return;
+	}
+
+	LobbySmokeReadyAttempts = 0;
+	// Delay the first attempt until the server has completed PostLogin and
+	// bound the PlayerState Ready delegate.
+	GetWorldTimerManager().SetTimer(
+		LobbySmokeReadyTimerHandle,
+		this,
+		&ThisClass::TryLobbySmokeAutoReady,
+		0.75f,
+		false);
+}
+
+void AGP_LobbyPlayerController::TryLobbySmokeAutoReady()
+{
+	++LobbySmokeReadyAttempts;
+	if (AGP_LobbyPlayerState* LobbyPlayerState = GetPlayerState<AGP_LobbyPlayerState>())
+	{
+		UE_LOG(
+			LogTemp,
+			Display,
+			TEXT("[LobbySmoke] client-ready controller=%s attempt=%d"),
+			*GetNameSafe(this),
+			LobbySmokeReadyAttempts);
+		LobbyPlayerState->ServerSetReady(true);
+		return;
+	}
+
+	constexpr int32 MaxReadyAttempts = 20;
+	if (LobbySmokeReadyAttempts >= MaxReadyAttempts)
+	{
+		UE_LOG(
+			LogTemp,
+			Error,
+			TEXT("[LobbySmoke] client-ready-timeout controller=%s attempts=%d"),
+			*GetNameSafe(this),
+			LobbySmokeReadyAttempts);
+		return;
+	}
+
+	GetWorldTimerManager().SetTimer(
+		LobbySmokeReadyTimerHandle,
+		this,
+		&ThisClass::TryLobbySmokeAutoReady,
+		0.25f,
+		false);
+}
+#endif
 
 void AGP_LobbyPlayerController::ClientRefreshPlayerList_Implementation()
 {
