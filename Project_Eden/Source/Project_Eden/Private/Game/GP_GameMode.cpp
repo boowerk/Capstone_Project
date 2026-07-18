@@ -8,6 +8,7 @@
 #include "Game/GP_EnemySpawnVolume.h"
 #include "Game/GP_GameState.h"
 #include "Game/GP_RunPortal.h"
+#include "Game/GP_ThreePlayerGameSession.h"
 #include "Game/Regions/GP_RegionSpatialSubsystem.h"
 #include "Game/RegionEvents/GP_RegionEventActor.h"
 #include "Game/RegionEvents/GP_RegionEventDirector.h"
@@ -30,6 +31,9 @@ AGP_GameMode::AGP_GameMode()
 	GameStateClass = AGP_GameState::StaticClass();
 	RegionEventDirectorClass = AGP_RegionEventDirector::StaticClass();
 	CorruptionPresentationClass = AGP_CorruptionPresentationActor::StaticClass();
+	// Preserve the three-player admission cap if a client attempts to join
+	// directly after seamless travel reaches the gameplay map.
+	GameSessionClass = AGP_ThreePlayerGameSession::StaticClass();
 
 	// Match the lobby's seamless transition so arriving clients are carried
 	// into this map instead of being dropped during the load.

@@ -3,6 +3,7 @@
 #include "Blueprint/UserWidget.h"
 #include "Game/GP_LobbyPlayerController.h"
 #include "Game/GP_LobbyPlayerState.h"
+#include "Game/GP_ThreePlayerGameSession.h"
 #include "GameFramework/PlayerController.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
@@ -24,6 +25,9 @@ AGP_LobbyGameMode::AGP_LobbyGameMode()
 {
 	PlayerControllerClass = AGP_LobbyPlayerController::StaticClass();
 	PlayerStateClass = AGP_LobbyPlayerState::StaticClass();
+	// Both lobby admission and gameplay travel share the same fixed
+	// three-player server contract.
+	GameSessionClass = AGP_ThreePlayerGameSession::StaticClass();
 
 	// Keep clients connected through the map load. Non-seamless ServerTravel
 	// disconnects every client while the server blocks on the map load; a slow
