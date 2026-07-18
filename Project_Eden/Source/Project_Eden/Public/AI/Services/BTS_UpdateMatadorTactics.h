@@ -14,6 +14,21 @@ class PROJECT_EDEN_API UBTS_UpdateMatadorTactics : public UBTService
 public:
 	UBTS_UpdateMatadorTactics();
 
+	// Both the service and the selector use this policy because the legacy
+	// BB_EnemyCommon asset does not contain Matador-only readiness keys.
+	bool IsBullPatternReady(
+		bool bHasTarget,
+		bool bReturningHome,
+		bool bGroggy,
+		bool bBullActive,
+		float DistanceToTarget,
+		bool bHasLineOfSight,
+		float WorldTimeSeconds) const;
+
+	// The legacy data-only common service calls this for Matador pawns so the
+	// dedicated BT keeps its asset layout while receiving native boss tactics.
+	void ApplyMatadorTactics(UBehaviorTreeComponent& OwnerComp) const;
+
 protected:
 	virtual void TickNode(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, float DeltaSeconds) override;
 	virtual void OnSearchStart(FBehaviorTreeSearchData& SearchData) override;
@@ -49,6 +64,4 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "AI|Matador")
 	bool bForceRangeRepositionWhenTooClose = true;
 
-private:
-	void UpdateMatadorTactics(UBehaviorTreeComponent& OwnerComp) const;
 };

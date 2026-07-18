@@ -6,6 +6,7 @@
 #include "AI/Data/EnemyLLMEvaluation.h"
 #include "AI/Debug/EnemyAIDebugUtils.h"
 #include "AI/Services/EnemyLeashPolicy.h"
+#include "AI/Services/BTS_UpdateMatadorTactics.h"
 #include "AI/Tasks/BossAttackPatternSelector.h"
 #include "AI/Tasks/EnemyBTTaskCommon.h"
 #include "AIController.h"
@@ -14,6 +15,7 @@
 #include "BehaviorTree/BehaviorTreeTypes.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "Characters/GP_EnemyCharacter.h"
+#include "Characters/GP_MatadorMageBossCharacter.h"
 #include "GameplayTags/GP_Tags.h"
 #include "Navigation/PathFollowingComponent.h"
 
@@ -142,6 +144,23 @@ void UBTS_UpdateEnemyTactics::OnSearchStart(FBehaviorTreeSearchData& SearchData)
 {
 	Super::OnSearchStart(SearchData);
 	UpdateTactics(SearchData.OwnerComp);
+}
+
+void UBTS_UpdateEnemyTactics::ApplyPawnSpecializedTactics(UBehaviorTreeComponent& OwnerComp) const
+{
+	const AAIController* AIController = OwnerComp.GetAIOwner();
+	const APawn* ControlledPawn = IsValid(AIController) ? AIController->GetPawn() : nullptr;
+	if (!IsValid(Cast<AGP_MatadorMageBossCharacter>(ControlledPawn)))
+	{
+		return;
+	}
+
+	// BT_Boss_Matador intentionally keeps its data-only common service. Route
+	// that service through native Matador policy without rewriting the asset.
+	if (const UBTS_UpdateMatadorTactics* MatadorTactics = GetDefault<UBTS_UpdateMatadorTactics>())
+	{
+		MatadorTactics->ApplyMatadorTactics(OwnerComp);
+	}
 }
 
 FString UBTS_UpdateEnemyTactics::GetStaticServiceDescription() const
@@ -504,6 +523,14 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 			BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldChase, true);
 		}
 	}
+
+	// Pawn-specific policy is the final writer. Comparing this final state avoids
+	// restarting the tree for a transient generic boss decision that Matador replaces.
+	ApplyPawnSpecializedTactics(OwnerComp);
+	bShouldRetreat = BlackboardComponent->GetValueAsBool(EnemyBlackboardKeys::bShouldRetreat);
+	bCanAttack = BlackboardComponent->GetValueAsBool(EnemyBlackboardKeys::bCanAttack);
+	bShouldReposition = BlackboardComponent->GetValueAsBool(EnemyBlackboardKeys::bShouldReposition);
+	bShouldChase = BlackboardComponent->GetValueAsBool(EnemyBlackboardKeys::bShouldChase);
 
 	if (bPreviousShouldRetreat != bShouldRetreat
 		|| bPreviousCanAttack != bCanAttack

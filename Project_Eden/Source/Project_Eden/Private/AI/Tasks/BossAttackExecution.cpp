@@ -5,6 +5,7 @@
 #include "AbilitySystemComponent.h"
 #include "AI/Data/EnemyBlackboardKeys.h"
 #include "AI/Debug/EnemyAIDebugUtils.h"
+#include "AI/Services/BTS_UpdateMatadorTactics.h"
 #include "AI/Tasks/EnemyBTTaskCommon.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "Characters/GP_CrystalSeraphBossCharacter.h"
@@ -162,6 +163,27 @@ namespace BossAttackExecution
 			Context.bBullPatternActive = IsValid(MatadorBoss)
 				? MatadorBoss->IsBullPatternActive()
 				: IsValid(MatadorStateComponent->GetActiveBullActor());
+			if (IsValid(MatadorBoss))
+			{
+				const UWorld* World = MatadorBoss->GetWorld();
+				const float WorldTimeSeconds = World != nullptr ? World->GetTimeSeconds() : 0.0f;
+				const UBTS_UpdateMatadorTactics* MatadorTactics = GetDefault<UBTS_UpdateMatadorTactics>();
+				// Runtime actor state is authoritative because BB_EnemyCommon
+				// intentionally omits Matador-only readiness keys.
+				Context.bCanUseBullPattern = Context.bCanUseBullPattern
+					|| (IsValid(MatadorTactics)
+						&& MatadorTactics->IsBullPatternReady(
+							IsValid(TargetActor),
+							GetBool(BlackboardComponent, EnemyBlackboardKeys::bShouldReturnHome),
+							Context.bIsGroggy,
+							Context.bBullPatternActive,
+							Context.DistanceToTarget,
+							GetBool(BlackboardComponent, EnemyBlackboardKeys::bHasLineOfSight),
+							WorldTimeSeconds));
+				Context.PreferredAirRange = MatadorBoss->GetPreferredAirRange();
+				Context.bShouldTeleport = Context.bShouldTeleport
+					|| MatadorBoss->ShouldTeleportForMatador(Context.DistanceToTarget);
+			}
 			Context.bSuppressGenericBossAttacks = true;
 		}
 

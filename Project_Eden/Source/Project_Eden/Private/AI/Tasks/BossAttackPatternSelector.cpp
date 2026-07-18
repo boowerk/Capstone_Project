@@ -210,8 +210,10 @@ TArray<FGPBossAttackPatternCandidate> FGPBossAttackPatternSelector::BuildCandida
 	{
 		if (FGPBossAttackPatternRanges::IsWithinReach(DistanceToTarget, FGPBossAttackPatternRanges::MatadorCapeGustReach))
 		{
-			const float CapeScore = 0.95f
-				+ ClosePressure * 0.35f
+			// Cape Gust wins at point-blank range to create readable space;
+			// Rapier naturally takes over near its mid-range sweet spot.
+			const float CapeScore = 1.1f
+				+ ClosePressure * 0.55f
 				+ PhaseBonus
 				+ (HealthRatio <= 0.35f ? 0.3f : 0.0f);
 			AddCandidate(Candidates, GPTags::Ability::Boss::Matador::CapeGust, CapeScore, TEXT("MatadorCapeGust"));

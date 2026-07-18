@@ -3,6 +3,7 @@
 #include "AI/Controllers/EnemyAIController.h"
 #include "AI/Data/EnemyBlackboardKeys.h"
 #include "AI/Debug/EnemyAIDebugUtils.h"
+#include "AI/Tasks/BossAttackPatternSelector.h"
 #include "AIController.h"
 #include "BehaviorTree/BehaviorTreeComponent.h"
 #include "BehaviorTree/BehaviorTreeTypes.h"
@@ -86,13 +87,13 @@ UBTS_UpdateMatadorTactics::UBTS_UpdateMatadorTactics()
 void UBTS_UpdateMatadorTactics::TickNode(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, float DeltaSeconds)
 {
 	Super::TickNode(OwnerComp, NodeMemory, DeltaSeconds);
-	UpdateMatadorTactics(OwnerComp);
+	ApplyMatadorTactics(OwnerComp);
 }
 
 void UBTS_UpdateMatadorTactics::OnSearchStart(FBehaviorTreeSearchData& SearchData)
 {
 	Super::OnSearchStart(SearchData);
-	UpdateMatadorTactics(SearchData.OwnerComp);
+	ApplyMatadorTactics(SearchData.OwnerComp);
 }
 
 FString UBTS_UpdateMatadorTactics::GetStaticServiceDescription() const
@@ -105,7 +106,30 @@ FString UBTS_UpdateMatadorTactics::GetStaticServiceDescription() const
 		BullPatternMaxRange);
 }
 
-void UBTS_UpdateMatadorTactics::UpdateMatadorTactics(UBehaviorTreeComponent& OwnerComp) const
+bool UBTS_UpdateMatadorTactics::IsBullPatternReady(
+	bool bHasTarget,
+	bool bReturningHome,
+	bool bGroggy,
+	bool bBullActive,
+	float DistanceToTarget,
+	bool bHasLineOfSight,
+	float WorldTimeSeconds) const
+{
+	const bool bInBullRange = DistanceToTarget >= BullPatternMinRange
+		&& DistanceToTarget <= BullPatternMaxRange;
+	return bHasTarget
+		&& !bReturningHome
+		&& !bGroggy
+		&& !bBullActive
+		&& bInBullRange
+		&& (bHasLineOfSight || bIgnoreLineOfSightForBullPattern)
+		&& MatadorTactics::IsPatternWindowOpen(
+			WorldTimeSeconds,
+			BullPatternInterval,
+			BullPatternWindow);
+}
+
+void UBTS_UpdateMatadorTactics::ApplyMatadorTactics(UBehaviorTreeComponent& OwnerComp) const
 {
 	AAIController* AIController = OwnerComp.GetAIOwner();
 	APawn* ControlledPawn = IsValid(AIController) ? AIController->GetPawn() : nullptr;
@@ -136,17 +160,25 @@ void UBTS_UpdateMatadorTactics::UpdateMatadorTactics(UBehaviorTreeComponent& Own
 		? FVector::Dist2D(MatadorBoss->GetActorLocation(), TargetActor->GetActorLocation())
 		: 0.0f;
 	const bool bHasLineOfSight = bHasTarget && AIController->LineOfSightTo(TargetActor);
-	const bool bInBullRange = DistanceToTarget >= BullPatternMinRange && DistanceToTarget <= BullPatternMaxRange;
 	const float WorldTimeSeconds = OwnerComp.GetWorld() != nullptr ? OwnerComp.GetWorld()->GetTimeSeconds() : 0.0f;
-	const bool bBullWindowOpen = MatadorTactics::IsPatternWindowOpen(WorldTimeSeconds, BullPatternInterval, BullPatternWindow);
-	const bool bCanUseBullPattern = bHasTarget
+	const bool bCanUseBullPattern = IsBullPatternReady(
+		bHasTarget,
+		bReturningHome,
+		bGroggy,
+		bBullActive,
+		DistanceToTarget,
+		bHasLineOfSight,
+		WorldTimeSeconds);
+	const bool bTooClose = bHasTarget && DistanceToTarget < PreferredAirRange * TooCloseRangeRatio;
+	const bool bCanUseMeleePattern = bHasTarget
 		&& !bReturningHome
 		&& !bGroggy
 		&& !bBullActive
-		&& bInBullRange
-		&& (bHasLineOfSight || bIgnoreLineOfSightForBullPattern)
-		&& bBullWindowOpen;
-	const bool bTooClose = bHasTarget && DistanceToTarget < PreferredAirRange * TooCloseRangeRatio;
+		&& (FGPBossAttackPatternRanges::IsWithinReach(
+				DistanceToTarget,
+				FGPBossAttackPatternRanges::MatadorCapeGustReach)
+			|| FGPBossAttackPatternRanges::IsWithinMatadorRapierRange(DistanceToTarget));
+	const bool bActionCommitted = MatadorBoss->IsBehaviorAttackCommitted();
 
 	MatadorTactics::SetName(BlackboardComponent, EnemyBlackboardKeys::CombatState, FName(*GPTags::AI::State::Combat.GetTag().ToString()));
 	MatadorTactics::SetFloat(BlackboardComponent, EnemyBlackboardKeys::DistanceToTarget, DistanceToTarget);
@@ -161,14 +193,26 @@ void UBTS_UpdateMatadorTactics::UpdateMatadorTactics(UBehaviorTreeComponent& Own
 	MatadorTactics::SetFloat(BlackboardComponent, EnemyBlackboardKeys::PreferredAirRange, MatadorBoss->GetPreferredAirRange());
 	MatadorTactics::SetBool(BlackboardComponent, EnemyBlackboardKeys::bShouldTeleport, MatadorBoss->ShouldTeleportForMatador(DistanceToTarget));
 
-	if (bCanUseBullPattern || (bEnterGroggyWhenChainComplete && ChainBreakCount >= ChainBreakTarget && !bGroggy))
+	if (bGroggy)
 	{
+		// Groggy is a stationary vulnerability window and interrupts prior intent.
+		MatadorTactics::SetBool(BlackboardComponent, EnemyBlackboardKeys::bCanAttack, false);
+		MatadorTactics::SetBool(BlackboardComponent, EnemyBlackboardKeys::bShouldRetreat, false);
+		MatadorTactics::SetBool(BlackboardComponent, EnemyBlackboardKeys::bShouldReposition, false);
+		MatadorTactics::SetBool(BlackboardComponent, EnemyBlackboardKeys::bShouldChase, false);
+	}
+	else if (bActionCommitted
+		|| bCanUseBullPattern
+		|| bCanUseMeleePattern
+		|| (bEnterGroggyWhenChainComplete && ChainBreakCount >= ChainBreakTarget))
+	{
+		// Bull, Cape, Rapier, and their recovery all retain the same attack branch.
 		MatadorTactics::SetBool(BlackboardComponent, EnemyBlackboardKeys::bCanAttack, true);
 		MatadorTactics::SetBool(BlackboardComponent, EnemyBlackboardKeys::bShouldRetreat, false);
 		MatadorTactics::SetBool(BlackboardComponent, EnemyBlackboardKeys::bShouldReposition, false);
 		MatadorTactics::SetBool(BlackboardComponent, EnemyBlackboardKeys::bShouldChase, false);
 	}
-	else if (bForceRangeRepositionWhenTooClose && bTooClose && !bGroggy && !bBullActive)
+	else if (bForceRangeRepositionWhenTooClose && bTooClose && !bBullActive)
 	{
 		MatadorTactics::SetBool(BlackboardComponent, EnemyBlackboardKeys::bCanAttack, false);
 		MatadorTactics::SetBool(BlackboardComponent, EnemyBlackboardKeys::bShouldRetreat, true);

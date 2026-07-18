@@ -70,6 +70,7 @@ protected:
 
 private:
 	void UpdateTactics(UBehaviorTreeComponent& OwnerComp) const;
+	void ApplyPawnSpecializedTactics(UBehaviorTreeComponent& OwnerComp) const;
 	void RestartTreeIfTacticalStateChanged(
 		UBehaviorTreeComponent& OwnerComp,
 		bool bPreviousShouldRetreat,
