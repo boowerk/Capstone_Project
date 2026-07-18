@@ -236,13 +236,30 @@ namespace BossAttackExecution
 			Context.BossPhase = DarkKnightBoss->GetDarkKnightPhase();
 			Context.PreferredMeleeRange = DarkKnightBoss->GetPreferredMeleeRange();
 			Context.PreferredRange = Context.PreferredMeleeRange;
-			Context.bCanUseDarkKnightBasic = bCadenceReady && DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::Basic);
-			Context.bCanUseDarkKnightHeavy = bCadenceReady && DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::Heavy);
+			Context.DarkKnightBasicAttackRange = DarkKnightBoss->GetBasicAttackRange();
+			Context.DarkKnightHeavyAttackRange = DarkKnightBoss->GetHeavyAttackRange();
+			Context.DarkKnightChargeMinRange = DarkKnightBoss->GetChargeMinRange();
+			Context.DarkKnightChargeMaxRange = FGPBossAttackPatternRanges::DarkKnightChargeMaxRange;
+			Context.DarkKnightDarkWaveMaxRange = DarkKnightBoss->GetDarkWaveMaxRange();
+			Context.DarkKnightGroundCrackMaxRange = DarkKnightBoss->GetGroundCrackMaxRange();
+			Context.bCanUseDarkKnightBasic = bCadenceReady
+				&& Context.DistanceToTarget <= Context.DarkKnightBasicAttackRange
+				&& DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::Basic);
+			Context.bCanUseDarkKnightHeavy = bCadenceReady
+				&& Context.DistanceToTarget <= Context.DarkKnightHeavyAttackRange
+				&& DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::Heavy);
 			// Sweep is no longer a selectable Dark Knight pattern; Ability_RMB is reserved as an animation wind-up.
 			Context.bCanUseDarkKnightSweep = false;
-			Context.bCanUseDarkKnightCharge = bCadenceReady && DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::Charge);
-			Context.bCanUseDarkWave = bCadenceReady && DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::DarkWave);
-			Context.bCanUseGroundCrack = bCadenceReady && DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::GroundCrack);
+			Context.bCanUseDarkKnightCharge = bCadenceReady
+				&& Context.DistanceToTarget >= Context.DarkKnightChargeMinRange
+				&& Context.DistanceToTarget <= Context.DarkKnightChargeMaxRange
+				&& DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::Charge);
+			Context.bCanUseDarkWave = bCadenceReady
+				&& Context.DistanceToTarget <= Context.DarkKnightDarkWaveMaxRange
+				&& DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::DarkWave);
+			Context.bCanUseGroundCrack = bCadenceReady
+				&& Context.DistanceToTarget <= Context.DarkKnightGroundCrackMaxRange
+				&& DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::GroundCrack);
 		}
 
 		return Context;

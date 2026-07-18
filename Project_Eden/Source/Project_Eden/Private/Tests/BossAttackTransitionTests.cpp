@@ -122,7 +122,7 @@ bool FBossAttackTransitionTimingTest::RunTest(const FString& Parameters)
 		TEXT("Charge at 1200cm can request the Dark Knight attack branch"),
 		BossAttackTransitionPolicy::CanRequestDarkKnightPattern(false, false, true, false, false));
 	TestTrue(
-		TEXT("Dark Wave at 2000cm can request the Dark Knight attack branch"),
+		TEXT("A range-validated Dark Wave can request the Dark Knight attack branch"),
 		BossAttackTransitionPolicy::CanRequestDarkKnightPattern(false, false, false, true, false));
 	TestTrue(
 		TEXT("Ground Crack can independently request the Dark Knight attack branch"),

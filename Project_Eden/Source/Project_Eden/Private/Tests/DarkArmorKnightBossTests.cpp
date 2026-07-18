@@ -68,11 +68,47 @@ bool FDarkArmorKnightPatternSelectorTest::RunTest(const FString& Parameters)
 	using namespace DarkArmorKnightBossTests;
 	FGPBossAttackPatternContext Context;
 	Context.bIsDarkArmorKnight = true;
-	Context.DistanceToTarget = 300.0f;
+	Context.DistanceToTarget = Context.DarkKnightBasicAttackRange;
 	Context.BossPhase = 1;
 	Context.bCanUseDarkKnightBasic = true;
-	ExpectPattern(*this, Context, GPTags::Ability::Boss::DarkKnight::Basic, TEXT("Close target uses sword combo"));
+	ExpectPattern(*this, Context, GPTags::Ability::Boss::DarkKnight::Basic, TEXT("Basic is valid at its exact cone edge"));
+	Context.DistanceToTarget += 1.0f;
+	TestTrue(
+		TEXT("Basic is rejected one centimeter beyond its real cone"),
+		FGPBossAttackPatternSelector::BuildCandidates(Context).IsEmpty());
 
+	Context = FGPBossAttackPatternContext();
+	Context.bIsDarkArmorKnight = true;
+	Context.bCanUseDarkKnightHeavy = true;
+	Context.DistanceToTarget = Context.DarkKnightHeavyAttackRange;
+	ExpectPattern(*this, Context, GPTags::Ability::Boss::DarkKnight::Heavy, TEXT("Heavy is valid at its exact cone edge"));
+	Context.DistanceToTarget += 1.0f;
+	TestTrue(
+		TEXT("Heavy is rejected one centimeter beyond its real cone"),
+		FGPBossAttackPatternSelector::BuildCandidates(Context).IsEmpty());
+
+	Context = FGPBossAttackPatternContext();
+	Context.bIsDarkArmorKnight = true;
+	Context.bCanUseDarkWave = true;
+	Context.DistanceToTarget = Context.DarkKnightDarkWaveMaxRange;
+	ExpectPattern(*this, Context, GPTags::Ability::Boss::DarkKnight::DarkWave, TEXT("Dark Wave is valid at its authored slash edge"));
+	Context.DistanceToTarget += 1.0f;
+	TestTrue(
+		TEXT("Dark Wave is rejected beyond its authored slash instead of stopping at range"),
+		FGPBossAttackPatternSelector::BuildCandidates(Context).IsEmpty());
+
+	Context = FGPBossAttackPatternContext();
+	Context.bIsDarkArmorKnight = true;
+	Context.DistanceToTarget = 1200.0f;
+	Context.bCanUseDarkKnightBasic = true;
+	Context.bCanUseDarkKnightHeavy = true;
+	Context.bCanUseDarkWave = true;
+	TestTrue(
+		TEXT("Melee and Dark Wave readiness cannot stop chase at 1200cm"),
+		FGPBossAttackPatternSelector::BuildCandidates(Context).IsEmpty());
+
+	Context = FGPBossAttackPatternContext();
+	Context.bIsDarkArmorKnight = true;
 	Context.bCanUseDarkKnightBasic = false;
 	Context.bCanUseDarkKnightSweep = true;
 	Context.LastHitDirection = TEXT("Side");
@@ -86,6 +122,12 @@ bool FDarkArmorKnightPatternSelectorTest::RunTest(const FString& Parameters)
 	Context.bCanUseDarkKnightCharge = true;
 	Context.bCanUseDarkWave = true;
 	ExpectPattern(*this, Context, GPTags::Ability::Boss::DarkKnight::Charge, TEXT("Far target prioritizes armored charge"));
+
+	Context = FGPBossAttackPatternContext();
+	Context.bIsDarkArmorKnight = true;
+	Context.DistanceToTarget = 1200.0f;
+	Context.bCanUseGroundCrack = true;
+	ExpectPattern(*this, Context, GPTags::Ability::Boss::DarkKnight::GroundCrack, TEXT("Ground Crack remains a ranged pattern"));
 
 	Context = FGPBossAttackPatternContext();
 	Context.bIsDarkArmorKnight = true;
@@ -174,6 +216,16 @@ bool FDarkArmorKnightAbilityGrantContractTest::RunTest(const FString& Parameters
 	Boss->PreAttackMontage = nullptr;
 	Boss->TelegraphVFXPatterns.FindOrAdd(GPTags::Ability::Boss::DarkKnight::Basic) = false;
 	Boss->BeginBehaviorAttackCommit(Target, 8.0f);
+	// A shorter designer-tuned slash is valid, but the obsolete 2200cm range must never return.
+	TestTrue(
+		TEXT("Production Blueprint cannot retain the obsolete 2200cm Dark Wave range"),
+		Boss->GetDarkWaveMaxRange() <= FGPBossAttackPatternRanges::DarkKnightDarkWaveMaxRange);
+	Target->SetActorLocation(FVector(Boss->GetBasicAttackRange() + 1.0f, 0.0f, 0.0f));
+	TestFalse(
+		TEXT("Basic tag activation is rejected outside its real damage range"),
+		ASC->TryActivateAbilityByTag(GPTags::Ability::Boss::DarkKnight::Basic));
+	TestTrue(TEXT("Rejected Basic does not consume shared cadence"), Boss->CanStartDarkKnightPattern());
+	Target->SetActorLocation(FVector(Boss->GetBasicAttackRange(), 0.0f, 0.0f));
 	const bool bBasicActivated = ASC->TryActivateAbilityByTag(GPTags::Ability::Boss::DarkKnight::Basic);
 	TestTrue(TEXT("Production Dark Knight activates Basic by exact tag"), bBasicActivated);
 	TestTrue(

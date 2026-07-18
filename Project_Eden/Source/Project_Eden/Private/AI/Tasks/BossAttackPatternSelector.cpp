@@ -142,28 +142,37 @@ TArray<FGPBossAttackPatternCandidate> FGPBossAttackPatternSelector::BuildCandida
 			return Candidates;
 		}
 		const float PhasePressure = FMath::Clamp(static_cast<float>(BossPhase - 1) * 0.22f, 0.0f, 0.45f);
-		const bool bInMeleeRange = DistanceToTarget <= FGPBossAttackPatternRanges::DarkKnightMeleeReach;
-		const bool bInChargeRange = DistanceToTarget >= FGPBossAttackPatternRanges::DarkKnightChargeMinRange
-			&& DistanceToTarget <= FGPBossAttackPatternRanges::DarkKnightChargeMaxRange;
+		// Dark Knight range checks intentionally use the exact authored damage reach.
+		// A tolerance here would stop movement for attacks that cannot hit.
+		const float BasicAttackRange = FMath::Max(0.0f, Context.DarkKnightBasicAttackRange);
+		const float HeavyAttackRange = FMath::Max(0.0f, Context.DarkKnightHeavyAttackRange);
+		const float DarkWaveMaxRange = FMath::Clamp(
+			Context.DarkKnightDarkWaveMaxRange,
+			0.0f,
+			FGPBossAttackPatternRanges::DarkKnightDarkWaveMaxRange);
+		const bool bInBasicRange = DistanceToTarget <= BasicAttackRange;
+		const bool bInHeavyRange = DistanceToTarget <= HeavyAttackRange;
+		const bool bInChargeRange = DistanceToTarget >= FMath::Max(0.0f, Context.DarkKnightChargeMinRange)
+			&& DistanceToTarget <= FMath::Max(0.0f, Context.DarkKnightChargeMaxRange);
 
 		if (Context.bCanUseDarkKnightCharge && bInChargeRange)
 		{
 			AddCandidate(Candidates, GPTags::Ability::Boss::DarkKnight::Charge, 1.15f + PhasePressure, TEXT("DarkKnightCharge"));
 		}
-		if (Context.bCanUseDarkWave && DistanceToTarget <= FGPBossAttackPatternRanges::DarkKnightDarkWaveMaxRange)
+		if (Context.bCanUseDarkWave && DistanceToTarget <= DarkWaveMaxRange)
 		{
-			const float RangeBonus = DistanceToTarget > FGPBossAttackPatternRanges::DarkKnightMeleeReach ? 0.35f : 0.0f;
+			const float RangeBonus = DistanceToTarget > HeavyAttackRange ? 0.35f : 0.0f;
 			AddCandidate(Candidates, GPTags::Ability::Boss::DarkKnight::DarkWave, 0.72f + RangeBonus + PhasePressure, TEXT("DarkWave"));
 		}
-		if (Context.bCanUseGroundCrack && DistanceToTarget <= FGPBossAttackPatternRanges::DarkKnightGroundCrackMaxRange)
+		if (Context.bCanUseGroundCrack && DistanceToTarget <= FMath::Max(0.0f, Context.DarkKnightGroundCrackMaxRange))
 		{
 			AddCandidate(Candidates, GPTags::Ability::Boss::DarkKnight::GroundCrack, 0.62f + PhasePressure + (HealthRatio <= 0.6f ? 0.3f : 0.0f), TEXT("GroundCrack"));
 		}
-		if (Context.bCanUseDarkKnightHeavy && bInMeleeRange)
+		if (Context.bCanUseDarkKnightHeavy && bInHeavyRange)
 		{
 			AddCandidate(Candidates, GPTags::Ability::Boss::DarkKnight::Heavy, 0.78f + PhasePressure + (HealthRatio <= 0.6f ? 0.15f : 0.0f), TEXT("DarkHeavy"));
 		}
-		if (Context.bCanUseDarkKnightBasic && bInMeleeRange)
+		if (Context.bCanUseDarkKnightBasic && bInBasicRange)
 		{
 			const float MeleeFit = 1.0f - FMath::Clamp(FMath::Abs(DistanceToTarget - Context.PreferredMeleeRange) / FMath::Max(100.0f, Context.PreferredMeleeRange), 0.0f, 1.0f);
 			AddCandidate(Candidates, GPTags::Ability::Boss::DarkKnight::Basic, 0.58f + MeleeFit * 0.35f + PhasePressure, TEXT("DarkBasic"));

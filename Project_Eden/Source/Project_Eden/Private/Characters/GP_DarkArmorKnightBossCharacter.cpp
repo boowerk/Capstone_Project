@@ -5,6 +5,7 @@
 #include "AbilitySystem/Abilities/Enemy/GP_DarkKnightPatternAbility.h"
 #include "AbilitySystemComponent.h"
 #include "AIController.h"
+#include "AI/Tasks/BossAttackPatternSelector.h"
 #include "Actors/GP_BossCombatUtils.h"
 #include "Actors/GP_DarkKnightChargeActor.h"
 #include "Actors/GP_DarkKnightGroundCrackActor.h"
@@ -205,6 +206,57 @@ bool AGP_DarkArmorKnightBossCharacter::IsPatternInterrupted() const
 		|| DarkKnightStateComponent->IsGuardBroken();
 }
 
+float AGP_DarkArmorKnightBossCharacter::GetDarkWaveMaxRange() const
+{
+	// Older Blueprint saves can retain the former 2200cm value. The authored DarkSlash is a 520cm cone,
+	// so clamp serialized overrides to the real damage reach instead of reopening a stationary whiff.
+	return FMath::Clamp(
+		DarkWaveMaxRange,
+		0.0f,
+		FGPBossAttackPatternRanges::DarkKnightDarkWaveMaxRange);
+}
+
+bool AGP_DarkArmorKnightBossCharacter::CanStartPatternAtTargetRange(
+	FGameplayTag PatternTag,
+	AActor* ExplicitTarget) const
+{
+	const bool bUsesTargetRange = PatternTag.MatchesTagExact(GPTags::Ability::Boss::DarkKnight::Basic)
+		|| PatternTag.MatchesTagExact(GPTags::Ability::Boss::DarkKnight::Heavy)
+		|| PatternTag.MatchesTagExact(GPTags::Ability::Boss::DarkKnight::Charge)
+		|| PatternTag.MatchesTagExact(GPTags::Ability::Boss::DarkKnight::DarkWave)
+		|| PatternTag.MatchesTagExact(GPTags::Ability::Boss::DarkKnight::GroundCrack);
+	if (!bUsesTargetRange)
+	{
+		return true;
+	}
+
+	const AActor* TargetActor = ResolvePatternTarget(ExplicitTarget);
+	if (!IsValid(TargetActor))
+	{
+		return false;
+	}
+
+	const float DistanceToTarget = FVector::Dist2D(GetActorLocation(), TargetActor->GetActorLocation());
+	if (PatternTag.MatchesTagExact(GPTags::Ability::Boss::DarkKnight::Basic))
+	{
+		return DistanceToTarget <= GetBasicAttackRange();
+	}
+	if (PatternTag.MatchesTagExact(GPTags::Ability::Boss::DarkKnight::Heavy))
+	{
+		return DistanceToTarget <= GetHeavyAttackRange();
+	}
+	if (PatternTag.MatchesTagExact(GPTags::Ability::Boss::DarkKnight::Charge))
+	{
+		return DistanceToTarget >= FMath::Max(0.0f, ChargeMinRange)
+			&& DistanceToTarget <= FGPBossAttackPatternRanges::DarkKnightChargeMaxRange;
+	}
+	if (PatternTag.MatchesTagExact(GPTags::Ability::Boss::DarkKnight::DarkWave))
+	{
+		return DistanceToTarget <= GetDarkWaveMaxRange();
+	}
+	return DistanceToTarget <= FMath::Max(0.0f, GroundCrackMaxRange);
+}
+
 UGP_BossTelegraphVFXComponent* AGP_DarkArmorKnightBossCharacter::GetBossTelegraphVFXComponent() const
 {
 	// BP_DarkArmorKnight already owns the designer-added component, so reuse it instead of creating a duplicate native node.
@@ -329,7 +381,7 @@ bool AGP_DarkArmorKnightBossCharacter::ExecuteHeavyAttack(AActor* TargetActor)
 	{
 		if (WeakThis.IsValid() && !WeakThis->IsPatternInterrupted())
 		{
-			WeakThis->ApplyConeDamage(420.0f, 55.0f, 1.6f, 350.0f);
+			WeakThis->ApplyConeDamage(WeakThis->GetHeavyAttackRange(), 55.0f, 1.6f, 350.0f);
 		}
 	}, 1.1f, false);
 	return true;
@@ -442,7 +494,7 @@ bool AGP_DarkArmorKnightBossCharacter::ExecuteDarkWave(AActor* TargetActor)
 		{
 			if (WeakThis.IsValid() && !WeakThis->IsPatternInterrupted())
 			{
-				WeakThis->ApplyConeDamage(520.0f, 60.0f, 1.35f, 325.0f);
+				WeakThis->ApplyConeDamage(WeakThis->GetDarkWaveMaxRange(), 60.0f, 1.35f, 325.0f);
 			}
 		}, 0.78f + Index * 0.30f, false);
 	}

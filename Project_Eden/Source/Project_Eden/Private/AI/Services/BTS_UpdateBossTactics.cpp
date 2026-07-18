@@ -344,10 +344,13 @@ void UBTS_UpdateBossTactics::UpdateBossTactics(UBehaviorTreeComponent& OwnerComp
 		DarkKnightStateComponent->SetCombatPhase(IsValid(DarkKnightBoss) ? DarkKnightBoss->GetDarkKnightPhase() : BossPhase);
 	}
 	const bool bDarkKnightCadenceReady = bIsDarkKnightBoss && DarkKnightBoss->CanStartDarkKnightPattern();
-	const bool bDarkKnightMeleeReady = bDarkKnightCadenceReady
-		&& DistanceToTarget <= FGPBossAttackPatternRanges::DarkKnightMeleeReach
-		&& (DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::Basic)
-			|| DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::Heavy));
+	const bool bDarkKnightBasicReady = bDarkKnightCadenceReady
+		&& DistanceToTarget <= DarkKnightBoss->GetBasicAttackRange()
+		&& DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::Basic);
+	const bool bDarkKnightHeavyReady = bDarkKnightCadenceReady
+		&& DistanceToTarget <= DarkKnightBoss->GetHeavyAttackRange()
+		&& DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::Heavy);
+	const bool bDarkKnightMeleeReady = bDarkKnightBasicReady || bDarkKnightHeavyReady;
 	const bool bDarkKnightChargeReady = bDarkKnightCadenceReady
 		&& DistanceToTarget >= DarkKnightBoss->GetChargeMinRange()
 		&& DistanceToTarget <= FGPBossAttackPatternRanges::DarkKnightChargeMaxRange
