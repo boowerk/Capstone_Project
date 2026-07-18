@@ -98,6 +98,13 @@ UAttributeSet* AGP_EnemyCharacter::GetAttributeSet() const
 
 void AGP_EnemyCharacter::UpdateAnimationSet()
 {
+	if (!IsValid(EnemyAnimationSet) && !DefaultEnemyAnimationSet.IsNull())
+	{
+		// Resolve native defaults only after actor components have initialized;
+		// loading animation assets during CDO construction can re-enter PostLoad.
+		EnemyAnimationSet = DefaultEnemyAnimationSet.LoadSynchronous();
+	}
+
 	if (!IsValid(EnemyAnimationSet))
 	{
 		// Existing enemies and bosses can continue using the legacy shared asset until migrated.

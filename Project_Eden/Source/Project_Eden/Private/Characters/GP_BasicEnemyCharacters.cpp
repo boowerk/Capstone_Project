@@ -5,6 +5,7 @@
 #include "AI/Data/EnemyArchetypeData.h"
 #include "AbilitySystem/Abilities/Enemy/GP_EnemyAttack.h"
 #include "AbilitySystem/Abilities/Enemy/GP_EnemyRangedAttack.h"
+#include "Animation/PDA_EnemyAnimationSet.h"
 #include "BehaviorTree/BehaviorTree.h"
 #include "BehaviorTree/BlackboardData.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -80,6 +81,10 @@ AGP_MeleeEnemyCharacter::AGP_MeleeEnemyCharacter()
 	const GPBasicEnemyDefaults::FSharedTemplateAssets& SharedAssets = GPBasicEnemyDefaults::GetSharedTemplateAssets();
 	BehaviorTreeAssetOverride = SharedAssets.CommonBehaviorTree;
 	BlackboardAssetOverride = SharedAssets.CommonBlackboard;
+	// Reuse the production Furnace Walker contract so default melee spawns have
+	// locomotion, enemy hit notifies, and a visible attack wind-up.
+	DefaultEnemyAnimationSet = TSoftObjectPtr<UPDA_EnemyAnimationSet>(FSoftObjectPath(
+		TEXT("/Game/Characters/EnemyCharacter/Monsters/FurnaceWalker/PDA_FW_EnemyAnimationSet.PDA_FW_EnemyAnimationSet")));
 	if (GetMesh() != nullptr && SharedAssets.MaskManMesh != nullptr)
 	{
 		GetMesh()->SetSkeletalMesh(SharedAssets.MaskManMesh);
@@ -124,6 +129,10 @@ AGP_RangedEnemyCharacter::AGP_RangedEnemyCharacter()
 	const GPBasicEnemyDefaults::FSharedTemplateAssets& SharedAssets = GPBasicEnemyDefaults::GetSharedTemplateAssets();
 	BehaviorTreeAssetOverride = SharedAssets.CommonBehaviorTree;
 	BlackboardAssetOverride = SharedAssets.CommonBlackboard;
+	// Cyclops Specter already provides a ranged enemy AnimBP and enemy-tagged
+	// attack montage, avoiding the retarget-only MaskMan player graph.
+	DefaultEnemyAnimationSet = TSoftObjectPtr<UPDA_EnemyAnimationSet>(FSoftObjectPath(
+		TEXT("/Game/Characters/EnemyCharacter/Monsters/CyclopsSpecter/PDA_CS_EnemyAnimationSet.PDA_CS_EnemyAnimationSet")));
 	if (GetMesh() != nullptr && SharedAssets.MaskManMesh != nullptr)
 	{
 		GetMesh()->SetSkeletalMesh(SharedAssets.MaskManMesh);
@@ -168,6 +177,10 @@ AGP_FlyingEnemyCharacter::AGP_FlyingEnemyCharacter()
 	const GPBasicEnemyDefaults::FSharedTemplateAssets& SharedAssets = GPBasicEnemyDefaults::GetSharedTemplateAssets();
 	BehaviorTreeAssetOverride = SharedAssets.CommonBehaviorTree;
 	BlackboardAssetOverride = SharedAssets.CommonBlackboard;
+	// The spectral presentation tolerates flying movement and keeps the same
+	// authoritative ranged timing contract as the grounded archetype.
+	DefaultEnemyAnimationSet = TSoftObjectPtr<UPDA_EnemyAnimationSet>(FSoftObjectPath(
+		TEXT("/Game/Characters/EnemyCharacter/Monsters/CyclopsSpecter/PDA_CS_EnemyAnimationSet.PDA_CS_EnemyAnimationSet")));
 	if (GetMesh() != nullptr && SharedAssets.MaskManMesh != nullptr)
 	{
 		GetMesh()->SetSkeletalMesh(SharedAssets.MaskManMesh);

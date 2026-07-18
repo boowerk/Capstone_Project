@@ -52,6 +52,7 @@ public:
 	virtual void UpdateAnimationSet() override;
 
 	UPDA_EnemyAnimationSet* GetEnemyAnimationSet() const { return EnemyAnimationSet; }
+	const TSoftObjectPtr<UPDA_EnemyAnimationSet>& GetDefaultEnemyAnimationSet() const { return DefaultEnemyAnimationSet; }
 
 	UFUNCTION(BlueprintPure, Category = "Boss")
 	bool IsBossEnemy() const { return bIsBossEnemy; }
@@ -162,6 +163,13 @@ protected:
 	/** Enemy-only visual and combat animation data. Leave the legacy base AnimationSet empty for new enemies. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation")
 	TObjectPtr<UPDA_EnemyAnimationSet> EnemyAnimationSet;
+
+	/**
+	 * Native archetypes use a soft default so animation-heavy packages are not
+	 * loaded while class default objects are still being constructed.
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Animation")
+	TSoftObjectPtr<UPDA_EnemyAnimationSet> DefaultEnemyAnimationSet;
 
 	// 향후 EQS나 복귀 로직에서 사용할 기준 위치를 월드에 배치할 수 있도록 유지한다.
 	UPROPERTY(EditInstanceOnly, Category = "AI", meta = (MakeEditWidget = "true"))
