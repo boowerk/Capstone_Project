@@ -4,10 +4,15 @@
 #include "AI/Services/BTS_UpdateEnemyTactics.h"
 #include "AI/Services/BTS_UpdateMatadorTactics.h"
 #include "AI/Tasks/BTT_ExecuteEnemyAttack.h"
+#include "AbilitySystemComponent.h"
+#include "Actors/GP_BullChargeActor.h"
 #include "BehaviorTree/BehaviorTree.h"
 #include "BehaviorTree/BTCompositeNode.h"
 #include "BehaviorTree/BTService.h"
 #include "BehaviorTree/BTTaskNode.h"
+#include "Characters/GP_MatadorBossStateComponent.h"
+#include "Characters/GP_MatadorMageBossCharacter.h"
+#include "Engine/World.h"
 #include "GameplayTags/GP_Tags.h"
 #include "Misc/AutomationTest.h"
 
@@ -144,6 +149,81 @@ bool FBossAttackTransitionTimingTest::RunTest(const FString& Parameters)
 				MatadorTree->RootNode,
 				UBTS_UpdateEnemyTactics::StaticClass()));
 	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FMatadorBullLifecycleCleanupTest,
+	"ProjectEden.AI.Boss.Matador.BullLifecycleCleanup",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FMatadorBullLifecycleCleanupTest::RunTest(const FString& Parameters)
+{
+	UWorld* TestWorld = UWorld::CreateWorld(EWorldType::Game, false);
+	if (!TestNotNull(TEXT("Created Matador bull lifecycle world"), TestWorld))
+	{
+		return false;
+	}
+
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AGP_MatadorMageBossCharacter* Matador = TestWorld->SpawnActor<AGP_MatadorMageBossCharacter>(
+		FVector::ZeroVector,
+		FRotator::ZeroRotator,
+		SpawnParameters);
+	UGP_MatadorBossStateComponent* State = IsValid(Matador) ? Matador->GetMatadorStateComponent() : nullptr;
+	UAbilitySystemComponent* ASC = IsValid(Matador) ? Matador->GetAbilitySystemComponent() : nullptr;
+	if (!TestNotNull(TEXT("Spawned Matador"), Matador)
+		|| !TestNotNull(TEXT("Matador state exists"), State)
+		|| !TestNotNull(TEXT("Matador ASC exists"), ASC))
+	{
+		TestWorld->DestroyWorld(false);
+		return false;
+	}
+
+	auto SpawnRegisteredBull = [&]() -> AGP_BullChargeActor*
+	{
+		AGP_BullChargeActor* Bull = TestWorld->SpawnActor<AGP_BullChargeActor>(
+			FVector(500.0f, 0.0f, 0.0f),
+			FRotator::ZeroRotator,
+			SpawnParameters);
+		if (IsValid(Bull))
+		{
+			// 테스트에서는 Matador 자체를 안전한 placeholder target으로 사용하고 lifecycle 등록만 검증한다.
+			Bull->InitializeBullCharge(Matador, Matador, nullptr, State, FVector::ForwardVector);
+		}
+		return Bull;
+	};
+
+	AGP_BullChargeActor* ExternallyDestroyedBull = SpawnRegisteredBull();
+	TestNotNull(TEXT("Spawned externally destroyed bull"), ExternallyDestroyedBull);
+	TestTrue(TEXT("State registers the active bull"), IsValid(State) && State->GetActiveBullActor() == ExternallyDestroyedBull);
+	TestTrue(
+		TEXT("Active bull applies the Matador melee tag"),
+		IsValid(ASC) && ASC->HasMatchingGameplayTag(GPTags::State::Status::Enemy::MatadorMeleeActive));
+
+	if (IsValid(ExternallyDestroyedBull))
+	{
+		ExternallyDestroyedBull->Destroy();
+	}
+	TestNull(TEXT("External Destroy clears the active bull pointer"), State->GetActiveBullActor());
+	TestFalse(
+		TEXT("External Destroy clears the Matador melee tag"),
+		ASC->HasMatchingGameplayTag(GPTags::State::Status::Enemy::MatadorMeleeActive));
+
+	AGP_BullChargeActor* StuckBull = SpawnRegisteredBull();
+	TestNotNull(TEXT("Spawned stuck-cap bull"), StuckBull);
+	if (IsValid(StuckBull))
+	{
+		// Tick the authoritative absolute cap directly; it must work even before the telegraph timer starts the charge.
+		StuckBull->Tick(18.1f);
+	}
+	TestNull(TEXT("Absolute cap clears a stuck bull pointer"), State->GetActiveBullActor());
+	TestFalse(
+		TEXT("Absolute cap clears a stuck bull tag"),
+		ASC->HasMatchingGameplayTag(GPTags::State::Status::Enemy::MatadorMeleeActive));
+
+	TestWorld->DestroyWorld(false);
 	return true;
 }
 
