@@ -22,6 +22,20 @@ namespace EnemyAttackTransitionPolicy
 			&& (bAllowAttacksInsidePreferredRange || SafeDistance >= ExitMinRange);
 	}
 
+	float StepFacingYaw(
+		float CurrentYaw,
+		float DesiredYaw,
+		float TurnRateDegreesPerSecond,
+		float DeltaSeconds)
+	{
+		const float MaximumYawStep = FMath::Max(0.0f, TurnRateDegreesPerSecond)
+			* FMath::Max(0.0f, DeltaSeconds);
+		return FMath::FixedTurn(
+			FRotator::NormalizeAxis(CurrentYaw),
+			FRotator::NormalizeAxis(DesiredYaw),
+			MaximumYawStep);
+	}
+
 	EEnemyAttackTransitionIntent ResolveIntent(const FEnemyAttackTransitionObservation& Observation)
 	{
 		if (Observation.bActionCommitted)

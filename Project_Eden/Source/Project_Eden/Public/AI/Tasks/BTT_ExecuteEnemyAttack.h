@@ -7,12 +7,15 @@
 
 class AActor;
 class AGP_EnemyCharacter;
+class APawn;
 class UAbilitySystemComponent;
 class UBehaviorTreeComponent;
+class UCharacterMovementComponent;
 
 enum class EEnemyAttackTaskPhase : uint8
 {
 	Idle,
+	FacingTarget,
 	AwaitingAbilityEnd,
 	FallbackCommit,
 	Recovery
@@ -55,6 +58,16 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "AI|Transition", meta = (ClampMin = "0.1", Units = "s"))
 	float AttackTimeoutSeconds = 8.0f;
 
+	// 공격 전 한 프레임 스냅 대신 제한된 각속도로 목표를 바라본다.
+	UPROPERTY(EditAnywhere, Category = "AI|Transition|Facing", meta = (ClampMin = "0.0", Units = "deg/s"))
+	float AttackFacingTurnRateDegreesPerSecond = 540.0f;
+
+	UPROPERTY(EditAnywhere, Category = "AI|Transition|Facing", meta = (ClampMin = "0.0", ClampMax = "180.0", Units = "deg"))
+	float AttackFacingToleranceDegrees = 8.0f;
+
+	UPROPERTY(EditAnywhere, Category = "AI|Transition|Facing", meta = (ClampMin = "0.0", Units = "s"))
+	float MaximumAttackFacingSeconds = 0.35f;
+
 	virtual EBTNodeResult::Type ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory) override;
 	virtual void TickTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, float DeltaSeconds) override;
 	virtual EBTNodeResult::Type AbortTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory) override;
@@ -65,7 +78,12 @@ protected:
 	virtual FString GetStaticDescription() const override;
 
 private:
+	bool ActivateBasicAttack();
 	bool IsTrackedAbilityActive() const;
+	bool IsFacingCommittedTarget() const;
+	void TickFacingTarget(UBehaviorTreeComponent& OwnerComp, float DeltaSeconds);
+	void BeginFacingOwnership(APawn* ControlledPawn);
+	void RestoreFacingOwnership();
 	void CompleteBasicAttack(UBehaviorTreeComponent& OwnerComp);
 	void ScheduleBasicAttackCadence();
 	void ResetExecutionState();
@@ -73,10 +91,15 @@ private:
 	EEnemyAttackTaskPhase ExecutionPhase = EEnemyAttackTaskPhase::Idle;
 	TWeakObjectPtr<UAbilitySystemComponent> ActiveAbilitySystemComponent;
 	TWeakObjectPtr<AGP_EnemyCharacter> ActiveEnemyCharacter;
+	TWeakObjectPtr<APawn> ActiveControlledPawn;
 	TWeakObjectPtr<AActor> CommittedTargetActor;
+	TWeakObjectPtr<UCharacterMovementComponent> FacingMovementComponent;
 	FGameplayTag ActiveAbilityTag;
 	float PhaseElapsedSeconds = 0.0f;
 	float TotalElapsedSeconds = 0.0f;
 	bool bAttackActivationAccepted = false;
 	bool bCadenceScheduled = false;
+	bool bPreviousOrientRotationToMovement = false;
+	bool bPreviousUseControllerDesiredRotation = false;
+	bool bOwnsFacingRotation = false;
 };

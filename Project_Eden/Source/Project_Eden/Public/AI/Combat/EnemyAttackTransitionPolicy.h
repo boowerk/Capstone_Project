@@ -29,6 +29,13 @@ namespace EnemyAttackTransitionPolicy
 		bool bWasInsideAttackBand,
 		float ExitHysteresis);
 
+	// 한 프레임의 최대 회전량을 제한하면서 -180/180 경계를 최단 방향으로 통과한다.
+	PROJECT_EDEN_API float StepFacingYaw(
+		float CurrentYaw,
+		float DesiredYaw,
+		float TurnRateDegreesPerSecond,
+		float DeltaSeconds);
+
 	// 공격 의도와 실행 준비 시간을 분리해 쿨다운만으로 Chase가 열리지 않게 한다.
 	PROJECT_EDEN_API EEnemyAttackTransitionIntent ResolveIntent(
 		const FEnemyAttackTransitionObservation& Observation);

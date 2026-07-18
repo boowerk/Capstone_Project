@@ -1,5 +1,6 @@
 #include "AI/Tasks/BTT_ExecuteEnemyAttack.h"
 
+#include "AI/Combat/EnemyAttackTransitionPolicy.h"
 #include "AI/Tasks/EnemyBTTaskCommon.h"
 #include "AbilitySystem/GP_AbilitySystemComponent.h"
 #include "AbilitySystemBlueprintLibrary.h"
@@ -10,6 +11,8 @@
 #include "AIController.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "Characters/GP_EnemyCharacter.h"
+#include "GameFramework/Character.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "GameplayTags/GP_Tags.h"
 
 namespace BTT_ExecuteEnemyAttack_Internal
@@ -83,16 +86,6 @@ EBTNodeResult::Type UBTT_ExecuteEnemyAttack::ExecuteTask(UBehaviorTreeComponent&
 	}
 
 	AActor* TargetActor = EnemyBTTaskCommon::GetTargetActor(BlackboardComponent);
-	if (bFaceTargetBeforeAttack && IsValid(TargetActor))
-	{
-		FVector LookDirection = TargetActor->GetActorLocation() - ControlledPawn->GetActorLocation();
-		LookDirection.Z = 0.0f;
-		if (!LookDirection.IsNearlyZero())
-		{
-			ControlledPawn->SetActorRotation(LookDirection.Rotation());
-		}
-	}
-
 	UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(ControlledPawn);
 	if (!IsValid(ASC))
 	{
@@ -102,6 +95,17 @@ EBTNodeResult::Type UBTT_ExecuteEnemyAttack::ExecuteTask(UBehaviorTreeComponent&
 
 	if (bUseBossPatternSelector)
 	{
+		if (bFaceTargetBeforeAttack && IsValid(TargetActor))
+		{
+			FVector LookDirection = TargetActor->GetActorLocation() - ControlledPawn->GetActorLocation();
+			LookDirection.Z = 0.0f;
+			if (!LookDirection.IsNearlyZero())
+			{
+				// 보스는 다음 원자 커밋에서 패턴 수명과 함께 회전 소유권을 전환한다.
+				ControlledPawn->SetActorRotation(LookDirection.Rotation());
+			}
+		}
+
 		// Some merged boss BT assets still reference this generic task; route boss pawns through the shared pattern selector.
 		UE_LOG(
 			LogEnemyAI,
@@ -114,6 +118,7 @@ EBTNodeResult::Type UBTT_ExecuteEnemyAttack::ExecuteTask(UBehaviorTreeComponent&
 
 	ActiveAbilitySystemComponent = ASC;
 	ActiveEnemyCharacter = EnemyCharacter;
+	ActiveControlledPawn = ControlledPawn;
 	CommittedTargetActor = TargetActor;
 	ActiveAbilityTag = EffectiveAttackAbilityTag;
 	if (IsValid(EnemyCharacter))
@@ -121,16 +126,42 @@ EBTNodeResult::Type UBTT_ExecuteEnemyAttack::ExecuteTask(UBehaviorTreeComponent&
 		EnemyCharacter->BeginBehaviorAttackCommit(TargetActor, AttackTimeoutSeconds);
 	}
 
-	bool bActivated = false;
+	if (bFaceTargetBeforeAttack && IsValid(TargetActor) && !IsFacingCommittedTarget())
+	{
+		// 이동 회전과 공격 조준이 동시에 ActorRotation을 덮어쓰지 않도록 준비 구간만 소유권을 가져온다.
+		BeginFacingOwnership(ControlledPawn);
+		ExecutionPhase = EEnemyAttackTaskPhase::FacingTarget;
+		return EBTNodeResult::InProgress;
+	}
 
+	return ActivateBasicAttack()
+		? EBTNodeResult::InProgress
+		: EBTNodeResult::Failed;
+}
+
+bool UBTT_ExecuteEnemyAttack::ActivateBasicAttack()
+{
+	RestoreFacingOwnership();
+	UAbilitySystemComponent* ASC = ActiveAbilitySystemComponent.Get();
+	AGP_EnemyCharacter* EnemyCharacter = ActiveEnemyCharacter.Get();
+	if (!IsValid(ASC) || !ActiveAbilityTag.IsValid())
+	{
+		if (IsValid(EnemyCharacter))
+		{
+			EnemyCharacter->FinishBehaviorAttackCommit(0.0f);
+		}
+		return false;
+	}
+
+	bool bActivated = false;
 	if (UGP_AbilitySystemComponent* GPASC = Cast<UGP_AbilitySystemComponent>(ASC))
 	{
-		bActivated = GPASC->TryActivateAbilityByTag(EffectiveAttackAbilityTag);
+		bActivated = GPASC->TryActivateAbilityByTag(ActiveAbilityTag);
 	}
 	else
 	{
 		// Keep non-project ability system components compatible with the same gameplay tag contract.
-		bActivated = ASC->TryActivateAbilitiesByTag(EffectiveAttackAbilityTag.GetSingleTagContainer());
+		bActivated = ASC->TryActivateAbilitiesByTag(ActiveAbilityTag.GetSingleTagContainer());
 	}
 
 	if (bActivated)
@@ -139,14 +170,15 @@ EBTNodeResult::Type UBTT_ExecuteEnemyAttack::ExecuteTask(UBehaviorTreeComponent&
 		ExecutionPhase = IsTrackedAbilityActive()
 			? EEnemyAttackTaskPhase::AwaitingAbilityEnd
 			: EEnemyAttackTaskPhase::FallbackCommit;
-		return EBTNodeResult::InProgress;
+		PhaseElapsedSeconds = 0.0f;
+		return true;
 	}
 
 	if (IsValid(EnemyCharacter))
 	{
 		EnemyCharacter->FinishBehaviorAttackCommit(0.0f);
 	}
-	return EBTNodeResult::Failed;
+	return false;
 }
 
 void UBTT_ExecuteEnemyAttack::TickTask(
@@ -158,6 +190,12 @@ void UBTT_ExecuteEnemyAttack::TickTask(
 
 	PhaseElapsedSeconds += DeltaSeconds;
 	TotalElapsedSeconds += DeltaSeconds;
+
+	if (ExecutionPhase == EEnemyAttackTaskPhase::FacingTarget)
+	{
+		TickFacingTarget(OwnerComp, DeltaSeconds);
+		return;
+	}
 
 	if (ExecutionPhase == EEnemyAttackTaskPhase::AwaitingAbilityEnd)
 	{
@@ -199,6 +237,7 @@ EBTNodeResult::Type UBTT_ExecuteEnemyAttack::AbortTask(
 	UBehaviorTreeComponent& OwnerComp,
 	uint8* NodeMemory)
 {
+	RestoreFacingOwnership();
 	ScheduleBasicAttackCadence();
 	if (AGP_EnemyCharacter* EnemyCharacter = ActiveEnemyCharacter.Get())
 	{
@@ -224,6 +263,104 @@ void UBTT_ExecuteEnemyAttack::OnTaskFinished(
 
 	ResetExecutionState();
 	Super::OnTaskFinished(OwnerComp, NodeMemory, TaskResult);
+}
+
+bool UBTT_ExecuteEnemyAttack::IsFacingCommittedTarget() const
+{
+	const APawn* ControlledPawn = ActiveControlledPawn.Get();
+	const AActor* TargetActor = CommittedTargetActor.Get();
+	if (!IsValid(ControlledPawn) || !IsValid(TargetActor))
+	{
+		return false;
+	}
+
+	FVector LookDirection = TargetActor->GetActorLocation() - ControlledPawn->GetActorLocation();
+	LookDirection.Z = 0.0f;
+	if (LookDirection.IsNearlyZero())
+	{
+		return true;
+	}
+
+	const float RemainingYaw = FMath::Abs(FMath::FindDeltaAngleDegrees(
+		ControlledPawn->GetActorRotation().Yaw,
+		LookDirection.Rotation().Yaw));
+	return RemainingYaw <= FMath::Max(0.0f, AttackFacingToleranceDegrees);
+}
+
+void UBTT_ExecuteEnemyAttack::TickFacingTarget(
+	UBehaviorTreeComponent& OwnerComp,
+	float DeltaSeconds)
+{
+	APawn* ControlledPawn = ActiveControlledPawn.Get();
+	const AActor* TargetActor = CommittedTargetActor.Get();
+	if (!IsValid(ControlledPawn) || !IsValid(TargetActor))
+	{
+		if (AGP_EnemyCharacter* EnemyCharacter = ActiveEnemyCharacter.Get())
+		{
+			EnemyCharacter->FinishBehaviorAttackCommit(0.0f);
+		}
+		FinishLatentTask(OwnerComp, EBTNodeResult::Failed);
+		return;
+	}
+
+	FVector LookDirection = TargetActor->GetActorLocation() - ControlledPawn->GetActorLocation();
+	LookDirection.Z = 0.0f;
+	if (!LookDirection.IsNearlyZero())
+	{
+		FRotator NewRotation = ControlledPawn->GetActorRotation();
+		NewRotation.Yaw = EnemyAttackTransitionPolicy::StepFacingYaw(
+			NewRotation.Yaw,
+			LookDirection.Rotation().Yaw,
+			AttackFacingTurnRateDegreesPerSecond,
+			DeltaSeconds);
+		// 제한된 SetActorRotation은 서버 권위 회전을 복제하면서 단일 프레임 스냅을 피한다.
+		ControlledPawn->SetActorRotation(NewRotation);
+	}
+
+	if (IsFacingCommittedTarget() || PhaseElapsedSeconds >= MaximumAttackFacingSeconds)
+	{
+		if (!ActivateBasicAttack())
+		{
+			FinishLatentTask(OwnerComp, EBTNodeResult::Failed);
+		}
+	}
+}
+
+void UBTT_ExecuteEnemyAttack::BeginFacingOwnership(APawn* ControlledPawn)
+{
+	ACharacter* Character = Cast<ACharacter>(ControlledPawn);
+	UCharacterMovementComponent* MovementComponent = IsValid(Character)
+		? Character->GetCharacterMovement()
+		: nullptr;
+	if (!IsValid(MovementComponent))
+	{
+		return;
+	}
+
+	FacingMovementComponent = MovementComponent;
+	bPreviousOrientRotationToMovement = MovementComponent->bOrientRotationToMovement;
+	bPreviousUseControllerDesiredRotation = MovementComponent->bUseControllerDesiredRotation;
+	MovementComponent->bOrientRotationToMovement = false;
+	MovementComponent->bUseControllerDesiredRotation = false;
+	bOwnsFacingRotation = true;
+}
+
+void UBTT_ExecuteEnemyAttack::RestoreFacingOwnership()
+{
+	if (!bOwnsFacingRotation)
+	{
+		return;
+	}
+
+	if (UCharacterMovementComponent* MovementComponent = FacingMovementComponent.Get())
+	{
+		// 공격 조준이 끝나면 각 아키타입의 원래 이동 회전 설정을 그대로 돌려준다.
+		MovementComponent->bOrientRotationToMovement = bPreviousOrientRotationToMovement;
+		MovementComponent->bUseControllerDesiredRotation = bPreviousUseControllerDesiredRotation;
+	}
+
+	FacingMovementComponent.Reset();
+	bOwnsFacingRotation = false;
 }
 
 bool UBTT_ExecuteEnemyAttack::IsTrackedAbilityActive() const
@@ -288,15 +425,19 @@ void UBTT_ExecuteEnemyAttack::ScheduleBasicAttackCadence()
 
 void UBTT_ExecuteEnemyAttack::ResetExecutionState()
 {
+	RestoreFacingOwnership();
 	ExecutionPhase = EEnemyAttackTaskPhase::Idle;
 	ActiveAbilitySystemComponent.Reset();
 	ActiveEnemyCharacter.Reset();
+	ActiveControlledPawn.Reset();
 	CommittedTargetActor.Reset();
 	ActiveAbilityTag = FGameplayTag();
 	PhaseElapsedSeconds = 0.0f;
 	TotalElapsedSeconds = 0.0f;
 	bAttackActivationAccepted = false;
 	bCadenceScheduled = false;
+	bPreviousOrientRotationToMovement = false;
+	bPreviousUseControllerDesiredRotation = false;
 }
 
 FString UBTT_ExecuteEnemyAttack::GetStaticDescription() const
