@@ -9,13 +9,12 @@ tags: [memoc, memoc/state]
 # Session Summary
 
 ## Status
-- `L_LandscapeMap` is playable with sculpt/collision, PlayerStart, full nav, 15 seeds, and one production event director.
-- Four corruption-aware exploration events use discovery, pacing/cooldowns, safe party placement, outcome deltas, and GAS-owned enemy cleanup.
+- `[EDEN-MAIN]` is the sole writer; DESIGN, CLIENT, WORLD, and QA role threads are active as read-only reviewers.
+- `EDEN-20260718-001` is evaluating the graduation Vertical Slice and cut line.
 
 ## Verified
-- Editor build and 11 focused automation tests pass.
-- PIE Structure Defense spawned four 3-enemy waves; completion retired all 12 AI and left zero event/enemy actors.
+- Baseline SHA is `3bc5d5ef`; `main` is 17 commits ahead of `origin/main`.
 
 ## Handoff
-- No editor setup required; production director is restored to `25/5/12`, `.30/.35`, `80`, `1400-2200`.
+- Split work into minimal functional commits using `type(scope): short summary`.
 - Preserve user changes in `TestMap`, `DA_RegionEventData`, and `L_MainMap`.

@@ -15,6 +15,8 @@ Last synced: 2026-07-14T06:51:59+09:00
 
 ## Current Status
 
+- The Project Eden Codex team workflow is initialized: `[EDEN-MAIN]` is the sole writer/integrator, while permanent DESIGN, CLIENT, WORLD, and QA threads perform read-only analysis and cross-review. Work is split into minimal functional units and committed using the repository's `type(scope): short summary` convention. The durable protocol is in `docs/AgentTeamWorkflow.md`.
+
 - `/Game/Maps/MainMap/L_LandscapeMap` retains the restored sculpt/collision and is immediate-play ready at LFS object `dc2e8205...` (11,425,665 bytes): PlayerStart is above terrain, full Landscape NavMesh bounds exist, 15 contiguous region seeds remain, and exactly one production event director is placed. `ProjectEden.Game.LandscapeMap.Integrity` guards all of these plus the absence of `GP.TestEnvironment` deck actors.
 
 - Corruption-aware exploration events are production-ready (`f8f088b7` through `05308541`). The placed director waits `25s`, evaluates every `5s` after `12s` regional dwell, uses `0.30 + corruption*0.35` chance, enforces an `80s` global cooldown, and places one event `1400-2200cm` from every player. Four production DataAssets provide Red Rift, Crystal Corruption, Shrine Ruins, and Structure Defense with authored corruption thresholds, success/failure deltas, discovery radii, and `150-180s` regional cooldowns. Exploration enemies are independent from linear-zone budgets and are retired through the shared GAS death path on completion/expiration. Full Editor build, seven Region Event tests, Landscape integrity, spatial-region, navigation-invoker, and corruption-state tests pass. PIE Structure Defense spawned four 3-enemy waves and retired all 12 enemies at completion.
@@ -221,6 +223,7 @@ Last synced: 2026-05-23T00:00:00
 
 ## Open Tasks
 
+- Complete the read-only cross-role review for `EDEN-20260718-001`, choose the graduation Vertical Slice and cut line, then implement the first P0 unit through the main thread as a separately verified functional commit.
 - PIE-check boss target marker VFX in a multi-player/session setup: first target acquisition and target swaps should flash on the selected player's torso only.
 - PIE-check Crystal Seraph before/after target acquisition and after tactical teleports; `[Patrol] Fallback move location selected` must not spam and `[Leash] Return home finished` must remain reachable.
 - PIE-check Crystal Seraph's visible fall, grounded hit gate, and return-to-hover timing; tune `GroggyDuration` / `FinalPhaseGroggyDuration` on the boss Blueprint if needed.
