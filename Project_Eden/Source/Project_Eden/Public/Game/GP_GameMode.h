@@ -175,6 +175,14 @@ private:
 	void FinishRun(bool bVictory);
 	void ReturnToLobby();
 
+#if !UE_BUILD_SHIPPING
+	// End-to-end QA continues past seamless travel until the authoritative three-player gameplay state is usable.
+	void BeginThreePlayerGameplaySmokeProbe();
+	void TryThreePlayerGameplaySmokeProbe();
+	FTimerHandle ThreePlayerGameplaySmokeTimerHandle;
+	int32 ThreePlayerGameplaySmokeAttempts = 0;
+#endif
+
 	UFUNCTION()
 	void HandlePlayerEnteredZone(AGP_EnemySpawnVolume* Zone);
 
