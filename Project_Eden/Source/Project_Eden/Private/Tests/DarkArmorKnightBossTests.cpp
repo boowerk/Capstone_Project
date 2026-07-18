@@ -1,5 +1,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
+#include "AbilitySystem/GP_AttributeSet.h"
+#include "AbilitySystemComponent.h"
 #include "AI/Tasks/BossAttackPatternSelector.h"
 #include "Actors/GP_DarkKnightChargeActor.h"
 #include "Actors/GP_DarkKnightGroundCrackActor.h"
@@ -280,6 +282,96 @@ bool FDarkArmorKnightChargeMovementFallbackTest::RunTest(const FString& Paramete
 	TestTrue(
 		TEXT("Fallback charge remains active before reaching its target or cap"),
 		IsValid(Charge) && !Charge->IsActorBeingDestroyed());
+
+	TestWorld->DestroyWorld(false);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FDarkArmorKnightGroggyInterruptTest,
+	"ProjectEden.Combat.DarkArmorKnight.GroggyInterruptsPatterns",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FDarkArmorKnightGroggyInterruptTest::RunTest(const FString& Parameters)
+{
+	UWorld* TestWorld = UWorld::CreateWorld(EWorldType::Game, false);
+	if (!TestNotNull(TEXT("Created groggy-interrupt test world"), TestWorld))
+	{
+		return false;
+	}
+
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AGP_DarkArmorKnightBossCharacter* Boss = TestWorld->SpawnActor<AGP_DarkArmorKnightBossCharacter>(
+		FVector::ZeroVector,
+		FRotator::ZeroRotator,
+		Params);
+	ATargetPoint* Target = TestWorld->SpawnActor<ATargetPoint>(
+		FVector(1400.0f, 0.0f, 0.0f),
+		FRotator::ZeroRotator,
+		Params);
+	if (!TestNotNull(TEXT("Spawned Dark Knight for groggy interrupt"), Boss)
+		|| !TestNotNull(TEXT("Spawned groggy interrupt target"), Target))
+	{
+		TestWorld->DestroyWorld(false);
+		return false;
+	}
+
+	UGP_DarkArmorKnightStateComponent* State = Boss->GetDarkKnightStateComponent();
+	UAbilitySystemComponent* ASC = Boss->GetAbilitySystemComponent();
+	UGP_AttributeSet* Attributes =
+		const_cast<UGP_AttributeSet*>(Cast<UGP_AttributeSet>(Boss->GetAttributeSet()));
+	if (!TestNotNull(TEXT("Dark Knight owns its state component"), State)
+		|| !TestNotNull(TEXT("Dark Knight owns its ability system"), ASC)
+		|| !TestNotNull(TEXT("Dark Knight owns its attribute set"), Attributes))
+	{
+		TestWorld->DestroyWorld(false);
+		return false;
+	}
+	// A transient world skips the normal component initialization pass, so
+	// register the existing subobject explicitly before setting phase health.
+	if (!ASC->GetSpawnedAttributes().Contains(Attributes))
+	{
+		ASC->AddAttributeSetSubobject(Attributes);
+	}
+	ASC->InitAbilityActorInfo(Boss, Boss);
+	ASC->SetNumericAttributeBase(UGP_AttributeSet::GetMaxHealthAttribute(), 100.0f);
+	ASC->SetNumericAttributeBase(UGP_AttributeSet::GetHealthAttribute(), 20.0f);
+	State->InitializeDarkKnightState(Boss);
+	TestEqual(TEXT("Test boss enters phase three"), Boss->GetDarkKnightPhase(), 3);
+
+	// Prove the phase-three follow-up can be scheduled before testing its interrupt gate.
+	Boss->HandleChargeFinished(false, Target);
+	TestEqual(TEXT("Healthy phase-three charge schedules one follow-up"), Boss->PatternTimerHandles.Num(), 1);
+	Boss->ClearPatternTimers();
+
+	TestTrue(TEXT("Heavy attack schedules a delayed impact"), Boss->ExecuteHeavyAttack(Target));
+	const FTimerHandle PendingImpactHandle = Boss->PatternTimerHandles.Last();
+	TestTrue(
+		TEXT("Heavy impact timer exists before groggy"),
+		TestWorld->GetTimerManager().TimerExists(PendingImpactHandle));
+	TestTrue(TEXT("Charge starts before guard break"), Boss->ExecuteChargeAttack(Target));
+	AGP_DarkKnightChargeActor* SpawnedCharge = Boss->ActiveChargeActor.Get();
+	TestNotNull(TEXT("Boss tracks the active charge coordinator"), SpawnedCharge);
+
+	State->EnterGroggy(8.0f);
+	// BeginPlay delegate binding is intentionally skipped in this narrow
+	// lifecycle fixture; invoke the same authoritative callback directly.
+	Boss->HandleGroggyChanged(true);
+
+	TestTrue(TEXT("Groggy clears all boss-owned pattern timers"), Boss->PatternTimerHandles.IsEmpty());
+	TestFalse(
+		TEXT("Groggy removes the pending heavy impact timer"),
+		TestWorld->GetTimerManager().TimerExists(PendingImpactHandle));
+	TestTrue(
+		TEXT("Groggy destroys the active charge coordinator"),
+		!IsValid(SpawnedCharge) || SpawnedCharge->IsActorBeingDestroyed());
+	TestFalse(TEXT("Boss releases its active charge reference"), Boss->ActiveChargeActor.IsValid());
+
+	Boss->HandleChargeFinished(false, Target);
+	TestTrue(
+		TEXT("Groggy phase three cannot schedule a charge follow-up"),
+		Boss->PatternTimerHandles.IsEmpty());
 
 	TestWorld->DestroyWorld(false);
 	return true;

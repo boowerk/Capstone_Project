@@ -86,12 +86,19 @@ protected:
 	virtual void HandlePostDamageTaken(AActor* InstigatorActor, float DamageAmount, FGameplayTag ElementTag) override;
 
 private:
+#if WITH_DEV_AUTOMATION_TESTS
+	// Exposes lifecycle state only to the deterministic groggy interrupt test.
+	friend class FDarkArmorKnightGroggyInterruptTest;
+#endif
+
 	void GrantDarkKnightAbilities();
 	AActor* ResolvePatternTarget(AActor* ExplicitTarget) const;
 	TArray<AActor*> GatherTargetsInCone(float Range, float HalfAngleDegrees) const;
 	void ApplyConeDamage(float Range, float HalfAngleDegrees, float DamageCoefficient, float KnockbackStrength = 0.0f);
 	void RecordPatternUse(const FGameplayTag& PatternTag);
 	float ResolvePatternCooldown(const FGameplayTag& PatternTag) const;
+	void ClearPatternTimers();
+	bool IsPatternInterrupted() const;
 	void SpawnDarkWaveVolley(AActor* TargetActor, int32 ProjectileCount);
 	void SpawnGroundCracks(AActor* TargetActor);
 	bool ExecutePatternNow(FGameplayTag PatternTag, AActor* TargetActor);
@@ -189,4 +196,5 @@ private:
 	TMap<FGameplayTag, float> LastPatternUseTimes;
 	TArray<FTimerHandle> PatternTimerHandles;
 	TWeakObjectPtr<AActor> PendingCounterTarget;
+	TWeakObjectPtr<AGP_DarkKnightChargeActor> ActiveChargeActor;
 };
