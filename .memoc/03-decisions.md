@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-18T19:25:11+09:00
+updated: 2026-07-19T13:26:17+09:00
 status: active
 tags:
   - memoc
@@ -15,7 +15,13 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 
 ## Decision Log
 
+### 2026-07-19
+- Keep the V2 runtime contract owner-relative: decode canonical Pair `(A,B,OwnerIsB)`, reorder the states into Owner/Other, and blend `Owner -> Other` with unsigned Mix `0..0.5`. Canonical-B weight is validation-only. The state-texture A lookup must use canonical A directly, not the owner-valued `RegionID` output; otherwise one side becomes `B -> B` and produces a hard seam.
+- Finish the Landscape-first rollout only on `MI_RegionLandscape_GameMap2`: save `UseRegionBlendV2=true`, PairV2/BlendV2, and the existing slope overlay; leave PCG and other MIs on legacy behavior. Treat the remaining sub-meter true triple-junction fallback and steep outer-wall projection stretch as separate follow-up issues rather than increasing ID texture resolution again.
+
 ### 2026-07-18
+- Split the remaining Landscape visual defects into two independent fixes: use a GameMap2-only slope/cliff overlay for outer steep-wall XY projection stretch, and use canonical PairV2 `(A,B,OwnerIsB)` plus unsigned BlendV2 for long pair-switch stripes and junction discontinuities. Keep both features behind default-false static switches and leave PCG/other MIs unchanged. Two-ID data may retain a tiny hard fallback at true triple junctions.
+- Supersede the topology-preserving 1024 seam repair as the final Landscape fix: reconstruct the current authoritative Region labels through per-label SDFs at 4096, derive the second-nearest label, and rebuild Pair and Edge together. Never regenerate from the stale seed list or nearest-upscale the 1024 image. Disable auto Virtual Texture on both outputs; keep Pair Nearest/NoMip and Edge Bilinear/mipped.
 - Repair Landscape Edge seams without changing topology: preserve the filtered source mask, overlay a 2px fully saturated chamfer core with falloff to 8px from every R ownership transition, and keep Pair Nearest plus `BoundaryAlpha=Edge*0.5`.
 - Roll out smooth RegionID boundaries to Landscape first: keep `M_StateMask.UseSeparateEdgeTexture` default false, enable it only on `MI_RegionLandscape_GameMap2`, and leave PCG on the legacy RegionID texture until a separate migration is requested.
 - Runtime vegetation uses hierarchical grids with `GRID128` for the graph default and the current shared grass node at `GRID32`; `L_GameMap1`'s earlier 7,135-instance verification was performed before that authored grass change, at `GRID64`. Keep engine-default 2x generation radii, cleanup multiplier `1.5`, and bounded Surface Samplers.

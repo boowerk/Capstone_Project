@@ -2,17 +2,21 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-07-18T19:25:11+09:00
+updated: 2026-07-19T13:26:17+09:00
 status: active
-tags: [memoc, memoc/state]
+tags:
+  - memoc
+  - memoc/state
+created: 2026-07-18T13:21:02
 ---
 # Session Summary
 
 ## Status
-- Long Landscape region stairs are fixed by overlaying an R-seam repair mask onto the preserved smooth Edge. Pair, material graph, map, and PCG wiring are unchanged.
+- Landscape Region V2 completed for the GameMap2 Landscape MI; PCG/other MIs remain legacy. No commit.
 
 ## Verified
-- All 7,443 R transitions are `255/255`; calculated discontinuity fell from 41.8% to 0. Edge asset is VALID and PIE target errors are 0. Worst old boundary is visually continuous.
+- Canonical-A state lookup now uses `Round_0`, not owner `RegionID`; graph export confirms it and 132/132 shaders pass. Long seam/junction are continuous. V2+slope are on/saved; map reloaded clean.
+- External V2 generator and 4096 Pair/Blend pass all 15 checks (`seam delta=0`).
 
-## Handoff
-- Edge fix is committed; branch is two commits ahead. A thin dotted boundary line remains as separate follow-up. External generator is non-Git; script SHA-256 starts `23E357A0`.
+## Resume
+- Optional: inspect outer-wall projection stretch separately; true triple fallback is ~0.52m.

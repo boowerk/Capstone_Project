@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-18T19:25:11+09:00
+updated: 2026-07-19T13:26:17+09:00
 status: active
 tags:
   - memoc
@@ -11,7 +11,7 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-07-18T19:25:11+09:00
+Last synced: 2026-07-19T13:26:17+09:00
 
 ## PCG Vegetation Runtime Handoff
 
@@ -22,10 +22,15 @@ Last synced: 2026-07-18T19:25:11+09:00
 
 ## Landscape Region Boundary Blend Handoff
 
+- 2026-07-19 completed rollout: the long black/stepped seam was a shader graph contract bug, not texture resolution or filtering. `RegionID` had been changed to the authoritative owner, but the canonical-A state lookup still read that output. `MF_RS_GetRegionBlendData.MaterialExpressionAdd_0.A` now connects directly to `MaterialExpressionRound_0` and carries `CODEX_REGION_V2_CANONICAL_A_STATE_LOOKUP`. Re-exported graph text proves the saved edge; logs show 132/132 shaders completed without related errors.
+- V2 assets remain under `/Game/RegionSystem/Textures/RegionID/GameMap1_Smoothed/V2`: PairV2 is Nearest/NoMip/Clamp/non-VT and BlendV2 is Bilinear/NoMip/Clamp/non-VT. Runtime contract is owner-relative: decode Pair `(A=min(P,N), B=max(P,N), OwnerIsB)`, reorder canonical states into Owner/Other, then blend `Owner -> Other` with `Mix=BlendByte/256` (`0..0.5`). Canonical-B weight is used only for continuity validation.
+- `MI_RegionLandscape_GameMap2` is saved with `UseRegionBlendV2=true`, the two V2 textures, and `UseSlopeCliffOverlay=true` (`Start=.30`, `End=.60`, `WorldSizeUU=800`). Lit/Unlit close checks at World `(30244,-9322)` and a complex junction show the former long seam is gone. `L_LandscapeMap` was reloaded without saving and has no dirty marker. PCG and other MIs stay legacy.
+- Generator/validation live in `Saved/CodexScratch/RegionPairV2Build` and were copied/run in external `VoronoIDTextureGen/GameMap1_RegionID_Smoothed/V2`. All 15 checks pass; deterministic hashes are PairV2 `748b2e8a...` and BlendV2 `5e1a3c97...`; 15 connected regions and 32 adjacencies are preserved, and ordinary seam derived-weight delta is `0.0`. A genuine two-ID triple junction can still leave only a sub-meter (~0.52m) local fallback. Steep outer-wall XY projection stretching is a separate slope/geometry issue. No commit was made.
+
 - `L_LandscapeMap` and `MI_RegionLandscape_GameMap2` use the new Pair-ID + smooth Edge texture path. `BP_RegionStateManager.ApplyLandscapeMaterial` now pushes `RegionEdgeTexture` as well as `IdTexture`.
 - `M_StateMask` retains the exact legacy branch behind default-false `UseSeparateEdgeTexture`; the other five material instances remain off. The new blend function is `MF_RS_GetRegionBlendData`.
 - PCG is intentionally not migrated: `PCG_Vegetation_Global` still overrides the legacy `T_GameMap1_RegionID`, has no Edge override, and its file hash stayed `45FC9A77...C3BA19`.
-- Long ownership stairs are fixed. The external non-Git generator (`generate_from_existing_region_id.py`, SHA-256 `23E357A0...`) overlays a 2px saturated chamfer core and 8px falloff on the preserved source Edge. All 7,443 R transitions are 255/255 with calculated discontinuity 0; Edge PNG SHA-256 is `A97DF949...`. The Unreal Edge texture was reimported without changing settings, validates `VALID`, and PIE target errors are zero. Direct inspection at the former 148/255 worst boundary shows continuous region material; a thin dotted boundary line remains as a separate follow-up, along with single-neighbor triple junction and distant-mip polish.
+- Remaining 1m ownership stairs were caused by the preserved 1024 R contour, not Edge saturation. The external non-Git generator (`generate_from_existing_region_id.py`, SHA-256 `025D9A5A...`) now performs source-label SDF/top-2 reconstruction at 4096. Pair PNG SHA is `AD6DF2BE...`; Edge is `32B4F811...`. Validation preserved 15 connected regions, 32 adjacencies, aligned source samples, and area within 0.000071526pp; grid resolution is 26.147UU/texel. Both Unreal textures are 4096 and non-VT; Pair remains Nearest/NoMip and Edge remains Bilinear/mipped. Material recompile and PIE with Regions 0/1 forced to different states passed. Large V corners are real authored polygon vertices. Current repo changes are only the two texture uassets and are uncommitted.
 
 ## Region Event System Handoff
 
