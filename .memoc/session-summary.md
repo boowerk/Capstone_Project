@@ -2,7 +2,7 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-07-19T13:26:17+09:00
+updated: 2026-07-19T19:08:00+09:00
 status: active
 tags:
   - memoc
@@ -12,11 +12,10 @@ created: 2026-07-18T13:21:02
 # Session Summary
 
 ## Status
-- Landscape Region V2 completed for the GameMap2 Landscape MI; PCG/other MIs remain legacy. No commit.
+- Region V2.2 direct top-4 blend is ON only for GameMap2. PCG/hard ID/map/other MIs are unchanged; no commit.
 
 ## Verified
-- Canonical-A state lookup now uses `Round_0`, not owner `RegionID`; graph export confirms it and 132/132 shaders pass. Long seam/junction are continuous. V2+slope are on/saved; map reloaded clean.
-- External V2 generator and 4096 Pair/Blend pass all 15 checks (`seam delta=0`).
+- Deterministic G8x2 IDs + RGBA8 weights pass 32/32 checks. UE formats pass; 206/206 shaders and zero material errors. OFF restores the V2.1 white network; ON removes it; four-way has no white/black seam.
 
 ## Resume
-- Optional: inspect outer-wall projection stretch separately; true triple fallback is ~0.52m.
+- Roll back with `UseRegionVisualBlendV22=false`. Farm stripes/color contrast and outer-wall stretch remain art/projection work. Backup: `Saved/CodexBackups/RegionVisualV22PreApply`.

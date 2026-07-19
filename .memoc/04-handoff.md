@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-19T13:26:17+09:00
+updated: 2026-07-19T19:08:00+09:00
 status: active
 tags:
   - memoc
@@ -11,7 +11,7 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-07-19T13:26:17+09:00
+Last synced: 2026-07-19T19:08:00+09:00
 
 ## PCG Vegetation Runtime Handoff
 
@@ -22,10 +22,19 @@ Last synced: 2026-07-19T13:26:17+09:00
 
 ## Landscape Region Boundary Blend Handoff
 
+- V2.2 is the current GameMap2 Landscape path. `M_StateMask.UseRegionVisualBlendV22` defaults false; only `MI_RegionLandscape_GameMap2` saves true. Disable it for exact V2.1, then disable `UseRegionTransitionV21` for V2. PCG and the other five material instances remain unchanged/default false.
+- New textures under `GameMap1_Smoothed/V2` are `T_GameMap1_RegionVisualIDs01V22` and `IDs23V22` (G8, Nearest, NoMip, Clamp, non-VT) plus `T_GameMap1_RegionVisualWeightsV22` (BGRA8/B8G8R8A8, Bilinear, NoMip, Clamp, non-VT). IDs are packed as low/high nibbles; no G16 or master precision override is used.
+- Generator, PNGs, and report are in `Saved/CodexScratch/RegionVisualSlotsV22` and mirrored byte-identically to external `VoronoIDTextureGen/GameMap1_RegionID_Smoothed/V2.2`; import/apply/inspection helpers are in `Saved/Codex`. Deterministic hashes: IDs01 `5FAD10BB...E0B7`, IDs23 `7A0E2CBF...0913`, weights `F9AF6845...BF12C`, report `97346545...D6B5`. All 32 checks pass, including exact float16 byte decode, preserved 15-region topology, zero invalid active IDs/transition-halo violations/same-slot overlaps, exact byte weight sums, and max four active regions.
+- Unreal post-audit: 294 expressions, 182 V2.2 markers, complete switch present, `MFPM_DEFAULT`, all three target textures resolved, and only GameMap2 true among six child MIs. Shader run completed 206/206 with no material/shader errors. OFF/ON aerial comparison restores/removes the old white network; close inspection of the balanced four-way junction shows direct material mixing without the white neutral line or black crack.
+- `L_LandscapeMap`, `T_GameMap1_RegionID`, legacy Pair, and PairV2 hashes stayed unchanged. Current farm stripes, large state color differences, road/PCG overlays, and steep outer-wall stretching are separate content/projection issues rather than V2.2 topology failures. A pre-apply binary backup exists in `Saved/CodexBackups/RegionVisualV22PreApply`.
+- V2.1 now masks the residual pair-switch ridge and true multi-way junction failure. `M_StateMask` has one default-false `UseRegionTransitionV21` parameter feeding two static switches: new-vs-V2 Blend texture and neutral-vs-existing material attributes. Only `MI_RegionLandscape_GameMap2` saves V2.1=true; V2 and SeparateEdge remain true prerequisites. Disable that one bool for an immediate exact V2 rollback. PCG and other MIs were not touched.
+- New assets are `MF_RS_TransitionNeutral`, `T_GameMap1_RegionBlendV21`, and `T_GameMap1_RegionTransitionV21` under the existing RegionSystem paths. The neutral function exposes unique BaseColor/Normal/ORM texture parameters. The auxiliary RG mask is Masks/Bilinear/NoMip/Clamp/non-VT; BlendV21 is Grayscale/Bilinear/NoMip/Clamp/non-VT. Both are 4096.
+- Deterministic generation/validation is in `Saved/CodexScratch/RegionTransitionV21` and copied to external `VoronoIDTextureGen/GameMap1_RegionID_Smoothed/V2`. BlendV21 uses a 2-texel/~0.523m exact seam core and 24 texels/6.275m support per side (12.551m total), covers 6.634% versus old 33.742%, and gives ordinary same-pair seam canonical delta `0.0`. Hashes: Blend `55c337e9...90d`, RG mask `59c1bbeb...71d`.
+- Saved `.copy` graph export confirms the shared bool feeds both V2.1 switches, R/G feed `Max -> Saturate -> NeutralBlend.Alpha`, the neutral result feeds both slope paths, and WPO stays on A. Lit/Unlit OFF/ON checks at pair-switch `(3713,-5204)` and junction `(5033,-4850)` show the black one-pixel stair line disappears and intersections become continuous. Shader compilation completed 165/165 with zero material errors. The current neutral dirt is intentionally provisional and appears bright/path-like, especially across the broad junction feather; tune/replace its texture parameters or regenerate narrower mask art later. Do not interpret that art caveat as a seam failure. `L_LandscapeMap` was not saved or modified.
 - 2026-07-19 completed rollout: the long black/stepped seam was a shader graph contract bug, not texture resolution or filtering. `RegionID` had been changed to the authoritative owner, but the canonical-A state lookup still read that output. `MF_RS_GetRegionBlendData.MaterialExpressionAdd_0.A` now connects directly to `MaterialExpressionRound_0` and carries `CODEX_REGION_V2_CANONICAL_A_STATE_LOOKUP`. Re-exported graph text proves the saved edge; logs show 132/132 shaders completed without related errors.
 - V2 assets remain under `/Game/RegionSystem/Textures/RegionID/GameMap1_Smoothed/V2`: PairV2 is Nearest/NoMip/Clamp/non-VT and BlendV2 is Bilinear/NoMip/Clamp/non-VT. Runtime contract is owner-relative: decode Pair `(A=min(P,N), B=max(P,N), OwnerIsB)`, reorder canonical states into Owner/Other, then blend `Owner -> Other` with `Mix=BlendByte/256` (`0..0.5`). Canonical-B weight is used only for continuity validation.
 - `MI_RegionLandscape_GameMap2` is saved with `UseRegionBlendV2=true`, the two V2 textures, and `UseSlopeCliffOverlay=true` (`Start=.30`, `End=.60`, `WorldSizeUU=800`). Lit/Unlit close checks at World `(30244,-9322)` and a complex junction show the former long seam is gone. `L_LandscapeMap` was reloaded without saving and has no dirty marker. PCG and other MIs stay legacy.
-- Generator/validation live in `Saved/CodexScratch/RegionPairV2Build` and were copied/run in external `VoronoIDTextureGen/GameMap1_RegionID_Smoothed/V2`. All 15 checks pass; deterministic hashes are PairV2 `748b2e8a...` and BlendV2 `5e1a3c97...`; 15 connected regions and 32 adjacencies are preserved, and ordinary seam derived-weight delta is `0.0`. A genuine two-ID triple junction can still leave only a sub-meter (~0.52m) local fallback. Steep outer-wall XY projection stretching is a separate slope/geometry issue. No commit was made.
+- Generator/validation live in `Saved/CodexScratch/RegionPairV2Build` and were copied/run in external `VoronoIDTextureGen/GameMap1_RegionID_Smoothed/V2`. All 15 checks pass; deterministic hashes are PairV2 `748b2e8a...` and BlendV2 `5e1a3c97...`; 15 connected regions and 32 adjacencies are preserved, and ordinary seam derived-weight delta is `0.0`. Baseline V2 can retain a sub-meter (~0.52m) true-junction fallback; V2.1 now covers it with the neutral junction mask. Steep outer-wall XY projection stretching is a separate slope/geometry issue. No commit was made.
 
 - `L_LandscapeMap` and `MI_RegionLandscape_GameMap2` use the new Pair-ID + smooth Edge texture path. `BP_RegionStateManager.ApplyLandscapeMaterial` now pushes `RegionEdgeTexture` as well as `IdTexture`.
 - `M_StateMask` retains the exact legacy branch behind default-false `UseSeparateEdgeTexture`; the other five material instances remain off. The new blend function is `MF_RS_GetRegionBlendData`.

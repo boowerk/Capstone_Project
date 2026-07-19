@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-19T13:26:17+09:00
+updated: 2026-07-19T19:08:00+09:00
 status: active
 tags:
   - memoc
@@ -11,11 +11,11 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-07-19T13:26:17+09:00
+Last synced: 2026-07-19T19:08:00+09:00
 
 ## Current Status
 
-- Landscape Region V2 is active only on `MI_RegionLandscape_GameMap2`; PCG and the other material instances remain on the legacy RegionID path. `MF_RS_GetRegionBlendData` now looks up canonical-A state directly (`Round_0 -> Add_0.A`) before reordering A/B into Owner/Other, eliminating the long owner-boundary discontinuity. The saved MI has `UseRegionBlendV2=true`, PairV2/BlendV2 assigned, and `UseSlopeCliffOverlay=true` (`Start=.30`, `End=.60`, `WorldSizeUU=800`). Lit/Unlit checks at the former long seam and the complex junction show no persistent black/stepped line; serialized graph export and 132/132 shader jobs pass. `L_LandscapeMap` was reloaded without saving and is clean. The deterministic 4096 generator and outputs are also copied to external `GameMap1_RegionID_Smoothed/V2`; all 15 checks pass. A true two-ID triple junction can still retain a sub-meter (~0.52m) local fallback, and steep outer-wall projection stretch remains a separate slope/geometry issue.
+- Landscape Region V2.2 is active only on `MI_RegionLandscape_GameMap2`. `UseRegionVisualBlendV22` directly blends up to four neighboring region states with visual-only fixed-slot weights, eliminating the V2.1 white neutral-path network while leaving hard `RegionID`, PCG, map topology, and all other MIs unchanged. Assets are two point-sampled G8 nibble-ID textures plus one bilinear uncompressed RGBA8 weight texture at 4096; the deterministic generator/report live in `Saved/CodexScratch/RegionVisualSlotsV22` and are mirrored to external `VoronoIDTextureGen/GameMap1_RegionID_Smoothed/V2.2`. All safety checks pass: 15 regions/topology unchanged, sum=255, active-ID mismatch=0, transition-halo violations=0, same-slot overlap=0, max active=4, float16 G8 decode mismatch=0. Shader compilation completed 206/206 with zero material errors. Master precision remains `MFPM_DEFAULT`; the default-false V2.2 switch returns exact V2.1, and V2.1 can still return V2. Only GameMap2 resolves V2.2=true among six instances. `L_LandscapeMap` and gameplay/PCG ID textures remain byte-identical; strong farm stripes/color contrast and steep outer-wall projection stretch remain material/geometry art follow-ups.
 
 - Runtime vegetation uses the shared hierarchical `PCG_Vegetation_Global` graph with default `GRID128` (128m), current grass `GRID32` (32m), cleanup multiplier `1.5`, and bounded Surface Samplers. `L_GameMap1` has map-sized PCG bounds (`51200,51200,5000`) and its Landscape Cache is `SerializeOnlyAtCook`; its earlier `GRID64` PIE pass generated 7,135 grass instances and followed a 400m pawn move without PCG errors. The original blocker there was `NeverSerialize`.
 - `L_LandscapeMap` runtime vegetation is also working. Its `BP_VegetationSpawner` is Activated/GenerateAtRuntime/Partitioned, the Box extent is `64000,64000,8000`, and `PCGWorldActor` uses `SerializeOnlyAtCook` with 289 cache entries. The map-specific blocker was the inherited `32,32,32cm` Box, which reduced the sampling area to almost zero. PIE generated 1,911 grass instances at the start and 1,803 after a 400m pawn move; 50 old runtime cells pooled. No Landscape Cache or `No surfaces found` error occurred.

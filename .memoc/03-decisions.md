@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-19T13:26:17+09:00
+updated: 2026-07-19T19:08:00+09:00
 status: active
 tags:
   - memoc
@@ -16,6 +16,10 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 ## Decision Log
 
 ### 2026-07-19
+- Make V2.2 the GameMap2 Landscape presentation path: keep the authoritative hard RegionID for gameplay/PCG, but visually blend up to four neighboring region states with fixed slots and normalized RGBA weights. Keep `UseRegionVisualBlendV22` default false in `M_StateMask`, enable it only on `MI_RegionLandscape_GameMap2`, and preserve V2.1/V2 as nested rollback paths.
+- Store four visual IDs in two point-sampled G8 textures (`id0|id1<<4`, `id2|id3<<4`) instead of one G16 texture. G8 normalized samples decode all 256 bytes exactly through float16; G16 did not. Accept one extra sampler to avoid changing the heavy shared master's global precision mode, and keep the RGBA8 weight texture bilinear/uncompressed for validation.
+- Resolve the remaining pair-switch and true-junction seams with Landscape-only V2.1: use an SDF-derived continuous Blend mask plus an auxiliary `R=pair-switch/G=junction` mask, and cover ambiguous cores with one replaceable neutral dirt/gravel surface. Keep its exact full-strength core near one source adjacency (~2 target texels), with smooth feathering outside it; do not increase RegionID resolution again.
+- Gate both V2.1 texture selection and neutral-attribute blending behind the single default-false static bool `UseRegionTransitionV21`. Enable it only on `MI_RegionLandscape_GameMap2`, preserve V2/SeparateEdge as prerequisites, and leave PCG/other MIs pruned on their previous paths. Treat the current bright neutral dirt appearance as validation art that can be changed through unique texture parameters without rebuilding the region materials.
 - Keep the V2 runtime contract owner-relative: decode canonical Pair `(A,B,OwnerIsB)`, reorder the states into Owner/Other, and blend `Owner -> Other` with unsigned Mix `0..0.5`. Canonical-B weight is validation-only. The state-texture A lookup must use canonical A directly, not the owner-valued `RegionID` output; otherwise one side becomes `B -> B` and produces a hard seam.
 - Finish the Landscape-first rollout only on `MI_RegionLandscape_GameMap2`: save `UseRegionBlendV2=true`, PairV2/BlendV2, and the existing slope overlay; leave PCG and other MIs on legacy behavior. Treat the remaining sub-meter true triple-junction fallback and steep outer-wall projection stretch as separate follow-up issues rather than increasing ID texture resolution again.
 
