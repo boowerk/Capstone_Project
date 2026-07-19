@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-19T19:08:00+09:00
+updated: 2026-07-19T22:20:00+09:00
 status: active
 tags:
   - memoc
@@ -11,7 +11,7 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-07-19T19:08:00+09:00
+Last synced: 2026-07-19T22:20:00+09:00
 
 ## PCG Vegetation Runtime Handoff
 
@@ -24,9 +24,10 @@ Last synced: 2026-07-19T19:08:00+09:00
 
 - V2.2 is the current GameMap2 Landscape path. `M_StateMask.UseRegionVisualBlendV22` defaults false; only `MI_RegionLandscape_GameMap2` saves true. Disable it for exact V2.1, then disable `UseRegionTransitionV21` for V2. PCG and the other five material instances remain unchanged/default false.
 - New textures under `GameMap1_Smoothed/V2` are `T_GameMap1_RegionVisualIDs01V22` and `IDs23V22` (G8, Nearest, NoMip, Clamp, non-VT) plus `T_GameMap1_RegionVisualWeightsV22` (BGRA8/B8G8R8A8, Bilinear, NoMip, Clamp, non-VT). IDs are packed as low/high nibbles; no G16 or master precision override is used.
-- Generator, PNGs, and report are in `Saved/CodexScratch/RegionVisualSlotsV22` and mirrored byte-identically to external `VoronoIDTextureGen/GameMap1_RegionID_Smoothed/V2.2`; import/apply/inspection helpers are in `Saved/Codex`. Deterministic hashes: IDs01 `5FAD10BB...E0B7`, IDs23 `7A0E2CBF...0913`, weights `F9AF6845...BF12C`, report `97346545...D6B5`. All 32 checks pass, including exact float16 byte decode, preserved 15-region topology, zero invalid active IDs/transition-halo violations/same-slot overlaps, exact byte weight sums, and max four active regions.
-- Unreal post-audit: 294 expressions, 182 V2.2 markers, complete switch present, `MFPM_DEFAULT`, all three target textures resolved, and only GameMap2 true among six child MIs. Shader run completed 206/206 with no material/shader errors. OFF/ON aerial comparison restores/removes the old white network; close inspection of the balanced four-way junction shows direct material mixing without the white neutral line or black crack.
-- `L_LandscapeMap`, `T_GameMap1_RegionID`, legacy Pair, and PairV2 hashes stayed unchanged. Current farm stripes, large state color differences, road/PCG overlays, and steep outer-wall stretching are separate content/projection issues rather than V2.2 topology failures. A pre-apply binary backup exists in `Saved/CodexBackups/RegionVisualV22PreApply`.
+- The authoritative generator, PNGs, and report live in `Project_Eden/ArtSource/RegionVisualSlotsV22`; byte-identical mirrors are under `Saved/CodexScratch/RegionVisualSlotsV22` and external `VoronoIDTextureGen/GameMap1_RegionID_Smoothed/V2.2`. The generator uses seed 22037 with independent SHA-derived seeds per boundary pair/component, 1D PCHIP displacement normal to each boundary, coarse 2.5m at 42-58m spacing, 0.65m detail at 22-32m, a 3.2m cap, 15m endpoint fades, and fixed junction/perimeter cores. It warps 31 of 32 boundaries; the approximately 1.08m Region 1-13 edge stays fixed. IDs01 `5FAD10BB...E0B7` and IDs23 `7A0E2CBF...0913` are unchanged; Weight PNG is `4C6A05A9...E75A42E`.
+- Validation passes 42/42: 87,666 changed labels (0.52253%), max commanded/observed displacement 2.996m/2.828m, RMS 1.191m, 18 junctions protected with zero anchor changes, zero boundary-halo/proposal/multiple-claim/ID-transition violations, maximum region-area delta 0.006885%, and unchanged 15 components/32 adjacencies. Offline old/new overlays show independent non-periodic waviness without the shared grid. Computer Use reimported/saved `T_GameMap1_RegionVisualWeightsV22.uasset`; final size/hash are 639,888 bytes and `E851B002...679B73`. The final texture is regular non-VT BGRA8, Bilinear, NoMipmaps/one mip, Clamp, sRGB off; the post-conversion log shows `BGRA8` rather than `BGRA8 VT` and no subsequent sampler error.
+- Opening the corrected texture had already cached a failed V2.2 material permutation from its temporary VT state, leaving the Landscape on the default gray material. In `MI_RegionLandscape_GameMap2`, toggle `UseRegionVisualBlendV22` false then true to force recompilation. This was done through Computer Use: 13/13 shaders completed, the preview/map recovered, and the MI was saved with the switch true (29,173 bytes, hash `9673F631...F049B`). No sampler error occurred after the recompile. The production map file remains unchanged; do not save its currently dirty editor tab without first reviewing unrelated user changes.
+- `L_LandscapeMap`, hard `T_GameMap1_RegionID`, StateRT, PCG, legacy Pair, and PairV2 were not modified by this warp. Current farm stripes, large state color differences, repeated four-state material art, road/PCG overlays, and steep outer-wall stretching are separate content/projection issues rather than V2.2 topology failures. A pre-apply binary backup exists in `Saved/CodexBackups/RegionVisualV22PreApply`.
 - V2.1 now masks the residual pair-switch ridge and true multi-way junction failure. `M_StateMask` has one default-false `UseRegionTransitionV21` parameter feeding two static switches: new-vs-V2 Blend texture and neutral-vs-existing material attributes. Only `MI_RegionLandscape_GameMap2` saves V2.1=true; V2 and SeparateEdge remain true prerequisites. Disable that one bool for an immediate exact V2 rollback. PCG and other MIs were not touched.
 - New assets are `MF_RS_TransitionNeutral`, `T_GameMap1_RegionBlendV21`, and `T_GameMap1_RegionTransitionV21` under the existing RegionSystem paths. The neutral function exposes unique BaseColor/Normal/ORM texture parameters. The auxiliary RG mask is Masks/Bilinear/NoMip/Clamp/non-VT; BlendV21 is Grayscale/Bilinear/NoMip/Clamp/non-VT. Both are 4096.
 - Deterministic generation/validation is in `Saved/CodexScratch/RegionTransitionV21` and copied to external `VoronoIDTextureGen/GameMap1_RegionID_Smoothed/V2`. BlendV21 uses a 2-texel/~0.523m exact seam core and 24 texels/6.275m support per side (12.551m total), covers 6.634% versus old 33.742%, and gives ordinary same-pair seam canonical delta `0.0`. Hashes: Blend `55c337e9...90d`, RG mask `59c1bbeb...71d`.

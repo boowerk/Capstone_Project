@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-19T19:08:00+09:00
+updated: 2026-07-19T22:20:00+09:00
 status: active
 tags:
   - memoc
@@ -11,11 +11,12 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-07-19T19:08:00+09:00
+Last synced: 2026-07-19T22:20:00+09:00
 
 ## Current Status
 
-- Landscape Region V2.2 is active only on `MI_RegionLandscape_GameMap2`. `UseRegionVisualBlendV22` directly blends up to four neighboring region states with visual-only fixed-slot weights, eliminating the V2.1 white neutral-path network while leaving hard `RegionID`, PCG, map topology, and all other MIs unchanged. Assets are two point-sampled G8 nibble-ID textures plus one bilinear uncompressed RGBA8 weight texture at 4096; the deterministic generator/report live in `Saved/CodexScratch/RegionVisualSlotsV22` and are mirrored to external `VoronoIDTextureGen/GameMap1_RegionID_Smoothed/V2.2`. All safety checks pass: 15 regions/topology unchanged, sum=255, active-ID mismatch=0, transition-halo violations=0, same-slot overlap=0, max active=4, float16 G8 decode mismatch=0. Shader compilation completed 206/206 with zero material errors. Master precision remains `MFPM_DEFAULT`; the default-false V2.2 switch returns exact V2.1, and V2.1 can still return V2. Only GameMap2 resolves V2.2=true among six instances. `L_LandscapeMap` and gameplay/PCG ID textures remain byte-identical; strong farm stripes/color contrast and steep outer-wall projection stretch remain material/geometry art follow-ups.
+- Landscape Region V2.2 is active only on `MI_RegionLandscape_GameMap2`. The rejected global grid warp was replaced by deterministic, boundary-pair-specific PCHIP normal displacement: coarse 2.5m at 42-58m spacing plus 0.65m detail at 22-32m, capped at 3.2m, with a 15m endpoint fade and fixed junction/perimeter cores. It warps 31 of 32 boundaries; the remaining Region 1-13 edge is only about 1.08m and stays fixed. Hard `RegionID`, StateRT, PCG, topology, visual ID textures, and runtime shader cost are unchanged. The authoritative files live in `Project_Eden/ArtSource/RegionVisualSlotsV22` and are mirrored byte-for-byte in `Saved/CodexScratch/RegionVisualSlotsV22` and external `VoronoIDTextureGen/GameMap1_RegionID_Smoothed/V2.2`. Validation passes 42/42: 87,666 changed visual pixels (0.52253%), max commanded/observed displacement 2.996m/2.828m, 18 protected junctions with zero changed anchor pixels, zero proposal/ID guard conflicts, and unchanged 15 components/32 adjacencies. Weight PNG hash is `4C6A05A9...E75A42E`; IDs01/IDs23 remain unchanged. Unreal Computer Use reimported and saved the Weight asset as regular non-VT BGRA8, Bilinear, NoMipmaps/one mip, Clamp, sRGB off. The uasset hash is `E851B002...679B73`. `L_LandscapeMap` was not saved.
+- The non-VT conversion initially left `MI_RegionLandscape_GameMap2` on its earlier failed shader permutation, so the editor displayed Unreal's default gray material even after the texture was corrected. Toggling `UseRegionVisualBlendV22` false then true forced a clean 13/13 shader recompile with no new sampler error; the material view and Landscape presentation recovered. The MI was saved with the switch still true (hash `9673F631...F049B`). The production `L_LandscapeMap.umap` timestamp/file is unchanged; its open tab remains dirty and was deliberately not saved.
 
 - Runtime vegetation uses the shared hierarchical `PCG_Vegetation_Global` graph with default `GRID128` (128m), current grass `GRID32` (32m), cleanup multiplier `1.5`, and bounded Surface Samplers. `L_GameMap1` has map-sized PCG bounds (`51200,51200,5000`) and its Landscape Cache is `SerializeOnlyAtCook`; its earlier `GRID64` PIE pass generated 7,135 grass instances and followed a 400m pawn move without PCG errors. The original blocker there was `NeverSerialize`.
 - `L_LandscapeMap` runtime vegetation is also working. Its `BP_VegetationSpawner` is Activated/GenerateAtRuntime/Partitioned, the Box extent is `64000,64000,8000`, and `PCGWorldActor` uses `SerializeOnlyAtCook` with 289 cache entries. The map-specific blocker was the inherited `32,32,32cm` Box, which reduced the sampling area to almost zero. PIE generated 1,911 grass instances at the start and 1,803 after a 400m pawn move; 50 old runtime cells pooled. No Landscape Cache or `No surfaces found` error occurred.
