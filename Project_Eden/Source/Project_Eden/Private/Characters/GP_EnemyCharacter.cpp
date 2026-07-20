@@ -1,6 +1,7 @@
 #include "Characters/GP_EnemyCharacter.h"
 
 #include "AI/Controllers/EnemyAIController.h"
+#include "AI/Data/EnemyBlackboardKeys.h"
 #include "AIController.h"
 #include "AI/Data/EnemyArchetypeData.h"
 #include "AI/Data/EnemyLLMEvaluation.h"
@@ -19,6 +20,7 @@
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimSequence.h"
 #include "Animation/PDA_EnemyAnimationSet.h"
+#include "BehaviorTree/BlackboardComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/DataTable.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -315,7 +317,26 @@ void AGP_EnemyCharacter::TryStartTurnInPlace()
 		return;
 	}
 
-	const float SignedYawDeltaDegrees = FMath::FindDeltaAngleDegrees(GetActorRotation().Yaw, GetController()->GetControlRotation().Yaw);
+	// Enemy controllers keep TargetActor in their Blackboard, but intentionally do not
+	// drive ControlRotation from that target.  ControlRotation therefore remains aligned
+	// to the pawn while stationary and cannot be used to detect an in-place turn.
+	float DesiredYawDegrees = GetController()->GetControlRotation().Yaw;
+	if (const AAIController* AIController = Cast<AAIController>(GetController()))
+	{
+		if (const UBlackboardComponent* BlackboardComponent = AIController->GetBlackboardComponent())
+		{
+			if (const AActor* TargetActor = Cast<AActor>(BlackboardComponent->GetValueAsObject(EnemyBlackboardKeys::TargetActor)))
+			{
+				const FVector TargetDirection = (TargetActor->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
+				if (!TargetDirection.IsNearlyZero())
+				{
+					DesiredYawDegrees = TargetDirection.Rotation().Yaw;
+				}
+			}
+		}
+	}
+
+	const float SignedYawDeltaDegrees = FMath::FindDeltaAngleDegrees(GetActorRotation().Yaw, DesiredYawDegrees);
 	if (FMath::Abs(SignedYawDeltaDegrees) < TurnInPlaceMinAngleDegrees)
 	{
 		return;
