@@ -348,15 +348,14 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 	const bool bTooClose = !bAllowAttacksInsidePreferredRange && DistanceToTarget < MinAttackRange;
 	const bool bTooFar = DistanceToTarget > MaxAttackRange;
 	const bool bAttackCadenceReady = !IsValid(EnemyCharacter) || EnemyCharacter->IsBasicEnemyAttackReady();
-	const bool bTurnInPlaceActive = IsValid(EnemyCharacter) && EnemyCharacter->IsTurnInPlaceActive();
 
 	bool bShouldRetreat = bModeForcesRetreat || (HealthRatio <= RetreatThreshold);
 	// Closing bCanAttack forces the shared BT to leave its old fixed Wait node while this enemy's own cadence runs.
-	bool bCanAttack = !bTurnInPlaceActive && !bShouldRetreat && bHasLineOfSight && bInsideAttackBand && bAttackCadenceReady;
+	bool bCanAttack = !bShouldRetreat && bHasLineOfSight && bInsideAttackBand && bAttackCadenceReady;
 	bool bShouldReposition = false;
 	bool bShouldChase = false;
 
-	if (!bTurnInPlaceActive && !bShouldRetreat && !bCanAttack)
+	if (!bShouldRetreat && !bCanAttack)
 	{
 		const bool bCoverDrivenReposition = CoverPreference >= CoverRepositionThreshold && !bHasLineOfSight;
 		const bool bRangeDrivenReposition = bTooClose || (bModePrefersHold && !bTooFar);
@@ -379,7 +378,7 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 	}
 
 	// When the AI still has a live target, patrol should be the "no target" fallback, not the "I saw the player" fallback.
-	if (!bTurnInPlaceActive && bFallbackToChaseWhenTargetExists && !bShouldRetreat && !bCanAttack && !bShouldReposition)
+	if (bFallbackToChaseWhenTargetExists && !bShouldRetreat && !bCanAttack && !bShouldReposition)
 	{
 		bShouldChase = true;
 	}
@@ -404,30 +403,6 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 	BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldReposition, bShouldReposition);
 	BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldChase, bShouldChase);
 	BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldReturnHome, false);
-
-	if (ControlledPawn->GetName().Contains(TEXT("FurnaceWalker")))
-	{
-		UE_LOG(
-			LogEnemyAI,
-			Log,
-			TEXT("[MoveTrace] Tactics Pawn=%s Pos=%s Target=%s MoveTo=%s Vel=%.0f MoveStatus=%d Chase=%d Attack=%d Reposition=%d Retreat=%d Turn=%d AttackLock=%d Dist=%.0f Range=%.0f..%.0f LOS=%d"),
-			*GetNameSafe(ControlledPawn),
-			*ControlledPawn->GetActorLocation().ToCompactString(),
-			*TargetActor->GetActorLocation().ToCompactString(),
-			*BlackboardComponent->GetValueAsVector(EnemyBlackboardKeys::MoveToLocation).ToCompactString(),
-			ControlledPawn->GetVelocity().Size2D(),
-			static_cast<int32>(AIController->GetMoveStatus()),
-			bShouldChase ? 1 : 0,
-			bCanAttack ? 1 : 0,
-			bShouldReposition ? 1 : 0,
-			bShouldRetreat ? 1 : 0,
-			bTurnInPlaceActive ? 1 : 0,
-			EnemyCharacter && EnemyCharacter->IsBasicEnemyAttackInProgress() ? 1 : 0,
-			DistanceToTarget,
-			MinAttackRange,
-			MaxAttackRange,
-			bHasLineOfSight ? 1 : 0);
-	}
 
 	if (IsValid(EnemyCharacter) && EnemyCharacter->IsBossEnemy() && BTS_UpdateEnemyTactics_Internal::HasBlackboardKey(BlackboardComponent, EnemyBlackboardKeys::BossPhase))
 	{

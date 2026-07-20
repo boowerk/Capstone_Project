@@ -1,11 +1,9 @@
 #include "Characters/GP_EnemyCharacter.h"
 
 #include "AI/Controllers/EnemyAIController.h"
-#include "AI/Data/EnemyBlackboardKeys.h"
 #include "AIController.h"
 #include "AI/Data/EnemyArchetypeData.h"
 #include "AI/Data/EnemyLLMEvaluation.h"
-#include "AI/Debug/EnemyAIDebugUtils.h"
 #include "AI/Debug/EnemyAIRangeVisualizationComponent.h"
 #include "BrainComponent.h"
 #include "AbilitySystem/Abilities/Enemy/GP_BossAreaAttack.h"
@@ -19,9 +17,7 @@
 #include "AbilitySystem/GP_AbilitySystemComponent.h"
 #include "AbilitySystem/GP_AttributeSet.h"
 #include "Animation/AnimInstance.h"
-#include "Animation/AnimSequence.h"
 #include "Animation/PDA_EnemyAnimationSet.h"
-#include "BehaviorTree/BlackboardComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/DataTable.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -35,14 +31,12 @@
 #include "UI/GP_AttributeWidget.h"
 #include "UI/GP_WidgetComponent.h"
 #include "UObject/ConstructorHelpers.h"
-#include "UObject/UnrealType.h"
 #include "VFX/GP_BossDeathPresentationComponent.h"
 #include "VFX/GP_BossTargetMarkerVFXComponent.h"
 
 AGP_EnemyCharacter::AGP_EnemyCharacter()
 {
-	PrimaryActorTick.bCanEverTick = true;
-	PrimaryActorTick.bStartWithTickEnabled = false;
+	PrimaryActorTick.bCanEverTick = false;
 
 	// Blueprint-only regular enemies (including FurnaceWalker) otherwise inherit
 	// CharacterMovement's unspecified turn defaults.  Keep their body aligned
@@ -105,12 +99,6 @@ AGP_EnemyCharacter::AGP_EnemyCharacter()
 	// Editor-only shapes make the gameplay ranges visible without adding runtime collision.
 	RefreshAIRangeVisualizers();
 #endif
-}
-
-void AGP_EnemyCharacter::Tick(float DeltaSeconds)
-{
-	Super::Tick(DeltaSeconds);
-	UpdateTurnInPlace(DeltaSeconds);
 }
 
 UAttributeSet* AGP_EnemyCharacter::GetAttributeSet() const
@@ -198,7 +186,6 @@ void AGP_EnemyCharacter::BeginPlay()
 	Super::BeginPlay();
 	RefreshWorldHealthBarVisibility();
 	InitializeBasicEnemyAttackCadence();
-	SetActorTickEnabled(bEnableTurnInPlace);
 
 	if (IsValid(EnemyAnimationSet))
 	{
@@ -265,7 +252,6 @@ void AGP_EnemyCharacter::BeginPlay()
 
 void AGP_EnemyCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	StopTurnInPlace(false);
 	UnbindMoveSpeedAttribute();
 	if (IsValid(BossTargetMarkerVFXComponent))
 	{
@@ -274,193 +260,6 @@ void AGP_EnemyCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	}
 
 	Super::EndPlay(EndPlayReason);
-}
-
-void AGP_EnemyCharacter::UpdateTurnInPlace(float DeltaSeconds)
-{
-	if (!bEnableTurnInPlace || bIsDead)
-	{
-		return;
-	}
-
-	if (bTurnInPlaceActive)
-	{
-		if (bBasicEnemyAttackInProgress)
-		{
-			StopTurnInPlace(true);
-			return;
-		}
-
-		TurnInPlaceElapsedSeconds += DeltaSeconds;
-		const float Alpha = FMath::Clamp(TurnInPlaceElapsedSeconds / FMath::Max(TurnInPlaceDurationSeconds, KINDA_SMALL_NUMBER), 0.0f, 1.0f);
-
-		if (Alpha >= 1.0f)
-		{
-			StopTurnInPlace(false);
-		}
-		return;
-	}
-
-	// Do not infer a turn from Blackboard TargetActor here.  This Tick runs in every
-	// stationary state, so that inference makes idle, recovery, and tactical waits
-	// continuously face the player.  A dedicated AI task must call
-	// StartTurnInPlaceForTarget when a turn is actually part of its state transition.
-}
-
-void AGP_EnemyCharacter::StartTurnInPlaceForTarget(const AActor* TargetActor)
-{
-	if (!IsValid(TargetActor))
-	{
-		return;
-	}
-
-	const FVector TargetLocation = TargetActor->GetActorLocation();
-	TryStartTurnInPlace(&TargetLocation);
-}
-
-void AGP_EnemyCharacter::TryStartTurnInPlace(const FVector* OverrideTargetLocation)
-{
-	if (bBasicEnemyAttackInProgress || !IsValid(GetController()))
-	{
-		return;
-	}
-
-	UCharacterMovementComponent* MovementComponent = GetCharacterMovement();
-	if (!IsValid(MovementComponent) || MovementComponent->Velocity.Size2D() > TurnInPlaceMaxStartSpeed)
-	{
-		return;
-	}
-
-	// Enemy controllers keep TargetActor in their Blackboard, but intentionally do not
-	// drive ControlRotation from that target.  ControlRotation therefore remains aligned
-	// to the pawn while stationary and cannot be used to detect an in-place turn.
-	float DesiredYawDegrees = GetController()->GetControlRotation().Yaw;
-	if (OverrideTargetLocation != nullptr)
-	{
-		const FVector TargetDirection = (*OverrideTargetLocation - GetActorLocation()).GetSafeNormal2D();
-		if (!TargetDirection.IsNearlyZero())
-		{
-			DesiredYawDegrees = TargetDirection.Rotation().Yaw;
-		}
-	}
-	else if (const AAIController* AIController = Cast<AAIController>(GetController()))
-	{
-		if (const UBlackboardComponent* BlackboardComponent = AIController->GetBlackboardComponent())
-		{
-			if (const AActor* TargetActor = Cast<AActor>(BlackboardComponent->GetValueAsObject(EnemyBlackboardKeys::TargetActor)))
-			{
-				const FVector TargetDirection = (TargetActor->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
-				if (!TargetDirection.IsNearlyZero())
-				{
-					DesiredYawDegrees = TargetDirection.Rotation().Yaw;
-				}
-			}
-		}
-	}
-
-	const float SignedYawDeltaDegrees = FMath::FindDeltaAngleDegrees(GetActorRotation().Yaw, DesiredYawDegrees);
-	if (FMath::Abs(SignedYawDeltaDegrees) < TurnInPlaceMinAngleDegrees)
-	{
-		return;
-	}
-
-	UAnimSequence* TurnSequence = SelectTurnInPlaceAnimation(SignedYawDeltaDegrees);
-	UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
-	if (!IsValid(TurnSequence) || !IsValid(AnimInstance))
-	{
-		return;
-	}
-
-	const float SafePlayRate = FMath::Max(TurnInPlacePlayRate, 0.1f);
-	// The retargeted turn sequences carry their own rotational root motion.
-	// Let that montage turn the capsule so the body motion and facing stay synchronized.
-	AnimInstance->SetRootMotionMode(ERootMotionMode::RootMotionFromMontagesOnly);
-	if (!AnimInstance->PlaySlotAnimationAsDynamicMontage(TurnSequence, TurnInPlaceSlotName, 0.18f, 0.18f, SafePlayRate, 1, 0.0f, 0.0f))
-	{
-		return;
-	}
-
-	bTurnInPlaceActive = true;
-	bRestoreOrientRotationToMovementAfterTurn = MovementComponent->bOrientRotationToMovement;
-	UE_LOG(
-		LogEnemyAI,
-		Log,
-		TEXT("[MoveTrace] TurnStop Pawn=%s Pos=%s TargetYaw=%.1f DeltaYaw=%.1f Seq=%s"),
-		*GetName(),
-		*GetActorLocation().ToCompactString(),
-		DesiredYawDegrees,
-		SignedYawDeltaDegrees,
-		*GetNameSafe(TurnSequence));
-	MovementComponent->StopMovementImmediately();
-	MovementComponent->bOrientRotationToMovement = false;
-	TurnInPlaceElapsedSeconds = 0.0f;
-	TurnInPlaceDurationSeconds = TurnSequence->GetPlayLength() / SafePlayRate;
-	SetTurnInPlaceAnimGraphFlag(true);
-}
-
-void AGP_EnemyCharacter::StopTurnInPlace(bool bStopAnimation)
-{
-	if (!bTurnInPlaceActive)
-	{
-		return;
-	}
-
-	if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
-	{
-		MovementComponent->bOrientRotationToMovement = bRestoreOrientRotationToMovementAfterTurn;
-	}
-
-	UE_LOG(
-		LogEnemyAI,
-		Log,
-		TEXT("[MoveTrace] TurnEnd Pawn=%s Pos=%s StopAnimation=%d"),
-		*GetName(),
-		*GetActorLocation().ToCompactString(),
-		bStopAnimation ? 1 : 0);
-
-	if (bStopAnimation)
-	{
-		if (UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr)
-		{
-			AnimInstance->StopSlotAnimation(0.18f, TurnInPlaceSlotName);
-		}
-	}
-
-	bTurnInPlaceActive = false;
-	SetTurnInPlaceAnimGraphFlag(false);
-}
-
-UAnimSequence* AGP_EnemyCharacter::SelectTurnInPlaceAnimation(float SignedYawDeltaDegrees) const
-{
-	const bool bTurnLeft = SignedYawDeltaDegrees < 0.0f;
-	const float AbsoluteYawDeltaDegrees = FMath::Abs(SignedYawDeltaDegrees);
-	if (AbsoluteYawDeltaDegrees >= 157.5f)
-	{
-		return bTurnLeft ? TurnInPlaceAnimations.Turn180Left : TurnInPlaceAnimations.Turn180Right;
-	}
-	if (AbsoluteYawDeltaDegrees >= 112.5f)
-	{
-		return bTurnLeft ? TurnInPlaceAnimations.Turn135Left : TurnInPlaceAnimations.Turn135Right;
-	}
-	if (AbsoluteYawDeltaDegrees >= 67.5f)
-	{
-		return bTurnLeft ? TurnInPlaceAnimations.Turn90Left : TurnInPlaceAnimations.Turn90Right;
-	}
-	return bTurnLeft ? TurnInPlaceAnimations.Turn45Left : TurnInPlaceAnimations.Turn45Right;
-}
-
-void AGP_EnemyCharacter::SetTurnInPlaceAnimGraphFlag(bool bActive) const
-{
-	UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
-	if (!IsValid(AnimInstance))
-	{
-		return;
-	}
-
-	if (FBoolProperty* TurnFlagProperty = FindFProperty<FBoolProperty>(AnimInstance->GetClass(), TEXT("bTurnInPlaceActive")))
-	{
-		TurnFlagProperty->SetPropertyValue_InContainer(AnimInstance, bActive);
-	}
 }
 
 bool AGP_EnemyCharacter::IsBasicEnemyAttackReady() const
@@ -474,7 +273,6 @@ bool AGP_EnemyCharacter::IsBasicEnemyAttackReady() const
 	const UWorld* World = GetWorld();
 	return IsValid(World)
 		&& !bBasicEnemyAttackInProgress
-		&& !bTurnInPlaceActive
 		&& EnemyAttackCadencePolicy::IsReady(World->GetTimeSeconds(), BasicEnemyAttackReadyTimeSeconds);
 }
 

@@ -7,7 +7,6 @@
 #include "GameplayTagContainer.h"
 #include "GP_EnemyCharacter.generated.h"
 
-class AActor;
 class UAbilitySystemComponent;
 class UAttributeSet;
 class UBehaviorTree;
@@ -20,7 +19,6 @@ class UGP_EnemyCorruptionComponent;
 class UGP_EnemyDeathAbility;
 class UGP_WidgetComponent;
 class UPDA_EnemyAnimationSet;
-class UAnimSequence;
 class AGP_EnemyCharacter;
 class AGP_PlayerState;
 struct FOnAttributeChangeData;
@@ -38,36 +36,6 @@ enum class EGPEnemyCombatArchetype : uint8
 	Flying UMETA(DisplayName = "Flying")
 };
 
-USTRUCT(BlueprintType)
-struct FGPEnemyTurnInPlaceAnimationSet
-{
-	GENERATED_BODY()
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Turn")
-	TObjectPtr<UAnimSequence> Turn45Left;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Turn")
-	TObjectPtr<UAnimSequence> Turn45Right;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Turn")
-	TObjectPtr<UAnimSequence> Turn90Left;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Turn")
-	TObjectPtr<UAnimSequence> Turn90Right;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Turn")
-	TObjectPtr<UAnimSequence> Turn135Left;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Turn")
-	TObjectPtr<UAnimSequence> Turn135Right;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Turn")
-	TObjectPtr<UAnimSequence> Turn180Left;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Turn")
-	TObjectPtr<UAnimSequence> Turn180Right;
-};
-
 // Broadcast on the server the first time this enemy's health reaches zero, so the GameMode can track zone clears.
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FGPOnEnemyDied, AGP_EnemyCharacter*, DeadEnemy);
 
@@ -78,7 +46,6 @@ class PROJECT_EDEN_API AGP_EnemyCharacter : public AGP_BaseCharacter
 
 public:
 	AGP_EnemyCharacter();
-	virtual void Tick(float DeltaSeconds) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 	virtual UAttributeSet* GetAttributeSet() const override;
@@ -139,8 +106,6 @@ public:
 	UFUNCTION(BlueprintPure, Category = "AI|Combat|Cadence")
 	bool IsBasicEnemyAttackReady() const;
 	bool IsBasicEnemyAttackInProgress() const { return bBasicEnemyAttackInProgress; }
-	bool IsTurnInPlaceActive() const { return bTurnInPlaceActive; }
-	void StartTurnInPlaceForTarget(const AActor* TargetActor);
 	void SetBasicEnemyAttackInProgress(bool bInProgress) { bBasicEnemyAttackInProgress = bInProgress; }
 
 	// Returns the newly rolled delay so attack logs and tests can inspect the selected cadence.
@@ -184,26 +149,6 @@ protected:
 	/** Enemy-only visual and combat animation data. Leave the legacy base AnimationSet empty for new enemies. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation")
 	TObjectPtr<UPDA_EnemyAnimationSet> EnemyAnimationSet;
-
-	// Disabled by default so existing enemies retain their current locomotion behavior.
-	// Opt-in children supply their retargeted sequences and route the named full-body slot in their AnimBP.
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Turn In Place")
-	bool bEnableTurnInPlace = false;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Turn In Place", meta = (EditCondition = "bEnableTurnInPlace"))
-	FGPEnemyTurnInPlaceAnimationSet TurnInPlaceAnimations;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Turn In Place", meta = (EditCondition = "bEnableTurnInPlace", ClampMin = "0.0", Units = "deg"))
-	float TurnInPlaceMinAngleDegrees = 45.0f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Turn In Place", meta = (EditCondition = "bEnableTurnInPlace", ClampMin = "0.0", Units = "cm/s"))
-	float TurnInPlaceMaxStartSpeed = 5.0f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Turn In Place", meta = (EditCondition = "bEnableTurnInPlace", ClampMin = "0.1"))
-	float TurnInPlacePlayRate = 1.0f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Turn In Place", meta = (EditCondition = "bEnableTurnInPlace"))
-	FName TurnInPlaceSlotName = TEXT("Unused_DefaultSlot");
 
 	// 향후 EQS나 복귀 로직에서 사용할 기준 위치를 월드에 배치할 수 있도록 유지한다.
 	UPROPERTY(EditInstanceOnly, Category = "AI", meta = (MakeEditWidget = "true"))
@@ -356,10 +301,6 @@ private:
 
 	bool bDeathStateApplied = false;
 	bool bBasicEnemyAttackInProgress = false;
-	bool bTurnInPlaceActive = false;
-	bool bRestoreOrientRotationToMovementAfterTurn = false;
-	float TurnInPlaceElapsedSeconds = 0.0f;
-	float TurnInPlaceDurationSeconds = 0.0f;
 	float BasicEnemyAttackReadyTimeSeconds = 0.0f;
 	FRandomStream AttackCadenceRandomStream;
 
@@ -385,11 +326,6 @@ private:
 	void BindMoveSpeedAttribute();
 	void UnbindMoveSpeedAttribute();
 	void InitializeBasicEnemyAttackCadence();
-	void UpdateTurnInPlace(float DeltaSeconds);
-	void TryStartTurnInPlace(const FVector* OverrideTargetLocation = nullptr);
-	void StopTurnInPlace(bool bStopAnimation);
-	UAnimSequence* SelectTurnInPlaceAnimation(float SignedYawDeltaDegrees) const;
-	void SetTurnInPlaceAnimGraphFlag(bool bActive) const;
 
 	FDelegateHandle MoveSpeedAttributeDelegateHandle;
 };

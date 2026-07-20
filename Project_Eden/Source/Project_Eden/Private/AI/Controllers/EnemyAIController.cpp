@@ -1003,12 +1003,9 @@ void AEnemyAIController::SetBlackboardTargetActor(AActor* NewTargetActor)
 	{
 		BlackboardComponent->SetValueAsObject(EnemyBlackboardKeys::TargetActor, NewTargetActor);
 
-		// This branch only runs when TargetActor changes, so target acquisition can
-		// request one transition turn.  Passive Pawn Tick must not re-request it
-		// while idle, recovering, or otherwise stationary.
+		// Boss pawns present the selected player only on first acquisition or a real target swap.
 		if (AGP_EnemyCharacter* EnemyPawn = Cast<AGP_EnemyCharacter>(GetPawn()))
 		{
-			EnemyPawn->StartTurnInPlaceForTarget(NewTargetActor);
 			EnemyPawn->NotifyBossTargetSelected(NewTargetActor);
 		}
 	}
