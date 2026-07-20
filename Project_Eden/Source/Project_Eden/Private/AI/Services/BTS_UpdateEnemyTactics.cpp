@@ -385,6 +385,17 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 			false);
 		return;
 	}
+	if (IsValid(EnemyCharacter) && EnemyCharacter->IsBasicEnemyAttackInProgress())
+	{
+		BTS_UpdateEnemyTactics_Internal::SetCombatStateTag(BlackboardComponent, GPTags::AI::State::Combat);
+		BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldRetreat, false);
+		// Keep the branch which activated this ability selected. Closing this condition aborts
+		// the attack branch and leaves the regular enemy locked in its attack state.
+		BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bCanAttack, bPreviousCanAttack);
+		BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldReposition, false);
+		BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldChase, false);
+		return;
+	}
 
 	const float DistanceToTarget = FVector::Distance(ControlledPawn->GetActorLocation(), TargetActor->GetActorLocation());
 	const bool bHasLineOfSight = AIController->LineOfSightTo(TargetActor);
@@ -424,6 +435,7 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 	const bool bTooClose = !bAllowAttacksInsideEffectiveRange && DistanceToTarget < MinAttackRange;
 	const bool bTooFar = DistanceToTarget > MaxAttackRange;
 	const bool bAttackCadenceReady = !IsValid(EnemyCharacter) || EnemyCharacter->IsBasicEnemyAttackReady();
+	const bool bTurnInPlaceActive = IsValid(EnemyCharacter) && EnemyCharacter->IsTurnInPlaceActive();
 
 	bool bShouldRetreat = bModeForcesRetreat || (HealthRatio <= RetreatThreshold);
 	FEnemyAttackTransitionObservation AttackObservation;
@@ -433,8 +445,10 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 	AttackObservation.bAttackCadenceReady = bAttackCadenceReady;
 	AttackObservation.bActionCommitted = bPreserveCommittedAction;
 	const EEnemyAttackTransitionIntent AttackIntent = EnemyAttackTransitionPolicy::ResolveIntent(AttackObservation);
-	bool bCanAttack = AttackIntent == EEnemyAttackTransitionIntent::Attack;
-	const bool bShouldCombatHold = AttackIntent == EEnemyAttackTransitionIntent::CombatHold;
+	// Turn-in-place owns movement until its root motion finishes, but an already committed attack still has priority.
+	const bool bTurnMovementHold = bTurnInPlaceActive && !bPreserveCommittedAction;
+	bool bCanAttack = AttackIntent == EEnemyAttackTransitionIntent::Attack && !bTurnMovementHold;
+	const bool bShouldCombatHold = AttackIntent == EEnemyAttackTransitionIntent::CombatHold || bTurnMovementHold;
 	bool bShouldReposition = false;
 	bool bShouldChase = false;
 

@@ -2,7 +2,7 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-07-18T21:24:21+09:00
+updated: 2026-07-21T06:47:00+09:00
 status: active
 tags:
   - memoc
@@ -11,9 +11,9 @@ created: 2026-07-18T07:01:20
 ---
 # Session Summary
 
-- AI/three-player slice is current through `0a22e69e`.
-- Dark Knight now chases until Basic 350cm or Heavy 420cm; Dark Wave is capped to its real 520cm slash. Charge/GroundCrack remain ranged.
-- GAS rechecks the committed target before activation, so stale BT state cannot start an out-of-range melee attack.
-- Editor build, Dark Knight 6/6, and AI 21/21 pass. Do not run more live server tests unless asked.
-- P0 manual: montage slot/contact, Dark Knight charge/timing; keep flying out until PIE.
-- Preserve dirty `TestMap`, `DA_RegionEventData`, and `L_MainMap`.
+- `main` merges local work through `b1baeb60` with origin through `8c9cd99b`.
+- Dark Knight uses Basic 350/Heavy 420/Dark Wave 520cm; Charge/GroundCrack stay ranged.
+- FurnaceWalker gains root-motion turns and an attack step. Committed actions and cancel-without-fallback-hit remain preserved.
+- Foley/Niagara additions remain; origin's broken legacy EarlyTransition trio is excluded.
+- Build and local tests pass: AI 22/22, Dark Knight 6/6, Network 2/2, Lobby 2/2. No live server run.
+- `TestMap`, `DA_RegionEventData`, and `L_MainMap` are clean and unchanged.

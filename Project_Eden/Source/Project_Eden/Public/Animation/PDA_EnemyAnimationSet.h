@@ -44,6 +44,21 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Combat|Root Motion")
 	TArray<TObjectPtr<UAnimSequence>> LowerBodyRootMotionSequences;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Combat|Forward Step")
+	bool bUseAbilityForwardStep = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Combat|Forward Step", meta = (EditCondition = "bUseAbilityForwardStep", ClampMin = "0.0", Units = "s"))
+	float AbilityForwardStepDelaySeconds = 0.20f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Combat|Forward Step", meta = (EditCondition = "bUseAbilityForwardStep", ClampMin = "0.0", Units = "cm"))
+	float AbilityForwardStepDistance = 500.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Combat|Forward Step", meta = (EditCondition = "bUseAbilityForwardStep", ClampMin = "0.01", Units = "s"))
+	float AbilityForwardStepDurationSeconds = 0.65f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Combat|Forward Step", meta = (EditCondition = "bUseAbilityForwardStep", ClampMin = "0.0", Units = "cm/s"))
+	float AbilityForwardStepPushSpeed = 360.0f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Combat")
 	TArray<TObjectPtr<UAnimMontage>> HitMontages;
 

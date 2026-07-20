@@ -1011,9 +1011,11 @@ void AEnemyAIController::SetBlackboardTargetActor(AActor* NewTargetActor)
 	{
 		BlackboardComponent->SetValueAsObject(EnemyBlackboardKeys::TargetActor, NewTargetActor);
 
-		// Boss pawns present the selected player only on first acquisition or a real target swap.
+		// Start the turn before this target change wakes the BT MoveTo branch. Otherwise
+		// CharacterMovement can rotate the capsule before the turn montage gets a chance.
 		if (AGP_EnemyCharacter* EnemyPawn = Cast<AGP_EnemyCharacter>(GetPawn()))
 		{
+			EnemyPawn->StartTurnInPlaceForTarget(NewTargetActor);
 			EnemyPawn->NotifyBossTargetSelected(NewTargetActor);
 		}
 	}

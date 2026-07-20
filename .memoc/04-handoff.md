@@ -234,6 +234,7 @@ Last synced: 2026-07-18T21:24:21+09:00
 
 ## Next Steps
 
+- After the demo deadline, remove the obsolete EarlyTransition notify state from the 22 UEFN Run/Slide animation sequences and resave them. Do not restore the deleted Sandbox ABP dependency stack just to silence these warnings.
 - For PLAZA_DE_TOROS runtime construction: close editor/game or press Ctrl+Alt+F11 to disable active Live Coding, then rebuild. Place `AGP_LevelBuildAnimator` in the arena, set `TargetActorTag=PLAZA_DE_TOROS`, tag all controlled structure actors with `PLAZA_DE_TOROS`, and tune `PieceDuration`, `PieceOverlapDelay`, `UndergroundOffset`, `MirrorSpiralRadius`, `StartYawTwist`, `RiseOvershoot`, and order mode in Details.
 - Build and PIE-test the corrected latest `feature/vfx-skills-impact` merge: Primary attack VisualCues, augment VFX priority, Matador AI/BT, and map asset loads.
 - Future skill UI requirement: when an upgrade augment transforms a skill, replace the skill-slot presentation so it appears evolved. Add augment presentation overrides such as `SkillNameOverride`, `SkillDescriptionOverride`, and `SkillIconOverride`, then resolve the latest applicable selected augment before base `UGP_SkillData` display fields.
@@ -256,6 +257,7 @@ _None yet._
 
 ## Verified
 
+- 2026-07-21 origin merge: `Project_EdenEditor Win64 Development` build passed; `ProjectEden.AI` 22/22, `ProjectEden.Combat.DarkArmorKnight` 6/6, `ProjectEden.Game.Network` 2/2, and `ProjectEden.Game.Lobby` 2/2 passed without live server execution.
 - `ABP_UEFNSource_Player` compiles and saves.
 - `BP_GP_PlayerCharacter` CDO shows `UEFNSourceMesh.animClass = /Game/Characters/PlayerCharacter/ABP_UEFNSource_Player.ABP_UEFNSource_Player_C`.
 - Build error about undefined `FTransformTrajectory` was fixed by including `Animation/TrajectoryTypes.h`.

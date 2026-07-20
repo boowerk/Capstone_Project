@@ -29,6 +29,8 @@
 AGP_MatadorMageBossCharacter::AGP_MatadorMageBossCharacter()
 {
 	PrimaryActorTick.bCanEverTick = true;
+	// Matador continuously locks the main body and follows decoy state even when turn-in-place is disabled.
+	PrimaryActorTick.bStartWithTickEnabled = true;
 	bIsBossEnemy = true;
 	BossDisplayName = NSLOCTEXT("GPMatadorMageBoss", "BossDisplayName", "Matador Mage");
 
