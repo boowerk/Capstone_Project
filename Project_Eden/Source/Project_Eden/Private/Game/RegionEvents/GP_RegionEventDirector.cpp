@@ -339,6 +339,13 @@ AGP_RegionEventActor* AGP_RegionEventDirector::SpawnSelectedEvent(
 		// Register ownership before overlap evaluation because configuration can activate and spawn enemies immediately.
 		ExplorationEvents.Add(EventActor);
 	}
+	if (bOverrideDormantTimeout)
+	{
+		if (AGP_ShrineRuinsRegionEventActor* GuidedShrine = Cast<AGP_ShrineRuinsRegionEventActor>(EventActor))
+		{
+			GuidedShrine->ConfigureGuidedPartyReward(true);
+		}
+	}
 	if (bExplorationEvent)
 	{
 		// Exploration markers wait for the party, giving dynamic navigation time to build before enemies spawn.

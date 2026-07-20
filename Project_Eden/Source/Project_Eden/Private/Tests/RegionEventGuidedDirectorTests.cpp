@@ -7,6 +7,8 @@
 #include "Game/RegionEvents/GP_RegionEventActor.h"
 #include "Game/RegionEvents/GP_RegionEventData.h"
 #include "Game/RegionEvents/GP_RegionEventDirector.h"
+#include "Game/RegionEvents/GP_ShrineRuinsRegionEventActor.h"
+#include "Player/GP_PlayerController.h"
 #include "TimerManager.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -110,6 +112,29 @@ bool FGPRegionEventGuidedDirectorControlTest::RunTest(const FString& Parameters)
 		TestFalse(TEXT("One of three players cannot satisfy a guided quorum"), Shrine->HasApproachPlayerQuorum(1, 3));
 		TestTrue(TEXT("Two of three players satisfy a guided quorum"), Shrine->HasApproachPlayerQuorum(2, 3));
 		TestTrue(TEXT("A one-player local run clamps the quorum"), Shrine->HasApproachPlayerQuorum(1, 1));
+
+		AGP_ShrineRuinsRegionEventActor* GuidedShrine = Cast<AGP_ShrineRuinsRegionEventActor>(Shrine);
+		TestNotNull(TEXT("Guided shrine uses its specialized reward actor"), GuidedShrine);
+		if (GuidedShrine)
+		{
+			TestTrue(TEXT("Director enables full-party shrine rewards"), GuidedShrine->IsGuidedPartyRewardEnabled());
+			TArray<AGP_PlayerController*> PartyControllers;
+			for (int32 PlayerIndex = 0; PlayerIndex < 3; ++PlayerIndex)
+			{
+				PartyControllers.Add(World->SpawnActor<AGP_PlayerController>(
+					FVector(PlayerIndex * 100.0f, 0.0f, 0.0f),
+					FRotator::ZeroRotator,
+					SpawnParameters));
+			}
+			GuidedShrine->ConfigureApproachActivation(false, 0.0f, -1.0f);
+			GuidedShrine->ActivateRegionEvent();
+			GuidedShrine->RewardPartyControllers(PartyControllers);
+			TestEqual(TEXT("Guided shrine dispatches rewards to all three controllers"), GuidedShrine->GetRewardedControllerCount(), 3);
+			TestEqual(
+				TEXT("Guided shrine completes after the full dispatch"),
+				GuidedShrine->GetRuntimeState(),
+				EGPRegionEventRuntimeState::Completed);
+		}
 	}
 
 	Director->bEnableExplorationEvents = true;
