@@ -7,6 +7,7 @@
 
 class AGP_EnemyCharacter;
 class AGP_CorruptionPresentationActor;
+class AGP_DemoRunDirector;
 class AGP_EnemySpawnVolume;
 class AGP_GameState;
 class AGP_RunPortal;
@@ -36,6 +37,9 @@ public:
 	int32 GetDemoRunSeed() const { return DemoRunSeed; }
 	bool HasValidDemoRunRoute() const { return bHasValidDemoRunRoute; }
 	const FGPDemoRunRoute& GetDemoRunRoute() const { return DemoRunRoute; }
+
+	// The guided landscape flow shares the existing result and lobby-return path.
+	void CompleteGuidedDemoRun(bool bVictory);
 
 	// Manual trigger — bypasses overlap and immediately spawns zone 0. Use from BP if needed.
 	UFUNCTION(BlueprintCallable, Category = "Run")
@@ -120,6 +124,16 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Region Events")
 	bool bStartRegionEventsOnZoneCompleted = false;
 
+	// Only the production open landscape receives the layered graduation-demo golden path.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Demo Flow")
+	bool bAutoStartGuidedDemoFlow = true;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Demo Flow", meta = (EditCondition = "bAutoStartGuidedDemoFlow"))
+	TSubclassOf<AGP_DemoRunDirector> DemoRunDirectorClass;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Demo Flow", meta = (EditCondition = "bAutoStartGuidedDemoFlow", ClampMin = "0.1", Units = "s"))
+	float DemoFlowStartupRetryIntervalSeconds = 0.5f;
+
 	// The production landscape currently authors one anchor. The server expands it into stable,
 	// collision-checked slots so a three-player party never relies on spawn collision nudging.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Network|Spawn", meta = (ClampMin = "1"))
@@ -141,6 +155,9 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<AGP_RegionEventDirector> RegionEventDirector;
+
+	UPROPERTY(Transient)
+	TObjectPtr<AGP_DemoRunDirector> DemoRunDirector;
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<APlayerStart>> RuntimePartyPlayerStarts;
@@ -169,6 +186,7 @@ private:
 	FGPDemoRunRoute DemoRunRoute;
 
 	FTimerHandle ReturnToLobbyTimerHandle;
+	FTimerHandle DemoFlowStartupTimerHandle;
 
 	void EnsurePartyPlayerStarts(AController* Player);
 	void EnsureDemoRunSeed();
@@ -195,6 +213,8 @@ private:
 	void GatherZones();
 	void ResolveRuntimeRegionConfiguration();
 	void ResolveRegionEventDirector();
+	void BeginGuidedDemoFlowStartup();
+	void TryStartGuidedDemoFlow();
 	void InitializeRegionStates();
 	void SpawnCorruptionPresentation();
 	void UnlockZone(int32 ZoneIndex);

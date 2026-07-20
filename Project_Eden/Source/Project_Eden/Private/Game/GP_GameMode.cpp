@@ -4,6 +4,7 @@
 #include "Characters/GP_PlayerCharacter.h"
 #include "Game/Corruption/GP_CorruptionPresentationActor.h"
 #include "Game/Corruption/GP_WorldCorruptionComponent.h"
+#include "Game/Demo/GP_DemoRunDirector.h"
 #include "Game/GP_EnemySpawnMarker.h"
 #include "Game/GP_EnemySpawnVolume.h"
 #include "Game/GP_GameState.h"
@@ -31,6 +32,7 @@ AGP_GameMode::AGP_GameMode()
 	GameStateClass = AGP_GameState::StaticClass();
 	RegionEventDirectorClass = AGP_RegionEventDirector::StaticClass();
 	CorruptionPresentationClass = AGP_CorruptionPresentationActor::StaticClass();
+	DemoRunDirectorClass = AGP_DemoRunDirector::StaticClass();
 	// Preserve the three-player admission cap if a client attempts to join
 	// directly after seamless travel reaches the gameplay map.
 	GameSessionClass = AGP_ThreePlayerGameSession::StaticClass();
@@ -654,6 +656,7 @@ void AGP_GameMode::BeginPlay()
 	GatherZones();
 	ResolveRegionEventDirector();
 	SpawnCorruptionPresentation();
+	BeginGuidedDemoFlowStartup();
 
 	// Let placed BP actors bind to GameState delegates in their BeginPlay before
 	// the initial all-dead reset is broadcast on the server/listen host.
@@ -945,6 +948,86 @@ void AGP_GameMode::ResolveRegionEventDirector()
 		// A blocking objective re-evaluates zone completion as soon as it succeeds or expires.
 		RegionEventDirector->OnRegionEventEnded.AddDynamic(this, &ThisClass::HandleRegionEventEnded);
 	}
+}
+
+void AGP_GameMode::BeginGuidedDemoFlowStartup()
+{
+	UWorld* World = GetWorld();
+	if (!HasAuthority()
+		|| !IsValid(World)
+		|| !bAutoStartGuidedDemoFlow
+		|| !ShouldUsePeripheralPartyStarts()
+		|| !OrderedZones.IsEmpty())
+	{
+		return;
+	}
+
+	// ChoosePlayerStart can run after GameMode::BeginPlay on an empty server, so keep a cheap
+	// authority-only probe alive until the first safe peripheral route has been published.
+	const float StartupInterval = FMath::Max(0.1f, DemoFlowStartupRetryIntervalSeconds);
+	World->GetTimerManager().SetTimer(
+		DemoFlowStartupTimerHandle,
+		this,
+		&ThisClass::TryStartGuidedDemoFlow,
+		StartupInterval,
+		true,
+		StartupInterval);
+}
+
+void AGP_GameMode::TryStartGuidedDemoFlow()
+{
+	UWorld* World = GetWorld();
+	if (!HasAuthority()
+		|| !IsValid(World)
+		|| bRunFinished
+		|| IsValid(DemoRunDirector)
+		|| !bAutoStartGuidedDemoFlow
+		|| !ShouldUsePeripheralPartyStarts()
+		|| !OrderedZones.IsEmpty())
+	{
+		GetWorldTimerManager().ClearTimer(DemoFlowStartupTimerHandle);
+		return;
+	}
+
+	if (bPartyPlayerStartsInitialized && !bHasValidDemoRunRoute)
+	{
+		// A fully evaluated unsafe landscape keeps the authored start and does not run a mismatched route.
+		UE_LOG(LogTemp, Warning, TEXT("[DemoFlow] Guided flow disabled because no safe peripheral route was published."));
+		GetWorldTimerManager().ClearTimer(DemoFlowStartupTimerHandle);
+		return;
+	}
+
+	if (!IsValid(RegionEventDirector)
+		|| !bHasValidDemoRunRoute
+		|| !DemoRunRoute.IsValid()
+		|| !*DemoRunDirectorClass)
+	{
+		return;
+	}
+
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	SpawnParameters.Owner = this;
+	AGP_DemoRunDirector* SpawnedDirector = World->SpawnActor<AGP_DemoRunDirector>(
+		DemoRunDirectorClass,
+		DemoRunRoute.CenterLocation,
+		FRotator::ZeroRotator,
+		SpawnParameters);
+	if (!IsValid(SpawnedDirector))
+	{
+		return;
+	}
+
+	if (!SpawnedDirector->InitializeDemoRun(this, RegionEventDirector, DemoRunRoute, DemoRunSeed))
+	{
+		SpawnedDirector->Destroy();
+		return;
+	}
+
+	DemoRunDirector = SpawnedDirector;
+	bRunStarted = true;
+	GetWorldTimerManager().ClearTimer(DemoFlowStartupTimerHandle);
+	UE_LOG(LogTemp, Display, TEXT("[DemoFlow] Guided inward run started with seed %d."), DemoRunSeed);
 }
 
 void AGP_GameMode::UnlockZone(int32 ZoneIndex)
@@ -1317,6 +1400,17 @@ void AGP_GameMode::NotifyAllPlayersDead()
 	FinishRun(/*bVictory=*/false);
 }
 
+void AGP_GameMode::CompleteGuidedDemoRun(bool bVictory)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	// Reuse the established replicated match result and seamless lobby return for the demo flow.
+	FinishRun(bVictory);
+}
+
 void AGP_GameMode::FinishRun(bool bVictory)
 {
 	if (bRunFinished)
@@ -1325,6 +1419,12 @@ void AGP_GameMode::FinishRun(bool bVictory)
 	}
 
 	bRunFinished = true;
+	GetWorldTimerManager().ClearTimer(DemoFlowStartupTimerHandle);
+	if (IsValid(DemoRunDirector))
+	{
+		// Defeat and externally completed runs must stop every delayed guided callback before phase changes.
+		DemoRunDirector->StopDemoRun();
+	}
 
 	if (AGP_GameState* GPGameState = GetGPGameState())
 	{
