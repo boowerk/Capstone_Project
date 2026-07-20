@@ -405,6 +405,30 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 	BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldChase, bShouldChase);
 	BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldReturnHome, false);
 
+	if (ControlledPawn->GetName().Contains(TEXT("FurnaceWalker")))
+	{
+		UE_LOG(
+			LogEnemyAI,
+			Log,
+			TEXT("[MoveTrace] Tactics Pawn=%s Pos=%s Target=%s MoveTo=%s Vel=%.0f MoveStatus=%d Chase=%d Attack=%d Reposition=%d Retreat=%d Turn=%d AttackLock=%d Dist=%.0f Range=%.0f..%.0f LOS=%d"),
+			*GetNameSafe(ControlledPawn),
+			*ControlledPawn->GetActorLocation().ToCompactString(),
+			*TargetActor->GetActorLocation().ToCompactString(),
+			*BlackboardComponent->GetValueAsVector(EnemyBlackboardKeys::MoveToLocation).ToCompactString(),
+			ControlledPawn->GetVelocity().Size2D(),
+			static_cast<int32>(AIController->GetMoveStatus()),
+			bShouldChase ? 1 : 0,
+			bCanAttack ? 1 : 0,
+			bShouldReposition ? 1 : 0,
+			bShouldRetreat ? 1 : 0,
+			bTurnInPlaceActive ? 1 : 0,
+			EnemyCharacter && EnemyCharacter->IsBasicEnemyAttackInProgress() ? 1 : 0,
+			DistanceToTarget,
+			MinAttackRange,
+			MaxAttackRange,
+			bHasLineOfSight ? 1 : 0);
+	}
+
 	if (IsValid(EnemyCharacter) && EnemyCharacter->IsBossEnemy() && BTS_UpdateEnemyTactics_Internal::HasBlackboardKey(BlackboardComponent, EnemyBlackboardKeys::BossPhase))
 	{
 		constexpr float BossPhaseTwoHealthRatio = 0.66f;

@@ -5,6 +5,7 @@
 #include "AIController.h"
 #include "AI/Data/EnemyArchetypeData.h"
 #include "AI/Data/EnemyLLMEvaluation.h"
+#include "AI/Debug/EnemyAIDebugUtils.h"
 #include "AI/Debug/EnemyAIRangeVisualizationComponent.h"
 #include "BrainComponent.h"
 #include "AbilitySystem/Abilities/Enemy/GP_BossAreaAttack.h"
@@ -381,6 +382,15 @@ void AGP_EnemyCharacter::TryStartTurnInPlace(const FVector* OverrideTargetLocati
 
 	bTurnInPlaceActive = true;
 	bRestoreOrientRotationToMovementAfterTurn = MovementComponent->bOrientRotationToMovement;
+	UE_LOG(
+		LogEnemyAI,
+		Log,
+		TEXT("[MoveTrace] TurnStop Pawn=%s Pos=%s TargetYaw=%.1f DeltaYaw=%.1f Seq=%s"),
+		*GetName(),
+		*GetActorLocation().ToCompactString(),
+		DesiredYawDegrees,
+		SignedYawDeltaDegrees,
+		*GetNameSafe(TurnSequence));
 	MovementComponent->StopMovementImmediately();
 	MovementComponent->bOrientRotationToMovement = false;
 	TurnInPlaceElapsedSeconds = 0.0f;
@@ -399,6 +409,14 @@ void AGP_EnemyCharacter::StopTurnInPlace(bool bStopAnimation)
 	{
 		MovementComponent->bOrientRotationToMovement = bRestoreOrientRotationToMovementAfterTurn;
 	}
+
+	UE_LOG(
+		LogEnemyAI,
+		Log,
+		TEXT("[MoveTrace] TurnEnd Pawn=%s Pos=%s StopAnimation=%d"),
+		*GetName(),
+		*GetActorLocation().ToCompactString(),
+		bStopAnimation ? 1 : 0);
 
 	if (bStopAnimation)
 	{

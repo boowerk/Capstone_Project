@@ -64,6 +64,13 @@ EBTNodeResult::Type UBTT_ExecuteEnemyAttack::ExecuteTask(UBehaviorTreeComponent&
 
 	if (bStopMovementBeforeAttack)
 	{
+		UE_LOG(
+			LogEnemyAI,
+			Log,
+			TEXT("[MoveTrace] AttackStop Pawn=%s Pos=%s Target=%s"),
+			*GetNameSafe(ControlledPawn),
+			*ControlledPawn->GetActorLocation().ToCompactString(),
+			*EnemyAIDebugUtils::DescribeActor(EnemyBTTaskCommon::GetTargetActor(BlackboardComponent)));
 		AIController->StopMovement();
 	}
 
@@ -111,6 +118,13 @@ EBTNodeResult::Type UBTT_ExecuteEnemyAttack::ExecuteTask(UBehaviorTreeComponent&
 
 	if (bActivated)
 	{
+		UE_LOG(
+			LogEnemyAI,
+			Log,
+			TEXT("[MoveTrace] AttackActivated Pawn=%s Pos=%s Tag=%s"),
+			*GetNameSafe(ControlledPawn),
+			*ControlledPawn->GetActorLocation().ToCompactString(),
+			*EffectiveAttackAbilityTag.ToString());
 		if (AGP_EnemyCharacter* EnemyCharacter = Cast<AGP_EnemyCharacter>(ControlledPawn))
 		{
 			// Start cadence only after GAS accepts the attack; rejected activations must remain immediately retryable.
