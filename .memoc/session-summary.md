@@ -2,20 +2,23 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-07-14T04:14:00+09:00
+updated: 2026-07-17T15:02:00+09:00
 status: active
-tags: [memoc, memoc/state]
+tags:
+  - memoc
+  - memoc/state
+created: 2026-07-17T06:03:26
 ---
 # Session Summary
 
 ## Status
-- `L_LandscapeMap` restored to pre-deck LFS `ba9e714a...`; sculpt/collision returned and test-deck actor count is zero.
-- Removed the destructive deck generator and obsolete assets/docs.
-- Added `ProjectEden.Game.LandscapeMap.Integrity` regression coverage.
+- FurnaceWalker attack is now one synchronized pair: `AM_FW_Attack` upper montage + `A_FW_Sword_Attack_RM` lower root motion.
+- Basic-enemy cadence starts after ability recovery/end, not activation; `bBasicEnemyAttackInProgress` also locks BT chase/reposition during the full attack. Missing hit notifies use a 0.55s fallback rather than recovery-end damage.
 
 ## Verified
-- Editor map load/PIE, Project_EdenEditor build, LandscapeMap integrity test pass.
+- `Project_EdenEditor Win64 Development` build passed.
+- Editor MCP reloaded `PDA_FW_EnemyAnimationSet` with the intended one-to-one montage/root mapping.
 
 ## Handoff
-- Original PlayerStart `(0,0,92)` is below the sculpt surface and may need relocation.
-- Preserve user changes in `TestMap`, `WorldEventTestMap`, `DA_RegionEventData`, and `L_MainMap`.
+- PIE-check FurnaceWalker: approach → prepare/strike/recover → cooldown → reattack or chase.
+- Confirm `AM_FW_Attack` has `Enemy.AttackHit` at its hit frame and `Enemy.ActionEnd` after recovery.
