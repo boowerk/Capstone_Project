@@ -303,7 +303,18 @@ void AGP_EnemyCharacter::UpdateTurnInPlace(float DeltaSeconds)
 	TryStartTurnInPlace();
 }
 
-void AGP_EnemyCharacter::TryStartTurnInPlace()
+void AGP_EnemyCharacter::StartTurnInPlaceForTarget(const AActor* TargetActor)
+{
+	if (!IsValid(TargetActor))
+	{
+		return;
+	}
+
+	const FVector TargetLocation = TargetActor->GetActorLocation();
+	TryStartTurnInPlace(&TargetLocation);
+}
+
+void AGP_EnemyCharacter::TryStartTurnInPlace(const FVector* OverrideTargetLocation)
 {
 	if (bBasicEnemyAttackInProgress || !IsValid(GetController()))
 	{
@@ -320,7 +331,15 @@ void AGP_EnemyCharacter::TryStartTurnInPlace()
 	// drive ControlRotation from that target.  ControlRotation therefore remains aligned
 	// to the pawn while stationary and cannot be used to detect an in-place turn.
 	float DesiredYawDegrees = GetController()->GetControlRotation().Yaw;
-	if (const AAIController* AIController = Cast<AAIController>(GetController()))
+	if (OverrideTargetLocation != nullptr)
+	{
+		const FVector TargetDirection = (*OverrideTargetLocation - GetActorLocation()).GetSafeNormal2D();
+		if (!TargetDirection.IsNearlyZero())
+		{
+			DesiredYawDegrees = TargetDirection.Rotation().Yaw;
+		}
+	}
+	else if (const AAIController* AIController = Cast<AAIController>(GetController()))
 	{
 		if (const UBlackboardComponent* BlackboardComponent = AIController->GetBlackboardComponent())
 		{
@@ -352,7 +371,7 @@ void AGP_EnemyCharacter::TryStartTurnInPlace()
 	// The retargeted turn sequences carry their own rotational root motion.
 	// Let that montage turn the capsule so the body motion and facing stay synchronized.
 	AnimInstance->SetRootMotionMode(ERootMotionMode::RootMotionFromMontagesOnly);
-	if (!AnimInstance->PlaySlotAnimationAsDynamicMontage(TurnSequence, TurnInPlaceSlotName, 0.08f, 0.08f, SafePlayRate, 1, 0.0f, 0.0f))
+	if (!AnimInstance->PlaySlotAnimationAsDynamicMontage(TurnSequence, TurnInPlaceSlotName, 0.18f, 0.18f, SafePlayRate, 1, 0.0f, 0.0f))
 	{
 		return;
 	}
@@ -382,7 +401,7 @@ void AGP_EnemyCharacter::StopTurnInPlace(bool bStopAnimation)
 	{
 		if (UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr)
 		{
-			AnimInstance->StopSlotAnimation(0.08f, TurnInPlaceSlotName);
+			AnimInstance->StopSlotAnimation(0.18f, TurnInPlaceSlotName);
 		}
 	}
 

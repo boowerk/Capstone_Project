@@ -7,6 +7,7 @@
 #include "GameplayTagContainer.h"
 #include "GP_EnemyCharacter.generated.h"
 
+class AActor;
 class UAbilitySystemComponent;
 class UAttributeSet;
 class UBehaviorTree;
@@ -139,6 +140,7 @@ public:
 	bool IsBasicEnemyAttackReady() const;
 	bool IsBasicEnemyAttackInProgress() const { return bBasicEnemyAttackInProgress; }
 	bool IsTurnInPlaceActive() const { return bTurnInPlaceActive; }
+	void StartTurnInPlaceForTarget(const AActor* TargetActor);
 	void SetBasicEnemyAttackInProgress(bool bInProgress) { bBasicEnemyAttackInProgress = bInProgress; }
 
 	// Returns the newly rolled delay so attack logs and tests can inspect the selected cadence.
@@ -384,7 +386,7 @@ private:
 	void UnbindMoveSpeedAttribute();
 	void InitializeBasicEnemyAttackCadence();
 	void UpdateTurnInPlace(float DeltaSeconds);
-	void TryStartTurnInPlace();
+	void TryStartTurnInPlace(const FVector* OverrideTargetLocation = nullptr);
 	void StopTurnInPlace(bool bStopAnimation);
 	UAnimSequence* SelectTurnInPlaceAnimation(float SignedYawDeltaDegrees) const;
 	void SetTurnInPlaceAnimGraphFlag(bool bActive) const;
