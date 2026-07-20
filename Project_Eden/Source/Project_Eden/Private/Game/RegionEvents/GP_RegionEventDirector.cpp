@@ -182,7 +182,8 @@ AGP_RegionEventActor* AGP_RegionEventDirector::TryStartGuidedRegionEventAtLocati
 	FName EventId,
 	int32 RegionId,
 	FVector SpawnLocation,
-	float DormantWaitTimeoutSeconds)
+	float DormantWaitTimeoutSeconds,
+	int32 RequiredApproachPlayers)
 {
 	if (!HasAuthority() || !bEnableRegionEvents)
 	{
@@ -201,7 +202,8 @@ AGP_RegionEventActor* AGP_RegionEventDirector::TryStartGuidedRegionEventAtLocati
 		SelectedEvent,
 		/*bExplorationEvent=*/true,
 		/*bOverrideDormantTimeout=*/true,
-		FMath::Max(-1.0f, DormantWaitTimeoutSeconds));
+		FMath::Max(-1.0f, DormantWaitTimeoutSeconds),
+		FMath::Max(1, RequiredApproachPlayers));
 }
 
 void AGP_RegionEventDirector::SetAmbientExplorationSuppressed(bool bSuppressed)
@@ -267,7 +269,8 @@ AGP_RegionEventActor* AGP_RegionEventDirector::SpawnSelectedEvent(
 		SelectedEvent,
 		bExplorationEvent,
 		/*bOverrideDormantTimeout=*/false,
-		/*DormantTimeoutOverride=*/-1.0f);
+		/*DormantTimeoutOverride=*/-1.0f,
+		/*RequiredApproachPlayers=*/1);
 }
 
 AGP_RegionEventActor* AGP_RegionEventDirector::SpawnSelectedEvent(
@@ -276,7 +279,8 @@ AGP_RegionEventActor* AGP_RegionEventDirector::SpawnSelectedEvent(
 	const UGP_RegionEventData* SelectedEvent,
 	bool bExplorationEvent,
 	bool bOverrideDormantTimeout,
-	float DormantTimeoutOverride)
+	float DormantTimeoutOverride,
+	int32 RequiredApproachPlayers)
 {
 	if (!HasAuthority() || !bEnableRegionEvents || !IsValid(SelectedEvent))
 	{
@@ -344,7 +348,17 @@ AGP_RegionEventActor* AGP_RegionEventDirector::SpawnSelectedEvent(
 			: (SelectedEvent->DormantWaitTimeoutSeconds > 0.0f
 				? SelectedEvent->DormantWaitTimeoutSeconds
 				: 55.0f);
-		EventActor->ConfigureExplorationActivation(ActivationRadius, DormantTimeout);
+		if (bOverrideDormantTimeout)
+		{
+			EventActor->ConfigureGuidedExplorationActivation(
+				ActivationRadius,
+				DormantTimeout,
+				RequiredApproachPlayers);
+		}
+		else
+		{
+			EventActor->ConfigureExplorationActivation(ActivationRadius, DormantTimeout);
+		}
 	}
 	OnRegionEventStarted.Broadcast(this, EventActor);
 	if (!bExplorationEvent && bAutoActivateSpawnedEvents)

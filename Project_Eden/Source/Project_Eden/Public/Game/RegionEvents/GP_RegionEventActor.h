@@ -67,8 +67,18 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Region Event|Discovery")
 	void ConfigureExplorationActivation(float InActivationRadius, float InDormantTimeoutSeconds);
 
+	// Guided objectives wait for a party quorum; the effective requirement clamps to currently possessed players.
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Region Event|Discovery")
+	void ConfigureGuidedExplorationActivation(
+		float InActivationRadius,
+		float InDormantTimeoutSeconds,
+		int32 InRequiredApproachPlayers);
+
 	UFUNCTION(BlueprintPure, Category = "Region Event|Discovery")
 	bool IsWaitingForPlayerApproach() const { return bWaitingForPlayerApproach; }
+
+	UFUNCTION(BlueprintPure, Category = "Region Event|Discovery")
+	int32 GetRequiredApproachPlayerCount() const { return RequiredApproachPlayerCount; }
 
 	UFUNCTION(BlueprintPure, Category = "Region Event|Enemy")
 	int32 GetAliveSpawnedEnemyCount() const;
@@ -190,12 +200,14 @@ private:
 	bool bWaitingForPlayerApproach = false;
 	float ApproachActivationRadiusOverride = 700.0f;
 	float DormantWaitTimeoutOverride = -1.0f;
+	int32 RequiredApproachPlayerCount = 1;
 
 	void DispatchStatePresentation(EGPRegionEventRuntimeState PresentedState);
 	void RefreshWorldMarkerPresentation();
 	void BeginWaitingForPlayerApproach();
 	void StopWaitingForPlayerApproach();
 	void TryActivateFromCurrentOverlaps();
+	bool HasApproachPlayerQuorum(int32 OverlappingPlayerCount, int32 PossessedPlayerCount) const;
 	void HandleDormantWaitTimeout();
 	void ApplyCorruptionOutcome(bool bCompletedSuccessfully) const;
 	void RetireSpawnedEnemies();

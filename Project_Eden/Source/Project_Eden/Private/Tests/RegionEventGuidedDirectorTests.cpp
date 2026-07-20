@@ -71,7 +71,11 @@ bool FGPRegionEventGuidedDirectorControlTest::RunTest(const FString& Parameters)
 	if (RedRift)
 	{
 		TestTrue(TEXT("Guided production id resolves to the Red Rift actor"), RedRift->IsA<AGP_RedRiftRegionEventActor>());
-		TestEqual(TEXT("Guided actor keeps the specifically requested EventId"), RedRift->GetEventData()->EventId, FName(TEXT("world_red_rift")));
+		TestNotNull(TEXT("Guided actor keeps its production data"), RedRift->GetEventData());
+		if (RedRift->GetEventData())
+		{
+			TestEqual(TEXT("Guided actor keeps the specifically requested EventId"), RedRift->GetEventData()->EventId, FName(TEXT("world_red_rift")));
+		}
 		TestEqual(TEXT("Guided event keeps the requested region"), RedRift->GetRegionId(), 2);
 		TestTrue(
 			TEXT("Director spawn offset is applied exactly once"),
@@ -82,6 +86,7 @@ bool FGPRegionEventGuidedDirectorControlTest::RunTest(const FString& Parameters)
 			RedRift->GetRuntimeState(),
 			EGPRegionEventRuntimeState::Dormant);
 		TestTrue(TEXT("Guided event is waiting for approach"), RedRift->IsWaitingForPlayerApproach());
+		TestEqual(TEXT("Guided event requires the configured party quorum"), RedRift->GetRequiredApproachPlayerCount(), 2);
 		TestEqual(TEXT("Negative guided timeout remains unlimited"), RedRift->GetConfiguredDormantWaitTimeout(), -1.0f);
 		TestFalse(
 			TEXT("Unlimited guided discovery owns no dormant-expiration timer"),
@@ -100,6 +105,12 @@ bool FGPRegionEventGuidedDirectorControlTest::RunTest(const FString& Parameters)
 		3,
 		FVector(500.0f, 0.0f, 0.0f));
 	TestNotNull(TEXT("Completing a guided event reopens exploration capacity"), Shrine);
+	if (Shrine)
+	{
+		TestFalse(TEXT("One of three players cannot satisfy a guided quorum"), Shrine->HasApproachPlayerQuorum(1, 3));
+		TestTrue(TEXT("Two of three players satisfy a guided quorum"), Shrine->HasApproachPlayerQuorum(2, 3));
+		TestTrue(TEXT("A one-player local run clamps the quorum"), Shrine->HasApproachPlayerQuorum(1, 1));
+	}
 
 	Director->bEnableExplorationEvents = true;
 	Director->ObservedRegionId = 4;

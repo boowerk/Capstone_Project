@@ -39,12 +39,13 @@ public:
 		EGPRegionEventTrigger Trigger = EGPRegionEventTrigger::ZoneStarted);
 
 	// Guided demo beats select a stable production id while retaining exploration ownership and lifecycle handling.
-	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Region Event|Guided", meta = (AdvancedDisplay = "DormantWaitTimeoutSeconds"))
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Region Event|Guided", meta = (AdvancedDisplay = "DormantWaitTimeoutSeconds,RequiredApproachPlayers"))
 	AGP_RegionEventActor* TryStartGuidedRegionEventAtLocation(
 		FName EventId,
 		int32 RegionId,
 		FVector SpawnLocation,
-		float DormantWaitTimeoutSeconds = -1.0f);
+		float DormantWaitTimeoutSeconds = -1.0f,
+		int32 RequiredApproachPlayers = 2);
 
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Region Event|Exploration")
 	void SetAmbientExplorationSuppressed(bool bSuppressed);
@@ -188,7 +189,8 @@ private:
 		const UGP_RegionEventData* SelectedEvent,
 		bool bExplorationEvent,
 		bool bOverrideDormantTimeout,
-		float DormantTimeoutOverride);
+		float DormantTimeoutOverride,
+		int32 RequiredApproachPlayers);
 	const UGP_RegionEventData* FindUniqueExplorationEventById(FName EventId) const;
 	void StartExplorationScheduler();
 	void StopExplorationScheduler();
