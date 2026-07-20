@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Game/Demo/GP_DemoRunFlowPolicy.h"
 #include "GameFramework/GameModeBase.h"
 #include "GP_GameMode.generated.h"
 
@@ -30,6 +31,11 @@ class PROJECT_EDEN_API AGP_GameMode : public AGameModeBase
 
 public:
 	AGP_GameMode();
+	virtual void InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage) override;
+
+	int32 GetDemoRunSeed() const { return DemoRunSeed; }
+	bool HasValidDemoRunRoute() const { return bHasValidDemoRunRoute; }
+	const FGPDemoRunRoute& GetDemoRunRoute() const { return DemoRunRoute; }
 
 	// Manual trigger — bypasses overlap and immediately spawns zone 0. Use from BP if needed.
 	UFUNCTION(BlueprintCallable, Category = "Run")
@@ -122,6 +128,13 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Network|Spawn", meta = (ClampMin = "150.0", Units = "cm"))
 	float PartyPlayerStartSpacing = 260.0f;
 
+	// Only the production landscape replaces its authored center anchor with a shared peripheral party cluster.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Network|Spawn")
+	bool bUsePeripheralPartyStarts = true;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Network|Spawn", meta = (EditCondition = "bUsePeripheralPartyStarts"))
+	FString PeripheralStartMapToken = TEXT("L_LandscapeMap");
+
 private:
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<AGP_EnemySpawnVolume>> OrderedZones;
@@ -147,10 +160,32 @@ private:
 	bool bRunStarted = false;
 	bool bRunFinished = false;
 	bool bPartyPlayerStartsInitialized = false;
+	bool bDemoRunSeedInitialized = false;
+	bool bHasValidDemoRunRoute = false;
+	int32 DemoRunSeed = 0;
+	FString InitializedMapName;
+
+	UPROPERTY(Transient)
+	FGPDemoRunRoute DemoRunRoute;
 
 	FTimerHandle ReturnToLobbyTimerHandle;
 
 	void EnsurePartyPlayerStarts(AController* Player);
+	void EnsureDemoRunSeed();
+	void InitializeDemoRunSeed(const FString& MapName, const FString& Options);
+	bool ShouldUsePeripheralPartyStarts() const;
+	bool CollectDemoRegionSeedPoints(TArray<FGPDemoRegionSeedPoint>& OutSeedPoints) const;
+	bool TryInitializePeripheralPartyStarts(const APawn* PawnToFit);
+	bool TryResolvePeripheralClusterTransforms(
+		const FGPDemoRunRoute& Route,
+		const APawn* PawnToFit,
+		TArray<FTransform>& OutTransforms) const;
+	bool ResolveSafePeripheralStartTransform(
+		const FVector& DesiredLocation,
+		const FRotator& DesiredRotation,
+		const APawn* PawnToFit,
+		FTransform& OutTransform) const;
+	bool SpawnPeripheralPartyStartsAtomically(const TArray<FTransform>& StartTransforms);
 	APlayerStart* SpawnRuntimePartyPlayerStart(
 		const APlayerStart& Anchor,
 		const APawn* PawnToFit,

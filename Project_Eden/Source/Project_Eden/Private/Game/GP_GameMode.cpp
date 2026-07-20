@@ -40,6 +40,12 @@ AGP_GameMode::AGP_GameMode()
 	bUseSeamlessTravel = true;
 }
 
+void AGP_GameMode::InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage)
+{
+	Super::InitGame(MapName, Options, ErrorMessage);
+	InitializeDemoRunSeed(MapName, Options);
+}
+
 AActor* AGP_GameMode::ChoosePlayerStart_Implementation(AController* Player)
 {
 	EnsurePartyPlayerStarts(Player);
@@ -76,6 +82,7 @@ void AGP_GameMode::EnsurePartyPlayerStarts(AController* Player)
 	{
 		return;
 	}
+	EnsureDemoRunSeed();
 
 	TArray<APlayerStart*> AuthoredStarts;
 	for (TActorIterator<APlayerStart> It(World); It; ++It)
@@ -90,6 +97,14 @@ void AGP_GameMode::EnsurePartyPlayerStarts(AController* Player)
 		// Actor paths are serialized and provide deterministic slot order across server runs.
 		return Left.GetPathName() < Right.GetPathName();
 	});
+
+	UClass* PawnClass = GetDefaultPawnClassForController(Player);
+	const APawn* PawnToFit = PawnClass ? PawnClass->GetDefaultObject<APawn>() : nullptr;
+	if (TryInitializePeripheralPartyStarts(PawnToFit))
+	{
+		bPartyPlayerStartsInitialized = true;
+		return;
+	}
 
 	if (AuthoredStarts.IsEmpty())
 	{
@@ -111,8 +126,6 @@ void AGP_GameMode::EnsurePartyPlayerStarts(AController* Player)
 	}
 
 	const APlayerStart& Anchor = *AuthoredStarts[0];
-	UClass* PawnClass = GetDefaultPawnClassForController(Player);
-	const APawn* PawnToFit = PawnClass ? PawnClass->GetDefaultObject<APawn>() : nullptr;
 	static const FVector CandidateDirections[] =
 	{
 		FVector(0.0f, 1.0f, 0.0f),
@@ -168,6 +181,324 @@ void AGP_GameMode::EnsurePartyPlayerStarts(AController* Player)
 			FMath::Min(AuthoredStarts.Num(), RequiredPartyPlayerStartCount),
 			RuntimePartyPlayerStarts.Num());
 	}
+}
+
+void AGP_GameMode::EnsureDemoRunSeed()
+{
+	if (bDemoRunSeedInitialized)
+	{
+		return;
+	}
+
+	const UWorld* World = GetWorld();
+	InitializeDemoRunSeed(World ? World->GetMapName() : FString(), FString());
+}
+
+void AGP_GameMode::InitializeDemoRunSeed(const FString& MapName, const FString& Options)
+{
+	if (bDemoRunSeedInitialized)
+	{
+		return;
+	}
+
+	InitializedMapName = MapName;
+	const FString OptionSeed = UGameplayStatics::ParseOption(Options, TEXT("DemoSeed"));
+	int32 ParsedSeed = 0;
+	bool bUsedExplicitSeed = !OptionSeed.IsEmpty() && LexTryParseString(ParsedSeed, *OptionSeed);
+	if (!bUsedExplicitSeed)
+	{
+		bUsedExplicitSeed = FParse::Value(FCommandLine::Get(), TEXT("DemoRunSeed="), ParsedSeed);
+	}
+
+	if (bUsedExplicitSeed)
+	{
+		DemoRunSeed = ParsedSeed;
+	}
+	else
+	{
+		const uint64 Cycles = FPlatformTime::Cycles64();
+		const uint32 TimeBits = static_cast<uint32>(Cycles) ^ static_cast<uint32>(Cycles >> 32);
+		DemoRunSeed = static_cast<int32>(HashCombineFast(GetTypeHash(MapName), TimeBits));
+	}
+	bDemoRunSeedInitialized = true;
+
+	UE_LOG(
+		LogTemp,
+		Display,
+		TEXT("[DemoFlow] Run seed %d selected for '%s' (%s)."),
+		DemoRunSeed,
+		*MapName,
+		bUsedExplicitSeed ? TEXT("explicit") : TEXT("generated"));
+}
+
+bool AGP_GameMode::ShouldUsePeripheralPartyStarts() const
+{
+	if (!bUsePeripheralPartyStarts || RequiredPartyPlayerStartCount != 3 || PeripheralStartMapToken.IsEmpty())
+	{
+		return false;
+	}
+
+	const UWorld* World = GetWorld();
+	const FString RuntimeMapName = World ? World->GetMapName() : FString();
+	return InitializedMapName.Contains(PeripheralStartMapToken)
+		|| RuntimeMapName.Contains(PeripheralStartMapToken)
+		|| (World && World->GetName().Contains(PeripheralStartMapToken));
+}
+
+bool AGP_GameMode::CollectDemoRegionSeedPoints(TArray<FGPDemoRegionSeedPoint>& OutSeedPoints) const
+{
+	OutSeedPoints.Reset();
+	UWorld* World = GetWorld();
+	UGP_RegionSpatialSubsystem* RegionSpatial = World
+		? World->GetSubsystem<UGP_RegionSpatialSubsystem>()
+		: nullptr;
+	if (!IsValid(RegionSpatial))
+	{
+		return false;
+	}
+
+	// ChoosePlayerStart may run before subsystem BeginPlay, so refresh the authored actors explicitly.
+	RegionSpatial->RefreshRegionSeeds();
+	for (int32 RegionId = 0; RegionId < RegionSpatial->GetRegionCount(); ++RegionId)
+	{
+		FVector SeedLocation = FVector::ZeroVector;
+		if (RegionSpatial->GetSeedLocation(RegionId, SeedLocation))
+		{
+			FGPDemoRegionSeedPoint& Point = OutSeedPoints.AddDefaulted_GetRef();
+			Point.RegionId = RegionId;
+			Point.WorldLocation = SeedLocation;
+		}
+	}
+	return OutSeedPoints.Num() >= 5;
+}
+
+bool AGP_GameMode::TryInitializePeripheralPartyStarts(const APawn* PawnToFit)
+{
+	if (!ShouldUsePeripheralPartyStarts())
+	{
+		return false;
+	}
+
+	bHasValidDemoRunRoute = false;
+	DemoRunRoute = FGPDemoRunRoute();
+	TArray<FGPDemoRegionSeedPoint> SeedPoints;
+	FGPDemoRunRoute InitialRoute;
+	if (!CollectDemoRegionSeedPoints(SeedPoints)
+		|| !GPDemoRunFlowPolicy::BuildInwardRoute(SeedPoints, DemoRunSeed, InitialRoute))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[DemoFlow] Peripheral route unavailable; using the authored start fallback."));
+		return false;
+	}
+
+	for (const int32 PeripheralRegionId : InitialRoute.PeripheralCandidateRegionIds)
+	{
+		FGPDemoRunRoute CandidateRoute;
+		TArray<FTransform> CandidateTransforms;
+		if (!GPDemoRunFlowPolicy::BuildInwardRouteFromOuterRegion(
+				SeedPoints,
+				DemoRunSeed,
+				PeripheralRegionId,
+				CandidateRoute)
+			|| !TryResolvePeripheralClusterTransforms(CandidateRoute, PawnToFit, CandidateTransforms)
+			|| !SpawnPeripheralPartyStartsAtomically(CandidateTransforms))
+		{
+			continue;
+		}
+
+		DemoRunRoute = MoveTemp(CandidateRoute);
+		bHasValidDemoRunRoute = true;
+		UE_LOG(
+			LogTemp,
+			Display,
+			TEXT("[DemoFlow] Prepared a three-player peripheral cluster in region %d for run seed %d."),
+			PeripheralRegionId,
+			DemoRunSeed);
+		return true;
+	}
+
+	UE_LOG(
+		LogTemp,
+		Warning,
+		TEXT("[DemoFlow] No peripheral region produced three safe starts; using the authored start fallback."));
+	return false;
+}
+
+bool AGP_GameMode::TryResolvePeripheralClusterTransforms(
+	const FGPDemoRunRoute& Route,
+	const APawn* PawnToFit,
+	TArray<FTransform>& OutTransforms) const
+{
+	OutTransforms.Reset();
+	const FGPDemoRoutePoint* OuterStart = Route.FindPoint(EGPDemoRouteRole::OuterStart);
+	if (!OuterStart)
+	{
+		return false;
+	}
+
+	const FVector InwardDirection = (Route.CenterLocation - OuterStart->WorldLocation).GetSafeNormal2D();
+	if (InwardDirection.IsNearlyZero())
+	{
+		return false;
+	}
+	const FRotator InwardRotation = InwardDirection.Rotation();
+	const FVector BaseRight = FVector::CrossProduct(FVector::UpVector, InwardDirection).GetSafeNormal2D();
+	const float FormationAngles[] = {0.0f, 45.0f, 90.0f, 135.0f};
+	for (const float FormationAngle : FormationAngles)
+	{
+		TArray<FTransform> CandidateTransforms;
+		const FVector FormationAxis = BaseRight.RotateAngleAxis(FormationAngle, FVector::UpVector);
+		const FVector FormationOffsets[] =
+		{
+			FVector::ZeroVector,
+			FormationAxis * PartyPlayerStartSpacing,
+			FormationAxis * -PartyPlayerStartSpacing
+		};
+		bool bFormationValid = true;
+		for (const FVector& Offset : FormationOffsets)
+		{
+			FTransform ResolvedTransform;
+			if (!ResolveSafePeripheralStartTransform(
+				OuterStart->WorldLocation + Offset,
+				InwardRotation,
+				PawnToFit,
+				ResolvedTransform))
+			{
+				bFormationValid = false;
+				break;
+			}
+			CandidateTransforms.Add(ResolvedTransform);
+		}
+
+		const float MinimumSeparation = FMath::Max(150.0f, PartyPlayerStartSpacing * 0.6f);
+		for (int32 FirstIndex = 0; bFormationValid && FirstIndex < CandidateTransforms.Num(); ++FirstIndex)
+		{
+			for (int32 SecondIndex = FirstIndex + 1; SecondIndex < CandidateTransforms.Num(); ++SecondIndex)
+			{
+				if (FVector::Dist2D(
+						CandidateTransforms[FirstIndex].GetLocation(),
+						CandidateTransforms[SecondIndex].GetLocation()) < MinimumSeparation)
+				{
+					bFormationValid = false;
+					break;
+				}
+			}
+		}
+
+		if (bFormationValid && CandidateTransforms.Num() == RequiredPartyPlayerStartCount)
+		{
+			OutTransforms = MoveTemp(CandidateTransforms);
+			return true;
+		}
+	}
+	return false;
+}
+
+bool AGP_GameMode::ResolveSafePeripheralStartTransform(
+	const FVector& DesiredLocation,
+	const FRotator& DesiredRotation,
+	const APawn* PawnToFit,
+	FTransform& OutTransform) const
+{
+	UWorld* World = GetWorld();
+	if (!IsValid(World) || DesiredLocation.ContainsNaN())
+	{
+		return false;
+	}
+
+	float MinimumWalkableNormalZ = 0.7f;
+	if (const ACharacter* CharacterToFit = Cast<ACharacter>(PawnToFit))
+	{
+		if (const UCharacterMovementComponent* Movement = CharacterToFit->GetCharacterMovement())
+		{
+			MinimumWalkableNormalZ = Movement->GetWalkableFloorZ();
+		}
+	}
+
+	const auto SnapToWalkableGround = [World, PawnToFit, MinimumWalkableNormalZ](FVector& InOutLocation)
+	{
+		FHitResult GroundHit;
+		FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(GP_PeripheralPartyStartGround), false);
+		const FVector TraceStart(InOutLocation.X, InOutLocation.Y, InOutLocation.Z + 6000.0f);
+		const FVector TraceEnd(InOutLocation.X, InOutLocation.Y, InOutLocation.Z - 10000.0f);
+		if (!World->LineTraceSingleByObjectType(
+			GroundHit,
+			TraceStart,
+			TraceEnd,
+			FCollisionObjectQueryParams(ECC_WorldStatic),
+			QueryParams)
+			|| GroundHit.ImpactNormal.Z < MinimumWalkableNormalZ)
+		{
+			return false;
+		}
+
+		const float PawnHalfHeight = PawnToFit ? PawnToFit->GetDefaultHalfHeight() : 96.0f;
+		InOutLocation.Z = GroundHit.ImpactPoint.Z + PawnHalfHeight + 2.0f;
+		return true;
+	};
+
+	FVector ResolvedLocation = DesiredLocation;
+	if (!SnapToWalkableGround(ResolvedLocation))
+	{
+		return false;
+	}
+	if (PawnToFit
+		&& World->EncroachingBlockingGeometry(PawnToFit, ResolvedLocation, DesiredRotation)
+		&& !World->FindTeleportSpot(PawnToFit, ResolvedLocation, DesiredRotation))
+	{
+		return false;
+	}
+	if (!SnapToWalkableGround(ResolvedLocation)
+		|| (PawnToFit && World->EncroachingBlockingGeometry(PawnToFit, ResolvedLocation, DesiredRotation)))
+	{
+		return false;
+	}
+
+	OutTransform = FTransform(DesiredRotation, ResolvedLocation);
+	return true;
+}
+
+bool AGP_GameMode::SpawnPeripheralPartyStartsAtomically(const TArray<FTransform>& StartTransforms)
+{
+	UWorld* World = GetWorld();
+	if (!IsValid(World) || StartTransforms.Num() != RequiredPartyPlayerStartCount)
+	{
+		return false;
+	}
+
+	TArray<APlayerStart*> SpawnedStarts;
+	for (const FTransform& StartTransform : StartTransforms)
+	{
+		FActorSpawnParameters SpawnParameters;
+		SpawnParameters.ObjectFlags |= RF_Transient;
+		SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		APlayerStart* RuntimeStart = World->SpawnActor<APlayerStart>(
+			APlayerStart::StaticClass(),
+			StartTransform,
+			SpawnParameters);
+		if (!IsValid(RuntimeStart))
+		{
+			for (APlayerStart* PartialStart : SpawnedStarts)
+			{
+				if (IsValid(PartialStart))
+				{
+					PartialStart->Destroy();
+				}
+			}
+			return false;
+		}
+		RuntimeStart->SetReplicates(false);
+		RuntimeStart->Tags.AddUnique(TEXT("GP.RuntimePartyStart"));
+		RuntimeStart->Tags.AddUnique(TEXT("GP.PeripheralPartyStart"));
+		SpawnedStarts.Add(RuntimeStart);
+	}
+
+	// Publish the cluster only after all three actors exist, preventing partial slots from leaking into fallback logic.
+	for (APlayerStart* RuntimeStart : SpawnedStarts)
+	{
+		RuntimePartyPlayerStarts.Add(RuntimeStart);
+		PartyPlayerStartSlots.Add(RuntimeStart);
+	}
+	return true;
 }
 
 APlayerStart* AGP_GameMode::SpawnRuntimePartyPlayerStart(
