@@ -17,6 +17,7 @@
 #include "AbilitySystem/GP_AbilitySystemComponent.h"
 #include "AbilitySystem/GP_AttributeSet.h"
 #include "Animation/AnimInstance.h"
+#include "Animation/AnimSequence.h"
 #include "Animation/PDA_EnemyAnimationSet.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/DataTable.h"
@@ -31,12 +32,14 @@
 #include "UI/GP_AttributeWidget.h"
 #include "UI/GP_WidgetComponent.h"
 #include "UObject/ConstructorHelpers.h"
+#include "UObject/UnrealType.h"
 #include "VFX/GP_BossDeathPresentationComponent.h"
 #include "VFX/GP_BossTargetMarkerVFXComponent.h"
 
 AGP_EnemyCharacter::AGP_EnemyCharacter()
 {
-	PrimaryActorTick.bCanEverTick = false;
+	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bStartWithTickEnabled = false;
 
 	// Blueprint-only regular enemies (including FurnaceWalker) otherwise inherit
 	// CharacterMovement's unspecified turn defaults.  Keep their body aligned
@@ -99,6 +102,12 @@ AGP_EnemyCharacter::AGP_EnemyCharacter()
 	// Editor-only shapes make the gameplay ranges visible without adding runtime collision.
 	RefreshAIRangeVisualizers();
 #endif
+}
+
+void AGP_EnemyCharacter::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	UpdateTurnInPlace(DeltaSeconds);
 }
 
 UAttributeSet* AGP_EnemyCharacter::GetAttributeSet() const
@@ -186,6 +195,7 @@ void AGP_EnemyCharacter::BeginPlay()
 	Super::BeginPlay();
 	RefreshWorldHealthBarVisibility();
 	InitializeBasicEnemyAttackCadence();
+	SetActorTickEnabled(bEnableTurnInPlace);
 
 	if (IsValid(EnemyAnimationSet))
 	{
@@ -252,6 +262,7 @@ void AGP_EnemyCharacter::BeginPlay()
 
 void AGP_EnemyCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	StopTurnInPlace(false);
 	UnbindMoveSpeedAttribute();
 	if (IsValid(BossTargetMarkerVFXComponent))
 	{
@@ -260,6 +271,135 @@ void AGP_EnemyCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	}
 
 	Super::EndPlay(EndPlayReason);
+}
+
+void AGP_EnemyCharacter::UpdateTurnInPlace(float DeltaSeconds)
+{
+	if (!bEnableTurnInPlace || bIsDead)
+	{
+		return;
+	}
+
+	if (bTurnInPlaceActive)
+	{
+		if (bBasicEnemyAttackInProgress)
+		{
+			StopTurnInPlace(true);
+			return;
+		}
+
+		TurnInPlaceElapsedSeconds += DeltaSeconds;
+		const float Alpha = FMath::Clamp(TurnInPlaceElapsedSeconds / FMath::Max(TurnInPlaceDurationSeconds, KINDA_SMALL_NUMBER), 0.0f, 1.0f);
+		SetActorRotation(FRotator(0.0f, TurnInPlaceStartYawDegrees + (TurnInPlaceDeltaYawDegrees * Alpha), 0.0f));
+
+		if (Alpha >= 1.0f)
+		{
+			StopTurnInPlace(false);
+		}
+		return;
+	}
+
+	TryStartTurnInPlace();
+}
+
+void AGP_EnemyCharacter::TryStartTurnInPlace()
+{
+	if (bBasicEnemyAttackInProgress || !IsValid(GetController()))
+	{
+		return;
+	}
+
+	UCharacterMovementComponent* MovementComponent = GetCharacterMovement();
+	if (!IsValid(MovementComponent) || MovementComponent->Velocity.Size2D() > TurnInPlaceMaxStartSpeed)
+	{
+		return;
+	}
+
+	const float SignedYawDeltaDegrees = FMath::FindDeltaAngleDegrees(GetActorRotation().Yaw, GetController()->GetControlRotation().Yaw);
+	if (FMath::Abs(SignedYawDeltaDegrees) < TurnInPlaceMinAngleDegrees)
+	{
+		return;
+	}
+
+	UAnimSequence* TurnSequence = SelectTurnInPlaceAnimation(SignedYawDeltaDegrees);
+	UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
+	if (!IsValid(TurnSequence) || !IsValid(AnimInstance))
+	{
+		return;
+	}
+
+	const float SafePlayRate = FMath::Max(TurnInPlacePlayRate, 0.1f);
+	if (!AnimInstance->PlaySlotAnimationAsDynamicMontage(TurnSequence, TurnInPlaceSlotName, 0.08f, 0.08f, SafePlayRate, 1, 0.0f, 0.0f))
+	{
+		return;
+	}
+
+	bTurnInPlaceActive = true;
+	bRestoreOrientRotationToMovementAfterTurn = MovementComponent->bOrientRotationToMovement;
+	MovementComponent->StopMovementImmediately();
+	MovementComponent->bOrientRotationToMovement = false;
+	TurnInPlaceElapsedSeconds = 0.0f;
+	TurnInPlaceDurationSeconds = TurnSequence->GetPlayLength() / SafePlayRate;
+	TurnInPlaceStartYawDegrees = GetActorRotation().Yaw;
+	TurnInPlaceDeltaYawDegrees = SignedYawDeltaDegrees;
+	SetTurnInPlaceAnimGraphFlag(true);
+}
+
+void AGP_EnemyCharacter::StopTurnInPlace(bool bStopAnimation)
+{
+	if (!bTurnInPlaceActive)
+	{
+		return;
+	}
+
+	if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
+	{
+		MovementComponent->bOrientRotationToMovement = bRestoreOrientRotationToMovementAfterTurn;
+	}
+
+	if (bStopAnimation)
+	{
+		if (UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr)
+		{
+			AnimInstance->StopSlotAnimation(0.08f, TurnInPlaceSlotName);
+		}
+	}
+
+	bTurnInPlaceActive = false;
+	SetTurnInPlaceAnimGraphFlag(false);
+}
+
+UAnimSequence* AGP_EnemyCharacter::SelectTurnInPlaceAnimation(float SignedYawDeltaDegrees) const
+{
+	const bool bTurnLeft = SignedYawDeltaDegrees < 0.0f;
+	const float AbsoluteYawDeltaDegrees = FMath::Abs(SignedYawDeltaDegrees);
+	if (AbsoluteYawDeltaDegrees >= 157.5f)
+	{
+		return bTurnLeft ? TurnInPlaceAnimations.Turn180Left : TurnInPlaceAnimations.Turn180Right;
+	}
+	if (AbsoluteYawDeltaDegrees >= 112.5f)
+	{
+		return bTurnLeft ? TurnInPlaceAnimations.Turn135Left : TurnInPlaceAnimations.Turn135Right;
+	}
+	if (AbsoluteYawDeltaDegrees >= 67.5f)
+	{
+		return bTurnLeft ? TurnInPlaceAnimations.Turn90Left : TurnInPlaceAnimations.Turn90Right;
+	}
+	return bTurnLeft ? TurnInPlaceAnimations.Turn45Left : TurnInPlaceAnimations.Turn45Right;
+}
+
+void AGP_EnemyCharacter::SetTurnInPlaceAnimGraphFlag(bool bActive) const
+{
+	UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
+	if (!IsValid(AnimInstance))
+	{
+		return;
+	}
+
+	if (FBoolProperty* TurnFlagProperty = FindFProperty<FBoolProperty>(AnimInstance->GetClass(), TEXT("bTurnInPlaceActive")))
+	{
+		TurnFlagProperty->SetPropertyValue_InContainer(AnimInstance, bActive);
+	}
 }
 
 bool AGP_EnemyCharacter::IsBasicEnemyAttackReady() const
