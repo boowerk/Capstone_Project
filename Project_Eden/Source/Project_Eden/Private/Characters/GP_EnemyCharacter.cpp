@@ -196,6 +196,15 @@ void AGP_EnemyCharacter::NotifyBossTargetSelected(AActor* TargetActor)
 void AGP_EnemyCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+	if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
+	{
+		// Blueprint component defaults can override constructor values.  Reapply the
+		// chase policy at runtime so walking enemies turn with their movement path,
+		// rather than retaining a stale controller-facing rotation.
+		MovementComponent->bOrientRotationToMovement = true;
+		MovementComponent->bUseControllerDesiredRotation = false;
+		MovementComponent->RotationRate = FRotator(0.0f, 540.0f, 0.0f);
+	}
 	RefreshWorldHealthBarVisibility();
 	InitializeBasicEnemyAttackCadence();
 	SetActorTickEnabled(bEnableTurnInPlace);

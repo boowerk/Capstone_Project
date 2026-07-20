@@ -186,6 +186,7 @@ void UGP_EnemyAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 	}
 	if (AGP_EnemyCharacter* EnemyCharacter = Cast<AGP_EnemyCharacter>(AvatarActor))
 	{
+		// Setting the attack lock also clears an active turn slot before DefaultSlot starts.
 		EnemyCharacter->SetBasicEnemyAttackInProgress(true);
 		if (const UPDA_EnemyAnimationSet* Set = EnemyCharacter->GetEnemyAnimationSet(); IsValid(Set) && Set->bUseAbilityForwardStep)
 		{
