@@ -67,7 +67,7 @@ namespace
 		return true;
 	}
 
-	bool HasClassInHierarchy(const AActor& Actor, const FName RequiredClassName)
+	bool HasDemoRouteClassInHierarchy(const AActor& Actor, const FName RequiredClassName)
 	{
 		for (const UClass* ActorClass = Actor.GetClass(); ActorClass; ActorClass = ActorClass->GetSuperClass())
 		{
@@ -91,7 +91,7 @@ namespace
 		const FName RegionSeedClassName(TEXT("BP_RegionSeed_C"));
 		for (AActor* Actor : World->PersistentLevel->Actors)
 		{
-			if (!IsValid(Actor) || !HasClassInHierarchy(*Actor, RegionSeedClassName))
+			if (!IsValid(Actor) || !HasDemoRouteClassInHierarchy(*Actor, RegionSeedClassName))
 			{
 				continue;
 			}
