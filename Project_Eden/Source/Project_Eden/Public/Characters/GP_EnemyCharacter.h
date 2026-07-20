@@ -357,8 +357,6 @@ private:
 	bool bRestoreOrientRotationToMovementAfterTurn = false;
 	float TurnInPlaceElapsedSeconds = 0.0f;
 	float TurnInPlaceDurationSeconds = 0.0f;
-	float TurnInPlaceStartYawDegrees = 0.0f;
-	float TurnInPlaceDeltaYawDegrees = 0.0f;
 	float BasicEnemyAttackReadyTimeSeconds = 0.0f;
 	FRandomStream AttackCadenceRandomStream;
 

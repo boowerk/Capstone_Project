@@ -292,7 +292,6 @@ void AGP_EnemyCharacter::UpdateTurnInPlace(float DeltaSeconds)
 
 		TurnInPlaceElapsedSeconds += DeltaSeconds;
 		const float Alpha = FMath::Clamp(TurnInPlaceElapsedSeconds / FMath::Max(TurnInPlaceDurationSeconds, KINDA_SMALL_NUMBER), 0.0f, 1.0f);
-		SetActorRotation(FRotator(0.0f, TurnInPlaceStartYawDegrees + (TurnInPlaceDeltaYawDegrees * Alpha), 0.0f));
 
 		if (Alpha >= 1.0f)
 		{
@@ -350,6 +349,9 @@ void AGP_EnemyCharacter::TryStartTurnInPlace()
 	}
 
 	const float SafePlayRate = FMath::Max(TurnInPlacePlayRate, 0.1f);
+	// The retargeted turn sequences carry their own rotational root motion.
+	// Let that montage turn the capsule so the body motion and facing stay synchronized.
+	AnimInstance->SetRootMotionMode(ERootMotionMode::RootMotionFromMontagesOnly);
 	if (!AnimInstance->PlaySlotAnimationAsDynamicMontage(TurnSequence, TurnInPlaceSlotName, 0.08f, 0.08f, SafePlayRate, 1, 0.0f, 0.0f))
 	{
 		return;
@@ -361,8 +363,6 @@ void AGP_EnemyCharacter::TryStartTurnInPlace()
 	MovementComponent->bOrientRotationToMovement = false;
 	TurnInPlaceElapsedSeconds = 0.0f;
 	TurnInPlaceDurationSeconds = TurnSequence->GetPlayLength() / SafePlayRate;
-	TurnInPlaceStartYawDegrees = GetActorRotation().Yaw;
-	TurnInPlaceDeltaYawDegrees = SignedYawDeltaDegrees;
 	SetTurnInPlaceAnimGraphFlag(true);
 }
 
