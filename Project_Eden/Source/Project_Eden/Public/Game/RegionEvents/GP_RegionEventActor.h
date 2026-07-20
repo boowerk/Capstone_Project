@@ -217,4 +217,8 @@ private:
 	UFUNCTION()
 	void HandleActivationOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
 		UPrimitiveComponent* OtherComponent, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+
+#if WITH_DEV_AUTOMATION_TESTS
+	friend class FGPRegionEventGuidedDirectorControlTest;
+#endif
 };

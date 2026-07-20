@@ -38,6 +38,20 @@ public:
 		FVector SpawnLocation,
 		EGPRegionEventTrigger Trigger = EGPRegionEventTrigger::ZoneStarted);
 
+	// Guided demo beats select a stable production id while retaining exploration ownership and lifecycle handling.
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Region Event|Guided", meta = (AdvancedDisplay = "DormantWaitTimeoutSeconds"))
+	AGP_RegionEventActor* TryStartGuidedRegionEventAtLocation(
+		FName EventId,
+		int32 RegionId,
+		FVector SpawnLocation,
+		float DormantWaitTimeoutSeconds = -1.0f);
+
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Region Event|Exploration")
+	void SetAmbientExplorationSuppressed(bool bSuppressed);
+
+	UFUNCTION(BlueprintPure, Category = "Region Event|Exploration")
+	bool IsAmbientExplorationSuppressed() const { return bAmbientExplorationSuppressed; }
+
 	UFUNCTION(BlueprintCallable, Category = "Region Event")
 	void CompleteEventsForRegion(int32 RegionId);
 
@@ -150,6 +164,7 @@ private:
 	FRandomStream EventRandomStream;
 	int32 RegionCount = 0;
 	bool bDirectorInitialized = false;
+	bool bAmbientExplorationSuppressed = false;
 	int32 ObservedRegionId = INDEX_NONE;
 	double ObservedRegionSinceSeconds = 0.0;
 	double NextExplorationAttemptSeconds = 0.0;
@@ -167,6 +182,14 @@ private:
 		const FVector& SpawnLocation,
 		const UGP_RegionEventData* SelectedEvent,
 		bool bExplorationEvent);
+	AGP_RegionEventActor* SpawnSelectedEvent(
+		int32 RegionId,
+		const FVector& SpawnLocation,
+		const UGP_RegionEventData* SelectedEvent,
+		bool bExplorationEvent,
+		bool bOverrideDormantTimeout,
+		float DormantTimeoutOverride);
+	const UGP_RegionEventData* FindUniqueExplorationEventById(FName EventId) const;
 	void StartExplorationScheduler();
 	void StopExplorationScheduler();
 	void EvaluateExplorationEvents();
@@ -186,4 +209,8 @@ private:
 
 	UFUNCTION()
 	void HandleRegionEventEnemySpawned(AGP_RegionEventActor* EventActor, AGP_EnemyCharacter* Enemy);
+
+#if WITH_DEV_AUTOMATION_TESTS
+	friend class FGPRegionEventGuidedDirectorControlTest;
+#endif
 };
