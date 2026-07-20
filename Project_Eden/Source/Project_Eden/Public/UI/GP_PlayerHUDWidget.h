@@ -20,6 +20,7 @@ class UGP_AttributeSet;
 class UGP_MinimapSubsystem;
 class UGP_WorldCorruptionComponent;
 class UGP_SkillSlotHUDWidget;
+class AGP_DemoRunDirector;
 class AGP_PlayerState;
 class UGP_SkillData;
 
@@ -76,6 +77,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "EldenRing HUD|Minimap")
 	void RefreshMinimapPresentation(float DeltaSeconds = 0.0f);
 
+	// Shared pure placement rule keeps edge markers circular on non-square widget layouts.
+	static FVector2D CalculateClampedMarkerOffsetPixels(
+		const FVector2D& MapDeltaUV,
+		float Zoom,
+		const FVector2D& MarkerLayerSize,
+		float VisibleRadius,
+		float MarkerSize);
+
 	// Call after BindToASC to wire up the two equipped-skill slot widgets.
 	UFUNCTION(BlueprintCallable, Category = "EldenRing HUD|Skill")
 	void BindSkillSlots(AGP_PlayerState* PS);
@@ -108,6 +117,7 @@ private:
 	void RefreshMinimapMapUV();
 	bool EnsureMinimapMarkerLayer();
 	void RefreshEnemyMinimapMarkers(float DeltaSeconds);
+	void RefreshDemoObjectiveMinimapMarker();
 	void BindAttributeWidgetToASC(UAbilitySystemComponent* InASC, UGP_AttributeWidget* Widget, UGP_AttributeSet* AttributeSet, TArray<FGPAttributeDelegateBinding>& DelegateHandles);
 	void RemoveAttributeDelegateHandles(TWeakObjectPtr<UAbilitySystemComponent>& BoundASC, TArray<FGPAttributeDelegateBinding>& DelegateHandles);
 	void EnsureBossHealthAttributes(UGP_AttributeWidget* Widget) const;
@@ -205,6 +215,13 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EldenRing HUD|Minimap", meta = (AllowPrivateAccess = "true", ClampMin = "0.1", ClampMax = "0.5"))
 	float MinimapMarkerVisibleRadius = 0.47f;
 
+	// The guided objective reuses the existing marker canvas but remains visually distinct from enemies.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EldenRing HUD|Minimap|Demo Objective", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UTexture2D> MinimapObjectiveMarkerTexture;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EldenRing HUD|Minimap|Demo Objective", meta = (AllowPrivateAccess = "true", ClampMin = "4.0", ClampMax = "64.0"))
+	float MinimapObjectiveMarkerSize = 18.0f;
+
 	// Tint only the captured map image; the brass frame, player arrow, and enemy markers remain readable.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EldenRing HUD|Minimap|Corruption", meta = (AllowPrivateAccess = "true"))
 	FLinearColor MinimapCleanTint = FLinearColor::White;
@@ -228,6 +245,10 @@ private:
 	TObjectPtr<UCanvasPanel> MinimapMarkerCanvas;
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UImage>> EnemyMarkerPool;
+	UPROPERTY(Transient)
+	TObjectPtr<UImage> DemoObjectiveMarker;
+	TWeakObjectPtr<AGP_DemoRunDirector> CachedDemoRunDirector;
+	double NextDemoDirectorResolveTimeSeconds = 0.0;
 	FVector2D CachedPlayerMapUV = FVector2D(-1.0f, -1.0f);
 	float CachedMinimapZoom = -1.0f;
 	float EnemyMarkerRefreshAccumulator = 0.0f;
