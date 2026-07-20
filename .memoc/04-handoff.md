@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-18T21:24:21+09:00
+updated: 2026-07-21T08:30:00+09:00
 status: active
 tags:
   - memoc
@@ -11,7 +11,16 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-07-18T21:24:21+09:00
+Last synced: 2026-07-21T08:30:00+09:00
+
+## Seeded Inward Demo Flow Handoff
+
+- Commits `fdf070fc` through `e81a7b34` implement the production golden path without modifying `L_LandscapeMap`, `TestMap`, `DA_RegionEventData`, or `L_MainMap`.
+- Flow: one safe shared outer party cluster -> `world_red_rift` -> `world_structure_defense` -> `world_shrine_ruins` -> center rally -> production `BP_DarkArmorKnight` -> existing victory/result travel. Beat roles are fixed; route regions vary deterministically with the run seed.
+- `AGP_DemoRunDirector` is authority-only orchestration with replicated stage/location/region/event/seed. It suppresses future ambient discoveries during the guided run, advances only for the exact current event actor, retries temporary capacity conflicts until the 180-second stage watchdog, verifies the Dark Knight AI brain before entering BossFight, and terminates callbacks/boss/event state on defeat.
+- The HUD lazily resolves the replicated director and draws one gold objective point on the existing minimap marker canvas. Distant objectives clamp to the circular edge in pixel space; BossFight and terminal stages hide it.
+- Verified locally: Editor build; DemoFlow 7/7; RegionEvents 8/8; Minimap 1/1; Dark Knight 6/6 plus selector; three-player runtime start; Landscape integrity. No live server or multiplayer PIE test was run per user instruction.
+- P0 manual PIE: traverse the route with three players; confirm two-player activation at every guided event, all three Shrine pickers, objective marker direction/readability, center boss reveal without overlap, Dark Knight chase/attacks, boss death, and lobby return. Use `?DemoSeed=12345` to reproduce a failed route.
 
 ## Three-Player Network/Lobby Handoff
 

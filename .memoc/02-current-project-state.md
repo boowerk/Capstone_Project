@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-18T21:24:21+09:00
+updated: 2026-07-21T08:30:00+09:00
 status: active
 tags:
   - memoc
@@ -11,10 +11,12 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-07-18T21:24:21+09:00
+Last synced: 2026-07-21T08:30:00+09:00
 
 ## Current Status
 
+- The seeded inward graduation-demo run is implemented on `main` (`fdf070fc` through `e81a7b34`) without changing the map or replacing existing systems. A three-player party shares one collision-checked outer cluster, then follows fixed roles at run-seed-varied locations: Red Rift -> Structure Defense -> full-party Shrine reward -> center rally -> Dark Armor Knight. Guided objectives require two of three currently possessed players, suppress ambient scheduling while active, retry temporary spawn conflicts, and stop cleanly on defeat. The replicated objective appears as a gold minimap point and clamps to the circular edge when off-screen. `?DemoSeed=N` or `-DemoRunSeed=N` reproduces a route.
+- Current verification: Editor build; DemoFlow 7/7; RegionEvents 8/8; Minimap 1/1; Dark Armor Knight combat 6/6 plus selector 1/1; three-player runtime starts 1/1; Landscape integrity 1/1. No live server or multiplayer PIE session was run by request. Manual P0 remains three-player objective/quorum traversal, all three Shrine UI deliveries, gold marker readability, boss reveal/attack, and result travel.
 - The product contract is now exactly three network players (`5e0a4fcb` through `4ca8c603`). `AGP_ThreePlayerGameSession` fixes players/spectators/split-screen to `3/0/1` in lobby and gameplay, exact-three Ready is required, the one authored Landscape PlayerStart expands into three collision/ground-validated stable slots, and debug ForceStart is disabled in Shipping and limited to an explicit `-AllowLobbyForceStart` local host.
 - Verification is current: Editor and Development Server builds pass; WindowsServer Cook/Stage/Pak/Archive passed after `729d334d` removed the unused broken projectile scaffold backup; the completed baseline used one packaged dedicated server plus three clients and reached three unique owned Pawns with HUD/ASC/input ready. The final local AI/Dark Knight/lobby/network regression is 30/30. The user requested no further live server tests unless explicitly asked; keep future verification to server-compatible implementation, builds, and local automation.
 - Graduation-demo enemy transition polish is current (`80f64845` through `a0c674e1`). Regular enemies use range hysteresis, smooth facing, GAS-lifetime attack commits, and recovery/cadence sequencing; target loss or leash reevaluation no longer opens movement during a committed attack, while death/groggy-style interrupts cancel immediately. Matador holds its body stationary while a live bull owns the pattern, cleans the bull state on every destroy path, and uses independent actor/task stuck caps of 18/20 seconds. `Project_EdenEditor` builds and all 21 `ProjectEden.AI` tests pass.

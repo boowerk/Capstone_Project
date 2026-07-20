@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-18T19:49:02+09:00
+updated: 2026-07-21T08:30:00+09:00
 status: active
 tags:
   - memoc
@@ -14,6 +14,12 @@ tags:
 Durable project decisions live here. Keep entries short, dated, and useful to future agents.
 
 ## Decision Log
+
+### 2026-07-21
+- Keep the production Landscape architecture intact and layer the demo flow over it. The run uses one replicated authority director only on `L_LandscapeMap` when no legacy linear zones exist; it never calls the zero-zone `StartRun()` path.
+- Preserve a fixed authored beat order while varying spatial execution by `RunSeed`: shared safe outer start, Red Rift, Structure Defense, Shrine, center rally, and Dark Armor Knight. This makes runs recognizable but not position-identical.
+- Guided objectives use a two-of-three quorum clamped to currently possessed players. The Shrine rewards every connected party controller; the final rally normally requires two players but accepts one nearby player after a 45-second demo-safety watchdog.
+- Reuse the existing minimap marker canvas and gold point texture for route guidance. Off-map objectives clamp in pixel space to the circular edge; red points remain enemy markers.
 
 ### 2026-07-18
 - Treat Project Eden as a fixed three-player network game, not a minimum-three session: server admission is `3` players, `0` spectators, and `1` player per connection; only an exact three-player Ready party may travel.
