@@ -62,11 +62,6 @@ EBTNodeResult::Type UBTT_ExecuteEnemyAttack::ExecuteTask(UBehaviorTreeComponent&
 		return EBTNodeResult::Failed;
 	}
 
-	if (bStopMovementBeforeAttack)
-	{
-		AIController->StopMovement();
-	}
-
 	AActor* TargetActor = EnemyBTTaskCommon::GetTargetActor(BlackboardComponent);
 	if (bFaceTargetBeforeAttack && IsValid(TargetActor))
 	{
@@ -111,6 +106,13 @@ EBTNodeResult::Type UBTT_ExecuteEnemyAttack::ExecuteTask(UBehaviorTreeComponent&
 
 	if (bActivated)
 	{
+		// A rejected GAS activation must not cancel the active chase.  The ability
+		// itself also stops movement after it has committed successfully.
+		if (bStopMovementBeforeAttack)
+		{
+			AIController->StopMovement();
+		}
+
 		if (AGP_EnemyCharacter* EnemyCharacter = Cast<AGP_EnemyCharacter>(ControlledPawn))
 		{
 			// Start cadence only after GAS accepts the attack; rejected activations must remain immediately retryable.
