@@ -29,3 +29,10 @@ ProjectSettings.json
 /Project_Eden/Intermediate/
 /Project_Eden/Saved/
 /Project_Eden/DerivedDataCache/
+
+# Local Codex-generated scratch files and asset backups
+/Saved/
+
+# Python bytecode caches
+__pycache__/
+*.pyc
