@@ -300,7 +300,10 @@ void AGP_EnemyCharacter::UpdateTurnInPlace(float DeltaSeconds)
 		return;
 	}
 
-	TryStartTurnInPlace();
+	// Do not infer a turn from Blackboard TargetActor here.  This Tick runs in every
+	// stationary state, so that inference makes idle, recovery, and tactical waits
+	// continuously face the player.  A dedicated AI task must call
+	// StartTurnInPlaceForTarget when a turn is actually part of its state transition.
 }
 
 void AGP_EnemyCharacter::StartTurnInPlaceForTarget(const AActor* TargetActor)
