@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-19T21:55:00+09:00
+updated: 2026-07-20T15:47:38+09:00
 status: active
 tags:
   - memoc
@@ -15,8 +15,13 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 
 ## Decision Log
 
+### 2026-07-20
+- Approve Candidate J geometry plus a production-safe variable blend half-width for V2.2. Keep hard IDs and packed visual IDs unchanged; vary only each region-pair's continuous visual influence from 18-32px around 24px with independent 80-240m low-frequency anchors. Each region samples its own nearest boundary-side pixel, while junctions, segment endpoints, and the perimeter return to the 24px baseline. This avoids cross-pair contamination and keeps the material/runtime contract unchanged.
+- Historical stepping stone, superseded by Candidate J above: the first stronger V2.2 preset used 36-180m spacing, 2.5-15m amplitudes, and a 12m cap; it produced 10.575m actual maximum displacement and passed the then-current 51 checks.
+- Do not judge Landscape V2.2 boundary visibility from an editor view until `RT_RegionState_15x1` contains at least two distinct states. A fresh editor map load can leave this transient render target black, making all four V2.2 slots resolve to the same surface even though the MI switch and Weight binding are correct. For non-persistent QA, use placed `BP_RegionStateManager.DebugRandomRegionStates` followed by `RefreshRegionTexture`; do not save the map solely for this validation state.
+
 ### 2026-07-19
-- Disturb Landscape region borders offline in the V2.2 visual-weight generator, not with runtime shader noise. Supersede the rejected global 2D grid warp with independent per-boundary PCHIP normal offsets: coarse 2.5m at 42-58m spacing plus 0.65m detail at 22-32m, capped at 3.2m. Pin junction/perimeter cores and fade offsets over 15m toward endpoints. Keep hard RegionID/PCG/StateRT and packed visual IDs exact; accept that the 1.08m Region 1-13 edge is too short to warp safely and remains fixed.
+- Disturb Landscape region borders offline in the V2.2 visual-weight generator, not with runtime shader noise. Use one independent non-uniform-anchor PCHIP per movable region-pair boundary: truncated-lognormal 36-140m gaps, Beta-distributed 1.75-9m magnitudes with local geometry caps/rare accents, 72% sign persistence, and dynamic 8-24m endpoint fades. Keep junction/perimeter cores fixed and limit each segment's signed mean to 10% of weighted RMS; this gives slower, larger asymmetric bends while the rasterized maximum region-area change stays below 0.5%. Do not normalize every segment to the same peak, force exact zero mean, alternate signs, or combine fixed coarse/detail bands, because those choices reveal a repeating S-wave cadence. Keep hard RegionID/PCG/StateRT and packed visual IDs exact.
 - Make V2.2 the GameMap2 Landscape presentation path: keep the authoritative hard RegionID for gameplay/PCG, but visually blend up to four neighboring region states with fixed slots and normalized RGBA weights. Keep `UseRegionVisualBlendV22` default false in `M_StateMask`, enable it only on `MI_RegionLandscape_GameMap2`, and preserve V2.1/V2 as nested rollback paths.
 - Store four visual IDs in two point-sampled G8 textures (`id0|id1<<4`, `id2|id3<<4`) instead of one G16 texture. G8 normalized samples decode all 256 bytes exactly through float16; G16 did not. Accept one extra sampler to avoid changing the heavy shared master's global precision mode, and keep the RGBA8 weight texture bilinear/uncompressed for validation.
 - Resolve the remaining pair-switch and true-junction seams with Landscape-only V2.1: use an SDF-derived continuous Blend mask plus an auxiliary `R=pair-switch/G=junction` mask, and cover ambiguous cores with one replaceable neutral dirt/gravel surface. Keep its exact full-strength core near one source adjacency (~2 target texels), with smooth feathering outside it; do not increase RegionID resolution again.

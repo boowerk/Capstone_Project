@@ -2,20 +2,20 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-07-19T22:20:00+09:00
+updated: 2026-07-20T15:47:38+09:00
 status: active
-tags:
-  - memoc
-  - memoc/state
+tags: [memoc, memoc/state]
 created: 2026-07-18T13:21:02
 ---
 # Session Summary
 
 ## Status
-- V2.2 uses per-boundary PCHIP wobble (2.5m coarse/0.65m detail, 22-58m, fixed junctions). Weight is non-VT/Bilinear/NoMip. A stale failed shader caused the gray default material; toggling V2.2 off/on forced 13/13 recompile and restored the map. MI saved true; map file untouched.
+- Candidate J + variable 18-32px V2.2 blend width is generated, mirrored, reimported, and saved in Unreal.
 
 ## Verified
-- Generator 42/42; material 13/13, no new sampler error. Weight `E851B002...679B73`; MI `9673F631...F049B`.
+- 61/61 twice; Weight PNG `8209CBD4...11917`, uasset `F91AB7E1...53CC6`.
+- Regular BGRA8, Bilinear, NoMip/1 mip, Clamp XY, sRGB off, VectorDisplacementmap.
+- Transient random-state refresh visibly applied it. Map/MI unchanged: `E8CE0B5D...B728C` / `841EE208...D740`.
 
 ## Resume
-- The 1.08m Region 1-13 edge stays fixed. Other material/projection issues are separate; source mirrors match.
+- User should inspect varied boundary softness/art in the open map. No commit made.
