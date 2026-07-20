@@ -434,6 +434,7 @@ bool AGP_EnemyCharacter::IsBasicEnemyAttackReady() const
 	const UWorld* World = GetWorld();
 	return IsValid(World)
 		&& !bBasicEnemyAttackInProgress
+		&& !bTurnInPlaceActive
 		&& EnemyAttackCadencePolicy::IsReady(World->GetTimeSeconds(), BasicEnemyAttackReadyTimeSeconds);
 }
 

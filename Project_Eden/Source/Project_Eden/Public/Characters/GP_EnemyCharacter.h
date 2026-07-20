@@ -138,6 +138,7 @@ public:
 	UFUNCTION(BlueprintPure, Category = "AI|Combat|Cadence")
 	bool IsBasicEnemyAttackReady() const;
 	bool IsBasicEnemyAttackInProgress() const { return bBasicEnemyAttackInProgress; }
+	bool IsTurnInPlaceActive() const { return bTurnInPlaceActive; }
 	void SetBasicEnemyAttackInProgress(bool bInProgress) { bBasicEnemyAttackInProgress = bInProgress; }
 
 	// Returns the newly rolled delay so attack logs and tests can inspect the selected cadence.

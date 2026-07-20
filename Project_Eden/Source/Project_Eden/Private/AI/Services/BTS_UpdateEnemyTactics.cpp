@@ -348,14 +348,15 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 	const bool bTooClose = !bAllowAttacksInsidePreferredRange && DistanceToTarget < MinAttackRange;
 	const bool bTooFar = DistanceToTarget > MaxAttackRange;
 	const bool bAttackCadenceReady = !IsValid(EnemyCharacter) || EnemyCharacter->IsBasicEnemyAttackReady();
+	const bool bTurnInPlaceActive = IsValid(EnemyCharacter) && EnemyCharacter->IsTurnInPlaceActive();
 
 	bool bShouldRetreat = bModeForcesRetreat || (HealthRatio <= RetreatThreshold);
 	// Closing bCanAttack forces the shared BT to leave its old fixed Wait node while this enemy's own cadence runs.
-	bool bCanAttack = !bShouldRetreat && bHasLineOfSight && bInsideAttackBand && bAttackCadenceReady;
+	bool bCanAttack = !bTurnInPlaceActive && !bShouldRetreat && bHasLineOfSight && bInsideAttackBand && bAttackCadenceReady;
 	bool bShouldReposition = false;
 	bool bShouldChase = false;
 
-	if (!bShouldRetreat && !bCanAttack)
+	if (!bTurnInPlaceActive && !bShouldRetreat && !bCanAttack)
 	{
 		const bool bCoverDrivenReposition = CoverPreference >= CoverRepositionThreshold && !bHasLineOfSight;
 		const bool bRangeDrivenReposition = bTooClose || (bModePrefersHold && !bTooFar);
@@ -378,7 +379,7 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 	}
 
 	// When the AI still has a live target, patrol should be the "no target" fallback, not the "I saw the player" fallback.
-	if (bFallbackToChaseWhenTargetExists && !bShouldRetreat && !bCanAttack && !bShouldReposition)
+	if (!bTurnInPlaceActive && bFallbackToChaseWhenTargetExists && !bShouldRetreat && !bCanAttack && !bShouldReposition)
 	{
 		bShouldChase = true;
 	}
