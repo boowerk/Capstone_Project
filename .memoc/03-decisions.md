@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-21T08:30:00+09:00
+updated: 2026-07-21T21:15:00+09:00
 status: active
 tags:
   - memoc
@@ -16,6 +16,7 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 ## Decision Log
 
 ### 2026-07-21
+- Treat enemy `ActionEnd` as gameplay-window closure, not montage completion. A shared enemy attack remains ability/BT-committed through the real montage end, recovery, and its exit bridge; only explicit incapacitation cancels it. Keep `AttackPrepare` and `ChaseResume` as optional per-enemy DataAsset seams with same-skeleton Idle fallbacks, and replicate the semantic phase rather than a runtime-created montage.
 - Keep the production Landscape architecture intact and layer the demo flow over it. The run uses one replicated authority director only on `L_LandscapeMap` when no legacy linear zones exist; it never calls the zero-zone `StartRun()` path.
 - Preserve a fixed authored beat order while varying spatial execution by `RunSeed`: shared safe outer start, Red Rift, Structure Defense, Shrine, center rally, and Dark Armor Knight. This makes runs recognizable but not position-identical.
 - Guided objectives use a two-of-three quorum clamped to currently possessed players. The Shrine rewards every connected party controller; the final rally normally requires two players but accepts one nearby player after a 45-second demo-safety watchdog.

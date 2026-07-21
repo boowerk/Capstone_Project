@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-21T08:30:00+09:00
+updated: 2026-07-21T21:15:00+09:00
 status: active
 tags:
   - memoc
@@ -11,7 +11,7 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-07-21T08:30:00+09:00
+Last synced: 2026-07-21T21:15:00+09:00
 
 ## Seeded Inward Demo Flow Handoff
 
@@ -34,8 +34,9 @@ Last synced: 2026-07-21T08:30:00+09:00
 
 - Commits `80f64845` through `a0c674e1` stabilize attack range transitions, smooth facing, latch actions through GAS, preserve committed targets, restore boss recovery, and close Matador bull lifecycle gaps.
 - Latest focused fixes are `42e8cec8` (committed attacks survive target-loss/leash root reevaluation; explicit interrupts and cancellation policy), `668f7f37` (bull destroy cleanup plus 18-second absolute cap), and `a0c674e1` (stationary live-bull tactics hold plus 20-second BT stuck cap).
-- Verified: `Project_EdenEditor Win64 Development` build and all 21 `ProjectEden.AI` automation tests. Existing missing Fab/UEFN assets and duplicate DefaultSlot startup warnings are not resolved by these commits.
-- P0 before July 22/27: record three Idle→Move→Aim→Hit→Recovery cycles for each included enemy; confirm one hit and one ActionEnd per selectable montage; verify FurnaceWalker/Cyclops slot evaluation and capsule drift; visually align Dark Knight impacts and prove Charge travel/hit/recovery. Do not run additional live network sessions unless the user explicitly asks; the product contract remains three players.
+- `1ce0f79d` separates the gameplay `ActionEnd` signal from real montage completion; BlendOut no longer ends the ability and cuts its tail. `9e7dfeaf` adds `Face -> AttackPrepare -> GAS -> Recovery -> ChaseResume` inside the existing attack task. Both regular-enemy bridges use the owning DataAsset's Idle as a temporary same-skeleton fallback (`0.30/0.20s`) and expose replaceable clips/timing/blends/slot. A replicated phase lets three-player clients create the cosmetic dynamic montage locally while the server remains authoritative over timing.
+- Verified: `Project_EdenEditor Win64 Development` build and all 23 `ProjectEden.AI` automation tests. No live server or PIE session was run by request. Existing missing Fab/UEFN assets and the Cyclops duplicate `DefaultSlot` warnings are not resolved by these commits.
+- P0 before July 22/27: record three `Move -> AttackPrepare -> Hit -> full montage tail -> ChaseResume -> Move` cycles for each included enemy. Confirm one hit, no `Interrupted` callback on normal completion, no movement before the tail finishes, and visible preparation on FurnaceWalker/Cyclops. The loaded Furnace BT currently has editor strings for turn tasks but no compiled runtime turn-task instances; the new in-task bridge still runs, but compile/save that BT later if its separate turn nodes are expected. Do not run additional live network sessions unless the user explicitly asks; the product contract remains three players.
 - Script the demo in `EventMap` rather than the corrupt `TestMap` or randomized production landscape events. Use Dark Armor Knight plus melee/ranged basics; exclude flying unless its chase/altitude/re-entry loop passes PIE.
 - Remaining engineering risks are exact GAS ability-spec tracking when duplicate attack-tag grants exist and simulated-proxy montage/yaw/root-motion behavior. Do not start the Motion Warping pilot until every P0 gate above is green.
 - Preserve existing user edits in `TestMap.umap`, `DA_RegionEventData.uasset`, and `L_MainMap.umap`.
