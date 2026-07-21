@@ -2,7 +2,7 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-07-21T21:15:00+09:00
+updated: 2026-07-21T22:24:01+09:00
 status: active
 tags:
   - memoc
@@ -11,8 +11,7 @@ created: 2026-07-18T07:01:20
 ---
 # Session Summary
 
-- `main` includes seeded inward demo flow and enemy transition commits `1ce0f79d`, `9e7dfeaf`.
-- Three players run outer Rift -> Defense -> Shrine -> center Dark Knight with seed-varied locations and 2-of-3 quorum.
-- Regular enemies now run Face -> AttackPrepare -> full GAS montage -> Recovery -> ChaseResume; temporary bridges use each DataAsset's Idle and are replaceable.
-- ActionEnd no longer stops the montage tail; commit spans the whole sequence and the phase replicates for clients.
-- Editor build and all 23 `ProjectEden.AI` tests pass. No live server/PIE run; protected assets unchanged.
+- `main` now includes enemy engagement fixes `bea85a35`, `a04c9d5e`, `e8dec768`, `788facec`.
+- Attacks lock one player identity at activation, track that player's live position through prepare/windup, and lock direction at `AttackHit`; each activation applies one hit/spec.
+- Melee uses physical ranges: Furnace step 350cm, Cyclops in-place 240cm. Cadence pursues outside 275cm, holds/faces smoothly inside 225cm, and resets range latch on player swap.
+- Editor build and all 25 `ProjectEden.AI` tests pass. No live PIE/server run by request; protected assets unchanged.

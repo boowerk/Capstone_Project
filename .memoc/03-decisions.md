@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-21T21:15:00+09:00
+updated: 2026-07-21T22:24:01+09:00
 status: active
 tags:
   - memoc
@@ -16,6 +16,9 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 ## Decision Log
 
 ### 2026-07-21
+- Lock enemy attack target identity at ability activation in the three-player game. Preparation and windup may sample that same actor's live position, but `AttackHit` locks direction and no target rescore may redirect the strike or projectile to a teammate.
+- Keep regular-melee physical reach separate from runtime personality `PreferredRange`: forward-step melee starts at 350cm, in-place melee at 240cm, and cadence uses 275cm pursuit-entry / 225cm close-hold edges. Target changes reset attack-band hysteresis.
+- One BT attack request activates exactly one exact-tag GAS spec, and one ability activation can apply its hit only once even when notify and fallback signals both fire.
 - Treat enemy `ActionEnd` as gameplay-window closure, not montage completion. A shared enemy attack remains ability/BT-committed through the real montage end, recovery, and its exit bridge; only explicit incapacitation cancels it. Keep `AttackPrepare` and `ChaseResume` as optional per-enemy DataAsset seams with same-skeleton Idle fallbacks, and replicate the semantic phase rather than a runtime-created montage.
 - Keep the production Landscape architecture intact and layer the demo flow over it. The run uses one replicated authority director only on `L_LandscapeMap` when no legacy linear zones exist; it never calls the zero-zone `StartRun()` path.
 - Preserve a fixed authored beat order while varying spatial execution by `RunSeed`: shared safe outer start, Red Rift, Structure Defense, Shrine, center rally, and Dark Armor Knight. This makes runs recognizable but not position-identical.

@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-21T21:15:00+09:00
+updated: 2026-07-21T22:24:01+09:00
 status: active
 tags:
   - memoc
@@ -11,7 +11,14 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-07-21T21:15:00+09:00
+Last synced: 2026-07-21T22:24:01+09:00
+
+## Enemy Live-Target Combat Handoff
+
+- Commits `bea85a35`, `a04c9d5e`, `e8dec768`, and `788facec` fix the observed Furnace 7m attack/cooldown idle, stale windup aim, duplicate hit/spec activation, unsafe forward-step lifetime, Cyclops no-step range, and three-player target-switch latch leak.
+- Runtime contract: the attack locks one actor identity at activation, turns toward only that actor's live position through preparation/windup, locks at `AttackHit`, completes its montage, then chases during cadence outside the 275cm entry edge or smoothly faces inside the 225cm hold edge.
+- Verified: `Project_EdenEditor Win64 Development` build succeeded and `ProjectEden.AI` passed 25/25. No content/map asset changed.
+- Still manual: PIE-check Furnace lunge, Cyclops in-place hit, and ranged/flying shots against a strafing player. Live/server testing was intentionally skipped by request. Existing Cyclops AnimBP duplicate `DefaultSlot` warnings are unrelated and remain.
 
 ## Seeded Inward Demo Flow Handoff
 
