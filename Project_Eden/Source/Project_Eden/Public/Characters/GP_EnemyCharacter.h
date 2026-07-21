@@ -20,6 +20,7 @@ class UGP_EnemyCorruptionComponent;
 class UGP_EnemyDeathAbility;
 class UGP_WidgetComponent;
 class UPDA_EnemyAnimationSet;
+class UAnimMontage;
 class UAnimSequence;
 class AGP_EnemyCharacter;
 class AGP_PlayerState;
@@ -36,6 +37,15 @@ enum class EGPEnemyCombatArchetype : uint8
 	Melee UMETA(DisplayName = "Melee"),
 	Ranged UMETA(DisplayName = "Ranged"),
 	Flying UMETA(DisplayName = "Flying")
+};
+
+/** Replicated cosmetic bridge owned by the authoritative attack BT task. */
+UENUM(BlueprintType)
+enum class EGPEnemyCombatTransitionPhase : uint8
+{
+	None,
+	AttackPrepare,
+	ChaseResume
 };
 
 USTRUCT(BlueprintType)
@@ -142,6 +152,9 @@ public:
 	bool IsBasicEnemyAttackInProgress() const { return bBasicEnemyAttackInProgress; }
 	bool IsTurnInPlaceActive() const { return bTurnInPlaceActive; }
 	void StartTurnInPlaceForTarget(const AActor* TargetActor);
+	float BeginCombatTransitionAnimation(EGPEnemyCombatTransitionPhase TransitionPhase);
+	void EndCombatTransitionAnimation();
+	float GetCombatTransitionDurationSeconds(EGPEnemyCombatTransitionPhase TransitionPhase) const;
 	void SetBasicEnemyAttackInProgress(bool bInProgress)
 	{
 		bBasicEnemyAttackInProgress = bInProgress;
@@ -388,6 +401,12 @@ private:
 	bool bDeathStateApplied = false;
 	bool bBasicEnemyAttackInProgress = false;
 	bool bTurnInPlaceActive = false;
+
+	UPROPERTY(ReplicatedUsing = OnRep_CombatTransitionPhase)
+	EGPEnemyCombatTransitionPhase CombatTransitionPhase = EGPEnemyCombatTransitionPhase::None;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UAnimMontage> ActiveCombatTransitionMontage;
 	bool bRestoreOrientRotationToMovementAfterTurn = false;
 	float TurnInPlaceElapsedSeconds = 0.0f;
 	float TurnInPlaceDurationSeconds = 0.0f;
@@ -425,6 +444,12 @@ private:
 	void StopTurnInPlace(bool bStopAnimation);
 	UAnimSequence* SelectTurnInPlaceAnimation(float SignedYawDeltaDegrees) const;
 	void SetTurnInPlaceAnimGraphFlag(bool bActive) const;
+	UAnimSequence* ResolveCombatTransitionAnimation(EGPEnemyCombatTransitionPhase TransitionPhase) const;
+	void ApplyCombatTransitionAnimation();
+	void StopActiveCombatTransitionMontage();
+
+	UFUNCTION()
+	void OnRep_CombatTransitionPhase();
 
 	FDelegateHandle MoveSpeedAttributeDelegateHandle;
 };

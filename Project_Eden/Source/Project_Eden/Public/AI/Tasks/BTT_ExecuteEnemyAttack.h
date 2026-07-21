@@ -12,14 +12,17 @@ class UAbilitySystemComponent;
 class UBehaviorTreeComponent;
 class UBlackboardComponent;
 class UCharacterMovementComponent;
+enum class EGPEnemyCombatTransitionPhase : uint8;
 
 enum class EEnemyAttackTaskPhase : uint8
 {
 	Idle,
 	FacingTarget,
+	AttackPreparation,
 	AwaitingAbilityEnd,
 	FallbackCommit,
-	Recovery
+	Recovery,
+	ChasePreparation
 };
 
 UCLASS()
@@ -47,6 +50,11 @@ protected:
 	// 공격 직전에 현재 타겟을 바라보도록 회전시킨다.
 	UPROPERTY(EditAnywhere, Category = "AI")
 	bool bFaceTargetBeforeAttack = true;
+
+	// Regular enemies play short, DataAsset-driven bridges around the GAS attack.
+	// Boss patterns keep their own authored telegraph and recovery presentation.
+	UPROPERTY(EditAnywhere, Category = "AI|Transition")
+	bool bUseBasicEnemyTransitionAnimations = true;
 
 	// 보스가 휘둘러치기 가능 상태일 때 기본 공격 대신 휘둘러치기를 선택할 확률입니다.
 	UPROPERTY(EditAnywhere, Category = "AI|Boss", meta = (ClampMin = "0.0", ClampMax = "1.0"))
@@ -105,9 +113,13 @@ private:
 	void TickFacingTarget(UBehaviorTreeComponent& OwnerComp, float DeltaSeconds);
 	void BeginFacingOwnership(APawn* ControlledPawn);
 	void RestoreFacingOwnership();
+	bool BeginCombatTransition(EEnemyAttackTaskPhase TaskPhase);
+	void EndCombatTransition();
+	bool BeginAttackAfterFacing();
 	void CancelTrackedAttackAction();
 	void CompleteBasicAttack(UBehaviorTreeComponent& OwnerComp);
 	void FinishRecovery(UBehaviorTreeComponent& OwnerComp);
+	void FinishAttackSequence(UBehaviorTreeComponent& OwnerComp);
 	void ScheduleBasicAttackCadence();
 	void ResetExecutionState();
 
@@ -122,6 +134,7 @@ private:
 	float PhaseElapsedSeconds = 0.0f;
 	float TotalElapsedSeconds = 0.0f;
 	float CurrentFallbackCommitSeconds = 0.0f;
+	float CurrentTransitionDurationSeconds = 0.0f;
 	bool bAttackActivationAccepted = false;
 	bool bCadenceScheduled = false;
 	bool bUseBossPatternSelector = false;

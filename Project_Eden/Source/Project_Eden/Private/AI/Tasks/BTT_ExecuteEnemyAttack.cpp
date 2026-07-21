@@ -114,14 +114,17 @@ EBTNodeResult::Type UBTT_ExecuteEnemyAttack::ExecuteTask(UBehaviorTreeComponent&
 		return EBTNodeResult::InProgress;
 	}
 
-	return ActivateBasicAttack()
+	return BeginAttackAfterFacing()
 		? EBTNodeResult::InProgress
 		: EBTNodeResult::Failed;
 }
 
 bool UBTT_ExecuteEnemyAttack::ActivateBasicAttack()
 {
+	EndCombatTransition();
 	RestoreFacingOwnership();
+	// Preparation time is outside the ability lifecycle timeout budget.
+	TotalElapsedSeconds = 0.0f;
 	UAbilitySystemComponent* ASC = ActiveAbilitySystemComponent.Get();
 	AGP_EnemyCharacter* EnemyCharacter = ActiveEnemyCharacter.Get();
 	if (!IsValid(ASC) || !ActiveAbilityTag.IsValid())
@@ -213,6 +216,7 @@ void UBTT_ExecuteEnemyAttack::TickTask(
 	if (bLatentAbortPending && IsExplicitAttackInterruptActive())
 	{
 		// 대기 중 새로 사망·그로기 상태가 들어오면 자연 종료를 기다리지 않고 즉시 상위 분기에 제어권을 돌린다.
+		EndCombatTransition();
 		CancelTrackedAttackAction();
 		ScheduleBasicAttackCadence();
 		if (AGP_EnemyCharacter* EnemyCharacter = ActiveEnemyCharacter.Get())
@@ -226,6 +230,16 @@ void UBTT_ExecuteEnemyAttack::TickTask(
 	if (ExecutionPhase == EEnemyAttackTaskPhase::FacingTarget)
 	{
 		TickFacingTarget(OwnerComp, DeltaSeconds);
+		return;
+	}
+
+	if (ExecutionPhase == EEnemyAttackTaskPhase::AttackPreparation)
+	{
+		if (PhaseElapsedSeconds >= CurrentTransitionDurationSeconds
+			&& !BeginAttackAfterFacing())
+		{
+			FinishLatentTask(OwnerComp, EBTNodeResult::Failed);
+		}
 		return;
 	}
 
@@ -310,6 +324,13 @@ void UBTT_ExecuteEnemyAttack::TickTask(
 		&& PhaseElapsedSeconds >= EffectiveRecoverySeconds)
 	{
 		FinishRecovery(OwnerComp);
+		return;
+	}
+
+	if (ExecutionPhase == EEnemyAttackTaskPhase::ChasePreparation
+		&& PhaseElapsedSeconds >= CurrentTransitionDurationSeconds)
+	{
+		FinishAttackSequence(OwnerComp);
 	}
 }
 
@@ -326,6 +347,7 @@ EBTNodeResult::Type UBTT_ExecuteEnemyAttack::AbortTask(
 	}
 
 	// 사망·그로기·안전 타임아웃은 진행 중 GAS까지 함께 끊어 잔여 피해가 새 분기와 겹치지 않게 한다.
+	EndCombatTransition();
 	CancelTrackedAttackAction();
 	ScheduleBasicAttackCadence();
 	if (AGP_EnemyCharacter* EnemyCharacter = ActiveEnemyCharacter.Get())
@@ -408,7 +430,7 @@ void UBTT_ExecuteEnemyAttack::TickFacingTarget(
 
 	if (IsFacingCommittedTarget() || PhaseElapsedSeconds >= MaximumAttackFacingSeconds)
 	{
-		if (!ActivateBasicAttack())
+		if (!BeginAttackAfterFacing())
 		{
 			FinishLatentTask(OwnerComp, EBTNodeResult::Failed);
 		}
@@ -450,6 +472,62 @@ void UBTT_ExecuteEnemyAttack::RestoreFacingOwnership()
 
 	FacingMovementComponent.Reset();
 	bOwnsFacingRotation = false;
+}
+
+bool UBTT_ExecuteEnemyAttack::BeginCombatTransition(EEnemyAttackTaskPhase TaskPhase)
+{
+	AGP_EnemyCharacter* EnemyCharacter = ActiveEnemyCharacter.Get();
+	if (!bUseBasicEnemyTransitionAnimations
+		|| bUseBossPatternSelector
+		|| !IsValid(EnemyCharacter)
+		|| EnemyCharacter->IsBossEnemy())
+	{
+		return false;
+	}
+
+	EGPEnemyCombatTransitionPhase CharacterPhase = EGPEnemyCombatTransitionPhase::None;
+	if (TaskPhase == EEnemyAttackTaskPhase::AttackPreparation)
+	{
+		CharacterPhase = EGPEnemyCombatTransitionPhase::AttackPrepare;
+	}
+	else if (TaskPhase == EEnemyAttackTaskPhase::ChasePreparation)
+	{
+		CharacterPhase = EGPEnemyCombatTransitionPhase::ChaseResume;
+	}
+	else
+	{
+		return false;
+	}
+
+	CurrentTransitionDurationSeconds = EnemyCharacter->BeginCombatTransitionAnimation(CharacterPhase);
+	if (CurrentTransitionDurationSeconds <= KINDA_SMALL_NUMBER)
+	{
+		return false;
+	}
+
+	ExecutionPhase = TaskPhase;
+	PhaseElapsedSeconds = 0.0f;
+	return true;
+}
+
+void UBTT_ExecuteEnemyAttack::EndCombatTransition()
+{
+	if (AGP_EnemyCharacter* EnemyCharacter = ActiveEnemyCharacter.Get())
+	{
+		EnemyCharacter->EndCombatTransitionAnimation();
+	}
+	CurrentTransitionDurationSeconds = 0.0f;
+}
+
+bool UBTT_ExecuteEnemyAttack::BeginAttackAfterFacing()
+{
+	if (ExecutionPhase != EEnemyAttackTaskPhase::AttackPreparation
+		&& BeginCombatTransition(EEnemyAttackTaskPhase::AttackPreparation))
+	{
+		return true;
+	}
+
+	return ActivateBasicAttack();
 }
 
 bool UBTT_ExecuteEnemyAttack::IsTrackedAbilityActive() const
@@ -506,7 +584,7 @@ bool UBTT_ExecuteEnemyAttack::IsExplicitAttackInterruptActive() const
 bool UBTT_ExecuteEnemyAttack::ShouldDeferAbortForCommittedAction() const
 {
 	const AGP_EnemyCharacter* EnemyCharacter = ActiveEnemyCharacter.Get();
-	return bAttackActivationAccepted
+	return ExecutionPhase != EEnemyAttackTaskPhase::Idle
 		&& IsValid(EnemyCharacter)
 		&& EnemyAttackTransitionPolicy::ShouldPreserveCommittedAction(
 			EnemyCharacter->IsBehaviorAttackCommitted(),
@@ -537,14 +615,19 @@ void UBTT_ExecuteEnemyAttack::CancelTrackedAttackAction()
 
 void UBTT_ExecuteEnemyAttack::CompleteBasicAttack(UBehaviorTreeComponent& OwnerComp)
 {
-	ScheduleBasicAttackCadence();
 	const float EffectiveRecoverySeconds = bUseBossPatternSelector
 		? BossAttackRecoverySeconds
 		: AttackRecoverySeconds;
 	if (AGP_EnemyCharacter* EnemyCharacter = ActiveEnemyCharacter.Get())
 	{
 		// cadence는 공격 시작이 아니라 실제 종료 뒤부터 계산해 긴 몽타주와 다음 공격이 겹치지 않게 한다.
-		EnemyCharacter->FinishBehaviorAttackCommit(EffectiveRecoverySeconds);
+		const float ChaseResumeSeconds = bUseBasicEnemyTransitionAnimations && !EnemyCharacter->IsBossEnemy()
+			? EnemyCharacter->GetCombatTransitionDurationSeconds(EGPEnemyCombatTransitionPhase::ChaseResume)
+			: 0.0f;
+		// Keep the same commit through recovery and the chase bridge so a root
+		// reevaluation cannot open movement over either presentation phase.
+		EnemyCharacter->FinishBehaviorAttackCommit(
+			EffectiveRecoverySeconds + ChaseResumeSeconds + 0.5f);
 	}
 
 	ExecutionPhase = EEnemyAttackTaskPhase::Recovery;
@@ -557,9 +640,27 @@ void UBTT_ExecuteEnemyAttack::CompleteBasicAttack(UBehaviorTreeComponent& OwnerC
 
 void UBTT_ExecuteEnemyAttack::FinishRecovery(UBehaviorTreeComponent& OwnerComp)
 {
+	if (BeginCombatTransition(EEnemyAttackTaskPhase::ChasePreparation))
+	{
+		return;
+	}
+
+	FinishAttackSequence(OwnerComp);
+}
+
+void UBTT_ExecuteEnemyAttack::FinishAttackSequence(UBehaviorTreeComponent& OwnerComp)
+{
+	EndCombatTransition();
+	ScheduleBasicAttackCadence();
+	if (AGP_EnemyCharacter* EnemyCharacter = ActiveEnemyCharacter.Get())
+	{
+		EnemyCharacter->FinishBehaviorAttackCommit(0.0f);
+	}
+
 	if (bLatentAbortPending)
 	{
-		// 액션과 회복까지 끝난 시점에 보류했던 상위 분기 변경을 다시 허용한다.
+		// Release a deferred branch change only after attack, recovery, and the
+		// chase-resume bridge have all yielded their animation ownership.
 		FinishLatentAbort(OwnerComp);
 		return;
 	}
@@ -590,6 +691,7 @@ void UBTT_ExecuteEnemyAttack::ScheduleBasicAttackCadence()
 
 void UBTT_ExecuteEnemyAttack::ResetExecutionState()
 {
+	EndCombatTransition();
 	RestoreFacingOwnership();
 	ExecutionPhase = EEnemyAttackTaskPhase::Idle;
 	ActiveAbilitySystemComponent.Reset();
@@ -601,6 +703,7 @@ void UBTT_ExecuteEnemyAttack::ResetExecutionState()
 	PhaseElapsedSeconds = 0.0f;
 	TotalElapsedSeconds = 0.0f;
 	CurrentFallbackCommitSeconds = 0.0f;
+	CurrentTransitionDurationSeconds = 0.0f;
 	bAttackActivationAccepted = false;
 	bCadenceScheduled = false;
 	bUseBossPatternSelector = false;
@@ -612,7 +715,7 @@ void UBTT_ExecuteEnemyAttack::ResetExecutionState()
 FString UBTT_ExecuteEnemyAttack::GetStaticDescription() const
 {
 	return FString::Printf(
-		TEXT("Attack tag: %s\nWait for GAS/external action, recovery %.2fs (boss %.2fs)"),
+		TEXT("Attack tag: %s\nRegular: Face > AttackPrepare > GAS > Recovery > ChaseResume\nRecovery %.2fs (boss %.2fs)"),
 		*AttackAbilityTag.ToString(),
 		AttackRecoverySeconds,
 		BossAttackRecoverySeconds);
