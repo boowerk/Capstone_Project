@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-20T22:00:02+09:00
+updated: 2026-07-21T17:32:45+09:00
 status: active
 tags:
   - memoc
@@ -11,11 +11,11 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-07-20T22:00:02+09:00
+Last synced: 2026-07-21T17:32:45+09:00
 
 ## Current Status
 
-- Village-layout V1 source is implemented but not yet authored into `L_LandscapeMap`. Lobby travel creates a nonnegative `RunSeed` URL option; `AGP_GameMode` parses/falls back once and replicates it through `AGP_GameState`. Placeable, non-spatial `AGP_VillageSlot` actors provide stable slot/group IDs and weight, while the server `AGP_VillageLayoutDirector` deterministically selects optional/required slots per group and exposes per-slot selection state. The default native rule is optional group `Village`, 50% chance, pick one. This V1 intentionally does not activate Data Layers, generate PCG, spawn `BP_CityAnchor`, or change zones. Full Editor build and `ProjectEden.Game.RunSeed.Flow` plus `ProjectEden.Game.WorldLayout.VillageSelection` pass; both native actors are searchable in the Editor Add menu. No map/content asset was saved for this work.
+- Village-layout streaming V1 is verified. `AGP_VillageLayoutDirector` deterministically selects one placed slot, asynchronously loads `/Game/WorldLayout/L_Village_00` at that transform while hidden, configures its PCG component as On Demand/non-partitioned with a RunSeed+Slot seed, shows the level, then requests local generation. PIE seed `993821918` selected `Village_B` at `(-12870, 38880, 4140)` and the user visually confirmed the generated village; Editor build and both village/run-seed automation tests pass. Keep the former fixed main-map village instance removed. V1 intentionally permits only one active village; multiple villages require per-instance Road/District tag/graph-parameter isolation, and multiplayer client streaming plus packaging cook registration remain follow-up work. Runtime Data Layer application exists but defaults off and is not part of this path.
 - Landscape Region V2.2 is active only on `MI_RegionLandscape_GameMap2`. The approved final preset is Candidate J: deterministic per-pair PCHIP boundary displacement with non-uniform 36-260m spacing, 4-26m random amplitudes, 50% sign persistence, 16m cap, and fixed junction/perimeter cores. Its blend half-width now varies independently and smoothly per region-pair from 18-32px around a 24px base, with 80-240m anchors; each region influence samples its own nearest boundary-side pixel. Hard `RegionID`, StateRT, PCG, topology, packed visual IDs, and the runtime shader remain unchanged. Authoritative source is `Project_Eden/ArtSource/RegionVisualSlotsV22`; the external V2.2 mirror is byte-identical.
 - Final generation passes 61/61 twice deterministically. Observed blend half-width is 18.105-31.112px (mean 23.935px) with 81.045-237.979m actual anchor gaps; unassigned boundary pixels, same-slot support/guard overlap, active-ID mismatch, and ID-transition violations are zero, with at most four active regions. Weight PNG is `8209CBD4...11917`; IDs01/IDs23 remain `5FAD10BB...E0B7` / `7A0E2CBF...0913`. Computer Use reimported and saved Weight as regular non-VT BGRA8, Bilinear, NoMipmaps/one mip, Clamp X/Y, sRGB off, VectorDisplacementmap (717,075 bytes, `F91AB7E1...53CC6`). `MI_RegionLandscape_GameMap2` remains `841EE208...D740`; the user-owned map remains `E8CE0B5D...B728C` and was not saved. Transient random-state refresh visibly applied the new boundary weights; no related material/texture error followed the save.
 

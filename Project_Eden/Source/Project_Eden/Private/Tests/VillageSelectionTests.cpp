@@ -2,6 +2,7 @@
 
 #include "Algo/Reverse.h"
 #include "Components/BoxComponent.h"
+#include "Game/WorldLayout/GP_VillageLayoutDirector.h"
 #include "Game/WorldLayout/GP_VillageSelectionPolicy.h"
 #include "Game/WorldLayout/GP_VillageSlot.h"
 #include "Misc/AutomationTest.h"
@@ -139,6 +140,15 @@ bool FVillageSelectionPolicyTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Required group still selects every eligible fallback"), TooManyRequiredResult.SelectedSlotIds.Num(), 3);
 
 	TestNotNull(TEXT("VillageSlot owns an editor footprint box"), GetDefault<AGP_VillageSlot>()->GetSlotBounds());
+	TestNull(TEXT("VillageSlot Data Layer is explicitly authored per placed slot"),
+		GetDefault<AGP_VillageSlot>()->GetVillageDataLayer());
+	TestNotNull(TEXT("VillageSlot exposes a VillageDataLayer property"),
+		AGP_VillageSlot::StaticClass()->FindPropertyByName(TEXT("VillageDataLayer")));
+	TestNotNull(TEXT("VillageLayoutDirector exposes a single VillageLevelPreset property"),
+		AGP_VillageLayoutDirector::StaticClass()->FindPropertyByName(TEXT("VillageLevelPreset")));
+	TestEqual(TEXT("VillageLayoutDirector defaults to the first authored village preset"),
+		GetDefault<AGP_VillageLayoutDirector>()->GetVillageLevelPreset().ToSoftObjectPath(),
+		FSoftObjectPath(TEXT("/Game/WorldLayout/L_Village_00.L_Village_00")));
 	return true;
 }
 

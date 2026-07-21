@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-20T22:00:02+09:00
+updated: 2026-07-21T17:32:45+09:00
 status: active
 tags:
   - memoc
@@ -14,6 +14,10 @@ tags:
 Durable project decisions live here. Keep entries short, dated, and useful to future agents.
 
 ## Decision Log
+
+### 2026-07-21
+- Use an authored Level Instance preset rather than Runtime Data Layers for the first playable village activation. V1 loads only `/Game/WorldLayout/L_Village_00` at one selected slot, keeps it hidden until its PCG component is configured as On Demand/non-partitioned, then shows it and generates locally. The fixed source instance must remain absent from the main map.
+- Defer multiple active villages until Road/District discovery is isolated per instance through unique tags and PCG graph-parameter overrides. Multiplayer client streaming and explicit cook registration are also follow-up work.
 
 ### 2026-07-20
 - Build village randomization in two phases. V1 only propagates a per-run `RunSeed` and deterministically marks manually placed, stable-ID `AGP_VillageSlot` candidates selected/not selected by group. Do not activate candidate Runtime Data Layers or call city PCG yet: existing `BP_CityAnchor` content may generate on load, so real activation needs an explicit selected-layer contract, streaming-complete gate, city-PCG-complete gate, and vegetation ordering in V2. Keep Region Event zones independent until village placement is proven.

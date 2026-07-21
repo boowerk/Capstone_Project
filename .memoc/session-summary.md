@@ -2,20 +2,22 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-07-20T22:00:02+09:00
+updated: 2026-07-21T17:32:45+09:00
 status: active
-tags: [memoc, memoc/state]
+tags:
+  - memoc
+  - memoc/state
 created: 2026-07-18T13:21:02
 ---
 # Session Summary
 
 ## Status
-- Village-layout V1 source complete: per-run RunSeed plus deterministic candidate-slot group selection.
+- Single-preset village streaming works: `L_Village_00` loads at one deterministic selected slot and generates PCG after load/show.
 
 ## Verified
-- Full Editor build and both `ProjectEden.Game.RunSeed.Flow` / `ProjectEden.Game.WorldLayout.VillageSelection` pass.
-- Editor Add menu exposes both native actors. No map/content asset was saved.
+- Editor build and `RunSeed.Flow` / `VillageSelection` pass.
+- PIE seed `993821918` selected `Village_B`; one PCG component configured/generated, and the user visually confirmed the village at the slot.
 
 ## Resume
-- Get candidate count/positions, then place unique-ID slots for a debug-only PIE smoke test.
-- Data Layer/PCG activation is V2; gate streaming and city PCG before vegetation. Keep zones separate.
+- Keep the fixed main-map village instance removed.
+- Multiple villages need per-instance Road/District tags plus PCG parameter overrides. Client sync and cook registration remain.

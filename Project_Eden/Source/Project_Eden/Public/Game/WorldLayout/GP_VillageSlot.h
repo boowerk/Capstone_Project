@@ -7,6 +7,7 @@
 
 class AGP_VillageSlot;
 class UBoxComponent;
+class UDataLayerAsset;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
 	FGPOnVillageSlotSelectionChanged,
@@ -29,6 +30,7 @@ public:
 	bool IsCandidateEnabled() const { return bEnabled; }
 	bool IsSelectedForRun() const { return bSelectedForRun; }
 	UBoxComponent* GetSlotBounds() const { return SlotBounds; }
+	UDataLayerAsset* GetVillageDataLayer() const { return VillageDataLayer; }
 
 	UPROPERTY(BlueprintAssignable, Category = "Village")
 	FGPOnVillageSlotSelectionChanged OnSelectionChanged;
@@ -51,6 +53,9 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Village", meta = (ClampMin = "-1"))
 	int32 RegionId = INDEX_NONE;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Village|Data Layer")
+	TObjectPtr<UDataLayerAsset> VillageDataLayer;
 
 	UPROPERTY(Transient, BlueprintReadOnly, Category = "Village")
 	bool bSelectedForRun = false;
