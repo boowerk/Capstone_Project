@@ -181,9 +181,8 @@ bool UBTT_ExecuteEnemyAttack::ActivateBasicAttack()
 		UE_LOG(
 			LogEnemyAI,
 			Log,
-			TEXT("[MoveTrace] AttackActivated Pawn=%s Pos=%s Tag=%s"),
-			*GetNameSafe(ControlledPawn),
-			*ControlledPawn->GetActorLocation().ToCompactString(),
+			TEXT("[MoveTrace] AttackActivated Pawn=%s Tag=%s"),
+			*GetNameSafe(ActiveControlledPawn.Get()),
 			*ActiveAbilityTag.ToString());
 
 		bAttackActivationAccepted = true;

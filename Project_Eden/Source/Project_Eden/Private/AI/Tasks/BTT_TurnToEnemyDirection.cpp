@@ -1,6 +1,5 @@
 #include "AI/Tasks/BTT_TurnToEnemyDirection.h"
 
-#include "AI/Data/EnemyBlackboardKeys.h"
 #include "AI/Tasks/EnemyBTTaskCommon.h"
 #include "AIController.h"
 #include "BehaviorTree/BlackboardComponent.h"
@@ -34,18 +33,17 @@ EBTNodeResult::Type UBTT_TurnToEnemyDirection::ExecuteTask(UBehaviorTreeComponen
 	}
 
 	AActor* TargetActor = EnemyBTTaskCommon::GetTargetActor(BlackboardComponent);
-	const bool bIsPositionalMove = bUseMoveToLocation
-		&& (!IsValid(TargetActor)
-			|| BlackboardComponent->GetValueAsBool(EnemyBlackboardKeys::bShouldRetreat)
-			|| BlackboardComponent->GetValueAsBool(EnemyBlackboardKeys::bShouldReposition)
-			|| BlackboardComponent->GetValueAsBool(EnemyBlackboardKeys::bShouldReturnHome));
+	if (!IsValid(TargetActor))
+	{
+		return EBTNodeResult::Succeeded;
+	}
 
-	// Chase MoveTo nodes may still carry an old MoveToLocation from a previous
-	// reposition.  Their intentional direction is TargetActor, never that stale vector.
-	const bool bStartedTurn = bIsPositionalMove
-		? EnemyCharacter->StartTurnInPlaceForLocation(BlackboardComponent->GetValueAsVector(EnemyBlackboardKeys::MoveToLocation))
-		: EnemyCharacter->StartTurnInPlaceForTarget(TargetActor);
-	return bStartedTurn ? EBTNodeResult::InProgress : EBTNodeResult::Succeeded;
+	// origin/main exposes target-based turning only.  Positional move branches
+	// still need a valid combat target, but never consume a stale MoveToLocation.
+	EnemyCharacter->StartTurnInPlaceForTarget(TargetActor);
+	return EnemyCharacter->IsTurnInPlaceActive()
+		? EBTNodeResult::InProgress
+		: EBTNodeResult::Succeeded;
 }
 
 void UBTT_TurnToEnemyDirection::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, float DeltaSeconds)
