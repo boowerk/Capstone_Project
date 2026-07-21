@@ -178,11 +178,109 @@ AGP_RegionEventActor* AGP_RegionEventDirector::TryStartRegionEventAtLocation(
 	return SpawnSelectedEvent(RegionId, SpawnLocation + SpawnOffset, SelectedEvent, false);
 }
 
+AGP_RegionEventActor* AGP_RegionEventDirector::TryStartGuidedRegionEventAtLocation(
+	FName EventId,
+	int32 RegionId,
+	FVector SpawnLocation,
+	float DormantWaitTimeoutSeconds,
+	int32 RequiredApproachPlayers)
+{
+	if (!HasAuthority() || !bEnableRegionEvents)
+	{
+		return nullptr;
+	}
+
+	const UGP_RegionEventData* SelectedEvent = FindUniqueExplorationEventById(EventId);
+	if (!IsValid(SelectedEvent))
+	{
+		return nullptr;
+	}
+
+	return SpawnSelectedEvent(
+		RegionId,
+		SpawnLocation + SpawnOffset,
+		SelectedEvent,
+		/*bExplorationEvent=*/true,
+		/*bOverrideDormantTimeout=*/true,
+		FMath::Max(-1.0f, DormantWaitTimeoutSeconds),
+		FMath::Max(1, RequiredApproachPlayers));
+}
+
+void AGP_RegionEventDirector::SetAmbientExplorationSuppressed(bool bSuppressed)
+{
+	if (!HasAuthority() || bAmbientExplorationSuppressed == bSuppressed)
+	{
+		return;
+	}
+
+	bAmbientExplorationSuppressed = bSuppressed;
+	ObservedRegionId = INDEX_NONE;
+	ObservedRegionSinceSeconds = 0.0;
+	if (bAmbientExplorationSuppressed)
+	{
+		// Guided flow pauses only future ambient scheduling; any discovered event keeps its normal lifecycle.
+		StopExplorationScheduler();
+	}
+	else if (bDirectorInitialized)
+	{
+		StartExplorationScheduler();
+	}
+}
+
+const UGP_RegionEventData* AGP_RegionEventDirector::FindUniqueExplorationEventById(FName EventId) const
+{
+	if (EventId.IsNone())
+	{
+		return nullptr;
+	}
+
+	const UGP_RegionEventData* Match = nullptr;
+	for (const UGP_RegionEventData* Candidate : ExplorationEventPool)
+	{
+		if (!IsValid(Candidate) || Candidate->EventId != EventId)
+		{
+			continue;
+		}
+		if (Match)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[RegionEvent] Guided EventId '%s' is duplicated."), *EventId.ToString());
+			return nullptr;
+		}
+		Match = Candidate;
+	}
+
+	if (!Match || !*ResolveProductionEventClass(*Match))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[RegionEvent] Guided EventId '%s' is unavailable."), *EventId.ToString());
+		return nullptr;
+	}
+	return Match;
+}
+
 AGP_RegionEventActor* AGP_RegionEventDirector::SpawnSelectedEvent(
 	int32 RegionId,
 	const FVector& SpawnLocation,
 	const UGP_RegionEventData* SelectedEvent,
 	bool bExplorationEvent)
+{
+	return SpawnSelectedEvent(
+		RegionId,
+		SpawnLocation,
+		SelectedEvent,
+		bExplorationEvent,
+		/*bOverrideDormantTimeout=*/false,
+		/*DormantTimeoutOverride=*/-1.0f,
+		/*RequiredApproachPlayers=*/1);
+}
+
+AGP_RegionEventActor* AGP_RegionEventDirector::SpawnSelectedEvent(
+	int32 RegionId,
+	const FVector& SpawnLocation,
+	const UGP_RegionEventData* SelectedEvent,
+	bool bExplorationEvent,
+	bool bOverrideDormantTimeout,
+	float DormantTimeoutOverride,
+	int32 RequiredApproachPlayers)
 {
 	if (!HasAuthority() || !bEnableRegionEvents || !IsValid(SelectedEvent))
 	{
@@ -191,6 +289,8 @@ AGP_RegionEventActor* AGP_RegionEventDirector::SpawnSelectedEvent(
 
 	RemoveInactiveEvents();
 	if ((MaxActiveEvents >= 0 && ActiveEvents.Num() >= MaxActiveEvents)
+		|| (bExplorationEvent
+			&& CountActiveExplorationEvents() >= FMath::Max(1, MaxActiveExplorationEvents))
 		|| RegionId < 0
 		|| (RegionCount > 0 && RegionId >= RegionCount)
 		|| HasActiveEventForRegion(RegionId))
@@ -239,14 +339,33 @@ AGP_RegionEventActor* AGP_RegionEventDirector::SpawnSelectedEvent(
 		// Register ownership before overlap evaluation because configuration can activate and spawn enemies immediately.
 		ExplorationEvents.Add(EventActor);
 	}
+	if (bOverrideDormantTimeout)
+	{
+		if (AGP_ShrineRuinsRegionEventActor* GuidedShrine = Cast<AGP_ShrineRuinsRegionEventActor>(EventActor))
+		{
+			GuidedShrine->ConfigureGuidedPartyReward(true);
+		}
+	}
 	if (bExplorationEvent)
 	{
 		// Exploration markers wait for the party, giving dynamic navigation time to build before enemies spawn.
 		const float ActivationRadius = FMath::Max(100.0f, SelectedEvent->ApproachActivationRadius);
-		const float DormantTimeout = SelectedEvent->DormantWaitTimeoutSeconds > 0.0f
-			? SelectedEvent->DormantWaitTimeoutSeconds
-			: 55.0f;
-		EventActor->ConfigureExplorationActivation(ActivationRadius, DormantTimeout);
+		const float DormantTimeout = bOverrideDormantTimeout
+			? FMath::Max(-1.0f, DormantTimeoutOverride)
+			: (SelectedEvent->DormantWaitTimeoutSeconds > 0.0f
+				? SelectedEvent->DormantWaitTimeoutSeconds
+				: 55.0f);
+		if (bOverrideDormantTimeout)
+		{
+			EventActor->ConfigureGuidedExplorationActivation(
+				ActivationRadius,
+				DormantTimeout,
+				RequiredApproachPlayers);
+		}
+		else
+		{
+			EventActor->ConfigureExplorationActivation(ActivationRadius, DormantTimeout);
+		}
 	}
 	OnRegionEventStarted.Broadcast(this, EventActor);
 	if (!bExplorationEvent && bAutoActivateSpawnedEvents)
@@ -384,7 +503,12 @@ FVector AGP_RegionEventDirector::ResolveSpawnLocationForZone(AGP_EnemySpawnVolum
 void AGP_RegionEventDirector::StartExplorationScheduler()
 {
 	StopExplorationScheduler();
-	if (!HasAuthority() || !bEnableRegionEvents || !bEnableExplorationEvents || ExplorationEventPool.IsEmpty())
+	if (!HasAuthority()
+		|| !bDirectorInitialized
+		|| bAmbientExplorationSuppressed
+		|| !bEnableRegionEvents
+		|| !bEnableExplorationEvents
+		|| ExplorationEventPool.IsEmpty())
 	{
 		return;
 	}
@@ -413,7 +537,11 @@ void AGP_RegionEventDirector::StopExplorationScheduler()
 void AGP_RegionEventDirector::EvaluateExplorationEvents()
 {
 	UWorld* World = GetWorld();
-	if (!HasAuthority() || !World || !bEnableRegionEvents || !bEnableExplorationEvents)
+	if (!HasAuthority()
+		|| !World
+		|| bAmbientExplorationSuppressed
+		|| !bEnableRegionEvents
+		|| !bEnableExplorationEvents)
 	{
 		return;
 	}

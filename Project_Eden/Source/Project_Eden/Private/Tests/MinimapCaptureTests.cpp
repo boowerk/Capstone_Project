@@ -6,10 +6,12 @@
 #include "Components/Overlay.h"
 #include "Components/Widget.h"
 #include "Engine/World.h"
+#include "Engine/Texture2D.h"
 #include "Materials/Material.h"
 #include "Misc/AutomationTest.h"
 #include "UI/GP_MinimapCaptureActor.h"
 #include "UI/GP_MinimapSubsystem.h"
+#include "UI/GP_PlayerHUDWidget.h"
 #include "Blueprint/WidgetBlueprintGeneratedClass.h"
 #include "Blueprint/WidgetTree.h"
 
@@ -215,6 +217,36 @@ bool FMinimapCaptureStabilityTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("Static minimap material uses the UI domain"), StaticMapMaterial->MaterialDomain, MD_UI);
 		TestEqual(TEXT("Static minimap material supports circular opacity"), StaticMapMaterial->BlendMode, BLEND_Translucent);
 	}
+
+	UTexture2D* DemoObjectiveMarker = LoadObject<UTexture2D>(
+		nullptr,
+		TEXT("/Game/UI/HUD/Minimap/Textures/T_UI_Minimap_Point_Gold.T_UI_Minimap_Point_Gold"));
+	TestNotNull(TEXT("Guided demo objective has a distinct gold minimap marker"), DemoObjectiveMarker);
+
+	const FVector2D NonSquareLayerSize(240.0f, 180.0f);
+	const float ObjectiveMarkerSize = 18.0f;
+	const float MarkerRadius = 0.47f;
+	const float ExpectedSafeRadius = 180.0f * MarkerRadius - ObjectiveMarkerSize * 0.5f;
+	const FVector2D ClampedObjectiveOffset = UGP_PlayerHUDWidget::CalculateClampedMarkerOffsetPixels(
+		FVector2D(3.0f, 2.0f),
+		3.0f,
+		NonSquareLayerSize,
+		MarkerRadius,
+		ObjectiveMarkerSize);
+	TestTrue(
+		TEXT("A distant objective is clamped inside the circular minimap edge"),
+		FMath::IsNearlyEqual(ClampedObjectiveOffset.Size(), ExpectedSafeRadius, KINDA_SMALL_NUMBER));
+	TestTrue(
+		TEXT("A clamped objective preserves its pixel-space direction"),
+		FMath::IsNearlyZero(FVector2D::CrossProduct(ClampedObjectiveOffset, FVector2D(2160.0f, 1080.0f)), 0.1f));
+	TestTrue(
+		TEXT("Invalid marker geometry resolves to a safe center offset"),
+		UGP_PlayerHUDWidget::CalculateClampedMarkerOffsetPixels(
+			FVector2D(1.0f),
+			3.0f,
+			FVector2D::ZeroVector,
+			MarkerRadius,
+			ObjectiveMarkerSize).IsNearlyZero());
 
 	// Validate the production HUD contract so the subsystem always has a visible Image to receive the render target.
 	UClass* HUDWidgetClass = LoadClass<UUserWidget>(nullptr, TEXT("/Game/UI/HUD/WBP_PlayerHUDWidget.WBP_PlayerHUDWidget_C"));

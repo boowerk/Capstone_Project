@@ -9,6 +9,7 @@
 #include "Game/Corruption/GP_WorldCorruptionComponent.h"
 #include "Game/GP_GameState.h"
 #include "Game/RegionEvents/GP_RegionEventData.h"
+#include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
 #include "Materials/MaterialInterface.h"
 #include "NavigationSystem.h"
@@ -179,6 +180,16 @@ void AGP_RegionEventActor::ConfigureApproachActivation(
 void AGP_RegionEventActor::ConfigureExplorationActivation(float InActivationRadius, float InDormantTimeoutSeconds)
 {
 	// The director selects exploration events as a single mode, so it should not need to pass a redundant true flag.
+	RequiredApproachPlayerCount = 1;
+	ConfigureApproachActivation(/*bWaitForPlayerApproach=*/true, InActivationRadius, InDormantTimeoutSeconds);
+}
+
+void AGP_RegionEventActor::ConfigureGuidedExplorationActivation(
+	float InActivationRadius,
+	float InDormantTimeoutSeconds,
+	int32 InRequiredApproachPlayers)
+{
+	RequiredApproachPlayerCount = FMath::Max(1, InRequiredApproachPlayers);
 	ConfigureApproachActivation(/*bWaitForPlayerApproach=*/true, InActivationRadius, InDormantTimeoutSeconds);
 }
 
@@ -521,11 +532,43 @@ void AGP_RegionEventActor::TryActivateFromCurrentOverlaps()
 
 	TArray<AActor*> OverlappingPlayers;
 	ActivationTrigger->GetOverlappingActors(OverlappingPlayers, AGP_PlayerCharacter::StaticClass());
-	if (!OverlappingPlayers.IsEmpty())
+	TSet<AActor*> UniqueOverlappingPlayers;
+	for (AActor* OverlappingPlayer : OverlappingPlayers)
+	{
+		if (IsValid(OverlappingPlayer))
+		{
+			UniqueOverlappingPlayers.Add(OverlappingPlayer);
+		}
+	}
+
+	int32 PossessedPlayerCount = 0;
+	if (const UWorld* World = GetWorld())
+	{
+		for (FConstPlayerControllerIterator Iterator = World->GetPlayerControllerIterator(); Iterator; ++Iterator)
+		{
+			const APlayerController* PlayerController = Iterator->Get();
+			PossessedPlayerCount += IsValid(PlayerController)
+				&& IsValid(Cast<AGP_PlayerCharacter>(PlayerController->GetPawn()))
+				? 1
+				: 0;
+		}
+	}
+	if (HasApproachPlayerQuorum(UniqueOverlappingPlayers.Num(), PossessedPlayerCount))
 	{
 		bApproachActivationRequested = true;
 		ActivateRegionEvent();
 	}
+}
+
+bool AGP_RegionEventActor::HasApproachPlayerQuorum(
+	int32 OverlappingPlayerCount,
+	int32 PossessedPlayerCount) const
+{
+	const int32 EffectiveRequirement = FMath::Clamp(
+		RequiredApproachPlayerCount,
+		1,
+		FMath::Max(1, PossessedPlayerCount));
+	return FMath::Max(0, OverlappingPlayerCount) >= EffectiveRequirement;
 }
 
 void AGP_RegionEventActor::HandleDormantWaitTimeout()
@@ -644,6 +687,6 @@ void AGP_RegionEventActor::HandleActivationOverlap(UPrimitiveComponent* Overlapp
 		return;
 	}
 
-	bApproachActivationRequested = true;
-	ActivateRegionEvent();
+	// Recount live overlaps so one early player cannot activate a guided two-of-three objective alone.
+	TryActivateFromCurrentOverlaps();
 }

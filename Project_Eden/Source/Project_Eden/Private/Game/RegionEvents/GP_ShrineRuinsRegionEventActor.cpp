@@ -11,6 +11,21 @@ AGP_ShrineRuinsRegionEventActor::AGP_ShrineRuinsRegionEventActor()
 	ActivationRadius = 850.0f;
 }
 
+void AGP_ShrineRuinsRegionEventActor::ConfigureGuidedPartyReward(bool bEnabled)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	bGuidedPartyReward = bEnabled;
+	if (bGuidedPartyReward)
+	{
+		// Guided completion is owned by the full dispatch pass instead of the first claimant.
+		bCompleteAfterFirstClaim = false;
+	}
+}
+
 void AGP_ShrineRuinsRegionEventActor::ActivateRegionEvent()
 {
 	Super::ActivateRegionEvent();
@@ -20,8 +35,11 @@ void AGP_ShrineRuinsRegionEventActor::ActivateRegionEvent()
 		if (UWorld* World = GetWorld())
 		{
 			// Overlap-triggered test stations spawn the shrine around the player, so refresh once physics overlaps settle.
-			World->GetTimerManager().SetTimerForNextTick(
-				FTimerDelegate::CreateUObject(this, &ThisClass::RewardOverlappingPlayers));
+			World->GetTimerManager().SetTimerForNextTick(FTimerDelegate::CreateUObject(
+				this,
+				bGuidedPartyReward
+					? &ThisClass::RewardConnectedPartyPlayers
+					: &ThisClass::RewardOverlappingPlayers));
 		}
 	}
 }
@@ -66,26 +84,72 @@ void AGP_ShrineRuinsRegionEventActor::RewardOverlappingPlayers()
 	}
 }
 
+void AGP_ShrineRuinsRegionEventActor::RewardConnectedPartyPlayers()
+{
+	if (!HasAuthority() || GetRuntimeState() != EGPRegionEventRuntimeState::Active)
+	{
+		return;
+	}
+
+	TArray<AGP_PlayerController*> PartyControllers;
+	if (UWorld* World = GetWorld())
+	{
+		for (FConstPlayerControllerIterator Iterator = World->GetPlayerControllerIterator(); Iterator; ++Iterator)
+		{
+			if (AGP_PlayerController* PlayerController = Cast<AGP_PlayerController>(Iterator->Get()))
+			{
+				PartyControllers.Add(PlayerController);
+			}
+		}
+	}
+	RewardPartyControllers(PartyControllers);
+}
+
+void AGP_ShrineRuinsRegionEventActor::RewardPartyControllers(
+	const TArray<AGP_PlayerController*>& PartyControllers)
+{
+	TSet<AGP_PlayerController*> UniqueControllers;
+	for (AGP_PlayerController* PlayerController : PartyControllers)
+	{
+		if (IsValid(PlayerController))
+		{
+			UniqueControllers.Add(PlayerController);
+			TryRewardController(PlayerController);
+		}
+	}
+
+	if (bGuidedPartyReward
+		&& UniqueControllers.Num() > 0
+		&& RewardedControllers.Num() >= UniqueControllers.Num())
+	{
+		// RPC dispatch is synchronous on the server; the flow adds presentation grace before the boss beat.
+		CompleteRegionEvent();
+	}
+}
+
 void AGP_ShrineRuinsRegionEventActor::TryRewardPlayer(AGP_PlayerCharacter* PlayerCharacter)
 {
-	if (!IsValid(PlayerCharacter) || RewardedPlayers.Contains(PlayerCharacter))
+	if (!IsValid(PlayerCharacter))
 	{
 		return;
 	}
 
-	AGP_PlayerController* PlayerController = Cast<AGP_PlayerController>(PlayerCharacter->GetController());
-	if (!IsValid(PlayerController))
-	{
-		// Do not consume the one-shot shrine claim unless a controller can actually receive the reward UI.
-		return;
-	}
-
-	RewardedPlayers.Add(PlayerCharacter);
-	// The controller opens the actual widget locally so multiplayer clients receive their own choices.
-	PlayerController->ClientOpenRegionEventAugmentSelect();
-
-	if (bCompleteAfterFirstClaim)
+	if (TryRewardController(Cast<AGP_PlayerController>(PlayerCharacter->GetController()))
+		&& bCompleteAfterFirstClaim)
 	{
 		CompleteRegionEvent();
 	}
+}
+
+bool AGP_ShrineRuinsRegionEventActor::TryRewardController(AGP_PlayerController* PlayerController)
+{
+	if (!IsValid(PlayerController) || RewardedControllers.Contains(PlayerController))
+	{
+		return false;
+	}
+
+	RewardedControllers.Add(PlayerController);
+	// Each controller opens the actual widget locally so every multiplayer client receives independent choices.
+	PlayerController->ClientOpenRegionEventAugmentSelect();
+	return true;
 }
