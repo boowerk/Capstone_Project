@@ -146,10 +146,27 @@ public:
 	UFUNCTION(BlueprintPure, Category = "AI|Combat")
 	FGameplayTag GetDefaultAttackAbilityTag() const { return DefaultAttackAbilityTag; }
 
+	UFUNCTION(BlueprintPure, Category = "AI|Combat|Range")
+	float GetBasicMeleeAttackStartRange() const;
+
+	UFUNCTION(BlueprintPure, Category = "AI|Combat|Range")
+	float GetBasicMeleeAttackExitHysteresis() const { return FMath::Max(0.0f, BasicMeleeAttackExitHysteresis); }
+
+	UFUNCTION(BlueprintPure, Category = "AI|Combat|Range")
+	float GetBasicMeleeCadenceHoldRange() const { return FMath::Max(0.0f, BasicMeleeCadenceHoldRange); }
+	// The tactics service opens this explicit state; Tick then samples the same actor every frame for smooth close-hold facing.
+	void BeginBasicEnemyCombatHoldFacing(AActor* TargetActor, float TurnRateDegreesPerSecond);
+	void ClearBasicEnemyCombatHoldFacing();
+
 	// Regular-enemy BT tasks use this server-side gate instead of a fixed shared Wait node.
 	UFUNCTION(BlueprintPure, Category = "AI|Combat|Cadence")
 	bool IsBasicEnemyAttackReady() const;
 	bool IsBasicEnemyAttackInProgress() const { return bBasicEnemyAttackInProgress; }
+	bool IsBasicEnemyAttackAimTracking() const { return bBasicEnemyAttackAimTracking; }
+	// The attack ability opens this server-side window so the BT can follow only its committed player until AttackHit.
+	void BeginBasicEnemyAttackAimTracking() { bBasicEnemyAttackAimTracking = true; }
+	// Locking at AttackHit prevents a melee strike from homing during its contact and recovery frames.
+	void LockBasicEnemyAttackAim() { bBasicEnemyAttackAimTracking = false; }
 	bool IsTurnInPlaceActive() const { return bTurnInPlaceActive; }
 	void StartTurnInPlaceForTarget(const AActor* TargetActor);
 	float BeginCombatTransitionAnimation(EGPEnemyCombatTransitionPhase TransitionPhase);
@@ -160,7 +177,13 @@ public:
 		bBasicEnemyAttackInProgress = bInProgress;
 		if (bInProgress)
 		{
+			ClearBasicEnemyCombatHoldFacing();
 			StopTurnInPlace(true);
+		}
+		else
+		{
+			// Cancellation and natural completion both close any windup-facing ownership left by the ability.
+			bBasicEnemyAttackAimTracking = false;
 		}
 	}
 
@@ -282,6 +305,22 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AI|Combat|Cadence")
 	FGPEnemyAttackCadenceSettings AttackCadenceSettings;
 
+	// Physical melee execution range is separate from personality PreferredRange, which may be changed by runtime evaluation.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AI|Combat|Range", meta = (ClampMin = "0.0", Units = "cm"))
+	float BasicMeleeAttackStartRange = 350.0f;
+
+	// In-place melee has only the shared overlap reach, so it must enter closer than a forward-step archetype.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AI|Combat|Range", meta = (ClampMin = "0.0", Units = "cm"))
+	float BasicMeleeStationaryAttackStartRange = 240.0f;
+
+	// A small exit margin prevents chase/attack flicker after a target crosses the start boundary.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AI|Combat|Range", meta = (ClampMin = "0.0", Units = "cm"))
+	float BasicMeleeAttackExitHysteresis = 50.0f;
+
+	// During cadence recovery, melee enemies inside this distance hold and face; outside it they resume pursuit.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AI|Combat|Range", meta = (ClampMin = "0.0", Units = "cm"))
+	float BasicMeleeCadenceHoldRange = 225.0f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AI|Debug")
 	bool bShowAIRangesInEditor = true;
 
@@ -400,6 +439,7 @@ private:
 
 	bool bDeathStateApplied = false;
 	bool bBasicEnemyAttackInProgress = false;
+	bool bBasicEnemyAttackAimTracking = false;
 	bool bTurnInPlaceActive = false;
 
 	UPROPERTY(ReplicatedUsing = OnRep_CombatTransitionPhase)
@@ -414,6 +454,8 @@ private:
 	bool bBehaviorAttackBandLatched = false;
 	float BehaviorAttackCommitUntilTimeSeconds = 0.0f;
 	TWeakObjectPtr<AActor> BehaviorAttackCommittedTarget;
+	TWeakObjectPtr<AActor> BasicEnemyCombatHoldFacingTarget;
+	float BasicEnemyCombatHoldFacingTurnRateDegreesPerSecond = 0.0f;
 	FRandomStream AttackCadenceRandomStream;
 
 	const FEnemyArchetypeTuning* ResolveEnemyArchetypeTuning() const;
@@ -440,6 +482,7 @@ private:
 	void InitializeBasicEnemyAttackCadence();
 	void ApplyRuntimeMovementPolicy();
 	void UpdateTurnInPlace(float DeltaSeconds);
+	void UpdateBasicEnemyCombatHoldFacing(float DeltaSeconds);
 	void TryStartTurnInPlace(const FVector* OverrideTargetLocation = nullptr);
 	void StopTurnInPlace(bool bStopAnimation);
 	UAnimSequence* SelectTurnInPlaceAnimation(float SignedYawDeltaDegrees) const;

@@ -44,6 +44,35 @@ namespace EnemyAttackTransitionPolicy
 		return bActionCommitted && !bExplicitInterrupt;
 	}
 
+	float ResolveMaximumAttackRange(
+		float AuthoredMaximumRange,
+		bool bIsRegularMelee,
+		float MeleeMaximumStartRange)
+	{
+		const float SafeAuthoredRange = FMath::Max(0.0f, AuthoredMaximumRange);
+		return bIsRegularMelee
+			? FMath::Min(SafeAuthoredRange, FMath::Max(0.0f, MeleeMaximumStartRange))
+			: SafeAuthoredRange;
+	}
+
+	bool ShouldPursueDuringCadenceRecovery(
+		EEnemyAttackTransitionIntent Intent,
+		bool bIsRegularMelee,
+		bool bWasChasing,
+		float DistanceToTarget,
+		float MeleeHoldRange,
+		float PursuitEntryHysteresis)
+	{
+		const float SafeHoldRange = FMath::Max(0.0f, MeleeHoldRange);
+		const float PursuitThreshold = bWasChasing
+			? SafeHoldRange
+			: SafeHoldRange + FMath::Max(0.0f, PursuitEntryHysteresis);
+		// Ranged/flying spacing stays authored; melee uses separate pursuit-entry and hold-entry edges to avoid BT thrash.
+		return Intent == EEnemyAttackTransitionIntent::CombatHold
+			&& bIsRegularMelee
+			&& FMath::Max(0.0f, DistanceToTarget) > PursuitThreshold;
+	}
+
 	EEnemyAttackTransitionIntent ResolveIntent(const FEnemyAttackTransitionObservation& Observation)
 	{
 		if (Observation.bActionCommitted)

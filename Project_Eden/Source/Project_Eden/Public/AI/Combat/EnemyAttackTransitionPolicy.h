@@ -42,6 +42,21 @@ namespace EnemyAttackTransitionPolicy
 		bool bActionCommitted,
 		bool bExplicitInterrupt);
 
+	// Personality tuning cannot expand a regular melee attack beyond its physical execution range.
+	PROJECT_EDEN_API float ResolveMaximumAttackRange(
+		float AuthoredMaximumRange,
+		bool bIsRegularMelee,
+		float MeleeMaximumStartRange);
+
+	// Melee cadence recovery remains a close hold only while the target is already within pressure distance.
+	PROJECT_EDEN_API bool ShouldPursueDuringCadenceRecovery(
+		EEnemyAttackTransitionIntent Intent,
+		bool bIsRegularMelee,
+		bool bWasChasing,
+		float DistanceToTarget,
+		float MeleeHoldRange,
+		float PursuitEntryHysteresis);
+
 	PROJECT_EDEN_API EEnemyAttackTransitionIntent ResolveIntent(
 		const FEnemyAttackTransitionObservation& Observation);
 }

@@ -113,6 +113,7 @@ void AGP_EnemyCharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	UpdateTurnInPlace(DeltaSeconds);
+	UpdateBasicEnemyCombatHoldFacing(DeltaSeconds);
 }
 
 UAttributeSet* AGP_EnemyCharacter::GetAttributeSet() const
@@ -156,6 +157,40 @@ FVector AGP_EnemyCharacter::GetBehaviorAnchorLocation() const
 {
 	// AI possession can ask for the anchor before BeginPlay, so compute the editor-authored point on demand.
 	return bHasBehaviorAnchorLocation ? BehaviorAnchorLocation : GetActorTransform().TransformPosition(BehaviorAnchorOffset);
+}
+
+float AGP_EnemyCharacter::GetBasicMeleeAttackStartRange() const
+{
+	const float ForwardStepRange = FMath::Max(0.0f, BasicMeleeAttackStartRange);
+	const float StationaryRange = FMath::Min(
+		ForwardStepRange,
+		FMath::Max(0.0f, BasicMeleeStationaryAttackStartRange));
+	// Furnace-style lunges can use the wider edge; in-place melee such as production Cyclops stays inside overlap reach.
+	return IsValid(EnemyAnimationSet) && EnemyAnimationSet->bUseAbilityForwardStep
+		? ForwardStepRange
+		: StationaryRange;
+}
+
+void AGP_EnemyCharacter::BeginBasicEnemyCombatHoldFacing(AActor* TargetActor, float TurnRateDegreesPerSecond)
+{
+	if (!HasAuthority() || bIsDead || !IsValid(TargetActor))
+	{
+		ClearBasicEnemyCombatHoldFacing();
+		return;
+	}
+
+	BasicEnemyCombatHoldFacingTarget = TargetActor;
+	BasicEnemyCombatHoldFacingTurnRateDegreesPerSecond = FMath::Max(0.0f, TurnRateDegreesPerSecond);
+	// Tick is normally dormant for regular enemies; the explicit close-hold state temporarily enables per-frame facing.
+	SetActorTickEnabled(true);
+}
+
+void AGP_EnemyCharacter::ClearBasicEnemyCombatHoldFacing()
+{
+	BasicEnemyCombatHoldFacingTarget.Reset();
+	BasicEnemyCombatHoldFacingTurnRateDegreesPerSecond = 0.0f;
+	// Preserve opt-in turn-in-place or derived persistent Tick after the temporary combat hold ends.
+	SetActorTickEnabled(bEnableTurnInPlace || PrimaryActorTick.bStartWithTickEnabled);
 }
 
 void AGP_EnemyCharacter::OnConstruction(const FTransform& Transform)
@@ -298,6 +333,8 @@ void AGP_EnemyCharacter::ApplyRuntimeMovementPolicy()
 
 void AGP_EnemyCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	// Release the transient target reference before this replicated pawn leaves the world.
+	ClearBasicEnemyCombatHoldFacing();
 	StopTurnInPlace(false);
 	StopActiveCombatTransitionMontage();
 	CombatTransitionPhase = EGPEnemyCombatTransitionPhase::None;
@@ -341,6 +378,38 @@ void AGP_EnemyCharacter::UpdateTurnInPlace(float DeltaSeconds)
 	// stationary state, so that inference makes idle, recovery, and tactical waits
 	// continuously face the player.  A dedicated AI task must call
 	// StartTurnInPlaceForTarget when a turn is actually part of its state transition.
+}
+
+void AGP_EnemyCharacter::UpdateBasicEnemyCombatHoldFacing(float DeltaSeconds)
+{
+	AActor* TargetActor = BasicEnemyCombatHoldFacingTarget.Get();
+	if (!HasAuthority() || bIsDead || bBasicEnemyAttackInProgress || !IsValid(TargetActor))
+	{
+		ClearBasicEnemyCombatHoldFacing();
+		return;
+	}
+
+	const UCharacterMovementComponent* MovementComponent = GetCharacterMovement();
+	if (bTurnInPlaceActive || (IsValid(MovementComponent) && MovementComponent->Velocity.Size2D() > 5.0f))
+	{
+		return;
+	}
+
+	FVector LookDirection = TargetActor->GetActorLocation() - GetActorLocation();
+	LookDirection.Z = 0.0f;
+	if (LookDirection.IsNearlyZero())
+	{
+		return;
+	}
+
+	FRotator NewRotation = GetActorRotation();
+	NewRotation.Yaw = EnemyAttackTransitionPolicy::StepFacingYaw(
+		NewRotation.Yaw,
+		LookDirection.Rotation().Yaw,
+		BasicEnemyCombatHoldFacingTurnRateDegreesPerSecond,
+		DeltaSeconds);
+	// Server movement replication distributes this smooth close-hold yaw to all three connected players.
+	SetActorRotation(NewRotation);
 }
 
 void AGP_EnemyCharacter::StartTurnInPlaceForTarget(const AActor* TargetActor)
@@ -869,7 +938,20 @@ void AGP_EnemyCharacter::GiveDefaultEnemyAttackAbility()
 		return;
 	}
 
-	// Blueprint StartupAbilities can override this; the default grant only fills an otherwise missing basic attack.
+	if (DefaultAttackAbilityTag.IsValid())
+	{
+		for (const FGameplayAbilitySpec& AbilitySpec : ASC->GetActivatableAbilities())
+		{
+			if (IsValid(AbilitySpec.Ability)
+				&& AbilitySpec.Ability->GetAssetTags().HasTagExact(DefaultAttackAbilityTag))
+			{
+				// A tag-compatible StartupAbility replaces the native fallback, preventing two specs from answering one BT attack.
+				return;
+			}
+		}
+	}
+
+	// Class identity remains the fallback contract when an older enemy has no valid attack tag configured.
 	if (ASC->FindAbilitySpecFromClass(DefaultEnemyAttackAbilityClass) == nullptr)
 	{
 		ASC->GiveAbility(FGameplayAbilitySpec(DefaultEnemyAttackAbilityClass));
