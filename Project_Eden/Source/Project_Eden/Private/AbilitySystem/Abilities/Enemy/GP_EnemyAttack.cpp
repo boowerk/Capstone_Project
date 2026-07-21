@@ -5,6 +5,7 @@
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
 #include "Animation/PDA_CharacterAnimationSet.h"
 #include "Animation/PDA_EnemyAnimationSet.h"
+#include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
 #include "Animation/AnimSequence.h"
 #include "Characters/GP_EnemyCharacter.h"
@@ -223,23 +224,16 @@ void UGP_EnemyAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 
 	if (MontageToPlay)
 	{
+		UAnimMontage* LowerBodyMontage = nullptr;
 		if (UAnimSequence* LowerBodyRootMotionSequence = GP_EnemyAttack_Internal::ResolveLowerBodyRootMotionSequence(AvatarActor, MontageToPlay))
 		{
-			if (UAnimMontage* LowerBodyMontage = UAnimMontage::CreateSlotAnimationAsDynamicMontage(
+			LowerBodyMontage = UAnimMontage::CreateSlotAnimationAsDynamicMontage(
 				LowerBodyRootMotionSequence,
 				TEXT("Enemy_LowerBody"),
 				0.1f,
 				0.2f,
 				1.0f,
-				1))
-			{
-				// The lower-body slot supplies authored root motion while DefaultSlot keeps the attack upper body.
-				if (UAbilityTask_PlayMontageAndWait* LowerBodyTask =
-					UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(this, NAME_None, LowerBodyMontage, 1.0f))
-				{
-					LowerBodyTask->ReadyForActivation();
-				}
-			}
+				1);
 		}
 
 		if (bUseGameplayEventForHitTiming && AttackEventTag.IsValid())
@@ -273,6 +267,16 @@ void UGP_EnemyAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 			PlayMontageTask->OnInterrupted.AddDynamic(this, &ThisClass::OnMontageCompleted);
 			PlayMontageTask->OnCancelled.AddDynamic(this, &ThisClass::OnMontageCompleted);
 			PlayMontageTask->ReadyForActivation();
+
+			// GAS owns DefaultSlot so its replicated attack montage cannot be replaced.
+			// The lower slot is visual-only and must not overwrite GAS's single current montage.
+			if (LowerBodyMontage)
+			{
+				if (UAnimInstance* AnimInstance = GetCurrentActorInfo()->GetAnimInstance())
+				{
+					AnimInstance->Montage_Play(LowerBodyMontage, 1.0f, EMontagePlayReturnType::MontageLength, 0.0f, false);
+				}
+			}
 		}
 
 		// 이벤트 타이밍을 쓰지 않는 경우 어빌리티 시작 즉시 판정을 수행
