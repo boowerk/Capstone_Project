@@ -6,8 +6,36 @@
 #include "Engine/Level.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
+#include "GameFramework/PlayerStart.h"
+#include "UObject/UnrealType.h"
 #include "UObject/Package.h"
 #include "UObject/UObjectGlobals.h"
+
+namespace
+{
+	constexpr int32 ExpectedLandscapeRegionCount = 15;
+	constexpr float MinimumPlayablePlayerStartZ = 800.0f;
+	constexpr double MinimumNavigationXYCoverage = 0.9;
+	constexpr float MinimumProductionExplorationDelay = 20.0f;
+	constexpr float MinimumProductionExplorationInterval = 3.0f;
+	constexpr float MinimumProductionRegionDwell = 8.0f;
+	constexpr float MinimumProductionGlobalCooldown = 60.0f;
+	constexpr float MinimumProductionSpawnDistance = 1000.0f;
+
+	bool HasClassInHierarchy(const AActor& Actor, const FName RequiredClassName)
+	{
+		// Native and Blueprint subclasses both satisfy the map contract when their hierarchy owns the required role.
+		for (const UClass* ActorClass = Actor.GetClass(); ActorClass != nullptr; ActorClass = ActorClass->GetSuperClass())
+		{
+			if (ActorClass->GetFName() == RequiredClassName)
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+}
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FGPLandscapeMapIntegrityTest,
@@ -22,6 +50,9 @@ bool FGPLandscapeMapIntegrityTest::RunTest(const FString& Parameters)
 	const FName LandscapeProxyClassName(TEXT("LandscapeStreamingProxy"));
 	const FName LandscapeComponentClassName(TEXT("LandscapeComponent"));
 	const FName LandscapeCollisionClassName(TEXT("LandscapeHeightfieldCollisionComponent"));
+	const FName NavigationBoundsClassName(TEXT("NavMeshBoundsVolume"));
+	const FName RegionEventDirectorClassName(TEXT("GP_RegionEventDirector"));
+	const FName RegionSeedClassName(TEXT("BP_RegionSeed_C"));
 	UPackage* MapPackage = LoadPackage(nullptr, MapPackagePath, LOAD_None);
 	TestNotNull(TEXT("L_LandscapeMap package loads"), MapPackage);
 
@@ -36,6 +67,15 @@ bool FGPLandscapeMapIntegrityTest::RunTest(const FString& Parameters)
 	int32 LandscapeComponentCount = 0;
 	int32 LandscapeCollisionCount = 0;
 	int32 TestEnvironmentActorCount = 0;
+	int32 PlayerStartCount = 0;
+	int32 NavigationBoundsCount = 0;
+	int32 RegionSeedActorCount = 0;
+	int32 RegionEventDirectorCount = 0;
+	AActor* RegionEventDirectorActor = nullptr;
+	float LowestPlayerStartZ = TNumericLimits<float>::Max();
+	FBox LandscapeBounds(EForceInit::ForceInit);
+	FBox NavigationBounds(EForceInit::ForceInit);
+	TSet<int32> AddressableRegionIndices;
 	for (AActor* Actor : World->PersistentLevel->Actors)
 	{
 		if (!IsValid(Actor))
@@ -52,6 +92,37 @@ bool FGPLandscapeMapIntegrityTest::RunTest(const FString& Parameters)
 		if (ActorClassName == LandscapeClassName || ActorClassName == LandscapeProxyClassName)
 		{
 			++LandscapeActorCount;
+			// Serialized component bounds let the test compare authored navigation coverage without starting PIE.
+			LandscapeBounds += Actor->GetComponentsBoundingBox(true);
+		}
+
+		if (Actor->IsA<APlayerStart>())
+		{
+			++PlayerStartCount;
+			LowestPlayerStartZ = FMath::Min(LowestPlayerStartZ, Actor->GetActorLocation().Z);
+		}
+
+		if (HasClassInHierarchy(*Actor, NavigationBoundsClassName))
+		{
+			++NavigationBoundsCount;
+			// All authored navigation volumes are combined because large landscapes may intentionally use tiled bounds.
+			NavigationBounds += Actor->GetComponentsBoundingBox(true);
+		}
+
+		if (HasClassInHierarchy(*Actor, RegionEventDirectorClassName))
+		{
+			++RegionEventDirectorCount;
+			RegionEventDirectorActor = Actor;
+		}
+
+		if (HasClassInHierarchy(*Actor, RegionSeedClassName))
+		{
+			++RegionSeedActorCount;
+			// SeedIndex is a Blueprint variable, so reflection keeps this editor test independent of the Blueprint type.
+			if (const FIntProperty* SeedIndexProperty = FindFProperty<FIntProperty>(Actor->GetClass(), TEXT("SeedIndex")))
+			{
+				AddressableRegionIndices.Add(SeedIndexProperty->GetPropertyValue_InContainer(Actor));
+			}
 		}
 
 		// Class-name checks avoid adding a runtime Landscape module dependency solely for an editor integrity test.
@@ -80,6 +151,139 @@ bool FGPLandscapeMapIntegrityTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Sculpted Landscape components remain present"), LandscapeComponentCount > 0);
 	TestTrue(TEXT("Landscape collision components remain present"), LandscapeCollisionCount > 0);
 	TestEqual(TEXT("Production landscape contains no generated test-deck actors"), TestEnvironmentActorCount, 0);
+
+	// Immediate-play infrastructure prevents players, AI, and corruption events from starting in an unusable world.
+	TestTrue(TEXT("Production landscape contains a PlayerStart"), PlayerStartCount > 0);
+	TestTrue(
+		TEXT("Every PlayerStart is above the sculpted ground baseline"),
+		PlayerStartCount > 0 && LowestPlayerStartZ >= MinimumPlayablePlayerStartZ);
+	TestTrue(TEXT("Production landscape contains NavMesh bounds"), NavigationBoundsCount > 0);
+	TestTrue(TEXT("Sculpted Landscape exposes valid world bounds"), LandscapeBounds.IsValid != 0);
+	TestTrue(TEXT("NavMesh bounds expose valid world bounds"), NavigationBounds.IsValid != 0);
+
+	if (LandscapeBounds.IsValid && NavigationBounds.IsValid)
+	{
+		const double LandscapeWidth = FMath::Max(1.0, static_cast<double>(LandscapeBounds.Max.X - LandscapeBounds.Min.X));
+		const double LandscapeDepth = FMath::Max(1.0, static_cast<double>(LandscapeBounds.Max.Y - LandscapeBounds.Min.Y));
+		const double OverlapWidth = FMath::Max(
+			0.0,
+			static_cast<double>(FMath::Min(LandscapeBounds.Max.X, NavigationBounds.Max.X)
+				- FMath::Max(LandscapeBounds.Min.X, NavigationBounds.Min.X)));
+		const double OverlapDepth = FMath::Max(
+			0.0,
+			static_cast<double>(FMath::Min(LandscapeBounds.Max.Y, NavigationBounds.Max.Y)
+				- FMath::Max(LandscapeBounds.Min.Y, NavigationBounds.Min.Y)));
+		const double CoverageX = OverlapWidth / LandscapeWidth;
+		const double CoverageY = OverlapDepth / LandscapeDepth;
+
+		// Report authored extents so a failed map edit is actionable from the automation log.
+		AddInfo(FString::Printf(
+			TEXT("Landscape bounds %s; NavMesh bounds %s; XY coverage %.3f x %.3f"),
+			*LandscapeBounds.ToString(),
+			*NavigationBounds.ToString(),
+			CoverageX,
+			CoverageY));
+		TestTrue(TEXT("NavMesh bounds substantially cover Landscape X"), CoverageX >= MinimumNavigationXYCoverage);
+		TestTrue(TEXT("NavMesh bounds substantially cover Landscape Y"), CoverageY >= MinimumNavigationXYCoverage);
+		TestTrue(TEXT("NavMesh bounds include Landscape minimum Z"), NavigationBounds.Min.Z <= LandscapeBounds.Min.Z);
+		TestTrue(TEXT("NavMesh bounds include Landscape maximum Z"), NavigationBounds.Max.Z >= LandscapeBounds.Max.Z);
+	}
+
+	TestEqual(TEXT("Landscape contains exactly 15 region seed actors"), RegionSeedActorCount, ExpectedLandscapeRegionCount);
+	TestEqual(TEXT("Landscape exposes exactly 15 unique SeedIndex values"), AddressableRegionIndices.Num(), ExpectedLandscapeRegionCount);
+	for (int32 ExpectedRegionId = 0; ExpectedRegionId < ExpectedLandscapeRegionCount; ++ExpectedRegionId)
+	{
+		// A contiguous address space is required by the replicated region-state and corruption arrays.
+		TestTrue(
+			*FString::Printf(TEXT("Region SeedIndex %d is addressable"), ExpectedRegionId),
+			AddressableRegionIndices.Contains(ExpectedRegionId));
+	}
+	TestEqual(TEXT("Landscape contains one region event director"), RegionEventDirectorCount, 1);
+
+	if (IsValid(RegionEventDirectorActor))
+	{
+		// Guard the authored production cadence so temporary PIE acceleration cannot be saved into the shipping map.
+		const auto ReadFloat = [this, RegionEventDirectorActor](const FName PropertyName, float& OutValue)
+		{
+			const FFloatProperty* Property = FindFProperty<FFloatProperty>(RegionEventDirectorActor->GetClass(), PropertyName);
+			TestNotNull(*FString::Printf(TEXT("Director exposes %s"), *PropertyName.ToString()), Property);
+			if (!Property)
+			{
+				return false;
+			}
+
+			OutValue = Property->GetPropertyValue_InContainer(RegionEventDirectorActor);
+			return true;
+		};
+
+		float InitialDelay = 0.0f;
+		float EvaluationInterval = 0.0f;
+		float RegionDwell = 0.0f;
+		float BaseChance = 0.0f;
+		float FullCorruptionBonus = 0.0f;
+		float GlobalCooldown = 0.0f;
+		float MinimumSpawnDistance = 0.0f;
+		float MaximumSpawnDistance = 0.0f;
+		const bool bReadCadence =
+			ReadFloat(TEXT("InitialExplorationDelaySeconds"), InitialDelay)
+			&& ReadFloat(TEXT("ExplorationEvaluationIntervalSeconds"), EvaluationInterval)
+			&& ReadFloat(TEXT("RegionDwellSeconds"), RegionDwell)
+			&& ReadFloat(TEXT("BaseExplorationChance"), BaseChance)
+			&& ReadFloat(TEXT("FullCorruptionChanceBonus"), FullCorruptionBonus)
+			&& ReadFloat(TEXT("GlobalExplorationCooldownSeconds"), GlobalCooldown)
+			&& ReadFloat(TEXT("MinimumExplorationSpawnDistance"), MinimumSpawnDistance)
+			&& ReadFloat(TEXT("MaximumExplorationSpawnDistance"), MaximumSpawnDistance);
+
+		if (bReadCadence)
+		{
+			TestTrue(TEXT("Exploration waits before the first encounter"), InitialDelay >= MinimumProductionExplorationDelay);
+			TestTrue(TEXT("Exploration evaluation is not frame-like"), EvaluationInterval >= MinimumProductionExplorationInterval);
+			TestTrue(TEXT("Players must remain in a region before an encounter"), RegionDwell >= MinimumProductionRegionDwell);
+			TestTrue(TEXT("Base exploration chance stays restrained"), BaseChance > 0.0f && BaseChance <= 0.5f);
+			TestTrue(TEXT("Corruption chance bonus stays restrained"), FullCorruptionBonus >= 0.0f && FullCorruptionBonus <= 0.5f);
+			TestTrue(TEXT("Exploration encounters have a global cooldown"), GlobalCooldown >= MinimumProductionGlobalCooldown);
+			TestTrue(TEXT("Encounters spawn outside immediate combat range"), MinimumSpawnDistance >= MinimumProductionSpawnDistance);
+			TestTrue(TEXT("Exploration spawn distance range is valid"), MaximumSpawnDistance > MinimumSpawnDistance);
+		}
+
+		const FBoolProperty* EnableRegionEventsProperty =
+			FindFProperty<FBoolProperty>(RegionEventDirectorActor->GetClass(), TEXT("bEnableRegionEvents"));
+		const FBoolProperty* EnableExplorationEventsProperty =
+			FindFProperty<FBoolProperty>(RegionEventDirectorActor->GetClass(), TEXT("bEnableExplorationEvents"));
+		const FBoolProperty* DeterministicSeedProperty =
+			FindFProperty<FBoolProperty>(RegionEventDirectorActor->GetClass(), TEXT("bUseDeterministicRandomSeed"));
+		const FIntProperty* MaxActiveExplorationEventsProperty =
+			FindFProperty<FIntProperty>(RegionEventDirectorActor->GetClass(), TEXT("MaxActiveExplorationEvents"));
+		TestNotNull(TEXT("Director exposes region-event enablement"), EnableRegionEventsProperty);
+		TestNotNull(TEXT("Director exposes exploration-event enablement"), EnableExplorationEventsProperty);
+		TestNotNull(TEXT("Director exposes deterministic-seed mode"), DeterministicSeedProperty);
+		TestNotNull(TEXT("Director exposes exploration concurrency"), MaxActiveExplorationEventsProperty);
+		if (EnableRegionEventsProperty && EnableExplorationEventsProperty
+			&& DeterministicSeedProperty && MaxActiveExplorationEventsProperty)
+		{
+			// Production play keeps world events enabled, varied between runs, and limited to one readable objective.
+			TestTrue(TEXT("Region events are enabled in the production landscape"),
+				EnableRegionEventsProperty->GetPropertyValue_InContainer(RegionEventDirectorActor));
+			TestTrue(TEXT("Exploration events are enabled in the production landscape"),
+				EnableExplorationEventsProperty->GetPropertyValue_InContainer(RegionEventDirectorActor));
+			TestFalse(TEXT("Production exploration does not reuse a deterministic test sequence"),
+				DeterministicSeedProperty->GetPropertyValue_InContainer(RegionEventDirectorActor));
+			TestEqual(TEXT("Only one exploration objective can be active"),
+				MaxActiveExplorationEventsProperty->GetPropertyValue_InContainer(RegionEventDirectorActor),
+				1);
+		}
+
+		const FArrayProperty* ExplorationPoolProperty =
+			FindFProperty<FArrayProperty>(RegionEventDirectorActor->GetClass(), TEXT("ExplorationEventPool"));
+		TestNotNull(TEXT("Director exposes its exploration event pool"), ExplorationPoolProperty);
+		if (ExplorationPoolProperty)
+		{
+			FScriptArrayHelper ExplorationPool(
+				ExplorationPoolProperty,
+				ExplorationPoolProperty->ContainerPtrToValuePtr<void>(RegionEventDirectorActor));
+			TestEqual(TEXT("Landscape director resolves four production event definitions"), ExplorationPool.Num(), 4);
+		}
+	}
 	return true;
 }
 

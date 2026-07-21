@@ -57,12 +57,18 @@ private:
 	void OnMontageCompleted();
 
 	UFUNCTION()
+	void OnMontageCancelled();
+
+	UFUNCTION()
 	void OnAttackEventReceived(FGameplayEventData Payload);
 
 	UFUNCTION()
 	void OnActionEndEventReceived(FGameplayEventData Payload);
 
 	void FinishAttackAbility(bool bWasCancelled);
+	static bool ShouldApplyFallbackHit(bool bAlreadyApplied, bool bWasCancelled);
+
+	// The authored forward step is ability-owned so every completion and cancellation path restores movement state.
 	UFUNCTION() void BeginAbilityForwardStep();
 	void TickAbilityForwardStep();
 	void EndAbilityForwardStep();
@@ -70,6 +76,8 @@ private:
 
 	bool bHasAppliedAttackHit = false;
 	bool bHasFinishedAttackAbility = false;
+
+	friend class FEnemyAttackCancellationPolicyTest;
 
 	// Per-actor ability instance state. Prevents the same configured attack montage repeating twice in a row.
 	TObjectPtr<UAnimMontage> LastSelectedAttackMontage = nullptr;

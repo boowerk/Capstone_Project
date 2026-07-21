@@ -2,23 +2,18 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-07-17T15:02:00+09:00
+updated: 2026-07-21T06:47:00+09:00
 status: active
 tags:
   - memoc
   - memoc/state
-created: 2026-07-17T06:03:26
+created: 2026-07-18T07:01:20
 ---
 # Session Summary
 
-## Status
-- FurnaceWalker attack is now one synchronized pair: `AM_FW_Attack` upper montage + `A_FW_Sword_Attack_RM` lower root motion.
-- Basic-enemy cadence starts after ability recovery/end, not activation; `bBasicEnemyAttackInProgress` also locks BT chase/reposition during the full attack. Missing hit notifies use a 0.55s fallback rather than recovery-end damage.
-
-## Verified
-- `Project_EdenEditor Win64 Development` build passed.
-- Editor MCP reloaded `PDA_FW_EnemyAnimationSet` with the intended one-to-one montage/root mapping.
-
-## Handoff
-- PIE-check FurnaceWalker: approach → prepare/strike/recover → cooldown → reattack or chase.
-- Confirm `AM_FW_Attack` has `Enemy.AttackHit` at its hit frame and `Enemy.ActionEnd` after recovery.
+- `main` merges local work through `b1baeb60` with origin through `8c9cd99b`.
+- Dark Knight uses Basic 350/Heavy 420/Dark Wave 520cm; Charge/GroundCrack stay ranged.
+- FurnaceWalker gains root-motion turns and an attack step. Committed actions and cancel-without-fallback-hit remain preserved.
+- Foley/Niagara additions remain; origin's broken legacy EarlyTransition trio is excluded.
+- Build and local tests pass: AI 22/22, Dark Knight 6/6, Network 2/2, Lobby 2/2. No live server run.
+- `TestMap`, `DA_RegionEventData`, and `L_MainMap` are clean and unchanged.

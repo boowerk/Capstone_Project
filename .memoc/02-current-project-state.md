@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-14T04:14:00+09:00
+updated: 2026-07-18T21:24:21+09:00
 status: active
 tags:
   - memoc
@@ -11,11 +11,24 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-07-14T04:14:00+09:00
+Last synced: 2026-07-18T21:24:21+09:00
 
 ## Current Status
 
-- `/Game/Maps/MainMap/L_LandscapeMap` is restored byte-for-byte to the pre-test-deck sculpted Landscape LFS object (`ba9e714a...`, 11,416,959 bytes). The destructive production-map deck generator, generated floors/sign, old deck contract, and obsolete guide were removed. `ProjectEden.Game.LandscapeMap.Integrity` now requires a Landscape actor, sculpt components, heightfield collision, and zero `GP.TestEnvironment` actors. Editor load/PIE, full Editor build, and the integrity test pass (`0512bcf1`, `6042600a`, `8d88b067`).
+- The product contract is now exactly three network players (`5e0a4fcb` through `4ca8c603`). `AGP_ThreePlayerGameSession` fixes players/spectators/split-screen to `3/0/1` in lobby and gameplay, exact-three Ready is required, the one authored Landscape PlayerStart expands into three collision/ground-validated stable slots, and debug ForceStart is disabled in Shipping and limited to an explicit `-AllowLobbyForceStart` local host.
+- Verification is current: Editor and Development Server builds pass; WindowsServer Cook/Stage/Pak/Archive passed after `729d334d` removed the unused broken projectile scaffold backup; the completed baseline used one packaged dedicated server plus three clients and reached three unique owned Pawns with HUD/ASC/input ready. The final local AI/Dark Knight/lobby/network regression is 30/30. The user requested no further live server tests unless explicitly asked; keep future verification to server-compatible implementation, builds, and local automation.
+- Graduation-demo enemy transition polish is current (`80f64845` through `a0c674e1`). Regular enemies use range hysteresis, smooth facing, GAS-lifetime attack commits, and recovery/cadence sequencing; target loss or leash reevaluation no longer opens movement during a committed attack, while death/groggy-style interrupts cancel immediately. Matador holds its body stationary while a live bull owns the pattern, cleans the bull state on every destroy path, and uses independent actor/task stuck caps of 18/20 seconds. `Project_EdenEditor` builds and all 21 `ProjectEden.AI` tests pass.
+- Dark Armor Knight pattern grants are repaired at `b7eb11d6`. The production Blueprint had serialized an empty `DarkKnightAbilityClasses` override, so BT selected valid attacks but GAS rejected every candidate as ungranted. Configured replacements now win by exact tag, while missing Basic/Heavy/Charge/DarkWave/GroundCrack/Groggy specs receive idempotent native fallbacks on authority. The production BP contract test verifies one spec per tag and a real Basic `Started=1`; Editor build, all 6 Dark Knight combat tests, and all 21 AI tests pass.
+- Dark Armor Knight range selection is aligned with authored damage at `0a22e69e`: Basic is melee-only through `350cm`, Heavy through `420cm`, and Dark Wave is clamped to its real `520cm` cone instead of the obsolete `2200cm` ranged gate. Charge and GroundCrack remain valid ranged choices. Service, selector, execution context, and GAS activation share the same exact boundaries; without a reachable ready pattern the boss keeps chasing. Editor build, Dark Knight 6/6, and AI 21/21 pass; no live server session was run.
+- Release confidence remains conditional on manual P0 checks that automation cannot prove: every selectable montage's contact/ActionEnd timing, FurnaceWalker/Cyclops duplicate-slot runtime evaluation, and Dark Knight impact/charge travel. Keep flying enemies out of the scripted demo unless their chase/altitude/attack loop passes PIE.
+
+- The Project Eden Codex team workflow is initialized: `[EDEN-MAIN]` is the sole writer/integrator, while permanent DESIGN, CLIENT, WORLD, and QA threads perform read-only analysis and cross-review. Work is split into minimal functional units and committed using the repository's `type(scope): short summary` convention. The durable protocol is in `docs/AgentTeamWorkflow.md`.
+
+- The graduation lobby routes native and production Blueprint defaults to `MainMap/L_LandscapeMap`; the destination is an explicit dedicated-server Cook input. Cook/package and the three-client seamless-travel baseline have passed. The lobby also prevents duplicate travel, limits auto-ready to the lobby map, and keeps the debug start path out of production/remote-client control.
+
+- `/Game/Maps/MainMap/L_LandscapeMap` retains the restored sculpt/collision and is immediate-play ready at LFS object `dc2e8205...` (11,425,665 bytes): PlayerStart is above terrain, full Landscape NavMesh bounds exist, 15 contiguous region seeds remain, and exactly one production event director is placed. `ProjectEden.Game.LandscapeMap.Integrity` guards all of these plus the absence of `GP.TestEnvironment` deck actors.
+
+- Corruption-aware exploration events are production-ready (`f8f088b7` through `05308541`). The placed director waits `25s`, evaluates every `5s` after `12s` regional dwell, uses `0.30 + corruption*0.35` chance, enforces an `80s` global cooldown, and places one event `1400-2200cm` from every player. Four production DataAssets provide Red Rift, Crystal Corruption, Shrine Ruins, and Structure Defense with authored corruption thresholds, success/failure deltas, discovery radii, and `150-180s` regional cooldowns. Exploration enemies are independent from linear-zone budgets and are retired through the shared GAS death path on completion/expiration. Full Editor build, seven Region Event tests, Landscape integrity, spatial-region, navigation-invoker, and corruption-state tests pass. PIE Structure Defense spawned four 3-enemy waves and retired all 12 enemies at completion.
 
 - World corruption is implemented (`3a2a06d4` through `d764a5c6`). `AGP_GameState` owns replicated per-region values and their world average; `AGP_GameMode` passively increases them. Enemies receive an explicit/fallback corruption region and use one replaceable infinite GAS effect for `DamageIncreaseRate` and `Armor`; boss death cleanses that region once. The minimap, SkyAtmosphere, ExponentialHeightFog, and current Sci-Fi skybox `Tint`/`Brightness` react client-side through an auto-spawned presentation actor. Tuning/PIE instructions are in `docs/WorldCorruptionSystem.md`. Editor build, both `ProjectEden.Game.Corruption.*` tests, and `ProjectEden.UI.Minimap.CaptureStability` pass.
 
@@ -221,6 +234,8 @@ Last synced: 2026-05-23T00:00:00
 
 ## Open Tasks
 
+- Remove stale EarlyTransition notify states from the 22 referenced UEFN Run/Slide animations in the editor and resave them; the broken legacy notify package is intentionally absent, so load-all checks currently emit warning-only missing-package messages.
+- Run the first integration gate: two-player listen PIE from Lobby Ready through seamless travel to `L_LandscapeMap`, then Development Server Cook/package and packaged server-client travel. Do not mark the slice release-ready until connection, pawn/input/HUD recovery, and cooked map dependencies pass.
 - PIE-check boss target marker VFX in a multi-player/session setup: first target acquisition and target swaps should flash on the selected player's torso only.
 - PIE-check Crystal Seraph before/after target acquisition and after tactical teleports; `[Patrol] Fallback move location selected` must not spam and `[Leash] Return home finished` must remain reachable.
 - PIE-check Crystal Seraph's visible fall, grounded hit gate, and return-to-hover timing; tune `GroggyDuration` / `FinalPhaseGroggyDuration` on the boss Blueprint if needed.
@@ -232,6 +247,7 @@ Last synced: 2026-05-23T00:00:00
 
 ## Completed Tasks
 
+- 2026-07-21: Integrated local `main` through `b1baeb60` with `origin/main` through `8c9cd99b`, preserving the three-player, Dark Knight, committed-action, Furnace turn/step, Foley, and Niagara work. Full editor build and local automation passed: AI 22/22, Dark Knight 6/6, Network 2/2, Lobby 2/2. Live server tests were intentionally skipped.
 - Merged `origin/main` into `feature/vfx-skills`; resolved C++ conflicts by combining both sides and kept the current branch `WBP_PlayerHUDWidget.uasset` LFS pointer to preserve skill HUD icon work.
 - Merged latest `origin/main` into `feature/vfx-skills`; resolved `.memoc` memory conflicts while code merged automatically.
 - Added boss target marker VFX: boss AI target acquisition/swap now routes through a reusable `Boss Target Marker VFX` component using `/Game/Niagara/Vefects/Render_Particles_On_Top/VFX/Particles/NS_Render_Particles_On_Top_Stroke_03`.

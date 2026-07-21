@@ -85,6 +85,7 @@ public:
 	virtual void UpdateAnimationSet() override;
 
 	UPDA_EnemyAnimationSet* GetEnemyAnimationSet() const { return EnemyAnimationSet; }
+	const TSoftObjectPtr<UPDA_EnemyAnimationSet>& GetDefaultEnemyAnimationSet() const { return DefaultEnemyAnimationSet; }
 
 	UFUNCTION(BlueprintPure, Category = "Boss")
 	bool IsBossEnemy() const { return bIsBossEnemy; }
@@ -155,6 +156,21 @@ public:
 
 	const FGPEnemyAttackCadenceSettings& GetAttackCadenceSettings() const { return AttackCadenceSettings; }
 
+	// 서비스가 적별 거리 히스테리시스를 유지하도록 마지막 공격 밴드 판정을 캐릭터에 저장한다.
+	bool UpdateBehaviorAttackBandLatch(
+		float DistanceToTarget,
+		float MinAttackRange,
+		float MaxAttackRange,
+		bool bAllowAttacksInsidePreferredRange,
+		float ExitHysteresis);
+	void ResetBehaviorAttackBandLatch();
+
+	// BT 공격 태스크가 실제 액션 종료까지 이동 분기와 타깃 교체를 잠그는 서버 전용 계약이다.
+	void BeginBehaviorAttackCommit(AActor* TargetActor, float MaximumDurationSeconds);
+	void FinishBehaviorAttackCommit(float RecoverySeconds);
+	bool IsBehaviorAttackCommitted() const;
+	AActor* GetBehaviorAttackCommittedTarget() const;
+
 	UFUNCTION(BlueprintPure, Category = "Enemy|Death")
 	bool IsDead() const { return bIsDead; }
 
@@ -191,6 +207,13 @@ protected:
 	/** Enemy-only visual and combat animation data. Leave the legacy base AnimationSet empty for new enemies. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation")
 	TObjectPtr<UPDA_EnemyAnimationSet> EnemyAnimationSet;
+
+	/**
+	 * Native archetypes use a soft default so animation-heavy packages are not
+	 * loaded while class default objects are still being constructed.
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Animation")
+	TSoftObjectPtr<UPDA_EnemyAnimationSet> DefaultEnemyAnimationSet;
 
 	// Disabled by default so existing enemies retain their current locomotion behavior.
 	// Opt-in children supply their retargeted sequences and route the named full-body slot in their AnimBP.
@@ -325,6 +348,7 @@ protected:
 
 private:
 	friend class UGP_EnemyDeathAbility;
+	friend class FEnemyRuntimeMovementPolicyTest;
 
 #if WITH_EDITORONLY_DATA
 	UPROPERTY(VisibleAnywhere, Category = "AI|Debug", meta = (AllowPrivateAccess = "true"))
@@ -368,6 +392,9 @@ private:
 	float TurnInPlaceElapsedSeconds = 0.0f;
 	float TurnInPlaceDurationSeconds = 0.0f;
 	float BasicEnemyAttackReadyTimeSeconds = 0.0f;
+	bool bBehaviorAttackBandLatched = false;
+	float BehaviorAttackCommitUntilTimeSeconds = 0.0f;
+	TWeakObjectPtr<AActor> BehaviorAttackCommittedTarget;
 	FRandomStream AttackCadenceRandomStream;
 
 	const FEnemyArchetypeTuning* ResolveEnemyArchetypeTuning() const;
@@ -392,6 +419,7 @@ private:
 	void BindMoveSpeedAttribute();
 	void UnbindMoveSpeedAttribute();
 	void InitializeBasicEnemyAttackCadence();
+	void ApplyRuntimeMovementPolicy();
 	void UpdateTurnInPlace(float DeltaSeconds);
 	void TryStartTurnInPlace(const FVector* OverrideTargetLocation = nullptr);
 	void StopTurnInPlace(bool bStopAnimation);

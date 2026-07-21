@@ -752,6 +752,14 @@ void AEnemyAIController::RequestTargetActorReevaluation()
 
 void AEnemyAIController::RefreshTargetActorFromPerception()
 {
+	if (const AGP_EnemyCharacter* EnemyPawn = Cast<AGP_EnemyCharacter>(GetPawn());
+		IsValid(EnemyPawn) && EnemyPawn->IsBehaviorAttackCommitted())
+	{
+		// 승인된 공격 중에는 원래 타깃만 유지하며, 파괴된 경우에도 다른 플레이어로 판정을 돌리지 않는다.
+		SetBlackboardTargetActor(EnemyPawn->GetBehaviorAttackCommittedTarget());
+		return;
+	}
+
 	if (bLeashReturnHomeActive)
 	{
 		// The tactics service owns re-engagement using anchor-distance hysteresis; perception only records candidates here.

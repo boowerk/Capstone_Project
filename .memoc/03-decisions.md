@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-09T02:52:00+09:00
+updated: 2026-07-18T19:49:02+09:00
 status: active
 tags:
   - memoc
@@ -14,6 +14,18 @@ tags:
 Durable project decisions live here. Keep entries short, dated, and useful to future agents.
 
 ## Decision Log
+
+### 2026-07-18
+- Treat Project Eden as a fixed three-player network game, not a minimum-three session: server admission is `3` players, `0` spectators, and `1` player per connection; only an exact three-player Ready party may travel.
+- Keep ForceStart as an opt-in development escape hatch only. Shipping and remote clients always reject it; a non-Shipping local listen/standalone host must launch with `-AllowLobbyForceStart`.
+- Once an enemy attack is committed, let it finish through ordinary target loss, disconnect, or leash reevaluation; only explicit incapacitating states such as death or groggy may interrupt it immediately. Never synthesize a fallback hit when a cancelled montage did not reach its hit event.
+- While Matador's bull actor is live, the boss body stays stationary and the shared tactics service keeps the Attack branch committed. The bull actor owns an 18-second absolute lifecycle cap, while the BT task owns a 20-second external-action stuck cap and force-cleans the pattern on timeout/interruption.
+- The July demo uses Dark Armor Knight as the representative boss and prioritizes basic melee/ranged enemies. Flying enemies and Motion/Pose Warping remain gated behind runtime proof; Motion Warping is only a post-P0 Dark Knight Charge pilot with a retained manual swept-movement fallback.
+- Use the current `[EDEN-MAIN]` Codex thread as the single implementation and integration authority. Permanent DESIGN, CLIENT, WORLD, and QA threads provide read-only analysis and cross-review; the main thread relays messages because separate threads do not automatically share context.
+- Split implementation into the smallest independently reviewable functional units. One unit normally becomes one `type(scope): short summary` commit with its directly related tests; unrelated changes stay in separate commits.
+- Keep AI/GAS/network architecture and bulk-log specialists temporary rather than permanent, selecting a model and reasoning level from the bounded ticket risk.
+- Build the graduation golden path around Lobby ready travel into `L_LandscapeMap`, then one discoverable corruption objective, cleanse feedback, augment, boss, and result. Expand breadth only after this 15–20 minute path is reliable.
+- Treat dynamically named ServerTravel destinations as explicit Cook inputs. Editor package loading is not release proof; keep release status conditional until Cooked server/client travel passes.
 
 ### 2026-07-09
 - Region events are a separate run-layer system, not a PCG graph mutation. `AGP_GameMode` only asks the placed/optional `AGP_RegionEventDirector` to roll events at zone boundaries; selected `AGP_RegionEventActor` instances own replicated presentation, optional enemy waves, and temporary/final region-state writes through `AGP_GameState`.
@@ -78,3 +90,8 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 - Reinterpret the RegionState system as biome-type selection, not gameplay life/death/corruption status. Values should represent biome categories; GameMode terms like `AliveRegionState` / `DeadRegionState` are legacy naming to rename or replace when implementation resumes.
 - Minimap correctness should not depend on level-authored PCG completion wiring. Keep a startup fallback full-map capture, allow later PCG-ready notifications to restart it, and make the HUD map image resolver tolerate production widget renames such as `MiniMapImage`.
 - The minimap map texture should be clipped by the UI material, not only hidden under ring art. Player cursor heading should default to controller/view yaw so camera-facing a target matches the visible minimap direction.
+
+### 2026-07-14
+- Open-world exploration events are separate from the legacy linear-zone enemy budget. The event actor owns its spawned combatants and retires survivors through `RequestDeath`; zone/event tracking listens to the terminal `OnEnemyDeathStarted` delegate so scripted and combat deaths share one accounting path without granting cleanup XP.
+- Preserve authored region seed biome values. Corruption affects event eligibility, probability, enemy GAS scaling, and outcome deltas; it does not flatten seed `State` values or write generic active/completed biome states.
+- Production exploration pacing belongs to the placed `L_LandscapeMap` director: delayed/dwell-based evaluation, one active objective, global and per-region cooldowns, party-wide safe spawn distance, and non-deterministic event choice. Temporary PIE acceleration must remain unsaved and is guarded by map automation.

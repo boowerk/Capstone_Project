@@ -273,4 +273,12 @@ private:
 	// client travel). Called from both SetupInputComponent and BeginPlay so a
 	// null subsystem at input-setup time on clients does not leave input unbound.
 	void AddInputMappingContexts();
+
+#if !UE_BUILD_SHIPPING
+	// Headless three-client QA waits for possession, GAS, HUD, and Enhanced Input after seamless travel.
+	void BeginThreePlayerGameplaySmokeProbe();
+	void TryThreePlayerGameplaySmokeProbe();
+	FTimerHandle ThreePlayerGameplaySmokeTimerHandle;
+	int32 ThreePlayerGameplaySmokeAttempts = 0;
+#endif
 };

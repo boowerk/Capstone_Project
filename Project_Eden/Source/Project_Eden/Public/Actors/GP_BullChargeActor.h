@@ -36,6 +36,7 @@ public:
 	AGP_BullChargeActor();
 
 	virtual void Tick(float DeltaSeconds) override;
+	virtual void Destroyed() override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	UFUNCTION(BlueprintCallable, Category = "Boss|Matador")
@@ -88,6 +89,7 @@ private:
 	bool IsBlockingHitSafeNearDecoy(const FHitResult& Hit) const;
 	void ApplyBullImpactToActor(AActor* HitActor);
 	void FinishCharge(bool bHitDecoy);
+	void ClearRegisteredBullState();
 	void DrawTelegraph() const;
 	FVector ResolveDesiredDirection() const;
 	bool BeginChargeImpact();
@@ -113,6 +115,10 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Boss|Matador", meta = (ClampMin = "0.0", Units = "s"))
 	float MaxChargeLifeSeconds = 5.0f;
+
+	// Redirect 단계가 lifespan을 갱신해도 패턴 전체가 이 절대 상한을 넘지 않게 한다.
+	UPROPERTY(EditDefaultsOnly, Category = "Boss|Matador", meta = (ClampMin = "0.1", Units = "s"))
+	float MaximumTotalActionLifeSeconds = 18.0f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Boss|Matador", meta = (ClampMin = "0.0", Units = "cm"))
 	float TelegraphLength = 2200.0f;
@@ -237,6 +243,7 @@ private:
 	float DecoyCircleDirectionSign = 1.0f;
 	float DecoyRedirectCurveAlpha = 0.0f;
 	float DecoyRedirectCurveLength = 1000.0f;
+	float TotalActionElapsedSeconds = 0.0f;
 	bool bChargeStarted = false;
 	bool bChargeFinished = false;
 	bool bImpactHandled = false;

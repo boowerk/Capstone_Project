@@ -27,5 +27,6 @@ namespace BossAttackExecution
 		const APawn* ControlledPawn,
 		UBlackboardComponent* BlackboardComponent,
 		const FGameplayTag& DefaultAttackAbilityTag,
-		const AActor* TargetActor);
+		const AActor* TargetActor,
+		FGameplayTag* OutActivatedAbilityTag = nullptr);
 }

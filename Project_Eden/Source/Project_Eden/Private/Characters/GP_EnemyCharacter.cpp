@@ -1,5 +1,6 @@
 #include "Characters/GP_EnemyCharacter.h"
 
+#include "AI/Combat/EnemyAttackTransitionPolicy.h"
 #include "AI/Controllers/EnemyAIController.h"
 #include "AI/Data/EnemyBlackboardKeys.h"
 #include "AIController.h"
@@ -120,6 +121,13 @@ UAttributeSet* AGP_EnemyCharacter::GetAttributeSet() const
 
 void AGP_EnemyCharacter::UpdateAnimationSet()
 {
+	if (!IsValid(EnemyAnimationSet) && !DefaultEnemyAnimationSet.IsNull())
+	{
+		// Resolve native defaults only after actor components have initialized;
+		// loading animation assets during CDO construction can re-enter PostLoad.
+		EnemyAnimationSet = DefaultEnemyAnimationSet.LoadSynchronous();
+	}
+
 	if (!IsValid(EnemyAnimationSet))
 	{
 		// Existing enemies and bosses can continue using the legacy shared asset until migrated.
@@ -207,7 +215,7 @@ void AGP_EnemyCharacter::BeginPlay()
 	}
 	RefreshWorldHealthBarVisibility();
 	InitializeBasicEnemyAttackCadence();
-	SetActorTickEnabled(bEnableTurnInPlace);
+	ApplyRuntimeMovementPolicy();
 
 	if (IsValid(EnemyAnimationSet))
 	{
@@ -272,6 +280,21 @@ void AGP_EnemyCharacter::BeginPlay()
 	bHasBehaviorAnchorLocation = true;
 }
 
+void AGP_EnemyCharacter::ApplyRuntimeMovementPolicy()
+{
+	// Turn-in-place opts regular enemies into Tick, while derived actors can explicitly retain their own persistent Tick.
+	SetActorTickEnabled(bEnableTurnInPlace || PrimaryActorTick.bStartWithTickEnabled);
+
+	if (bIsBossEnemy)
+	{
+		if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
+		{
+			// Regular-enemy chase rotation must not override boss service/task-owned facing.
+			MovementComponent->bOrientRotationToMovement = false;
+		}
+	}
+}
+
 void AGP_EnemyCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	StopTurnInPlace(false);
@@ -294,8 +317,9 @@ void AGP_EnemyCharacter::UpdateTurnInPlace(float DeltaSeconds)
 
 	if (bTurnInPlaceActive)
 	{
-		if (bBasicEnemyAttackInProgress)
+		if (bBasicEnemyAttackInProgress || IsBehaviorAttackCommitted())
 		{
+			// The BT commits during its facing phase, before GAS marks the attack in progress.
 			StopTurnInPlace(true);
 			return;
 		}
@@ -329,7 +353,8 @@ void AGP_EnemyCharacter::StartTurnInPlaceForTarget(const AActor* TargetActor)
 
 void AGP_EnemyCharacter::TryStartTurnInPlace(const FVector* OverrideTargetLocation)
 {
-	if (bBasicEnemyAttackInProgress || !IsValid(GetController()))
+	// Never start rotational root motion while the BT owns pre-attack facing or GAS owns the attack.
+	if (bBasicEnemyAttackInProgress || IsBehaviorAttackCommitted() || !IsValid(GetController()))
 	{
 		return;
 	}
@@ -504,6 +529,81 @@ float AGP_EnemyCharacter::ScheduleNextBasicEnemyAttack()
 		BasicEnemyAttackReadyTimeSeconds = World->GetTimeSeconds() + SelectedDelay;
 	}
 	return SelectedDelay;
+}
+
+bool AGP_EnemyCharacter::UpdateBehaviorAttackBandLatch(
+	float DistanceToTarget,
+	float MinAttackRange,
+	float MaxAttackRange,
+	bool bAllowAttacksInsidePreferredRange,
+	float ExitHysteresis)
+{
+	bBehaviorAttackBandLatched = EnemyAttackTransitionPolicy::IsInsideAttackBand(
+		DistanceToTarget,
+		MinAttackRange,
+		MaxAttackRange,
+		bAllowAttacksInsidePreferredRange,
+		bBehaviorAttackBandLatched,
+		ExitHysteresis);
+	return bBehaviorAttackBandLatched;
+}
+
+void AGP_EnemyCharacter::ResetBehaviorAttackBandLatch()
+{
+	// 타깃을 잃거나 귀환하면 다음 교전은 좁은 진입 범위에서 새로 시작한다.
+	bBehaviorAttackBandLatched = false;
+}
+
+void AGP_EnemyCharacter::BeginBehaviorAttackCommit(AActor* TargetActor, float MaximumDurationSeconds)
+{
+	if (!HasAuthority() || bIsDead || !IsValid(TargetActor))
+	{
+		return;
+	}
+
+	const UWorld* World = GetWorld();
+	if (!IsValid(World))
+	{
+		return;
+	}
+
+	// 잘못된 몽타주/이벤트도 AI를 영구 정지시키지 않도록 태스크의 안전 타임아웃까지만 잠근다.
+	BehaviorAttackCommittedTarget = TargetActor;
+	BehaviorAttackCommitUntilTimeSeconds = World->GetTimeSeconds() + FMath::Max(0.0f, MaximumDurationSeconds);
+}
+
+void AGP_EnemyCharacter::FinishBehaviorAttackCommit(float RecoverySeconds)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	const UWorld* World = GetWorld();
+	BehaviorAttackCommitUntilTimeSeconds = IsValid(World)
+		? World->GetTimeSeconds() + FMath::Max(0.0f, RecoverySeconds)
+		: 0.0f;
+	if (RecoverySeconds <= KINDA_SMALL_NUMBER)
+	{
+		BehaviorAttackCommittedTarget.Reset();
+	}
+}
+
+bool AGP_EnemyCharacter::IsBehaviorAttackCommitted() const
+{
+	const UWorld* World = GetWorld();
+	// 타깃이 파괴되어 weak pointer가 먼저 비어도 이미 시작한 몽타주/타이머 액션의 잠금 수명은 유지한다.
+	return !bIsDead
+		&& IsValid(World)
+		&& World->GetTimeSeconds() < BehaviorAttackCommitUntilTimeSeconds;
+}
+
+AActor* AGP_EnemyCharacter::GetBehaviorAttackCommittedTarget() const
+{
+	// 액션 commit과 타깃 생존 여부는 별도 계약이며, 파괴된 타깃은 호출자에게 노출하지 않는다.
+	return IsBehaviorAttackCommitted() && BehaviorAttackCommittedTarget.IsValid()
+		? BehaviorAttackCommittedTarget.Get()
+		: nullptr;
 }
 
 void AGP_EnemyCharacter::InitializeBasicEnemyAttackCadence()
@@ -750,6 +850,9 @@ void AGP_EnemyCharacter::ApplyDeathState()
 	}
 
 	bDeathStateApplied = true;
+	// 사망은 모든 행동 커밋보다 우선하며 지연된 BT 재평가가 타깃을 다시 잡지 못하게 한다.
+	BehaviorAttackCommitUntilTimeSeconds = 0.0f;
+	BehaviorAttackCommittedTarget.Reset();
 	if (IsValid(EnemyCorruptionComponent))
 	{
 		// Only bosses mutate world corruption; the component guards authority and duplicate death presentation calls.

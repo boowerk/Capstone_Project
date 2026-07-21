@@ -3,6 +3,7 @@
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
+#include "Game/GP_LobbyGameMode.h"
 #include "Game/GP_LobbyPlayerController.h"
 #include "Game/GP_LobbyPlayerState.h"
 #include "GameFramework/GameStateBase.h"
@@ -27,7 +28,24 @@ void UGP_LobbyWidget::NativeConstruct()
 
 	if (Button_ForceStart)
 	{
-		Button_ForceStart->OnClicked.AddDynamic(this, &UGP_LobbyWidget::OnForceStartClicked);
+		AGP_LobbyPlayerController* LobbyController =
+			GetOwningPlayer<AGP_LobbyPlayerController>();
+		AGP_LobbyGameMode* LobbyGameMode = GetWorld()
+			? GetWorld()->GetAuthGameMode<AGP_LobbyGameMode>()
+			: nullptr;
+		const bool bCanForceStart =
+			LobbyGameMode && LobbyGameMode->CanForceStart(LobbyController);
+
+		// Remote clients and production launches should not advertise a button
+		// whose server RPC is intentionally unavailable to them.
+		Button_ForceStart->SetVisibility(
+			bCanForceStart ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+		if (bCanForceStart)
+		{
+			Button_ForceStart->OnClicked.AddDynamic(
+				this,
+				&UGP_LobbyWidget::OnForceStartClicked);
+		}
 	}
 
 	BindToPlayerStates();

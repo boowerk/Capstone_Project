@@ -10,4 +10,5 @@ class PROJECT_EDEN_API AGP_RangedEnemyCharacter : public AGP_EnemyCharacter
 
 public:
 	AGP_RangedEnemyCharacter();
+	virtual void UpdateAnimationSet() override;
 };

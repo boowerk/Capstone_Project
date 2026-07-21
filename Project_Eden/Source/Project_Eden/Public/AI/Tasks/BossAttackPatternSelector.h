@@ -25,10 +25,11 @@ struct PROJECT_EDEN_API FGPBossAttackPatternRanges
 	static constexpr float CrystalLaserMaxRange = 2200.0f;
 	static constexpr float CrystalPrismMinRange = 500.0f;
 	static constexpr float CrystalPrismMaxRange = 1800.0f;
-	static constexpr float DarkKnightMeleeReach = 420.0f;
+	static constexpr float DarkKnightBasicAttackReach = 350.0f;
+	static constexpr float DarkKnightHeavyAttackReach = 420.0f;
 	static constexpr float DarkKnightChargeMinRange = 900.0f;
 	static constexpr float DarkKnightChargeMaxRange = 1800.0f;
-	static constexpr float DarkKnightDarkWaveMaxRange = 2200.0f;
+	static constexpr float DarkKnightDarkWaveMaxRange = 520.0f;
 	static constexpr float DarkKnightGroundCrackMaxRange = 1800.0f;
 
 	static bool IsWithinReach(float DistanceToTarget, float AttackReach);
@@ -84,6 +85,12 @@ struct FGPBossAttackPatternContext
 	bool bCanUseDarkKnightCharge = false;
 	bool bCanUseDarkWave = false;
 	bool bCanUseGroundCrack = false;
+	float DarkKnightBasicAttackRange = FGPBossAttackPatternRanges::DarkKnightBasicAttackReach;
+	float DarkKnightHeavyAttackRange = FGPBossAttackPatternRanges::DarkKnightHeavyAttackReach;
+	float DarkKnightChargeMinRange = FGPBossAttackPatternRanges::DarkKnightChargeMinRange;
+	float DarkKnightChargeMaxRange = FGPBossAttackPatternRanges::DarkKnightChargeMaxRange;
+	float DarkKnightDarkWaveMaxRange = FGPBossAttackPatternRanges::DarkKnightDarkWaveMaxRange;
+	float DarkKnightGroundCrackMaxRange = FGPBossAttackPatternRanges::DarkKnightGroundCrackMaxRange;
 	float GuardGauge = 100.0f;
 	float MaxGuardGauge = 100.0f;
 	float PreferredMeleeRange = 350.0f;

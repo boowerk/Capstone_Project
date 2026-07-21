@@ -1,31 +1,325 @@
 #include "Game/GP_GameMode.h"
 
 #include "Characters/GP_EnemyCharacter.h"
+#include "Characters/GP_PlayerCharacter.h"
 #include "Game/Corruption/GP_CorruptionPresentationActor.h"
 #include "Game/Corruption/GP_WorldCorruptionComponent.h"
 #include "Game/GP_EnemySpawnMarker.h"
 #include "Game/GP_EnemySpawnVolume.h"
 #include "Game/GP_GameState.h"
 #include "Game/GP_RunPortal.h"
+#include "Game/GP_ThreePlayerGameSession.h"
+#include "Game/Regions/GP_RegionSpatialSubsystem.h"
 #include "Game/RegionEvents/GP_RegionEventActor.h"
 #include "Game/RegionEvents/GP_RegionEventDirector.h"
+#include "EngineUtils.h"
+#include "Engine/World.h"
+#include "GameFramework/Character.h"
+#include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/PlayerController.h"
+#include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerStart.h"
 #include "Kismet/GameplayStatics.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
+#include "Player/GP_PlayerController.h"
+#include "Player/GP_PlayerState.h"
+#include "TimerManager.h"
 
 AGP_GameMode::AGP_GameMode()
 {
 	GameStateClass = AGP_GameState::StaticClass();
 	RegionEventDirectorClass = AGP_RegionEventDirector::StaticClass();
 	CorruptionPresentationClass = AGP_CorruptionPresentationActor::StaticClass();
+	// Preserve the three-player admission cap if a client attempts to join
+	// directly after seamless travel reaches the gameplay map.
+	GameSessionClass = AGP_ThreePlayerGameSession::StaticClass();
 
 	// Match the lobby's seamless transition so arriving clients are carried
 	// into this map instead of being dropped during the load.
 	bUseSeamlessTravel = true;
 }
 
+AActor* AGP_GameMode::ChoosePlayerStart_Implementation(AController* Player)
+{
+	EnsurePartyPlayerStarts(Player);
+
+	const int32 SlotIndex = ResolvePartyStartSlot(Player);
+	if (PartyPlayerStartSlots.IsValidIndex(SlotIndex))
+	{
+		if (APlayerStart* AssignedStart = PartyPlayerStartSlots[SlotIndex].Get())
+		{
+			return AssignedStart;
+		}
+	}
+
+	// Preserve the engine fallback for maps without an authored anchor or for unexpected extra players.
+	return Super::ChoosePlayerStart_Implementation(Player);
+}
+
+void AGP_GameMode::Logout(AController* Exiting)
+{
+	// Release the deterministic slot immediately so a reconnect does not wait for garbage collection.
+	PartyStartSlotByController.Remove(TWeakObjectPtr<AController>(Exiting));
+	Super::Logout(Exiting);
+}
+
+void AGP_GameMode::EnsurePartyPlayerStarts(AController* Player)
+{
+	if (bPartyPlayerStartsInitialized)
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (!IsValid(World))
+	{
+		return;
+	}
+
+	TArray<APlayerStart*> AuthoredStarts;
+	for (TActorIterator<APlayerStart> It(World); It; ++It)
+	{
+		if (IsValid(*It) && !It->Tags.Contains(TEXT("GP.RuntimePartyStart")))
+		{
+			AuthoredStarts.Add(*It);
+		}
+	}
+	AuthoredStarts.Sort([](const APlayerStart& Left, const APlayerStart& Right)
+	{
+		// Actor paths are serialized and provide deterministic slot order across server runs.
+		return Left.GetPathName() < Right.GetPathName();
+	});
+
+	if (AuthoredStarts.IsEmpty())
+	{
+		UE_LOG(
+			LogTemp,
+			Error,
+			TEXT("[NetworkSpawn] No authored PlayerStart is available for the three-player runtime expansion."));
+		bPartyPlayerStartsInitialized = true;
+		return;
+	}
+
+	for (APlayerStart* AuthoredStart : AuthoredStarts)
+	{
+		if (PartyPlayerStartSlots.Num() >= RequiredPartyPlayerStartCount)
+		{
+			break;
+		}
+		PartyPlayerStartSlots.Add(AuthoredStart);
+	}
+
+	const APlayerStart& Anchor = *AuthoredStarts[0];
+	UClass* PawnClass = GetDefaultPawnClassForController(Player);
+	const APawn* PawnToFit = PawnClass ? PawnClass->GetDefaultObject<APawn>() : nullptr;
+	static const FVector CandidateDirections[] =
+	{
+		FVector(0.0f, 1.0f, 0.0f),
+		FVector(0.0f, -1.0f, 0.0f),
+		FVector(1.0f, 0.0f, 0.0f),
+		FVector(-1.0f, 0.0f, 0.0f),
+		FVector(1.0f, 1.0f, 0.0f).GetSafeNormal(),
+		FVector(1.0f, -1.0f, 0.0f).GetSafeNormal(),
+		FVector(-1.0f, 1.0f, 0.0f).GetSafeNormal(),
+		FVector(-1.0f, -1.0f, 0.0f).GetSafeNormal()
+	};
+
+	for (float RadiusMultiplier = 1.0f;
+		PartyPlayerStartSlots.Num() < RequiredPartyPlayerStartCount && RadiusMultiplier <= 3.0f;
+		RadiusMultiplier += 1.0f)
+	{
+		for (const FVector& Direction : CandidateDirections)
+		{
+			if (APlayerStart* RuntimeStart = SpawnRuntimePartyPlayerStart(
+				Anchor,
+				PawnToFit,
+				Direction,
+				RadiusMultiplier))
+			{
+				RuntimePartyPlayerStarts.Add(RuntimeStart);
+				PartyPlayerStartSlots.Add(RuntimeStart);
+			}
+
+			if (PartyPlayerStartSlots.Num() >= RequiredPartyPlayerStartCount)
+			{
+				break;
+			}
+		}
+	}
+
+	bPartyPlayerStartsInitialized = true;
+	if (PartyPlayerStartSlots.Num() < RequiredPartyPlayerStartCount)
+	{
+		UE_LOG(
+			LogTemp,
+			Error,
+			TEXT("[NetworkSpawn] Only %d/%d collision-safe party starts could be prepared; engine fallback remains enabled."),
+			PartyPlayerStartSlots.Num(),
+			RequiredPartyPlayerStartCount);
+	}
+	else
+	{
+		UE_LOG(
+			LogTemp,
+			Display,
+			TEXT("[NetworkSpawn] Prepared %d stable party starts (%d authored, %d runtime)."),
+			PartyPlayerStartSlots.Num(),
+			FMath::Min(AuthoredStarts.Num(), RequiredPartyPlayerStartCount),
+			RuntimePartyPlayerStarts.Num());
+	}
+}
+
+APlayerStart* AGP_GameMode::SpawnRuntimePartyPlayerStart(
+	const APlayerStart& Anchor,
+	const APawn* PawnToFit,
+	const FVector& LocalDirection,
+	float RadiusMultiplier)
+{
+	UWorld* World = GetWorld();
+	if (!IsValid(World))
+	{
+		return nullptr;
+	}
+
+	const FVector WorldDirection =
+		Anchor.GetActorForwardVector() * LocalDirection.X
+		+ Anchor.GetActorRightVector() * LocalDirection.Y;
+	FVector CandidateLocation =
+		Anchor.GetActorLocation()
+		+ WorldDirection.GetSafeNormal() * PartyPlayerStartSpacing * RadiusMultiplier;
+	const FRotator CandidateRotation = Anchor.GetActorRotation();
+	float MinimumWalkableNormalZ = 0.7f;
+	if (const ACharacter* CharacterToFit = Cast<ACharacter>(PawnToFit))
+	{
+		if (const UCharacterMovementComponent* Movement = CharacterToFit->GetCharacterMovement())
+		{
+			MinimumWalkableNormalZ = Movement->GetWalkableFloorZ();
+		}
+	}
+
+	const auto SnapToWalkableGround = [World, &Anchor, PawnToFit, MinimumWalkableNormalZ](FVector& InOutLocation)
+	{
+		FHitResult GroundHit;
+		FCollisionQueryParams GroundQueryParams(SCENE_QUERY_STAT(GP_RuntimePartyStartGround), false);
+		GroundQueryParams.AddIgnoredActor(&Anchor);
+		const FVector TraceStart(InOutLocation.X, InOutLocation.Y, Anchor.GetActorLocation().Z + 1000.0f);
+		const FVector TraceEnd(InOutLocation.X, InOutLocation.Y, Anchor.GetActorLocation().Z - 2000.0f);
+		if (!World->LineTraceSingleByObjectType(
+			GroundHit,
+			TraceStart,
+			TraceEnd,
+			FCollisionObjectQueryParams(ECC_WorldStatic),
+			GroundQueryParams)
+			|| GroundHit.ImpactNormal.Z < MinimumWalkableNormalZ)
+		{
+			return false;
+		}
+
+		const float PawnHalfHeight = PawnToFit ? PawnToFit->GetDefaultHalfHeight() : 96.0f;
+		InOutLocation.Z = GroundHit.ImpactPoint.Z + PawnHalfHeight + 2.0f;
+		return true;
+	};
+
+	// Never register a start over void or on a slope the production character cannot walk on.
+	if (!SnapToWalkableGround(CandidateLocation))
+	{
+		return nullptr;
+	}
+
+	if (PawnToFit
+		&& World->EncroachingBlockingGeometry(PawnToFit, CandidateLocation, CandidateRotation)
+		&& !World->FindTeleportSpot(PawnToFit, CandidateLocation, CandidateRotation))
+	{
+		return nullptr;
+	}
+
+	// FindTeleportSpot may move XY as well as Z; validate its final surface instead of trusting the first trace.
+	if (!SnapToWalkableGround(CandidateLocation)
+		|| (PawnToFit && World->EncroachingBlockingGeometry(PawnToFit, CandidateLocation, CandidateRotation)))
+	{
+		return nullptr;
+	}
+
+	const float MinimumSeparation = FMath::Max(150.0f, PartyPlayerStartSpacing * 0.6f);
+	for (const TWeakObjectPtr<APlayerStart>& ExistingStart : PartyPlayerStartSlots)
+	{
+		if (ExistingStart.IsValid()
+			&& FVector::DistSquared(ExistingStart->GetActorLocation(), CandidateLocation)
+				< FMath::Square(MinimumSeparation))
+		{
+			return nullptr;
+		}
+	}
+
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.ObjectFlags |= RF_Transient;
+	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	APlayerStart* RuntimeStart = World->SpawnActor<APlayerStart>(
+		APlayerStart::StaticClass(),
+		CandidateLocation,
+		CandidateRotation,
+		SpawnParameters);
+	if (IsValid(RuntimeStart))
+	{
+		// PlayerStarts are server-only selection helpers and never need to replicate to clients.
+		RuntimeStart->SetReplicates(false);
+		RuntimeStart->Tags.AddUnique(TEXT("GP.RuntimePartyStart"));
+	}
+	return RuntimeStart;
+}
+
+int32 AGP_GameMode::ResolvePartyStartSlot(AController* Player)
+{
+	if (!IsValid(Player))
+	{
+		return INDEX_NONE;
+	}
+
+	const TWeakObjectPtr<AController> PlayerKey(Player);
+	for (auto It = PartyStartSlotByController.CreateIterator(); It; ++It)
+	{
+		if (!It.Key().IsValid())
+		{
+			It.RemoveCurrent();
+		}
+	}
+
+	if (const int32* ExistingSlot = PartyStartSlotByController.Find(PlayerKey))
+	{
+		return *ExistingSlot;
+	}
+
+	TSet<int32> UsedSlots;
+	for (const TPair<TWeakObjectPtr<AController>, int32>& Assignment : PartyStartSlotByController)
+	{
+		if (Assignment.Key.IsValid())
+		{
+			UsedSlots.Add(Assignment.Value);
+		}
+	}
+
+	for (int32 SlotIndex = 0; SlotIndex < PartyPlayerStartSlots.Num(); ++SlotIndex)
+	{
+		if (!UsedSlots.Contains(SlotIndex) && PartyPlayerStartSlots[SlotIndex].IsValid())
+		{
+			PartyStartSlotByController.Add(PlayerKey, SlotIndex);
+			return SlotIndex;
+		}
+	}
+	return INDEX_NONE;
+}
+
 void AGP_GameMode::BeginPlay()
 {
 	Super::BeginPlay();
 
+#if !UE_BUILD_SHIPPING
+	BeginThreePlayerGameplaySmokeProbe();
+#endif
+
+	// Resolve map-authored seeds before the director and corruption state consume RegionCount.
+	ResolveRuntimeRegionConfiguration();
 	GatherZones();
 	ResolveRegionEventDirector();
 	SpawnCorruptionPresentation();
@@ -47,11 +341,147 @@ void AGP_GameMode::BeginPlay()
 	UnlockZone(0);
 }
 
+#if !UE_BUILD_SHIPPING
+void AGP_GameMode::BeginThreePlayerGameplaySmokeProbe()
+{
+	UWorld* World = GetWorld();
+	if (!IsValid(World)
+		|| !World->GetMapName().Contains(TEXT("L_LandscapeMap"))
+		|| !FParse::Param(FCommandLine::Get(), TEXT("LobbySmokeAutoReady")))
+	{
+		return;
+	}
+
+	ThreePlayerGameplaySmokeAttempts = 0;
+	World->GetTimerManager().SetTimer(
+		ThreePlayerGameplaySmokeTimerHandle,
+		this,
+		&ThisClass::TryThreePlayerGameplaySmokeProbe,
+		0.25f,
+		false);
+}
+
+void AGP_GameMode::TryThreePlayerGameplaySmokeProbe()
+{
+	++ThreePlayerGameplaySmokeAttempts;
+	constexpr int32 ExpectedPlayers = 3;
+	constexpr int32 MaxAttempts = 80;
+	constexpr float MinimumPawnSeparation = 150.0f;
+
+	TArray<APlayerController*> Controllers;
+	TArray<APawn*> Pawns;
+	TSet<APawn*> UniquePawns;
+	int32 OwnedPawnCount = 0;
+	int32 GameplayControllerCount = 0;
+	int32 GameplayPawnCount = 0;
+	int32 GameplayPlayerStateCount = 0;
+
+	if (UWorld* World = GetWorld())
+	{
+		for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+		{
+			APlayerController* Controller = It->Get();
+			if (!IsValid(Controller))
+			{
+				continue;
+			}
+
+			Controllers.Add(Controller);
+			GameplayControllerCount += Controller->IsA<AGP_PlayerController>() ? 1 : 0;
+			GameplayPlayerStateCount += Controller->GetPlayerState<AGP_PlayerState>() ? 1 : 0;
+			if (APawn* Pawn = Controller->GetPawn())
+			{
+				Pawns.Add(Pawn);
+				UniquePawns.Add(Pawn);
+				OwnedPawnCount += Pawn->GetController() == Controller ? 1 : 0;
+				GameplayPawnCount += Pawn->IsA<AGP_PlayerCharacter>() ? 1 : 0;
+			}
+		}
+	}
+
+	float MinimumObservedSeparation = TNumericLimits<float>::Max();
+	for (int32 FirstIndex = 0; FirstIndex < Pawns.Num(); ++FirstIndex)
+	{
+		for (int32 SecondIndex = FirstIndex + 1; SecondIndex < Pawns.Num(); ++SecondIndex)
+		{
+			MinimumObservedSeparation = FMath::Min(
+				MinimumObservedSeparation,
+				FVector::Dist(Pawns[FirstIndex]->GetActorLocation(), Pawns[SecondIndex]->GetActorLocation()));
+		}
+	}
+	if (Pawns.Num() < 2)
+	{
+		MinimumObservedSeparation = 0.0f;
+	}
+
+	const bool bGameplayReady =
+		Controllers.Num() == ExpectedPlayers
+		&& Pawns.Num() == ExpectedPlayers
+		&& UniquePawns.Num() == ExpectedPlayers
+		&& OwnedPawnCount == ExpectedPlayers
+		&& GameplayControllerCount == ExpectedPlayers
+		&& GameplayPawnCount == ExpectedPlayers
+		&& GameplayPlayerStateCount == ExpectedPlayers
+		&& MinimumObservedSeparation >= MinimumPawnSeparation;
+
+	if (bGameplayReady)
+	{
+		UE_LOG(
+			LogTemp,
+			Display,
+			TEXT("[Network3PSmoke] server-gameplay-ready controllers=%d pawns=%d unique=%d owned=%d gamePC=%d gamePawn=%d gamePS=%d minSeparation=%.1f"),
+			Controllers.Num(),
+			Pawns.Num(),
+			UniquePawns.Num(),
+			OwnedPawnCount,
+			GameplayControllerCount,
+			GameplayPawnCount,
+			GameplayPlayerStateCount,
+			MinimumObservedSeparation);
+		return;
+	}
+
+	if (ThreePlayerGameplaySmokeAttempts >= MaxAttempts)
+	{
+		UE_LOG(
+			LogTemp,
+			Error,
+			TEXT("[Network3PSmoke] server-gameplay-timeout attempts=%d controllers=%d pawns=%d unique=%d owned=%d gamePC=%d gamePawn=%d gamePS=%d minSeparation=%.1f"),
+			ThreePlayerGameplaySmokeAttempts,
+			Controllers.Num(),
+			Pawns.Num(),
+			UniquePawns.Num(),
+			OwnedPawnCount,
+			GameplayControllerCount,
+			GameplayPawnCount,
+			GameplayPlayerStateCount,
+			MinimumObservedSeparation);
+		return;
+	}
+
+	GetWorldTimerManager().SetTimer(
+		ThreePlayerGameplaySmokeTimerHandle,
+		this,
+		&ThisClass::TryThreePlayerGameplaySmokeProbe,
+		0.25f,
+		false);
+}
+#endif
+
 void AGP_GameMode::InitializeRegionStates()
 {
 	if (AGP_GameState* GPGameState = GetGPGameState())
 	{
-		GPGameState->InitRegionStates(RegionCount, DeadRegionState);
+		if (RuntimeInitialRegionStates.Num() == RegionCount)
+		{
+			// Landscape maps keep their serialized biome mosaic instead of being flattened to DeadRegionState.
+			GPGameState->InitRegionStatesFromArray(RuntimeInitialRegionStates);
+		}
+		else
+		{
+			// Maps without RegionSeed actors retain the original linear-run initialization contract.
+			GPGameState->InitRegionStates(RegionCount, DeadRegionState);
+		}
 
 		if (UGP_WorldCorruptionComponent* Corruption = GPGameState->GetWorldCorruptionComponent())
 		{
@@ -65,6 +495,42 @@ void AGP_GameMode::InitializeRegionStates()
 				bEnableWorldCorruption);
 		}
 	}
+}
+
+void AGP_GameMode::ResolveRuntimeRegionConfiguration()
+{
+	RuntimeInitialRegionStates.Reset();
+
+	UWorld* World = GetWorld();
+	UGP_RegionSpatialSubsystem* RegionSpatial = World
+		? World->GetSubsystem<UGP_RegionSpatialSubsystem>()
+		: nullptr;
+	if (!IsValid(RegionSpatial))
+	{
+		return;
+	}
+
+	const int32 AuthoredRegionCount = RegionSpatial->GetRegionCount();
+	if (AuthoredRegionCount <= 0 || RegionSpatial->GetSeedCount() <= 0)
+	{
+		return;
+	}
+
+	// The highest placed SeedIndex defines the addressable runtime array before any dependent system initializes.
+	RegionCount = AuthoredRegionCount;
+	if (!RegionSpatial->BuildAuthoredRegionStates(DeadRegionState, RuntimeInitialRegionStates))
+	{
+		// Unsupported legacy seed schemas still get the correct count and the established uniform fallback state.
+		RuntimeInitialRegionStates.Reset();
+	}
+
+	UE_LOG(
+		LogTemp,
+		Log,
+		TEXT("[GP_GameMode] Resolved %d runtime regions from %d placed seeds (authored states=%s)."),
+		RegionCount,
+		RegionSpatial->GetSeedCount(),
+		RuntimeInitialRegionStates.Num() == RegionCount ? TEXT("preserved") : TEXT("fallback"));
 }
 
 void AGP_GameMode::SpawnCorruptionPresentation()
@@ -145,6 +611,8 @@ void AGP_GameMode::ResolveRegionEventDirector()
 		// The director is server orchestration; spawned event actors replicate their own presentation state.
 		RegionEventDirector->InitializeRegionEventDirector(RegionCount);
 		RegionEventDirector->OnRegionEventEnemySpawned.AddDynamic(this, &ThisClass::HandleRegionEventEnemySpawned);
+		// A blocking objective re-evaluates zone completion as soon as it succeeds or expires.
+		RegionEventDirector->OnRegionEventEnded.AddDynamic(this, &ThisClass::HandleRegionEventEnded);
 	}
 }
 
@@ -238,10 +706,7 @@ void AGP_GameMode::StartZone(int32 ZoneIndex)
 	SpawnZoneEnemies(Zone);
 	OnZoneStarted(ZoneIndex, Zone);
 
-	if (AliveZoneEnemies == 0)
-	{
-		CompleteCurrentZone();
-	}
+	MaybeCompleteZone();
 }
 
 void AGP_GameMode::HandleMarkerTriggered(AGP_EnemySpawnVolume* Zone, AGP_EnemySpawnMarker* Marker)
@@ -324,7 +789,13 @@ void AGP_GameMode::MaybeCompleteZone()
 {
 	// In marker mode the zone clears only once every marker has fired and nothing is left alive.
 	const bool bAllMarkersDone = (MarkersTotal == 0) || (MarkersTriggered >= MarkersTotal);
-	if (bAllMarkersDone && AliveZoneEnemies == 0)
+	const AGP_EnemySpawnVolume* CurrentZone = OrderedZones.IsValidIndex(CurrentZoneIndex)
+		? OrderedZones[CurrentZoneIndex]
+		: nullptr;
+	const bool bWaitingForRegionObjective = RegionEventDirector
+		&& IsValid(CurrentZone)
+		&& RegionEventDirector->HasBlockingEventForZone(CurrentZone);
+	if (bAllMarkersDone && AliveZoneEnemies == 0 && !bWaitingForRegionObjective)
 	{
 		CompleteCurrentZone();
 	}
@@ -384,7 +855,7 @@ void AGP_GameMode::RegisterZoneEnemy(AGP_EnemyCharacter* Enemy, int32 Corruption
 		return;
 	}
 
-	if (Enemy->OnEnemyDied.IsAlreadyBound(this, &AGP_GameMode::HandleZoneEnemyDied))
+	if (Enemy->OnEnemyDeathStarted.IsAlreadyBound(this, &AGP_GameMode::HandleZoneEnemyDied))
 	{
 		return;
 	}
@@ -392,7 +863,8 @@ void AGP_GameMode::RegisterZoneEnemy(AGP_EnemyCharacter* Enemy, int32 Corruption
 	// The explicit event/zone id lets enemies retain their regional strength even after progression advances.
 	Enemy->SetCorruptionRegionId(CorruptionRegionId != INDEX_NONE ? CorruptionRegionId : CurrentZoneIndex);
 
-	Enemy->OnEnemyDied.AddDynamic(this, &AGP_GameMode::HandleZoneEnemyDied);
+	// The terminal death delegate also fires for scripted encounter cleanup, unlike the HP-zero reward delegate.
+	Enemy->OnEnemyDeathStarted.AddDynamic(this, &AGP_GameMode::HandleZoneEnemyDied);
 	++AliveZoneEnemies;
 
 	if (AGP_GameState* GPGameState = GetGPGameState())
@@ -401,7 +873,7 @@ void AGP_GameMode::RegisterZoneEnemy(AGP_EnemyCharacter* Enemy, int32 Corruption
 	}
 }
 
-void AGP_GameMode::HandleZoneEnemyDied(AGP_EnemyCharacter* DeadEnemy)
+void AGP_GameMode::HandleZoneEnemyDied(AGP_EnemyCharacter* DeadEnemy, AActor* DeathInstigator)
 {
 	AliveZoneEnemies = FMath::Max(0, AliveZoneEnemies - 1);
 
@@ -415,8 +887,22 @@ void AGP_GameMode::HandleZoneEnemyDied(AGP_EnemyCharacter* DeadEnemy)
 
 void AGP_GameMode::HandleRegionEventEnemySpawned(AGP_RegionEventActor* EventActor, AGP_EnemyCharacter* Enemy)
 {
+	if (RegionEventDirector && RegionEventDirector->IsExplorationEvent(EventActor))
+	{
+		// Open-world encounters own and retire their enemies; they must not mutate an unrelated linear-zone budget.
+		return;
+	}
+
 	// Event-spawned enemies join the current zone budget so events cannot be ignored during a city clear.
 	RegisterZoneEnemy(Enemy, IsValid(EventActor) ? EventActor->GetRegionId() : INDEX_NONE);
+}
+
+void AGP_GameMode::HandleRegionEventEnded(AGP_RegionEventDirector* Director, AGP_RegionEventActor* EventActor)
+{
+	(void)Director;
+	(void)EventActor;
+	// Enemy deaths and objective completion may arrive in either order; this single gate handles both safely.
+	MaybeCompleteZone();
 }
 
 void AGP_GameMode::CompleteCurrentZone()

@@ -10,6 +10,7 @@
 
 class USpringArmComponent;
 class UCameraComponent;
+class UNavigationInvokerComponent;
 class AGP_WhiteVoidSetActor;
 class USkeletalMeshComponent;
 class UAnimInstance;
@@ -242,6 +243,10 @@ private:
 
 	UPROPERTY(VisibleAnywhere, Category = "Camera")
 	TObjectPtr<UCameraComponent> FollowCamera;
+
+	// Large maps build navigation only near each player; exposing the native component lets designers tune both radii per player Blueprint.
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI|Navigation", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UNavigationInvokerComponent> NavigationInvoker;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|Motion", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
 	float IdleCameraArmLength = 340.0f;

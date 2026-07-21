@@ -66,6 +66,9 @@ public:
 	// (e.g. all regions dead at run start). Broadcasts a reset (-1).
 	void InitRegionStates(int32 Count, uint8 InitialState);
 
+	// Server-only. Preserves an authored per-region biome array instead of flattening every region to one state.
+	void InitRegionStatesFromArray(const TArray<uint8>& InitialStates);
+
 	// Server-only. Sets one region's state (e.g. revive on zone clear).
 	void SetRegionState(int32 RegionId, uint8 NewState);
 
@@ -115,4 +118,7 @@ protected:
 
 	UFUNCTION()
 	void OnRep_RegionStates();
+
+	// Emits one compact reset for uniform arrays and per-region changes for authored heterogeneous biome arrays.
+	void BroadcastFullRegionState();
 };

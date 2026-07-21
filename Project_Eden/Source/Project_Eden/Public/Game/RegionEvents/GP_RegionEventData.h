@@ -59,6 +59,39 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Region Event", meta = (ClampMin = "0.0"))
 	float SelectionWeight = 1.0f;
 
+	// Corruption bounds let the director keep an event out of regions where its fiction would not make sense.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Region Event|Corruption", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float MinimumCorruptionNormalized = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Region Event|Corruption", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float MaximumCorruptionNormalized = 1.0f;
+
+	// Outcome deltas are raw corruption points, matching UGP_WorldCorruptionComponent's public API.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Region Event|Corruption", meta = (ClampMin = "0.0"))
+	float CompletionCorruptionReduction = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Region Event|Corruption", meta = (ClampMin = "0.0"))
+	float ExpirationCorruptionIncrease = 0.0f;
+
+	// Zero preserves the legacy behavior where this event may be selected again immediately.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Region Event|Flow", meta = (ClampMin = "0.0"))
+	float RegionCooldownSeconds = 0.0f;
+
+	// Blocking is opt-in so existing event assets cannot unexpectedly prevent zone completion.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Region Event|Flow")
+	bool bBlocksZoneCompletion = false;
+
+	// Proximity activation keeps an event discoverable in-world before committing the party to its gameplay.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Region Event|Discovery")
+	bool bActivateWhenPlayerApproaches = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Region Event|Discovery", meta = (EditCondition = "bActivateWhenPlayerApproaches", ClampMin = "0.0"))
+	float ApproachActivationRadius = 700.0f;
+
+	// Negative values wait indefinitely; non-negative values fail an ignored dormant event after this many seconds.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Region Event|Discovery", meta = (EditCondition = "bActivateWhenPlayerApproaches", ClampMin = "-1.0"))
+	float DormantWaitTimeoutSeconds = -1.0f;
+
 	// Negative duration means the event stays alive until explicitly completed.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Region Event", meta = (ClampMin = "-1.0"))
 	float DurationSeconds = 20.0f;

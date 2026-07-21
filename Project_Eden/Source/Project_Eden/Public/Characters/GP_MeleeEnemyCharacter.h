@@ -10,4 +10,5 @@ class PROJECT_EDEN_API AGP_MeleeEnemyCharacter : public AGP_EnemyCharacter
 
 public:
 	AGP_MeleeEnemyCharacter();
+	virtual void UpdateAnimationSet() override;
 };

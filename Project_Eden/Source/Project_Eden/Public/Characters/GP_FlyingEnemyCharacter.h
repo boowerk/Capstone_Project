@@ -10,6 +10,7 @@ class PROJECT_EDEN_API AGP_FlyingEnemyCharacter : public AGP_EnemyCharacter
 
 public:
 	AGP_FlyingEnemyCharacter();
+	virtual void UpdateAnimationSet() override;
 
 protected:
 	virtual void BeginPlay() override;

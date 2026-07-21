@@ -99,7 +99,7 @@ bool FBossAttackPatternSelectorScoresTest::RunTest(const FString& Parameters)
 	Context.bCanUseBossSweepAttack = true;
 	Context.bCanUseBossAreaAttack = true;
 	Context.bCanSummonAdds = true;
-	Context.DistanceToTarget = 1300.0f;
+	Context.DistanceToTarget = 1500.0f;
 	ExpectNoDamagePattern(*this, TEXT("Matador suppresses common boss melee and area patterns outside special range"), Context);
 
 	Context = MakeBaseContext();

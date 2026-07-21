@@ -1,18 +1,22 @@
 #include "AI/Services/BTS_UpdateEnemyTactics.h"
 
+#include "AI/Combat/EnemyAttackTransitionPolicy.h"
 #include "AI/Controllers/EnemyAIController.h"
 #include "AI/Data/EnemyBlackboardKeys.h"
 #include "AI/Data/EnemyLLMEvaluation.h"
 #include "AI/Debug/EnemyAIDebugUtils.h"
 #include "AI/Services/EnemyLeashPolicy.h"
+#include "AI/Services/BTS_UpdateMatadorTactics.h"
 #include "AI/Tasks/BossAttackPatternSelector.h"
 #include "AI/Tasks/EnemyBTTaskCommon.h"
 #include "AIController.h"
 #include "AbilitySystem/GP_AttributeSet.h"
+#include "AbilitySystemComponent.h"
 #include "BehaviorTree/BehaviorTreeComponent.h"
 #include "BehaviorTree/BehaviorTreeTypes.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "Characters/GP_EnemyCharacter.h"
+#include "Characters/GP_MatadorMageBossCharacter.h"
 #include "GameplayTags/GP_Tags.h"
 #include "Navigation/PathFollowingComponent.h"
 
@@ -143,6 +147,23 @@ void UBTS_UpdateEnemyTactics::OnSearchStart(FBehaviorTreeSearchData& SearchData)
 	UpdateTactics(SearchData.OwnerComp);
 }
 
+void UBTS_UpdateEnemyTactics::ApplyPawnSpecializedTactics(UBehaviorTreeComponent& OwnerComp) const
+{
+	const AAIController* AIController = OwnerComp.GetAIOwner();
+	const APawn* ControlledPawn = IsValid(AIController) ? AIController->GetPawn() : nullptr;
+	if (!IsValid(Cast<AGP_MatadorMageBossCharacter>(ControlledPawn)))
+	{
+		return;
+	}
+
+	// BT_Boss_Matador intentionally keeps its data-only common service. Route
+	// that service through native Matador policy without rewriting the asset.
+	if (const UBTS_UpdateMatadorTactics* MatadorTactics = GetDefault<UBTS_UpdateMatadorTactics>())
+	{
+		MatadorTactics->ApplyMatadorTactics(OwnerComp);
+	}
+}
+
 FString UBTS_UpdateEnemyTactics::GetStaticServiceDescription() const
 {
 	return FString::Printf(
@@ -175,7 +196,13 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 	BlackboardComponent->SetValueAsFloat(EnemyBlackboardKeys::HealthRatio, HealthRatio);
 
 	AEnemyAIController* EnemyAIController = Cast<AEnemyAIController>(AIController);
-	const AGP_EnemyCharacter* EnemyCharacter = Cast<AGP_EnemyCharacter>(ControlledPawn);
+	AGP_EnemyCharacter* EnemyCharacter = Cast<AGP_EnemyCharacter>(ControlledPawn);
+	const bool bActionCommitted = IsValid(EnemyCharacter) && EnemyCharacter->IsBehaviorAttackCommitted();
+	const UAbilitySystemComponent* EnemyASC = IsValid(EnemyCharacter) ? EnemyCharacter->GetAbilitySystemComponent() : nullptr;
+	const bool bExplicitAttackInterrupt = IsValid(EnemyASC)
+		&& (EnemyASC->HasMatchingGameplayTag(GPTags::State::Status::Enemy::Groggy)
+			|| EnemyASC->HasMatchingGameplayTag(GPTags::State::Status::Enemy::WingCoreExposed)
+			|| EnemyASC->HasMatchingGameplayTag(GPTags::State::Status::Enemy::GuardBroken));
 	const float EffectiveMaxChaseDistanceFromHome = IsValid(EnemyCharacter) ? EnemyCharacter->GetReturnHomeDistance() : MaxChaseDistanceFromHome;
 	const float EffectiveReturnHomeAcceptanceRadius = IsValid(EnemyCharacter) ? EnemyCharacter->GetReturnHomeAcceptanceRadius() : ReturnHomeAcceptanceRadius;
 	const FVector HomeLocation = EnemyBTTaskCommon::GetBehaviorAnchorLocation(ControlledPawn);
@@ -204,7 +231,12 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 		EffectiveReturnHomeAcceptanceRadius,
 		EffectiveMaxChaseDistanceFromHome * FMath::Clamp(ReturnHomeReengageDistanceRatio, 0.0f, 1.0f));
 	LeashObservation.ReturnHomeAcceptanceRadius = EffectiveReturnHomeAcceptanceRadius;
-	const bool bShouldReturnHome = EnemyLeashPolicy::ShouldReturnHome(LeashObservation);
+	const bool bLeashRequestsReturnHome = EnemyLeashPolicy::ShouldReturnHome(LeashObservation);
+	const bool bPreserveCommittedAction = EnemyAttackTransitionPolicy::ShouldPreserveCommittedAction(
+		bActionCommitted,
+		bExplicitAttackInterrupt);
+	// 바깥 경계를 넘은 틱에도 현재 공격을 끝낸 뒤 귀환을 시작해 몽타주와 이동 분기가 겹치지 않게 한다.
+	const bool bShouldReturnHome = bLeashRequestsReturnHome && !bPreserveCommittedAction;
 	const bool bReengagingDuringReturn = LeashObservation.bCurrentlyReturningHome
 		&& !bShouldReturnHome
 		&& LeashObservation.bHasVisibleTarget
@@ -227,13 +259,46 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 	BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldReturnHome, bShouldReturnHome);
 	if (!bShouldReturnHome && !IsValid(TargetActor) && IsValid(EnemyAIController))
 	{
-		// After returning home, perception may need an explicit rescore before the player can become TargetActor again.
-		EnemyAIController->RequestTargetActorReevaluation();
+		if (bPreserveCommittedAction)
+		{
+			// 공격 도중에는 다른 플레이어를 재선택하지 않고, 살아 있는 원래 타깃만 조용히 다시 연결한다.
+			TargetActor = IsValid(EnemyCharacter) ? EnemyCharacter->GetBehaviorAttackCommittedTarget() : nullptr;
+			if (IsValid(TargetActor))
+			{
+				BlackboardComponent->SetValueAsObject(EnemyBlackboardKeys::TargetActor, TargetActor);
+			}
+		}
+		else
+		{
+			// After returning home, perception may need an explicit rescore before the player can become TargetActor again.
+			EnemyAIController->RequestTargetActorReevaluation();
+		}
 		TargetActor = Cast<AActor>(BlackboardComponent->GetValueAsObject(EnemyBlackboardKeys::TargetActor));
+	}
+
+	if (bPreserveCommittedAction && !IsValid(TargetActor))
+	{
+		// Disconnect/파괴로 타깃 키가 비어도 진행 중 액션은 Combat 분기를 소유하고 이동을 계속 잠근다.
+		BTS_UpdateEnemyTactics_Internal::SetCombatStateTag(BlackboardComponent, GPTags::AI::State::Combat);
+		BlackboardComponent->SetValueAsFloat(EnemyBlackboardKeys::DistanceToTarget, 0.0f);
+		BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bHasLineOfSight, false);
+		BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldRetreat, false);
+		BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bCanAttack, true);
+		BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldReposition, false);
+		BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldChase, false);
+		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldReturnHome, false);
+		// Targetless external actions must not inherit a stale boss teleport request while their task is abort-deferred.
+		BTS_UpdateEnemyTactics_Internal::SetOptionalBlackboardBool(BlackboardComponent, EnemyBlackboardKeys::bShouldTeleport, false);
+		return;
 	}
 
 	if (bShouldReturnHome)
 	{
+		if (IsValid(EnemyCharacter))
+		{
+			EnemyCharacter->ResetBehaviorAttackBandLatch();
+		}
+
 		BTS_UpdateEnemyTactics_Internal::SetCombatStateTag(BlackboardComponent, GPTags::AI::State::Patrol);
 		BlackboardComponent->SetValueAsVector(EnemyBlackboardKeys::MoveToLocation, HomeLocation);
 		BlackboardComponent->SetValueAsFloat(EnemyBlackboardKeys::DistanceToTarget, 0.0f);
@@ -277,6 +342,11 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 
 	if (!IsValid(TargetActor))
 	{
+		if (IsValid(EnemyCharacter))
+		{
+			EnemyCharacter->ResetBehaviorAttackBandLatch();
+		}
+
 		// No target means all combat branch keys collapse to false; decorators can abort immediately.
 		// 이동 중이 아니면 Idle, 순찰 MoveTo가 진행 중이면 Patrol 태그로 BT 논리 상태를 나눈다.
 		BTS_UpdateEnemyTactics_Internal::SetCombatStateTag(
@@ -344,19 +414,45 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 	const float AttackWindow = FMath::Max(AttackWindowFloor, FMath::Lerp(MinAttackWindow, MaxAttackWindow, Aggression));
 	const float MinAttackRange = FMath::Max(0.0f, PreferredRange - AttackWindow);
 	const float MaxAttackRange = PreferredRange + AttackWindow;
-	const bool bInsideAttackBand = DistanceToTarget <= MaxAttackRange && (bAllowAttacksInsidePreferredRange || DistanceToTarget >= MinAttackRange);
-	const bool bTooClose = !bAllowAttacksInsidePreferredRange && DistanceToTarget < MinAttackRange;
+	const bool bIsBasicRangedArchetype = IsValid(EnemyCharacter)
+		&& !EnemyCharacter->IsBossEnemy()
+		&& EnemyCharacter->GetCombatArchetype() != EGPEnemyCombatArchetype::Melee;
+	const bool bAllowAttacksInsideEffectiveRange = bAllowAttacksInsidePreferredRange && !bIsBasicRangedArchetype;
+	const bool bInsideAttackBand = IsValid(EnemyCharacter) && !EnemyCharacter->IsBossEnemy()
+		? EnemyCharacter->UpdateBehaviorAttackBandLatch(
+			DistanceToTarget,
+			MinAttackRange,
+			MaxAttackRange,
+			bAllowAttacksInsideEffectiveRange,
+			AttackRangeExitHysteresis)
+		: EnemyAttackTransitionPolicy::IsInsideAttackBand(
+			DistanceToTarget,
+			MinAttackRange,
+			MaxAttackRange,
+			bAllowAttacksInsideEffectiveRange,
+			bPreviousCanAttack,
+			AttackRangeExitHysteresis);
+	const bool bTooClose = !bAllowAttacksInsideEffectiveRange && DistanceToTarget < MinAttackRange;
 	const bool bTooFar = DistanceToTarget > MaxAttackRange;
 	const bool bAttackCadenceReady = !IsValid(EnemyCharacter) || EnemyCharacter->IsBasicEnemyAttackReady();
 	const bool bTurnInPlaceActive = IsValid(EnemyCharacter) && EnemyCharacter->IsTurnInPlaceActive();
 
 	bool bShouldRetreat = bModeForcesRetreat || (HealthRatio <= RetreatThreshold);
-	// Closing bCanAttack forces the shared BT to leave its old fixed Wait node while this enemy's own cadence runs.
-	bool bCanAttack = !bTurnInPlaceActive && !bShouldRetreat && bHasLineOfSight && bInsideAttackBand && bAttackCadenceReady;
+	FEnemyAttackTransitionObservation AttackObservation;
+	AttackObservation.bShouldRetreat = bShouldRetreat;
+	AttackObservation.bHasLineOfSight = bHasLineOfSight;
+	AttackObservation.bInsideAttackBand = bInsideAttackBand;
+	AttackObservation.bAttackCadenceReady = bAttackCadenceReady;
+	AttackObservation.bActionCommitted = bPreserveCommittedAction;
+	const EEnemyAttackTransitionIntent AttackIntent = EnemyAttackTransitionPolicy::ResolveIntent(AttackObservation);
+	// Turn-in-place owns movement until its root motion finishes, but an already committed attack still has priority.
+	const bool bTurnMovementHold = bTurnInPlaceActive && !bPreserveCommittedAction;
+	bool bCanAttack = AttackIntent == EEnemyAttackTransitionIntent::Attack && !bTurnMovementHold;
+	const bool bShouldCombatHold = AttackIntent == EEnemyAttackTransitionIntent::CombatHold || bTurnMovementHold;
 	bool bShouldReposition = false;
 	bool bShouldChase = false;
 
-	if (!bTurnInPlaceActive && !bShouldRetreat && !bCanAttack)
+	if (!bShouldRetreat && !bCanAttack && !bShouldCombatHold)
 	{
 		const bool bCoverDrivenReposition = CoverPreference >= CoverRepositionThreshold && !bHasLineOfSight;
 		const bool bRangeDrivenReposition = bTooClose || (bModePrefersHold && !bTooFar);
@@ -379,12 +475,12 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 	}
 
 	// When the AI still has a live target, patrol should be the "no target" fallback, not the "I saw the player" fallback.
-	if (!bTurnInPlaceActive && bFallbackToChaseWhenTargetExists && !bShouldRetreat && !bCanAttack && !bShouldReposition)
+	if (bFallbackToChaseWhenTargetExists && !bShouldRetreat && !bCanAttack && !bShouldCombatHold && !bShouldReposition)
 	{
 		bShouldChase = true;
 	}
 
-	// 추격만 별도 상태로 분리하고, 공격/후퇴/재배치는 모두 교전 상태로 BT에 전달한다.
+	// 쿨다운 홀드는 이동 분기를 열지 않은 채 Combat 상태를 유지해 미세 추격을 막는다.
 	const FGameplayTag CombatStateTag = bShouldChase
 		? GPTags::AI::State::Chasing
 		: GPTags::AI::State::Combat;
@@ -505,6 +601,14 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 			BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldChase, true);
 		}
 	}
+
+	// Pawn-specific policy is the final writer. Comparing this final state avoids
+	// restarting the tree for a transient generic boss decision that Matador replaces.
+	ApplyPawnSpecializedTactics(OwnerComp);
+	bShouldRetreat = BlackboardComponent->GetValueAsBool(EnemyBlackboardKeys::bShouldRetreat);
+	bCanAttack = BlackboardComponent->GetValueAsBool(EnemyBlackboardKeys::bCanAttack);
+	bShouldReposition = BlackboardComponent->GetValueAsBool(EnemyBlackboardKeys::bShouldReposition);
+	bShouldChase = BlackboardComponent->GetValueAsBool(EnemyBlackboardKeys::bShouldChase);
 
 	if (bPreviousShouldRetreat != bShouldRetreat
 		|| bPreviousCanAttack != bCanAttack

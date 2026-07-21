@@ -71,13 +71,22 @@ public:
 	float GetPreferredMeleeRange() const { return PreferredMeleeRange; }
 
 	UFUNCTION(BlueprintPure, Category = "Boss|Dark Knight")
+	float GetBasicAttackRange() const { return FMath::Max(0.0f, BasicAttackRange); }
+
+	UFUNCTION(BlueprintPure, Category = "Boss|Dark Knight")
+	float GetHeavyAttackRange() const { return FMath::Max(0.0f, HeavyAttackRange); }
+
+	UFUNCTION(BlueprintPure, Category = "Boss|Dark Knight")
 	float GetChargeMinRange() const { return ChargeMinRange; }
 
 	UFUNCTION(BlueprintPure, Category = "Boss|Dark Knight")
-	float GetDarkWaveMaxRange() const { return DarkWaveMaxRange; }
+	float GetDarkWaveMaxRange() const;
 
 	UFUNCTION(BlueprintPure, Category = "Boss|Dark Knight")
 	float GetGroundCrackMaxRange() const { return GroundCrackMaxRange; }
+
+	/** Validates the committed target before GAS reserves cadence; wind-up movement remains a valid dodge window. */
+	bool CanStartPatternAtTargetRange(FGameplayTag PatternTag, AActor* ExplicitTarget = nullptr) const;
 
 protected:
 	virtual void OnConstruction(const FTransform& Transform) override;
@@ -86,12 +95,21 @@ protected:
 	virtual void HandlePostDamageTaken(AActor* InstigatorActor, float DamageAmount, FGameplayTag ElementTag) override;
 
 private:
+#if WITH_DEV_AUTOMATION_TESTS
+	// Exposes lifecycle state only to the deterministic groggy interrupt test.
+	friend class FDarkArmorKnightGroggyInterruptTest;
+	// Verifies the production Blueprint cannot serialize away gameplay-critical GAS patterns.
+	friend class FDarkArmorKnightAbilityGrantContractTest;
+#endif
+
 	void GrantDarkKnightAbilities();
 	AActor* ResolvePatternTarget(AActor* ExplicitTarget) const;
 	TArray<AActor*> GatherTargetsInCone(float Range, float HalfAngleDegrees) const;
 	void ApplyConeDamage(float Range, float HalfAngleDegrees, float DamageCoefficient, float KnockbackStrength = 0.0f);
 	void RecordPatternUse(const FGameplayTag& PatternTag);
 	float ResolvePatternCooldown(const FGameplayTag& PatternTag) const;
+	void ClearPatternTimers();
+	bool IsPatternInterrupted() const;
 	void SpawnDarkWaveVolley(AActor* TargetActor, int32 ProjectileCount);
 	void SpawnGroundCracks(AActor* TargetActor);
 	bool ExecutePatternNow(FGameplayTag PatternTag, AActor* TargetActor);
@@ -143,6 +161,9 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Dark Knight|Basic", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "cm"))
 	float BasicAttackRange = 350.0f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Dark Knight|Heavy", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "cm"))
+	float HeavyAttackRange = 420.0f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Dark Knight|Guard", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "s"))
 	float GuardDuration = 3.0f;
 
@@ -158,8 +179,8 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Dark Knight|Charge", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "cm"))
 	float ChargeMinRange = 900.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Dark Knight|Dark Wave", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "cm"))
-	float DarkWaveMaxRange = 2200.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Dark Knight|Dark Wave", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", ClampMax = "520.0", Units = "cm"))
+	float DarkWaveMaxRange = 520.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Dark Knight|Ground Crack", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "cm"))
 	float GroundCrackMaxRange = 1800.0f;
@@ -189,4 +210,5 @@ private:
 	TMap<FGameplayTag, float> LastPatternUseTimes;
 	TArray<FTimerHandle> PatternTimerHandles;
 	TWeakObjectPtr<AActor> PendingCounterTarget;
+	TWeakObjectPtr<AGP_DarkKnightChargeActor> ActiveChargeActor;
 };

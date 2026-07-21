@@ -18,6 +18,7 @@
 #include "Camera/PlayerCameraManager.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "NavigationInvokerComponent.h"
 #include "Player/GP_PlayerController.h"
 
 // Animation Headers
@@ -96,6 +97,10 @@ AGP_PlayerCharacter::AGP_PlayerCharacter()
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>("FollowCamera");
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
 	FollowCamera->bUsePawnControlRotation = false;
+
+	// Every authoritative player becomes a navigation seed; the wider removal radius prevents tile churn at the generation boundary.
+	NavigationInvoker = CreateDefaultSubobject<UNavigationInvokerComponent>(TEXT("NavigationInvoker"));
+	NavigationInvoker->SetGenerationRadii(5000.0f, 7000.0f);
 
 	WhiteVoidSetClass = AGP_WhiteVoidSetActor::StaticClass();
 

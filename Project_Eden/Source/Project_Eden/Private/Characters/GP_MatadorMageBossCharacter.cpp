@@ -10,6 +10,7 @@
 #include "Actors/GP_MatadorBossDecoyActor.h"
 #include "Actors/GP_MatadorDecoyPressureComponent.h"
 #include "AIController.h"
+#include "BrainComponent.h"
 #include "BehaviorTree/BehaviorTree.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "BehaviorTree/BlackboardData.h"
@@ -28,6 +29,8 @@
 AGP_MatadorMageBossCharacter::AGP_MatadorMageBossCharacter()
 {
 	PrimaryActorTick.bCanEverTick = true;
+	// Matador continuously locks the main body and follows decoy state even when turn-in-place is disabled.
+	PrimaryActorTick.bStartWithTickEnabled = true;
 	bIsBossEnemy = true;
 	BossDisplayName = NSLOCTEXT("GPMatadorMageBoss", "BossDisplayName", "Matador Mage");
 
@@ -342,6 +345,34 @@ void AGP_MatadorMageBossCharacter::ExecutePendingBullPattern()
 	SpawnBullPattern(TargetActor);
 }
 
+void AGP_MatadorMageBossCharacter::ForceEndBullPattern()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	// Telegraph reservation과 live actor를 함께 지워 BT stuck cap과 명시적 interrupt가 같은 정리 계약을 사용한다.
+	GetWorldTimerManager().ClearTimer(BullTelegraphTimerHandle);
+	bBullPatternPending = false;
+	PendingBullPatternTarget.Reset();
+
+	if (!IsValid(MatadorStateComponent))
+	{
+		return;
+	}
+
+	if (AActor* ActiveBullActor = MatadorStateComponent->GetActiveBullActor(); IsValid(ActiveBullActor))
+	{
+		ActiveBullActor->Destroy();
+	}
+	if (MatadorStateComponent->GetActiveBullActor() != nullptr)
+	{
+		// Destroy가 지연되거나 stale pointer만 남은 경우에도 selector signal과 loose tag는 즉시 해제한다.
+		MatadorStateComponent->RegisterActiveBullActor(nullptr);
+	}
+}
+
 void AGP_MatadorMageBossCharacter::RequestEnterGroggy()
 {
 	if (HasAuthority() && IsValid(MatadorStateComponent))
@@ -503,6 +534,21 @@ void AGP_MatadorMageBossCharacter::GrantMatadorPatternAbilities()
 void AGP_MatadorMageBossCharacter::HandleMatadorFallbackPatternTick()
 {
 	if (!HasAuthority() || !IsValid(MatadorStateComponent) || MatadorStateComponent->IsGroggy() || IsBullPatternActive())
+	{
+		return;
+	}
+
+	const AAIController* AIController = Cast<AAIController>(GetController());
+	const UBrainComponent* BrainComponent = IsValid(AIController) ? AIController->GetBrainComponent() : nullptr;
+	if ((IsValid(BrainComponent) && BrainComponent->IsRunning()) || IsBehaviorAttackCommitted())
+	{
+		// The timer is only a recovery path when the dedicated BT is unavailable;
+		// it must never inject a bull into a live Cape/Rapier/Bull sequence.
+		return;
+	}
+
+	if (const UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+		IsValid(ASC) && ASC->HasMatchingGameplayTag(GPTags::State::Status::Enemy::MatadorMeleeActive))
 	{
 		return;
 	}

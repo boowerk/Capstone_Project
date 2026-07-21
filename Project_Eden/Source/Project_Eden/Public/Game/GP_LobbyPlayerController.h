@@ -18,8 +18,8 @@ public:
 	UFUNCTION(Client, Reliable)
 	void ClientShowLoading();
 
-	// Debug/solo start. Triggered by the lobby UI's force-start button; runs on
-	// the server and bypasses the lobby ready/count gate.
+	// Debug/solo start request. The server accepts it only from the local
+	// listen/standalone host when -AllowLobbyForceStart is explicitly present.
 	UFUNCTION(Server, Reliable)
 	void ServerForceStart();
 
@@ -30,6 +30,15 @@ protected:
 	TSubclassOf<UGP_LobbyWidget> LobbyWidgetClass;
 
 private:
+#if !UE_BUILD_SHIPPING
+	// Headless QA uses the real Ready RPC; this retry only waits for the
+	// replicated PlayerState when -LobbySmokeAutoReady is explicitly supplied.
+	void BeginLobbySmokeAutoReady();
+	void TryLobbySmokeAutoReady();
+	FTimerHandle LobbySmokeReadyTimerHandle;
+	int32 LobbySmokeReadyAttempts = 0;
+#endif
+
 	UPROPERTY()
 	TObjectPtr<UGP_LobbyWidget> LobbyWidget;
 };

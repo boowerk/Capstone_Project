@@ -12,6 +12,8 @@ class AGP_RunPortal;
 class AGP_EnemySpawnMarker;
 class AGP_RegionEventActor;
 class AGP_RegionEventDirector;
+class APawn;
+class APlayerStart;
 enum class EGPRegionEventTrigger : uint8;
 
 /**
@@ -38,6 +40,8 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
+	virtual void Logout(AController* Exiting) override;
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "Run|Zone")
 	void OnZoneStarted(int32 ZoneIndex, AGP_EnemySpawnVolume* Zone);
@@ -110,12 +114,30 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Region Events")
 	bool bStartRegionEventsOnZoneCompleted = false;
 
+	// The production landscape currently authors one anchor. The server expands it into stable,
+	// collision-checked slots so a three-player party never relies on spawn collision nudging.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Network|Spawn", meta = (ClampMin = "1"))
+	int32 RequiredPartyPlayerStartCount = 3;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Network|Spawn", meta = (ClampMin = "150.0", Units = "cm"))
+	float PartyPlayerStartSpacing = 260.0f;
+
 private:
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<AGP_EnemySpawnVolume>> OrderedZones;
 
 	UPROPERTY(Transient)
 	TObjectPtr<AGP_RegionEventDirector> RegionEventDirector;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<APlayerStart>> RuntimePartyPlayerStarts;
+
+	// Weak slots also include map-authored starts; only spawned starts need a strong transient reference above.
+	TArray<TWeakObjectPtr<APlayerStart>> PartyPlayerStartSlots;
+	TMap<TWeakObjectPtr<AController>, int32> PartyStartSlotByController;
+
+	// Populated from placed BP_RegionSeed actors when a map authors distinct biome states.
+	TArray<uint8> RuntimeInitialRegionStates;
 
 	int32 CurrentZoneIndex = INDEX_NONE;
 	int32 PendingZoneIndex = INDEX_NONE;
@@ -124,10 +146,19 @@ private:
 	int32 MarkersTriggered = 0;
 	bool bRunStarted = false;
 	bool bRunFinished = false;
+	bool bPartyPlayerStartsInitialized = false;
 
 	FTimerHandle ReturnToLobbyTimerHandle;
 
+	void EnsurePartyPlayerStarts(AController* Player);
+	APlayerStart* SpawnRuntimePartyPlayerStart(
+		const APlayerStart& Anchor,
+		const APawn* PawnToFit,
+		const FVector& LocalDirection,
+		float RadiusMultiplier);
+	int32 ResolvePartyStartSlot(AController* Player);
 	void GatherZones();
+	void ResolveRuntimeRegionConfiguration();
 	void ResolveRegionEventDirector();
 	void InitializeRegionStates();
 	void SpawnCorruptionPresentation();
@@ -144,6 +175,14 @@ private:
 	void FinishRun(bool bVictory);
 	void ReturnToLobby();
 
+#if !UE_BUILD_SHIPPING
+	// End-to-end QA continues past seamless travel until the authoritative three-player gameplay state is usable.
+	void BeginThreePlayerGameplaySmokeProbe();
+	void TryThreePlayerGameplaySmokeProbe();
+	FTimerHandle ThreePlayerGameplaySmokeTimerHandle;
+	int32 ThreePlayerGameplaySmokeAttempts = 0;
+#endif
+
 	UFUNCTION()
 	void HandlePlayerEnteredZone(AGP_EnemySpawnVolume* Zone);
 
@@ -151,10 +190,13 @@ private:
 	void HandleMarkerTriggered(AGP_EnemySpawnVolume* Zone, AGP_EnemySpawnMarker* Marker);
 
 	UFUNCTION()
-	void HandleZoneEnemyDied(AGP_EnemyCharacter* DeadEnemy);
+	void HandleZoneEnemyDied(AGP_EnemyCharacter* DeadEnemy, AActor* DeathInstigator);
 
 	UFUNCTION()
 	void HandleRegionEventEnemySpawned(AGP_RegionEventActor* EventActor, AGP_EnemyCharacter* Enemy);
+
+	UFUNCTION()
+	void HandleRegionEventEnded(AGP_RegionEventDirector* Director, AGP_RegionEventActor* EventActor);
 
 	AGP_GameState* GetGPGameState() const;
 };

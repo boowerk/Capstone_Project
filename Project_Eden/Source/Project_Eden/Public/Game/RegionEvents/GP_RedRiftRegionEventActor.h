@@ -15,8 +15,18 @@ public:
 	virtual void CompleteRegionEvent() override;
 	virtual void ExpireRegionEvent() override;
 
+	// Pure policy is shared by runtime completion and automation tests, including the infinite-wave edge case.
+	static bool ShouldCompleteAfterWaveSequence(int32 InMaxWaveCount, int32 InSpawnedWaveCount, int32 InAliveEnemyCount);
+
+	UFUNCTION(BlueprintPure, Category = "Region Event|Red Rift")
+	int32 GetSpawnedWaveCount() const { return SpawnedWaveCount; }
+
+	UFUNCTION(BlueprintPure, Category = "Region Event|Red Rift")
+	bool HaveAllConfiguredWavesSpawned() const { return bAllConfiguredWavesSpawned; }
+
 protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+	virtual void OnTrackedEnemyCountChanged() override;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Region Event|Red Rift", meta = (ClampMin = "0.0"))
 	float InitialWaveDelaySeconds = 8.0f;
@@ -31,7 +41,10 @@ protected:
 private:
 	FTimerHandle WaveTimerHandle;
 	int32 SpawnedWaveCount = 0;
+	bool bAllConfiguredWavesSpawned = false;
 
 	void SpawnWave();
 	void StopWaveTimer();
+	void MarkAllConfiguredWavesSpawned();
+	void TryCompleteAfterFinalWave();
 };

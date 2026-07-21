@@ -5,6 +5,7 @@
 #include "AbilitySystemComponent.h"
 #include "AI/Data/EnemyBlackboardKeys.h"
 #include "AI/Debug/EnemyAIDebugUtils.h"
+#include "AI/Services/BTS_UpdateMatadorTactics.h"
 #include "AI/Tasks/EnemyBTTaskCommon.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "Characters/GP_CrystalSeraphBossCharacter.h"
@@ -162,6 +163,27 @@ namespace BossAttackExecution
 			Context.bBullPatternActive = IsValid(MatadorBoss)
 				? MatadorBoss->IsBullPatternActive()
 				: IsValid(MatadorStateComponent->GetActiveBullActor());
+			if (IsValid(MatadorBoss))
+			{
+				const UWorld* World = MatadorBoss->GetWorld();
+				const float WorldTimeSeconds = World != nullptr ? World->GetTimeSeconds() : 0.0f;
+				const UBTS_UpdateMatadorTactics* MatadorTactics = GetDefault<UBTS_UpdateMatadorTactics>();
+				// Runtime actor state is authoritative because BB_EnemyCommon
+				// intentionally omits Matador-only readiness keys.
+				Context.bCanUseBullPattern = Context.bCanUseBullPattern
+					|| (IsValid(MatadorTactics)
+						&& MatadorTactics->IsBullPatternReady(
+							IsValid(TargetActor),
+							GetBool(BlackboardComponent, EnemyBlackboardKeys::bShouldReturnHome),
+							Context.bIsGroggy,
+							Context.bBullPatternActive,
+							Context.DistanceToTarget,
+							GetBool(BlackboardComponent, EnemyBlackboardKeys::bHasLineOfSight),
+							WorldTimeSeconds));
+				Context.PreferredAirRange = MatadorBoss->GetPreferredAirRange();
+				Context.bShouldTeleport = Context.bShouldTeleport
+					|| MatadorBoss->ShouldTeleportForMatador(Context.DistanceToTarget);
+			}
 			Context.bSuppressGenericBossAttacks = true;
 		}
 
@@ -214,13 +236,30 @@ namespace BossAttackExecution
 			Context.BossPhase = DarkKnightBoss->GetDarkKnightPhase();
 			Context.PreferredMeleeRange = DarkKnightBoss->GetPreferredMeleeRange();
 			Context.PreferredRange = Context.PreferredMeleeRange;
-			Context.bCanUseDarkKnightBasic = bCadenceReady && DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::Basic);
-			Context.bCanUseDarkKnightHeavy = bCadenceReady && DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::Heavy);
+			Context.DarkKnightBasicAttackRange = DarkKnightBoss->GetBasicAttackRange();
+			Context.DarkKnightHeavyAttackRange = DarkKnightBoss->GetHeavyAttackRange();
+			Context.DarkKnightChargeMinRange = DarkKnightBoss->GetChargeMinRange();
+			Context.DarkKnightChargeMaxRange = FGPBossAttackPatternRanges::DarkKnightChargeMaxRange;
+			Context.DarkKnightDarkWaveMaxRange = DarkKnightBoss->GetDarkWaveMaxRange();
+			Context.DarkKnightGroundCrackMaxRange = DarkKnightBoss->GetGroundCrackMaxRange();
+			Context.bCanUseDarkKnightBasic = bCadenceReady
+				&& Context.DistanceToTarget <= Context.DarkKnightBasicAttackRange
+				&& DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::Basic);
+			Context.bCanUseDarkKnightHeavy = bCadenceReady
+				&& Context.DistanceToTarget <= Context.DarkKnightHeavyAttackRange
+				&& DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::Heavy);
 			// Sweep is no longer a selectable Dark Knight pattern; Ability_RMB is reserved as an animation wind-up.
 			Context.bCanUseDarkKnightSweep = false;
-			Context.bCanUseDarkKnightCharge = bCadenceReady && DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::Charge);
-			Context.bCanUseDarkWave = bCadenceReady && DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::DarkWave);
-			Context.bCanUseGroundCrack = bCadenceReady && DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::GroundCrack);
+			Context.bCanUseDarkKnightCharge = bCadenceReady
+				&& Context.DistanceToTarget >= Context.DarkKnightChargeMinRange
+				&& Context.DistanceToTarget <= Context.DarkKnightChargeMaxRange
+				&& DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::Charge);
+			Context.bCanUseDarkWave = bCadenceReady
+				&& Context.DistanceToTarget <= Context.DarkKnightDarkWaveMaxRange
+				&& DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::DarkWave);
+			Context.bCanUseGroundCrack = bCadenceReady
+				&& Context.DistanceToTarget <= Context.DarkKnightGroundCrackMaxRange
+				&& DarkKnightBoss->IsPatternCooldownReady(GPTags::Ability::Boss::DarkKnight::GroundCrack);
 		}
 
 		return Context;
@@ -231,8 +270,14 @@ namespace BossAttackExecution
 		const APawn* ControlledPawn,
 		UBlackboardComponent* BlackboardComponent,
 		const FGameplayTag& DefaultAttackAbilityTag,
-		const AActor* TargetActor)
+		const AActor* TargetActor,
+		FGameplayTag* OutActivatedAbilityTag)
 	{
+		if (OutActivatedAbilityTag != nullptr)
+		{
+			*OutActivatedAbilityTag = FGameplayTag();
+		}
+
 		const FGPBossAttackPatternContext PatternContext = BuildPatternContext(ControlledPawn, BlackboardComponent, DefaultAttackAbilityTag);
 		const TArray<FGPBossAttackPatternCandidate> Candidates = FGPBossAttackPatternSelector::BuildCandidates(PatternContext);
 
@@ -251,12 +296,11 @@ namespace BossAttackExecution
 
 			if (TryActivateAbilityByTag(ASC, Candidate.AbilityTag))
 			{
-				if ((Cast<AGP_CrystalSeraphBossCharacter>(ControlledPawn) != nullptr
-						|| Cast<AGP_DarkArmorKnightBossCharacter>(ControlledPawn) != nullptr)
-					&& HasBlackboardKey(BlackboardComponent, EnemyBlackboardKeys::bCanAttack))
+				if (OutActivatedAbilityTag != nullptr)
 				{
-					// Leave the common BT Attack branch immediately; the tactics service will reopen it after the cadence expires.
-					BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bCanAttack, false);
+					// The BT task needs the concrete choice to follow any
+					// actor-owned telegraph after GAS activation returns.
+					*OutActivatedAbilityTag = Candidate.AbilityTag;
 				}
 
 				UE_LOG(
