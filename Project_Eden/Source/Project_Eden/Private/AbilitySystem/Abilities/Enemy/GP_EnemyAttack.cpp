@@ -282,14 +282,14 @@ void UGP_EnemyAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 		// 이벤트 타이밍을 쓰지 않는 경우 어빌리티 시작 즉시 판정을 수행
 		if (!bUseGameplayEventForHitTiming || !AttackEventTag.IsValid())
 		{
-			PerformAttackHit();
+			TryPerformAttackHitOnce();
 		}
 
 		return;
 	}
 
 	// 몽타주가 없으면 즉시 판정 후 종료
-	PerformAttackHit();
+	TryPerformAttackHitOnce();
 	FinishAttackAbility(false);
 }
 
@@ -335,7 +335,7 @@ void UGP_EnemyAttack::EndAbility(
 
 void UGP_EnemyAttack::OnAttackEventReceived(FGameplayEventData Payload)
 {
-	PerformAttackHit();
+	TryPerformAttackHitOnce();
 	// AttackHit is authored at the strike/recovery boundary. Keep advancing through
 	// the preparation and strike, then stop before the recoil animation begins.
 	EndAbilityForwardStep();
@@ -368,7 +368,7 @@ void UGP_EnemyAttack::FinishAttackAbility(bool bWasCancelled)
 	// 정상 종료에서만 누락 notify를 보정하고, 명시적으로 취소된 공격은 추가 피해 없이 끝낸다.
 	if (ShouldApplyFallbackHit(bHasAppliedAttackHit, bWasCancelled))
 	{
-		PerformAttackHit();
+		TryPerformAttackHitOnce();
 	}
 
 	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, bWasCancelled);
@@ -377,6 +377,18 @@ void UGP_EnemyAttack::FinishAttackAbility(bool bWasCancelled)
 bool UGP_EnemyAttack::ShouldApplyFallbackHit(bool bAlreadyApplied, bool bWasCancelled)
 {
 	return !bAlreadyApplied && !bWasCancelled;
+}
+
+void UGP_EnemyAttack::TryPerformAttackHitOnce()
+{
+	if (bHasAppliedAttackHit)
+	{
+		return;
+	}
+
+	// Set the latch before virtual dispatch so overrides cannot re-enter or omit the shared one-hit contract.
+	bHasAppliedAttackHit = true;
+	PerformAttackHit();
 }
 
 void UGP_EnemyAttack::BeginAbilityForwardStep()
@@ -438,10 +450,6 @@ void UGP_EnemyAttack::PushOverlappingForwardStepTargets()
 
 void UGP_EnemyAttack::PerformAttackHit()
 {
-	if (bHasAppliedAttackHit) return;
-
 	// Generic enemies keep the shared spherical hit; boss-only shapes live in derived boss ability classes.
 	PerformAreaAttack();
-
-	bHasAppliedAttackHit = true;
 }

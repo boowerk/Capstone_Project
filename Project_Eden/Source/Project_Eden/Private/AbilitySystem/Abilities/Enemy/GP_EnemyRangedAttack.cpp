@@ -4,6 +4,7 @@
 #include "AI/Data/EnemyBlackboardKeys.h"
 #include "Actors/GP_EnemyRangedProjectile.h"
 #include "BehaviorTree/BlackboardComponent.h"
+#include "Characters/GP_EnemyCharacter.h"
 #include "Engine/World.h"
 #include "GameFramework/Pawn.h"
 #include "GameplayTags/GP_Tags.h"
@@ -31,7 +32,14 @@ void UGP_EnemyRangedAttack::PerformAttackHit()
 	}
 
 	AActor* TargetActor = nullptr;
-	if (const AAIController* AIController = Cast<AAIController>(AvatarPawn->GetController()))
+	const AGP_EnemyCharacter* EnemyCharacter = Cast<AGP_EnemyCharacter>(AvatarPawn);
+	const bool bHasCommittedAttack = IsValid(EnemyCharacter) && EnemyCharacter->IsBehaviorAttackCommitted();
+	if (bHasCommittedAttack)
+	{
+		// A three-player target rescore must not redirect a projectile after this attack committed to another player.
+		TargetActor = EnemyCharacter->GetBehaviorAttackCommittedTarget();
+	}
+	else if (const AAIController* AIController = Cast<AAIController>(AvatarPawn->GetController()))
 	{
 		if (const UBlackboardComponent* BlackboardComponent = AIController->GetBlackboardComponent())
 		{

@@ -77,6 +77,8 @@ private:
 	UFUNCTION()
 	void OnActionEndEventReceived(FGameplayEventData Payload);
 
+	// Latch before virtual dispatch so every derived attack, including ranged projectiles, can apply at most one hit.
+	void TryPerformAttackHitOnce();
 	void FinishAttackAbility(bool bWasCancelled);
 	static bool ShouldFinishAttackForPresentationSignal(EEnemyAttackPresentationSignal Signal);
 	static bool ShouldApplyFallbackHit(bool bAlreadyApplied, bool bWasCancelled);
