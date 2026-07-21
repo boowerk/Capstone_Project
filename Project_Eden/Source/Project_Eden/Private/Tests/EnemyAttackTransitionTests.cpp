@@ -1,11 +1,42 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "AI/Combat/EnemyAttackTransitionPolicy.h"
+#include "AI/Data/EnemyBlackboardKeys.h"
 #include "AbilitySystem/Abilities/Enemy/GP_EnemyAttack.h"
+#include "BehaviorTree/BehaviorTree.h"
+#include "BehaviorTree/BTCompositeNode.h"
+#include "BehaviorTree/Tasks/BTTask_MoveTo.h"
 #include "Characters/GP_EnemyCharacter.h"
 #include "Engine/TargetPoint.h"
 #include "Engine/World.h"
 #include "Misc/AutomationTest.h"
+
+namespace EnemyAttackTransitionTests
+{
+	const UBTTask_MoveTo* FindMovingTargetChaseTask(const UBTCompositeNode* CompositeNode)
+	{
+		if (!IsValid(CompositeNode))
+		{
+			return nullptr;
+		}
+
+		for (const FBTCompositeChild& Child : CompositeNode->Children)
+		{
+			if (const UBTTask_MoveTo* MoveToTask = Cast<UBTTask_MoveTo>(Child.ChildTask))
+			{
+				if (MoveToTask->GetSelectedBlackboardKey() == EnemyBlackboardKeys::TargetActor)
+				{
+					return MoveToTask;
+				}
+			}
+			if (const UBTTask_MoveTo* NestedTask = FindMovingTargetChaseTask(Child.ChildComposite))
+			{
+				return NestedTask;
+			}
+		}
+		return nullptr;
+	}
+}
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FEnemyAttackTransitionPolicyTest,
@@ -39,6 +70,27 @@ bool FEnemyAttackTransitionPolicyTest::RunTest(const FString& Parameters)
 	Observation.bAttackCadenceReady = false;
 	TestTrue(TEXT("Cadence recovery inside range chooses CombatHold instead of Chase"),
 		EnemyAttackTransitionPolicy::ResolveIntent(Observation) == EEnemyAttackTransitionIntent::CombatHold);
+	TestTrue(TEXT("Melee outside its close hold resumes pursuit during cadence recovery"),
+		EnemyAttackTransitionPolicy::ShouldPursueDuringCadenceRecovery(
+			EEnemyAttackTransitionIntent::CombatHold, true, false, 300.0f, 225.0f, 50.0f));
+	TestFalse(TEXT("A holding melee does not restart pursuit inside the wider entry edge"),
+		EnemyAttackTransitionPolicy::ShouldPursueDuringCadenceRecovery(
+			EEnemyAttackTransitionIntent::CombatHold, true, false, 250.0f, 225.0f, 50.0f));
+	TestTrue(TEXT("An active melee pursuit continues until the close hold edge"),
+		EnemyAttackTransitionPolicy::ShouldPursueDuringCadenceRecovery(
+			EEnemyAttackTransitionIntent::CombatHold, true, true, 250.0f, 225.0f, 50.0f));
+	TestFalse(TEXT("Melee already inside pressure distance can hold between swings"),
+		EnemyAttackTransitionPolicy::ShouldPursueDuringCadenceRecovery(
+			EEnemyAttackTransitionIntent::CombatHold, true, true, 200.0f, 225.0f, 50.0f));
+	TestFalse(TEXT("Ranged cadence recovery never collapses its authored spacing into chase"),
+		EnemyAttackTransitionPolicy::ShouldPursueDuringCadenceRecovery(
+			EEnemyAttackTransitionIntent::CombatHold, false, false, 900.0f, 225.0f, 50.0f));
+
+	// A stale production PreferredRange can no longer expand regular melee beyond physical execution reach.
+	TestTrue(TEXT("Regular melee maximum attack range is physically capped"), FMath::IsNearlyEqual(
+		EnemyAttackTransitionPolicy::ResolveMaximumAttackRange(878.0f, true, 350.0f), 350.0f));
+	TestTrue(TEXT("Ranged maximum attack range remains authored"), FMath::IsNearlyEqual(
+		EnemyAttackTransitionPolicy::ResolveMaximumAttackRange(1175.0f, false, 350.0f), 1175.0f));
 
 	Observation.bHasLineOfSight = false;
 	Observation.bInsideAttackBand = false;
@@ -153,6 +205,77 @@ bool FEnemyAttackPresentationLifetimeTest::RunTest(const FString& Parameters)
 	TestTrue(
 		TEXT("An explicit montage interruption still cancels the ability"),
 		UGP_EnemyAttack::ShouldFinishAttackForPresentationSignal(EEnemyAttackPresentationSignal::MontageInterrupted));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEnemyAttackForwardStepPolicyTest,
+	"ProjectEden.AI.Enemy.AttackForwardStep",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEnemyAttackForwardStepPolicyTest::RunTest(const FString& Parameters)
+{
+	// The lunge may proceed only while every independent movement and committed-target contract remains valid.
+	TestTrue(TEXT("A live distant target permits a bounded forward step"),
+		UGP_EnemyAttack::ShouldContinueAbilityForwardStep(0.2f, 0.65f, 100.0f, 500.0f, true, true, 300.0f, 180.0f));
+	TestFalse(TEXT("Forward step stops at its authored duration"),
+		UGP_EnemyAttack::ShouldContinueAbilityForwardStep(0.65f, 0.65f, 100.0f, 500.0f, true, true, 300.0f, 180.0f));
+	TestFalse(TEXT("Forward step stops at its total travel budget"),
+		UGP_EnemyAttack::ShouldContinueAbilityForwardStep(0.2f, 0.65f, 500.0f, 500.0f, true, true, 300.0f, 180.0f));
+	TestFalse(TEXT("Forward step stops when the committed player is destroyed"),
+		UGP_EnemyAttack::ShouldContinueAbilityForwardStep(0.2f, 0.65f, 100.0f, 500.0f, true, false, 300.0f, 180.0f));
+	TestFalse(TEXT("Forward step stops before passing through a player already in hit reach"),
+		UGP_EnemyAttack::ShouldContinueAbilityForwardStep(0.2f, 0.65f, 100.0f, 500.0f, true, true, 180.0f, 180.0f));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEnemyChaseAssetContractTest,
+	"ProjectEden.AI.Enemy.ChaseAssetContract",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEnemyChaseAssetContractTest::RunTest(const FString& Parameters)
+{
+	UBehaviorTree* CommonTree = LoadObject<UBehaviorTree>(
+		nullptr,
+		TEXT("/Game/Characters/EnemyCharacter/BT/Common/BT_EnemyCommon.BT_EnemyCommon"));
+	if (!TestNotNull(TEXT("Production common enemy behavior tree loads"), CommonTree))
+	{
+		return false;
+	}
+
+	const UBTTask_MoveTo* ChaseTask = EnemyAttackTransitionTests::FindMovingTargetChaseTask(CommonTree->RootNode);
+	if (!TestNotNull(TEXT("Common tree chases the live TargetActor rather than a stale location"), ChaseTask))
+	{
+		return false;
+	}
+
+	// A null behavior component reads the asset's literal default without relying on deprecated implicit conversion.
+	TestTrue(TEXT("Chase MoveTo tracks its moving actor goal"), ChaseTask->bTrackMovingGoal.GetValue(static_cast<const UBehaviorTreeComponent*>(nullptr)));
+	TestTrue(TEXT("Chase acceptance radius reaches the melee close-hold edge"), ChaseTask->AcceptableRadius.GetValue(static_cast<const UBehaviorTreeComponent*>(nullptr)) < 225.0f);
+
+	UClass* FurnaceClass = LoadObject<UClass>(
+		nullptr,
+		TEXT("/Game/Characters/EnemyCharacter/Monsters/FurnaceWalker/BP_FurnaceWalker.BP_FurnaceWalker_C"));
+	UClass* CyclopsClass = LoadObject<UClass>(
+		nullptr,
+		TEXT("/Game/Characters/EnemyCharacter/Monsters/CyclopsSpecter/BP_CyclopsSpecter.BP_CyclopsSpecter_C"));
+	const AGP_EnemyCharacter* FurnaceDefaults = IsValid(FurnaceClass)
+		? Cast<AGP_EnemyCharacter>(FurnaceClass->GetDefaultObject())
+		: nullptr;
+	const AGP_EnemyCharacter* CyclopsDefaults = IsValid(CyclopsClass)
+		? Cast<AGP_EnemyCharacter>(CyclopsClass->GetDefaultObject())
+		: nullptr;
+	if (TestNotNull(TEXT("Production Furnace defaults load"), FurnaceDefaults))
+	{
+		// Its bounded forward step supports the wider 350cm attack entry.
+		TestTrue(TEXT("Furnace uses forward-step melee range"), FMath::IsNearlyEqual(FurnaceDefaults->GetBasicMeleeAttackStartRange(), 350.0f));
+	}
+	if (TestNotNull(TEXT("Production Cyclops defaults load"), CyclopsDefaults))
+	{
+		// Cyclops has no root motion or ability step, so its entry remains inside the shared overlap reach.
+		TestTrue(TEXT("Cyclops uses in-place melee range"), FMath::IsNearlyEqual(CyclopsDefaults->GetBasicMeleeAttackStartRange(), 240.0f));
+	}
 	return true;
 }
 
