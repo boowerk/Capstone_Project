@@ -1,5 +1,6 @@
 #include "AbilitySystem/Abilities/Enemy/GP_EnemyAttack.h"
 #include "AIController.h"
+#include "AI/Data/EnemyBlackboardKeys.h"
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 #include "Abilities/Tasks/AbilityTask_WaitDelay.h"
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
@@ -8,6 +9,7 @@
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
 #include "Animation/AnimSequence.h"
+#include "BehaviorTree/BlackboardComponent.h"
 #include "Characters/GP_EnemyCharacter.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/Character.h"
@@ -185,15 +187,44 @@ void UGP_EnemyAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
+
+	LockedAttackTarget.Reset();
+	bool bHasCommittedTargetContract = false;
+	if (const AGP_EnemyCharacter* EnemyCharacter = Cast<AGP_EnemyCharacter>(AvatarActor))
+	{
+		bHasCommittedTargetContract = EnemyCharacter->IsBehaviorAttackCommitted();
+		LockedAttackTarget = EnemyCharacter->GetBehaviorAttackCommittedTarget();
+	}
+	if (!bHasCommittedTargetContract)
+	{
+		if (const APawn* AvatarPawn = Cast<APawn>(AvatarActor))
+		{
+			if (const AAIController* AIController = Cast<AAIController>(AvatarPawn->GetController()))
+			{
+				if (const UBlackboardComponent* BlackboardComponent = AIController->GetBlackboardComponent())
+				{
+					// Non-BT activation caches its current player once instead of reading a mutable three-player key at hit time.
+					LockedAttackTarget = Cast<AActor>(BlackboardComponent->GetValueAsObject(EnemyBlackboardKeys::TargetActor));
+				}
+			}
+		}
+	}
 	if (AGP_EnemyCharacter* EnemyCharacter = Cast<AGP_EnemyCharacter>(AvatarActor))
 	{
 		// Setting the attack lock also clears an active turn slot before DefaultSlot starts.
 		EnemyCharacter->SetBasicEnemyAttackInProgress(true);
+		// The BT consumes this flag to keep reading the committed actor's live location only until the hit frame.
+		EnemyCharacter->BeginBasicEnemyAttackAimTracking();
 		if (const UPDA_EnemyAnimationSet* Set = EnemyCharacter->GetEnemyAnimationSet(); IsValid(Set) && Set->bUseAbilityForwardStep)
 		{
-			AbilityForwardStepDirection = AvatarActor->GetActorForwardVector().GetSafeNormal2D();
+			AbilityForwardStepTarget = LockedAttackTarget;
+			bAbilityForwardStepTracksCommittedTarget = AbilityForwardStepTarget.IsValid();
+			AbilityForwardStepDirection = bAbilityForwardStepTracksCommittedTarget
+				? (AbilityForwardStepTarget->GetActorLocation() - AvatarActor->GetActorLocation()).GetSafeNormal2D()
+				: AvatarActor->GetActorForwardVector().GetSafeNormal2D();
 			AbilityForwardStepDistance = Set->AbilityForwardStepDistance;
 			AbilityForwardStepDurationSeconds = FMath::Max(Set->AbilityForwardStepDurationSeconds, KINDA_SMALL_NUMBER);
+			AbilityForwardStepStopDistance = FMath::Max(0.0f, Set->AbilityForwardStepStopDistance);
 			AbilityForwardStepPushSpeed = Set->AbilityForwardStepPushSpeed;
 			if (AbilityForwardStepDistance > KINDA_SMALL_NUMBER && !AbilityForwardStepDirection.IsNearlyZero())
 			{
@@ -329,6 +360,8 @@ void UGP_EnemyAttack::EndAbility(
 	{
 		EnemyCharacter->SetBasicEnemyAttackInProgress(false);
 	}
+	// Per-actor ability instances are reused, so the next attack must capture its own player identity.
+	LockedAttackTarget.Reset();
 
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }
@@ -379,11 +412,34 @@ bool UGP_EnemyAttack::ShouldApplyFallbackHit(bool bAlreadyApplied, bool bWasCanc
 	return !bAlreadyApplied && !bWasCancelled;
 }
 
+bool UGP_EnemyAttack::ShouldContinueAbilityForwardStep(
+	float ElapsedSeconds,
+	float MaximumDurationSeconds,
+	float TravelledDistance,
+	float MaximumDistance,
+	bool bRequiresLiveTarget,
+	bool bTargetIsValid,
+	float DistanceToTarget,
+	float StopDistance)
+{
+	// Timer lifetime, travelled path, target lifetime, and contact gap are independent stop contracts.
+	return ElapsedSeconds < FMath::Max(0.0f, MaximumDurationSeconds)
+		&& TravelledDistance < FMath::Max(0.0f, MaximumDistance)
+		&& (!bRequiresLiveTarget || bTargetIsValid)
+		&& (!bRequiresLiveTarget || DistanceToTarget > FMath::Max(0.0f, StopDistance));
+}
+
 void UGP_EnemyAttack::TryPerformAttackHitOnce()
 {
 	if (bHasAppliedAttackHit)
 	{
 		return;
+	}
+
+	if (AGP_EnemyCharacter* EnemyCharacter = Cast<AGP_EnemyCharacter>(GetAvatarActorFromActorInfo()))
+	{
+		// AttackHit is the shared lock point for melee overlap direction and non-homing projectile launch direction.
+		EnemyCharacter->LockBasicEnemyAttackAim();
 	}
 
 	// Set the latch before virtual dispatch so overrides cannot re-enter or omit the shared one-hit contract.
@@ -394,39 +450,112 @@ void UGP_EnemyAttack::TryPerformAttackHitOnce()
 void UGP_EnemyAttack::BeginAbilityForwardStep()
 {
 	ACharacter* Character = Cast<ACharacter>(GetAvatarActorFromActorInfo());
+	UWorld* World = GetWorld();
 	AbilityForwardStepMovementComponent = IsValid(Character) ? Character->GetCharacterMovement() : nullptr;
-	if (bHasFinishedAttackAbility || !IsValid(AbilityForwardStepMovementComponent) || AbilityForwardStepDirection.IsNearlyZero()) return;
+	if (bHasFinishedAttackAbility
+		|| bHasAppliedAttackHit
+		|| !IsValid(World)
+		|| !IsValid(AbilityForwardStepMovementComponent)
+		|| AbilityForwardStepDirection.IsNearlyZero())
+	{
+		// A delayed forward-step callback must never reopen movement after AttackHit locked the strike.
+		return;
+	}
+	if (bAbilityForwardStepTracksCommittedTarget && !AbilityForwardStepTarget.IsValid()) return;
 	AbilityForwardStepCapsuleComponent = Character->GetCapsuleComponent();
 	if (IsValid(AbilityForwardStepCapsuleComponent))
 	{
 		AbilityForwardStepPreviousPawnResponse = AbilityForwardStepCapsuleComponent->GetCollisionResponseToChannel(ECC_Pawn);
+		bAbilityForwardStepPreviousGenerateOverlapEvents = AbilityForwardStepCapsuleComponent->GetGenerateOverlapEvents();
 		AbilityForwardStepCapsuleComponent->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
 		AbilityForwardStepCapsuleComponent->SetGenerateOverlapEvents(true);
 	}
 	AbilityForwardStepPushedActors.Reset();
+	// Elapsed time and travelled distance independently cap timer-driven movement even when an authored notify is late.
+	AbilityForwardStepElapsedSeconds = 0.0f;
+	AbilityForwardStepStartWorldTimeSeconds = World->GetTimeSeconds();
+	AbilityForwardStepTravelledDistance = 0.0f;
+	AbilityForwardStepPreviousLocation = Character->GetActorLocation();
 	bAbilityForwardStepActive = true;
 	TickAbilityForwardStep();
-	GetWorld()->GetTimerManager().SetTimer(AbilityForwardStepTimerHandle, this, &ThisClass::TickAbilityForwardStep, 0.02f, true);
+	if (bAbilityForwardStepActive)
+	{
+		// The immediate safety tick may already stop at contact range; only a live step owns a repeating timer.
+		World->GetTimerManager().SetTimer(AbilityForwardStepTimerHandle, this, &ThisClass::TickAbilityForwardStep, 0.02f, true);
+	}
 }
 
 void UGP_EnemyAttack::TickAbilityForwardStep()
 {
-	if (!bAbilityForwardStepActive || !IsValid(AbilityForwardStepMovementComponent)) { EndAbilityForwardStep(); return; }
-	AbilityForwardStepMovementComponent->RequestDirectMove(AbilityForwardStepDirection * (AbilityForwardStepDistance / AbilityForwardStepDurationSeconds), false);
+	constexpr float ForwardStepTickSeconds = 0.02f;
+	ACharacter* Character = Cast<ACharacter>(GetAvatarActorFromActorInfo());
+	UWorld* World = GetWorld();
+	if (!bAbilityForwardStepActive || !IsValid(World) || !IsValid(Character) || !IsValid(AbilityForwardStepMovementComponent)) { EndAbilityForwardStep(); return; }
+
+	const FVector CurrentLocation = Character->GetActorLocation();
+	// World time enforces the authored duration even when a low frame rate delays timer callbacks.
+	AbilityForwardStepElapsedSeconds = FMath::Max(0.0f, World->GetTimeSeconds() - AbilityForwardStepStartWorldTimeSeconds);
+	AbilityForwardStepTravelledDistance += FVector::Dist2D(CurrentLocation, AbilityForwardStepPreviousLocation);
+	AbilityForwardStepPreviousLocation = CurrentLocation;
+	AActor* LiveTarget = bAbilityForwardStepTracksCommittedTarget ? AbilityForwardStepTarget.Get() : nullptr;
+	const bool bLiveTargetIsValid = IsValid(LiveTarget);
+	const float LiveTargetDistance = bLiveTargetIsValid
+		? FVector::Dist2D(CurrentLocation, LiveTarget->GetActorLocation())
+		: TNumericLimits<float>::Max();
+	if (!ShouldContinueAbilityForwardStep(
+		AbilityForwardStepElapsedSeconds,
+		AbilityForwardStepDurationSeconds,
+		AbilityForwardStepTravelledDistance,
+		AbilityForwardStepDistance,
+		bAbilityForwardStepTracksCommittedTarget,
+		bLiveTargetIsValid,
+		LiveTargetDistance,
+		AbilityForwardStepStopDistance))
+	{
+		EndAbilityForwardStep();
+		return;
+	}
+
+	if (bAbilityForwardStepTracksCommittedTarget)
+	{
+		// Follow the task's capped actor yaw so the capsule never slides sideways while the mesh turns toward the live target.
+		AbilityForwardStepDirection = Character->GetActorForwardVector().GetSafeNormal2D();
+	}
+
+	if (AbilityForwardStepDirection.IsNearlyZero()) { EndAbilityForwardStep(); return; }
+	const float RemainingDistance = FMath::Max(0.0f, AbilityForwardStepDistance - AbilityForwardStepTravelledDistance);
+	const float ConfiguredSpeed = AbilityForwardStepDistance / AbilityForwardStepDurationSeconds;
+	// Low frame rates can integrate one requested velocity for longer than the timer interval, so cap against the real frame too.
+	const float MovementStepSeconds = FMath::Max(ForwardStepTickSeconds, World->GetDeltaSeconds());
+	const float CappedSpeed = FMath::Min(ConfiguredSpeed, RemainingDistance / MovementStepSeconds);
+	AbilityForwardStepMovementComponent->RequestDirectMove(AbilityForwardStepDirection * CappedSpeed, false);
 	PushOverlappingForwardStepTargets();
 }
 
 void UGP_EnemyAttack::EndAbilityForwardStep()
 {
-	if (!bAbilityForwardStepActive) return;
+	if (!bAbilityForwardStepActive)
+	{
+		// Delayed-task cancellation can arrive before movement starts, so clear its cached target and any stale timer as well.
+		AbilityForwardStepTarget.Reset();
+		bAbilityForwardStepTracksCommittedTarget = false;
+		AbilityForwardStepDirection = FVector::ZeroVector;
+		if (UWorld* World = GetWorld()) World->GetTimerManager().ClearTimer(AbilityForwardStepTimerHandle);
+		return;
+	}
 	bAbilityForwardStepActive = false;
 	if (IsValid(AbilityForwardStepMovementComponent)) AbilityForwardStepMovementComponent->StopMovementImmediately();
 	if (IsValid(AbilityForwardStepCapsuleComponent))
 	{
 		AbilityForwardStepCapsuleComponent->SetCollisionResponseToChannel(ECC_Pawn, AbilityForwardStepPreviousPawnResponse);
+		// Restore the component's authored overlap policy after the temporary player pass-through window.
+		AbilityForwardStepCapsuleComponent->SetGenerateOverlapEvents(bAbilityForwardStepPreviousGenerateOverlapEvents);
 	}
 	AbilityForwardStepCapsuleComponent = nullptr;
 	AbilityForwardStepPushedActors.Reset();
+	AbilityForwardStepTarget.Reset();
+	bAbilityForwardStepTracksCommittedTarget = false;
+	AbilityForwardStepDirection = FVector::ZeroVector;
 	if (UWorld* World = GetWorld()) World->GetTimerManager().ClearTimer(AbilityForwardStepTimerHandle);
 }
 

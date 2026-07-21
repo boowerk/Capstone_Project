@@ -94,6 +94,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Combat|Forward Step", meta = (EditCondition = "bUseAbilityForwardStep", ClampMin = "0.01", Units = "s"))
 	float AbilityForwardStepDurationSeconds = 0.65f;
 
+	/** Stop closing once the committed target reaches this center-to-center distance, avoiding a forward-step overshoot. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Combat|Forward Step", meta = (EditCondition = "bUseAbilityForwardStep", ClampMin = "0.0", Units = "cm"))
+	float AbilityForwardStepStopDistance = 180.0f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Combat|Forward Step", meta = (EditCondition = "bUseAbilityForwardStep", ClampMin = "0.0", Units = "cm/s"))
 	float AbilityForwardStepPushSpeed = 360.0f;
 
