@@ -51,6 +51,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Run")
 	int32 GetEnemiesRemaining() const { return EnemiesRemaining; }
 
+	UFUNCTION(BlueprintPure, Category = "Run")
+	bool HasRunSeed() const { return RunSeed >= 0; }
+
+	UFUNCTION(BlueprintPure, Category = "Run")
+	int32 GetRunSeed() const { return RunSeed; }
+
 	UFUNCTION(BlueprintPure, Category = "Run|Region")
 	uint8 GetRegionState(int32 RegionId) const;
 
@@ -61,6 +67,7 @@ public:
 	void SetMatchPhase(EGPMatchPhase NewPhase);
 	void SetCurrentZoneIndex(int32 NewZoneIndex);
 	void SetEnemiesRemaining(int32 NewEnemiesRemaining);
+	void SetRunSeed(int32 NewRunSeed);
 
 	// Server-only. Resizes RegionStates to Count and fills it with InitialState
 	// (e.g. all regions dead at run start). Broadcasts a reset (-1).
@@ -95,6 +102,9 @@ protected:
 
 	UPROPERTY(ReplicatedUsing = OnRep_EnemiesRemaining, BlueprintReadOnly, Category = "Run", meta = (AllowPrivateAccess = "true"))
 	int32 EnemiesRemaining = 0;
+
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Run", meta = (AllowPrivateAccess = "true"))
+	int32 RunSeed = INDEX_NONE;
 
 	// Per-region state value (index = region id). Replicated; clients apply it
 	// to the landscape/vegetation via OnRegionStateChanged.

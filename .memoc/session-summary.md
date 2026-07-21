@@ -2,7 +2,7 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-07-20T15:47:38+09:00
+updated: 2026-07-20T22:00:02+09:00
 status: active
 tags: [memoc, memoc/state]
 created: 2026-07-18T13:21:02
@@ -10,12 +10,12 @@ created: 2026-07-18T13:21:02
 # Session Summary
 
 ## Status
-- Candidate J + variable 18-32px V2.2 blend width is generated, mirrored, reimported, and saved in Unreal.
+- Village-layout V1 source complete: per-run RunSeed plus deterministic candidate-slot group selection.
 
 ## Verified
-- 61/61 twice; Weight PNG `8209CBD4...11917`, uasset `F91AB7E1...53CC6`.
-- Regular BGRA8, Bilinear, NoMip/1 mip, Clamp XY, sRGB off, VectorDisplacementmap.
-- Transient random-state refresh visibly applied it. Map/MI unchanged: `E8CE0B5D...B728C` / `841EE208...D740`.
+- Full Editor build and both `ProjectEden.Game.RunSeed.Flow` / `ProjectEden.Game.WorldLayout.VillageSelection` pass.
+- Editor Add menu exposes both native actors. No map/content asset was saved.
 
 ## Resume
-- User should inspect varied boundary softness/art in the open map. No commit made.
+- Get candidate count/positions, then place unique-ID slots for a debug-only PIE smoke test.
+- Data Layer/PCG activation is V2; gate streaming and city PCG before vegetation. Keep zones separate.

@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-20T15:47:38+09:00
+updated: 2026-07-20T22:00:02+09:00
 status: active
 tags:
   - memoc
@@ -11,7 +11,15 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-07-20T15:47:38+09:00
+Last synced: 2026-07-20T22:00:02+09:00
+
+## Village Layout Runtime V1 Handoff
+
+- Source-only V1 is complete. Lobby `ServerTravel` appends `RunSeed`; `AGP_GameMode` owns the parsed/fallback value and `AGP_GameState` replicates it. `AGP_VillageLayoutDirector` is found or auto-spawned by GameMode and runs an authority-only deterministic policy over loaded `AGP_VillageSlot` actors.
+- `AGP_VillageSlot` is non-spatial and excluded from Data Layers so candidate metadata is always available before World Partition selection. Give every placed slot a unique stable `SlotId`; use a shared `GroupId`, `SelectionWeight`, and matching Director `GroupRules`. Default native rule is optional `Village`, 50% chance, pick one.
+- Current output is only `SelectedForRun`, selected slot IDs, debug boxes/labels, and logs. It deliberately does not spawn village content, activate Data Layers, call `GenerateLocal`, modify vegetation, or touch Region Event zones.
+- Verified: full `Project_EdenEditor Win64 Development` build, `ProjectEden.Game.RunSeed.Flow`, and `ProjectEden.Game.WorldLayout.VillageSelection` pass. Editor Add search lists `GP Village Slot` and `GP Village Layout Director`. No map/content asset was saved.
+- Next authored smoke test needs user-approved candidate positions/count. Recommended minimum: place three slots in one `Village` group, keep 50%/pick-one, run PIE repeatedly, and verify one-or-none debug selection changes with the logged RunSeed. V2 then maps each slot 1:1 to an initially Unloaded Runtime Data Layer and gates activation -> World Partition streaming completion -> city PCG completion -> vegetation activation/regeneration. Confirm `BP_CityAnchor` generate-on-load behavior before connecting this.
 
 ## PCG Vegetation Runtime Handoff
 

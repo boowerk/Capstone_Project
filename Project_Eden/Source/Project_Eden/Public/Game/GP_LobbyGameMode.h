@@ -43,6 +43,8 @@ private:
 	UFUNCTION()
 	void OnPlayerReadyChanged(AGP_LobbyPlayerState* PlayerState, bool bIsReady);
 
+	bool bTravelStarted = false;
+
 	void BroadcastRefreshPlayerList();
 	void BroadcastLoading();
 	void TravelToGame();

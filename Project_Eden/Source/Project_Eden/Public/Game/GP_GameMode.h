@@ -12,6 +12,7 @@ class AGP_RunPortal;
 class AGP_EnemySpawnMarker;
 class AGP_RegionEventActor;
 class AGP_RegionEventDirector;
+class AGP_VillageLayoutDirector;
 enum class EGPRegionEventTrigger : uint8;
 
 /**
@@ -29,6 +30,9 @@ class PROJECT_EDEN_API AGP_GameMode : public AGameModeBase
 public:
 	AGP_GameMode();
 
+	UFUNCTION(BlueprintPure, Category = "Run")
+	int32 GetRunSeed() const { return RunSeed; }
+
 	// Manual trigger — bypasses overlap and immediately spawns zone 0. Use from BP if needed.
 	UFUNCTION(BlueprintCallable, Category = "Run")
 	void StartRun();
@@ -37,6 +41,8 @@ public:
 	void NotifyAllPlayersDead();
 
 protected:
+	virtual void InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage) override;
+	virtual void InitGameState() override;
 	virtual void BeginPlay() override;
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "Run|Zone")
@@ -110,12 +116,25 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Region Events")
 	bool bStartRegionEventsOnZoneCompleted = false;
 
+	// Optional run-layout coordinator. The native default only selects VillageSlot candidates;
+	// it does not spawn cities or change gameplay zones.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Village Layout")
+	TSubclassOf<AGP_VillageLayoutDirector> VillageLayoutDirectorClass;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Village Layout")
+	bool bAutoSpawnVillageLayoutDirector = true;
+
 private:
+	int32 RunSeed = INDEX_NONE;
+
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<AGP_EnemySpawnVolume>> OrderedZones;
 
 	UPROPERTY(Transient)
 	TObjectPtr<AGP_RegionEventDirector> RegionEventDirector;
+
+	UPROPERTY(Transient)
+	TObjectPtr<AGP_VillageLayoutDirector> VillageLayoutDirector;
 
 	int32 CurrentZoneIndex = INDEX_NONE;
 	int32 PendingZoneIndex = INDEX_NONE;
@@ -133,6 +152,7 @@ private:
 	FTimerHandle ReturnToLobbyTimerHandle;
 
 	void GatherZones();
+	void ResolveVillageLayoutDirector();
 	void ResolveRegionEventDirector();
 	void InitializeRegionStates();
 	void SpawnCorruptionPresentation();

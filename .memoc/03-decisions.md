@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-20T15:47:38+09:00
+updated: 2026-07-20T22:00:02+09:00
 status: active
 tags:
   - memoc
@@ -16,6 +16,7 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 ## Decision Log
 
 ### 2026-07-20
+- Build village randomization in two phases. V1 only propagates a per-run `RunSeed` and deterministically marks manually placed, stable-ID `AGP_VillageSlot` candidates selected/not selected by group. Do not activate candidate Runtime Data Layers or call city PCG yet: existing `BP_CityAnchor` content may generate on load, so real activation needs an explicit selected-layer contract, streaming-complete gate, city-PCG-complete gate, and vegetation ordering in V2. Keep Region Event zones independent until village placement is proven.
 - Approve Candidate J geometry plus a production-safe variable blend half-width for V2.2. Keep hard IDs and packed visual IDs unchanged; vary only each region-pair's continuous visual influence from 18-32px around 24px with independent 80-240m low-frequency anchors. Each region samples its own nearest boundary-side pixel, while junctions, segment endpoints, and the perimeter return to the 24px baseline. This avoids cross-pair contamination and keeps the material/runtime contract unchanged.
 - Historical stepping stone, superseded by Candidate J above: the first stronger V2.2 preset used 36-180m spacing, 2.5-15m amplitudes, and a 12m cap; it produced 10.575m actual maximum displacement and passed the then-current 51 checks.
 - Do not judge Landscape V2.2 boundary visibility from an editor view until `RT_RegionState_15x1` contains at least two distinct states. A fresh editor map load can leave this transient render target black, making all four V2.2 slots resolve to the same surface even though the MI switch and Weight binding are correct. For non-persistent QA, use placed `BP_RegionStateManager.DebugRandomRegionStates` followed by `RefreshRegionTexture`; do not save the map solely for this validation state.

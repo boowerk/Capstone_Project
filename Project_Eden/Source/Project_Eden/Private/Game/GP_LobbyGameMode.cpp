@@ -3,6 +3,7 @@
 #include "Blueprint/UserWidget.h"
 #include "Game/GP_LobbyPlayerController.h"
 #include "Game/GP_LobbyPlayerState.h"
+#include "Game/GP_RunSeed.h"
 #include "GameFramework/PlayerController.h"
 #include "UI/GP_LobbyWidget.h"
 
@@ -103,6 +104,13 @@ void AGP_LobbyGameMode::ForceStartGame()
 
 void AGP_LobbyGameMode::TravelToGame()
 {
+	if (!HasAuthority() || bTravelStarted)
+	{
+		return;
+	}
+
+	bTravelStarted = true;
+
 	// Restore game input for all players before travelling.
 	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
 	{
@@ -113,6 +121,13 @@ void AGP_LobbyGameMode::TravelToGame()
 		}
 	}
 
-	const FString URL = FString::Printf(TEXT("/Game/Maps/%s?listen"), *GameMapName);
-	GetWorld()->ServerTravel(URL);
+	const int32 RunSeed = GPRunSeed::Generate();
+	const FString URL = GPRunSeed::BuildTravelURL(GameMapName, RunSeed);
+	UE_LOG(LogTemp, Log, TEXT("[GP_LobbyGameMode] Starting run with seed %d."), RunSeed);
+
+	if (!GetWorld()->ServerTravel(URL))
+	{
+		bTravelStarted = false;
+		UE_LOG(LogTemp, Error, TEXT("[GP_LobbyGameMode] ServerTravel failed for '%s'."), *URL);
+	}
 }

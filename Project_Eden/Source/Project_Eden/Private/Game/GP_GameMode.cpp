@@ -6,9 +6,11 @@
 #include "Game/GP_EnemySpawnMarker.h"
 #include "Game/GP_EnemySpawnVolume.h"
 #include "Game/GP_GameState.h"
+#include "Game/GP_RunSeed.h"
 #include "Game/GP_RunPortal.h"
 #include "Game/RegionEvents/GP_RegionEventActor.h"
 #include "Game/RegionEvents/GP_RegionEventDirector.h"
+#include "Game/WorldLayout/GP_VillageLayoutDirector.h"
 #include "Kismet/GameplayStatics.h"
 
 AGP_GameMode::AGP_GameMode()
@@ -16,16 +18,41 @@ AGP_GameMode::AGP_GameMode()
 	GameStateClass = AGP_GameState::StaticClass();
 	RegionEventDirectorClass = AGP_RegionEventDirector::StaticClass();
 	CorruptionPresentationClass = AGP_CorruptionPresentationActor::StaticClass();
+	VillageLayoutDirectorClass = AGP_VillageLayoutDirector::StaticClass();
 
 	// Match the lobby's seamless transition so arriving clients are carried
 	// into this map instead of being dropped during the load.
 	bUseSeamlessTravel = true;
 }
 
+void AGP_GameMode::InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage)
+{
+	Super::InitGame(MapName, Options, ErrorMessage);
+
+	if (!GPRunSeed::TryParse(Options, RunSeed))
+	{
+		RunSeed = GPRunSeed::Generate();
+		UE_LOG(LogTemp, Warning,
+			TEXT("[GP_GameMode] No valid RunSeed option was provided; generated fallback seed %d."),
+			RunSeed);
+	}
+}
+
+void AGP_GameMode::InitGameState()
+{
+	Super::InitGameState();
+
+	if (AGP_GameState* GPGameState = GetGameState<AGP_GameState>())
+	{
+		GPGameState->SetRunSeed(RunSeed);
+	}
+}
+
 void AGP_GameMode::BeginPlay()
 {
 	Super::BeginPlay();
 
+	ResolveVillageLayoutDirector();
 	GatherZones();
 	ResolveRegionEventDirector();
 	SpawnCorruptionPresentation();
@@ -45,6 +72,26 @@ void AGP_GameMode::BeginPlay()
 	}
 
 	UnlockZone(0);
+}
+
+void AGP_GameMode::ResolveVillageLayoutDirector()
+{
+	VillageLayoutDirector = Cast<AGP_VillageLayoutDirector>(
+		UGameplayStatics::GetActorOfClass(this, AGP_VillageLayoutDirector::StaticClass()));
+
+	if (!VillageLayoutDirector && bAutoSpawnVillageLayoutDirector && *VillageLayoutDirectorClass)
+	{
+		if (UWorld* World = GetWorld())
+		{
+			FActorSpawnParameters SpawnParameters;
+			SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+			VillageLayoutDirector = World->SpawnActor<AGP_VillageLayoutDirector>(
+				VillageLayoutDirectorClass,
+				FVector::ZeroVector,
+				FRotator::ZeroRotator,
+				SpawnParameters);
+		}
+	}
 }
 
 void AGP_GameMode::InitializeRegionStates()

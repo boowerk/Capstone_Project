@@ -16,7 +16,27 @@ void AGP_GameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 	DOREPLIFETIME(AGP_GameState, MatchPhase);
 	DOREPLIFETIME(AGP_GameState, CurrentZoneIndex);
 	DOREPLIFETIME(AGP_GameState, EnemiesRemaining);
+	DOREPLIFETIME(AGP_GameState, RunSeed);
 	DOREPLIFETIME(AGP_GameState, RegionStates);
+}
+
+void AGP_GameState::SetRunSeed(int32 NewRunSeed)
+{
+	if (!HasAuthority() || NewRunSeed < 0)
+	{
+		return;
+	}
+
+	if (RunSeed >= 0 && RunSeed != NewRunSeed)
+	{
+		UE_LOG(LogTemp, Error,
+			TEXT("[GP_GameState] Refusing to replace initialized RunSeed %d with %d."),
+			RunSeed,
+			NewRunSeed);
+		return;
+	}
+
+	RunSeed = NewRunSeed;
 }
 
 uint8 AGP_GameState::GetRegionState(int32 RegionId) const
