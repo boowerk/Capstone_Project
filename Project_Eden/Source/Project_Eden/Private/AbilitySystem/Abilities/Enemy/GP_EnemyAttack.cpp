@@ -263,7 +263,7 @@ void UGP_EnemyAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 		if (PlayMontageTask)
 		{
 			PlayMontageTask->OnCompleted.AddDynamic(this, &ThisClass::OnMontageCompleted);
-			PlayMontageTask->OnBlendOut.AddDynamic(this, &ThisClass::OnMontageCompleted);
+			PlayMontageTask->OnBlendOut.AddDynamic(this, &ThisClass::OnMontageBlendOut);
 			PlayMontageTask->OnInterrupted.AddDynamic(this, &ThisClass::OnMontageCancelled);
 			PlayMontageTask->OnCancelled.AddDynamic(this, &ThisClass::OnMontageCancelled);
 			PlayMontageTask->ReadyForActivation();
@@ -295,13 +295,26 @@ void UGP_EnemyAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 
 void UGP_EnemyAttack::OnMontageCompleted()
 {
-	FinishAttackAbility(false);
+	if (ShouldFinishAttackForPresentationSignal(EEnemyAttackPresentationSignal::MontageCompleted))
+	{
+		FinishAttackAbility(false);
+	}
+}
+
+void UGP_EnemyAttack::OnMontageBlendOut()
+{
+	// Blend-out is still visible presentation. Ending the ability here makes
+	// PlayMontageAndWait stop the remaining blend and produces a visible pop.
+	ensure(!ShouldFinishAttackForPresentationSignal(EEnemyAttackPresentationSignal::MontageBlendOut));
 }
 
 void UGP_EnemyAttack::OnMontageCancelled()
 {
 	// 사망·그로기·BT 안전 타임아웃으로 끊긴 몽타주는 아직 오지 않은 타격 notify를 보정하지 않는다.
-	FinishAttackAbility(true);
+	if (ShouldFinishAttackForPresentationSignal(EEnemyAttackPresentationSignal::MontageInterrupted))
+	{
+		FinishAttackAbility(true);
+	}
 }
 
 void UGP_EnemyAttack::EndAbility(
@@ -330,7 +343,16 @@ void UGP_EnemyAttack::OnAttackEventReceived(FGameplayEventData Payload)
 
 void UGP_EnemyAttack::OnActionEndEventReceived(FGameplayEventData Payload)
 {
-	FinishAttackAbility(false);
+	// ActionEnd closes the damaging/movement window, but the montage remains
+	// ability-owned until its authored recovery and blend-out finish naturally.
+	EndAbilityForwardStep();
+	ensure(!ShouldFinishAttackForPresentationSignal(EEnemyAttackPresentationSignal::ActionEnd));
+}
+
+bool UGP_EnemyAttack::ShouldFinishAttackForPresentationSignal(EEnemyAttackPresentationSignal Signal)
+{
+	return Signal == EEnemyAttackPresentationSignal::MontageCompleted
+		|| Signal == EEnemyAttackPresentationSignal::MontageInterrupted;
 }
 
 void UGP_EnemyAttack::FinishAttackAbility(bool bWasCancelled)

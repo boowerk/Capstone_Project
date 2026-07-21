@@ -11,6 +11,15 @@ class UCharacterMovementComponent;
 class UCapsuleComponent;
 struct FGameplayEventData;
 
+// Gameplay-window notifies and montage presentation events have different lifetimes.
+enum class EEnemyAttackPresentationSignal : uint8
+{
+	ActionEnd,
+	MontageBlendOut,
+	MontageCompleted,
+	MontageInterrupted
+};
+
 UCLASS()
 class PROJECT_EDEN_API UGP_EnemyAttack : public UGP_SkillBase
 {
@@ -57,6 +66,9 @@ private:
 	void OnMontageCompleted();
 
 	UFUNCTION()
+	void OnMontageBlendOut();
+
+	UFUNCTION()
 	void OnMontageCancelled();
 
 	UFUNCTION()
@@ -66,6 +78,7 @@ private:
 	void OnActionEndEventReceived(FGameplayEventData Payload);
 
 	void FinishAttackAbility(bool bWasCancelled);
+	static bool ShouldFinishAttackForPresentationSignal(EEnemyAttackPresentationSignal Signal);
 	static bool ShouldApplyFallbackHit(bool bAlreadyApplied, bool bWasCancelled);
 
 	// The authored forward step is ability-owned so every completion and cancellation path restores movement state.
@@ -78,6 +91,7 @@ private:
 	bool bHasFinishedAttackAbility = false;
 
 	friend class FEnemyAttackCancellationPolicyTest;
+	friend class FEnemyAttackPresentationLifetimeTest;
 
 	// Per-actor ability instance state. Prevents the same configured attack montage repeating twice in a row.
 	TObjectPtr<UAnimMontage> LastSelectedAttackMontage = nullptr;

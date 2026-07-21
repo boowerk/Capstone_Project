@@ -132,4 +132,28 @@ bool FEnemyAttackCancellationPolicyTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEnemyAttackPresentationLifetimeTest,
+	"ProjectEden.AI.Enemy.AttackPresentationLifetime",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEnemyAttackPresentationLifetimeTest::RunTest(const FString& Parameters)
+{
+	// ActionEnd closes gameplay timing only; the authored recovery tail and its
+	// blend must remain alive until the montage actually completes.
+	TestFalse(
+		TEXT("ActionEnd does not terminate the attack montage"),
+		UGP_EnemyAttack::ShouldFinishAttackForPresentationSignal(EEnemyAttackPresentationSignal::ActionEnd));
+	TestFalse(
+		TEXT("Blend-out start does not cut the remaining blend"),
+		UGP_EnemyAttack::ShouldFinishAttackForPresentationSignal(EEnemyAttackPresentationSignal::MontageBlendOut));
+	TestTrue(
+		TEXT("Natural montage completion releases the ability"),
+		UGP_EnemyAttack::ShouldFinishAttackForPresentationSignal(EEnemyAttackPresentationSignal::MontageCompleted));
+	TestTrue(
+		TEXT("An explicit montage interruption still cancels the ability"),
+		UGP_EnemyAttack::ShouldFinishAttackForPresentationSignal(EEnemyAttackPresentationSignal::MontageInterrupted));
+	return true;
+}
+
 #endif
