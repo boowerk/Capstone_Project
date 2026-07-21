@@ -106,3 +106,10 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 - Reinterpret the RegionState system as biome-type selection, not gameplay life/death/corruption status. Values should represent biome categories; GameMode terms like `AliveRegionState` / `DeadRegionState` are legacy naming to rename or replace when implementation resumes.
 - Minimap correctness should not depend on level-authored PCG completion wiring. Keep a startup fallback full-map capture, allow later PCG-ready notifications to restart it, and make the HUD map image resolver tolerate production widget renames such as `MiniMapImage`.
 - The minimap map texture should be clipped by the UI material, not only hidden under ring art. Player cursor heading should default to controller/view yaw so camera-facing a target matches the visible minimap direction.
+
+### 2026-07-21
+
+- Isolate streamed village PCG with per-slot Actor Tags plus component-local `UPCGGraphInstance` `RoadTag`/`DistrictTag` overrides. Remove template tags after retagging so legacy/global searches cannot mix simultaneous villages; do not mutate the shared base graph.
+- Keep the automatically managed `PCGWorldActor` in `L_Village_00`; the Director only configures the explicitly identified `PCG_CityGen_FromAnchor` component. Remove fixed village Level Instances from the main map so the Director is the sole runtime owner.
+- Treat multiple villages as an atomic presentation batch: all loaded/configured before visibility, all shown before generation, completion/cancellation delegates before success, and timeout/failure rollback. Multiplayer replication is a separate future feature.
+- Run streamed city PCG sequentially after the all-shown barrier. Complex hierarchical graphs and engine PCG services are shared at world scope; one in-flight city graph removes cross-instance concurrency as a failure variable and spreads the generation spike. Preserve slot-unique tags and log PCG-managed output counts/bounds for runtime proof.

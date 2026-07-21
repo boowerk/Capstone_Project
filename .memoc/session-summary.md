@@ -2,7 +2,7 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-07-21T17:32:45+09:00
+updated: 2026-07-21T19:30:00+09:00
 status: active
 tags:
   - memoc
@@ -12,12 +12,12 @@ created: 2026-07-18T13:21:02
 # Session Summary
 
 ## Status
-- Single-preset village streaming works: `L_Village_00` loads at one deterministic selected slot and generates PCG after load/show.
+- Multi-slot `L_Village_00` streaming, isolation, and sequential PCG are implemented but uncommitted.
 
 ## Verified
-- Editor build and `RunSeed.Flow` / `VillageSelection` pass.
-- PIE seed `993821918` selected `Village_B`; one PCG component configured/generated, and the user visually confirmed the village at the slot.
+- Saved map: 3 slots, no fixed Level Instance, Required/PickCount=2.
+- Build plus `VillageSelection`/`RunSeed.Flow` pass.
+- Headless real-map runs generated A/B independently and reproduced seed 815718662: B/C produced 314/274 managed ISM instances at distinct transforms/bounds.
 
 ## Resume
-- Keep the fixed main-map village instance removed.
-- Multiple villages need per-instance Road/District tags plus PCG parameter overrides. Client sync and cook registration remain.
+- Optional visual PIE check; multiple preset assets and multiplayer replication remain deferred.

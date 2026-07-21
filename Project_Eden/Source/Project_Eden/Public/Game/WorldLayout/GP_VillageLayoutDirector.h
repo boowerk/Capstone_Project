@@ -3,9 +3,11 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "Game/WorldLayout/GP_VillageTypes.h"
+#include "TimerManager.h"
 #include "GP_VillageLayoutDirector.generated.h"
 
 class AGP_VillageSlot;
+class UPCGComponent;
 class USceneComponent;
 class ULevelStreamingDynamic;
 class UWorld;
@@ -49,12 +51,15 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Village|Data Layer")
 	bool bApplyDataLayersAtRuntime = false;
 
-	// V1 uses one authored village map at one selected slot per run.
+	// Selected slots instance the same authored village map independently.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Village|Level Instance")
 	TSoftObjectPtr<UWorld> VillageLevelPreset;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Village|Level Instance")
 	bool bStreamVillageLevelAtRuntime = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Village|Level Instance", meta = (ClampMin = "1.0", Units = "s"))
+	float VillageStreamingTimeoutSeconds = 30.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Village|Debug", meta = (ClampMin = "0"))
 	int32 PreviewSeed = 1337;
@@ -79,18 +84,43 @@ private:
 	TMap<FName, TObjectPtr<ULevelStreamingDynamic>> ActiveVillageLevels;
 
 	TSet<FName> ConfiguredVillageLevelIds;
+	TSet<FName> GenerationRequestedVillageLevelIds;
 	TSet<FName> GeneratedVillageLevelIds;
+	TMap<UPCGComponent*, FName> PendingVillagePCGComponents;
+	FTimerHandle VillageStreamingTimeoutHandle;
+	int32 ExpectedVillageLevelCount = 0;
+	bool bVillageLevelBatchFailed = false;
+	bool bSchedulingVillagePCG = false;
 
 	int32 LastRunSeed = INDEX_NONE;
 
 	void CollectSlots();
 	bool ApplyDataLayerStates(const TSet<FName>& InSelectedSlotIds) const;
-	bool StreamSelectedVillageLevel(const TSet<FName>& InSelectedSlotIds);
+	bool StreamSelectedVillageLevels(const TSet<FName>& InSelectedSlotIds);
 	void UnloadActiveVillageLevels();
-	int32 ConfigureVillagePCG(ULevelStreamingDynamic* StreamingLevel, FName SlotId) const;
-	int32 GenerateVillagePCG(ULevelStreamingDynamic* StreamingLevel) const;
+	bool ConfigureVillagePCG(
+		ULevelStreamingDynamic* StreamingLevel,
+		FName SlotId,
+		int32& OutPCGComponentCount,
+		int32& OutRoadActorCount,
+		int32& OutDistrictActorCount) const;
+	bool GenerateVillagePCG(
+		ULevelStreamingDynamic* StreamingLevel,
+		FName SlotId,
+		int32& OutPCGComponentCount);
+	bool RequestNextVillagePCGGeneration();
+	void LogVillagePCGResult(FName SlotId, UPCGComponent* PCGComponent) const;
+	bool GetCityPCGTemplateTags(
+		const UPCGComponent* PCGComponent,
+		FName& OutRoadTag,
+		FName& OutDistrictTag) const;
 	int32 MakeVillagePCGSeed(FName SlotId) const;
 	FString MakeStreamingLevelName(FName SlotId) const;
+	FName MakeVillageRoleTag(FName SlotId, const TCHAR* RoleSuffix) const;
+	void HandleVillagePCGGenerated(UPCGComponent* PCGComponent);
+	void HandleVillagePCGCancelled(UPCGComponent* PCGComponent);
+	void HandleVillageStreamingTimeout();
+	void ClearVillageStreamingTimeout();
 	void DrawSelectionDebug() const;
 
 	UFUNCTION()

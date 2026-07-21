@@ -6,6 +6,14 @@
 #include "Game/WorldLayout/GP_VillageSelectionPolicy.h"
 #include "Game/WorldLayout/GP_VillageSlot.h"
 #include "Misc/AutomationTest.h"
+#include "Elements/PCGActorSelector.h"
+#include "Elements/PCGDataFromActor.h"
+#include "Elements/PCGReroute.h"
+#include "Elements/PCGUserParameterGet.h"
+#include "PCGEdge.h"
+#include "PCGGraph.h"
+#include "PCGNode.h"
+#include "PCGPin.h"
 
 namespace
 {
@@ -44,6 +52,102 @@ namespace
 			}
 		}
 		return NAME_None;
+	}
+
+	const FPCGSettingsOverridableParam* FindActorTagOverride(
+		const UPCGDataFromActorSettings* Settings)
+	{
+		return Settings ? Settings->OverridableParams().FindByPredicate(
+			[](const FPCGSettingsOverridableParam& Param)
+			{
+				return Param.PropertiesNames.Num() == 2
+					&& Param.PropertiesNames[0]
+						== GET_MEMBER_NAME_CHECKED(UPCGDataFromActorSettings, ActorSelector)
+					&& Param.PropertiesNames[1]
+						== GET_MEMBER_NAME_CHECKED(FPCGActorSelectorSettings, ActorSelectionTag);
+			}) : nullptr;
+	}
+
+	bool IsDrivenByGraphParameter(
+		const UPCGPin* TargetInput,
+		const FPropertyBagPropertyDesc& ParameterDesc)
+	{
+		TArray<const UPCGPin*> PendingPins;
+		TSet<const UPCGPin*> VisitedPins;
+		PendingPins.Add(TargetInput);
+
+		while (!PendingPins.IsEmpty())
+		{
+			const UPCGPin* DownstreamPin = PendingPins.Pop(EAllowShrinking::No);
+			if (!DownstreamPin || VisitedPins.Contains(DownstreamPin))
+			{
+				continue;
+			}
+
+			VisitedPins.Add(DownstreamPin);
+			for (const UPCGEdge* Edge : DownstreamPin->Edges)
+			{
+				if (!Edge || Edge->OutputPin != DownstreamPin)
+				{
+					continue;
+				}
+
+				const UPCGPin* UpstreamPin = Edge->InputPin;
+				const UPCGNode* UpstreamNode = UpstreamPin ? UpstreamPin->Node.Get() : nullptr;
+				if (!UpstreamNode)
+				{
+					continue;
+				}
+
+				if (const UPCGUserParameterGetSettings* Getter =
+					Cast<UPCGUserParameterGetSettings>(UpstreamNode->GetSettings()))
+				{
+					if (Getter->PropertyGuid == ParameterDesc.ID
+						&& Getter->PropertyName == ParameterDesc.Name
+						&& UpstreamPin->Properties.Label == ParameterDesc.Name)
+					{
+						return true;
+					}
+				}
+
+				if (Cast<UPCGRerouteSettings>(UpstreamNode->GetSettings()))
+				{
+					for (const UPCGPin* RerouteInput : UpstreamNode->GetInputPins())
+					{
+						PendingPins.Add(RerouteInput);
+					}
+				}
+			}
+		}
+
+		return false;
+	}
+
+	int32 CountActorTagSelectorsDrivenByParameter(
+		const UPCGGraph* Graph,
+		const FPropertyBagPropertyDesc& ParameterDesc)
+	{
+		int32 ConnectedSelectorCount = 0;
+		for (const UPCGNode* Node : Graph->GetNodes())
+		{
+			const UPCGDataFromActorSettings* Settings =
+				Node ? Cast<UPCGDataFromActorSettings>(Node->GetSettings()) : nullptr;
+			if (!Settings
+				|| Settings->ActorSelector.ActorFilter != EPCGActorFilter::AllWorldActors
+				|| Settings->ActorSelector.ActorSelection != EPCGActorSelection::ByTag)
+			{
+				continue;
+			}
+
+			const FPCGSettingsOverridableParam* Override = FindActorTagOverride(Settings);
+			const UPCGPin* TagInput = Override ? Node->GetInputPin(Override->Label) : nullptr;
+			if (TagInput && IsDrivenByGraphParameter(TagInput, ParameterDesc))
+			{
+				++ConnectedSelectorCount;
+			}
+		}
+
+		return ConnectedSelectorCount;
 	}
 }
 
@@ -95,6 +199,10 @@ bool FVillageSelectionPolicyTest::RunTest(const FString& Parameters)
 		GPVillageSelectionPolicy::SelectSlots(1337, ShuffledCandidates, RequiredRule);
 	TestTrue(TEXT("Candidate enumeration order does not change the result"),
 		RequiredResult.SelectedSlotIds == ShuffledResult.SelectedSlotIds);
+	const FGP_VillageSelectionResult ShuffledPickTwoResult =
+		GPVillageSelectionPolicy::SelectSlots(1337, ShuffledCandidates, PickTwoRule);
+	TestTrue(TEXT("Multi-slot selection is independent of candidate enumeration order"),
+		PickTwoResult.SelectedSlotIds == ShuffledPickTwoResult.SelectedSlotIds);
 
 	TArray<FGP_VillageCandidate> WithOtherGroup = MainCandidates;
 	WithOtherGroup.Add(MakeCandidate(TEXT("Other_A"), TEXT("Other")));
@@ -149,6 +257,53 @@ bool FVillageSelectionPolicyTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("VillageLayoutDirector defaults to the first authored village preset"),
 		GetDefault<AGP_VillageLayoutDirector>()->GetVillageLevelPreset().ToSoftObjectPath(),
 		FSoftObjectPath(TEXT("/Game/WorldLayout/L_Village_00.L_Village_00")));
+
+	UPCGGraph* CityGraph = LoadObject<UPCGGraph>(
+		nullptr,
+		TEXT("/Game/RegionSystem/PCG/CityGen/PCG_CityGen_FromAnchor.PCG_CityGen_FromAnchor"));
+	TestNotNull(TEXT("City PCG graph is available for village streaming"), CityGraph);
+	if (CityGraph)
+	{
+		const TValueOrError<FName, EPropertyBagResult> RoadTag =
+			CityGraph->GetGraphParameter<FName>(TEXT("RoadTag"));
+		const TValueOrError<FName, EPropertyBagResult> DistrictTag =
+			CityGraph->GetGraphParameter<FName>(TEXT("DistrictTag"));
+		TestFalse(TEXT("City PCG exposes a RoadTag name parameter"), RoadTag.HasError());
+		TestFalse(TEXT("City PCG exposes a DistrictTag name parameter"), DistrictTag.HasError());
+		if (!RoadTag.HasError())
+		{
+			TestEqual(TEXT("City PCG road source tag is authored"), RoadTag.GetValue(), FName(TEXT("City_00_Road")));
+		}
+		if (!DistrictTag.HasError())
+		{
+			TestEqual(
+				TEXT("City PCG district source tag is authored"),
+				DistrictTag.GetValue(),
+				FName(TEXT("City_00_District")));
+		}
+
+		const FInstancedPropertyBag* UserParameters = CityGraph->GetUserParametersStruct();
+		TestNotNull(TEXT("City PCG user parameter bag is available"), UserParameters);
+		if (UserParameters)
+		{
+			for (const FName ParameterName : {FName(TEXT("RoadTag")), FName(TEXT("DistrictTag"))})
+			{
+				const FPropertyBagPropertyDesc* ParameterDesc =
+					UserParameters->FindPropertyDescByName(ParameterName);
+				TestNotNull(
+					*FString::Printf(TEXT("%s descriptor is available"), *ParameterName.ToString()),
+					ParameterDesc);
+				if (ParameterDesc)
+				{
+					TestTrue(
+						*FString::Printf(
+							TEXT("%s drives a tagged Get Actor Data selector"),
+							*ParameterName.ToString()),
+						CountActorTagSelectorsDrivenByParameter(CityGraph, *ParameterDesc) > 0);
+				}
+			}
+		}
+	}
 	return true;
 }
 

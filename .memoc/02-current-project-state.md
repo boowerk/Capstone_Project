@@ -284,3 +284,12 @@ Last synced: 2026-05-23T00:00:00
 ## Change Log
 
 See `.memoc/worklog/` and generated `.memoc/activity.md`.
+
+### 2026-07-21 Village multi-instance PCG isolation
+
+- `AGP_VillageLayoutDirector` can stream the same `L_Village_00` preset at every selected slot. Each instance receives seed/slot-stable Road/District Actor Tags, and only its component-local `UPCGGraphInstance` parameters are overridden.
+- The batch stays hidden until all levels load and configure, waits until all are shown before requesting PCG, confirms completion/cancellation through runtime component delegates, and rolls back on failure or a 30-second timeout.
+- City PCG identification is pinned to `PCG_CityGen_FromAnchor`; automation verifies `RoadTag` and `DistrictTag` really drive tagged `Get Actor Data` selectors.
+- Saved `L_LandscapeMap` has 3 slots, no fixed village Level Instance, and its current Required rule has `PickCount=2`.
+- City PCG now runs one selected slot at a time. Per-slot diagnostics report unique tags, world transforms, PCG-managed resources/ISM instances, and bounds.
+- Full editor build, `ProjectEden.Game.WorldLayout.VillageSelection`, and `ProjectEden.Game.RunSeed.Flow` pass. Headless `L_LandscapeMap` runs generated independent A/B outputs (257/253 instances) and reproduced the original seed's B/C selection with 314/274 managed ISM instances at distinct locations/bounds.
