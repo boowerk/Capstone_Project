@@ -6,6 +6,7 @@
 #include "AIController.h"
 #include "AI/Data/EnemyArchetypeData.h"
 #include "AI/Data/EnemyLLMEvaluation.h"
+#include "AI/Debug/EnemyAIDebugUtils.h"
 #include "AI/Debug/EnemyAIRangeVisualizationComponent.h"
 #include "BrainComponent.h"
 #include "AbilitySystem/Abilities/Enemy/GP_BossAreaAttack.h"
@@ -203,6 +204,15 @@ void AGP_EnemyCharacter::NotifyBossTargetSelected(AActor* TargetActor)
 void AGP_EnemyCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+	if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
+	{
+		// Blueprint component defaults can override constructor values.  Reapply the
+		// chase policy at runtime so walking enemies turn with their movement path,
+		// rather than retaining a stale controller-facing rotation.
+		MovementComponent->bOrientRotationToMovement = true;
+		MovementComponent->bUseControllerDesiredRotation = false;
+		MovementComponent->RotationRate = FRotator(0.0f, 540.0f, 0.0f);
+	}
 	RefreshWorldHealthBarVisibility();
 	InitializeBasicEnemyAttackCadence();
 	ApplyRuntimeMovementPolicy();
@@ -324,7 +334,10 @@ void AGP_EnemyCharacter::UpdateTurnInPlace(float DeltaSeconds)
 		return;
 	}
 
-	TryStartTurnInPlace();
+	// Do not infer a turn from Blackboard TargetActor here.  This Tick runs in every
+	// stationary state, so that inference makes idle, recovery, and tactical waits
+	// continuously face the player.  A dedicated AI task must call
+	// StartTurnInPlaceForTarget when a turn is actually part of its state transition.
 }
 
 void AGP_EnemyCharacter::StartTurnInPlaceForTarget(const AActor* TargetActor)
@@ -403,6 +416,15 @@ void AGP_EnemyCharacter::TryStartTurnInPlace(const FVector* OverrideTargetLocati
 
 	bTurnInPlaceActive = true;
 	bRestoreOrientRotationToMovementAfterTurn = MovementComponent->bOrientRotationToMovement;
+	UE_LOG(
+		LogEnemyAI,
+		Log,
+		TEXT("[MoveTrace] TurnStop Pawn=%s Pos=%s TargetYaw=%.1f DeltaYaw=%.1f Seq=%s"),
+		*GetName(),
+		*GetActorLocation().ToCompactString(),
+		DesiredYawDegrees,
+		SignedYawDeltaDegrees,
+		*GetNameSafe(TurnSequence));
 	MovementComponent->StopMovementImmediately();
 	MovementComponent->bOrientRotationToMovement = false;
 	TurnInPlaceElapsedSeconds = 0.0f;
@@ -421,6 +443,14 @@ void AGP_EnemyCharacter::StopTurnInPlace(bool bStopAnimation)
 	{
 		MovementComponent->bOrientRotationToMovement = bRestoreOrientRotationToMovementAfterTurn;
 	}
+
+	UE_LOG(
+		LogEnemyAI,
+		Log,
+		TEXT("[MoveTrace] TurnEnd Pawn=%s Pos=%s StopAnimation=%d"),
+		*GetName(),
+		*GetActorLocation().ToCompactString(),
+		bStopAnimation ? 1 : 0);
 
 	if (bStopAnimation)
 	{

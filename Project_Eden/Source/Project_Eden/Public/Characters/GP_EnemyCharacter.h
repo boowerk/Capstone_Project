@@ -142,7 +142,14 @@ public:
 	bool IsBasicEnemyAttackInProgress() const { return bBasicEnemyAttackInProgress; }
 	bool IsTurnInPlaceActive() const { return bTurnInPlaceActive; }
 	void StartTurnInPlaceForTarget(const AActor* TargetActor);
-	void SetBasicEnemyAttackInProgress(bool bInProgress) { bBasicEnemyAttackInProgress = bInProgress; }
+	void SetBasicEnemyAttackInProgress(bool bInProgress)
+	{
+		bBasicEnemyAttackInProgress = bInProgress;
+		if (bInProgress)
+		{
+			StopTurnInPlace(true);
+		}
+	}
 
 	// Returns the newly rolled delay so attack logs and tests can inspect the selected cadence.
 	float ScheduleNextBasicEnemyAttack();

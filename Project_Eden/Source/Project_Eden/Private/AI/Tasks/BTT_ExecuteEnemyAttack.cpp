@@ -178,6 +178,13 @@ bool UBTT_ExecuteEnemyAttack::ActivateBasicAttack()
 				GetExternalBossActionTimeoutSeconds());
 		}
 
+		UE_LOG(
+			LogEnemyAI,
+			Log,
+			TEXT("[MoveTrace] AttackActivated Pawn=%s Tag=%s"),
+			*GetNameSafe(ActiveControlledPawn.Get()),
+			*ActiveAbilityTag.ToString());
+
 		bAttackActivationAccepted = true;
 		ExecutionPhase = IsTrackedAbilityActive()
 			? EEnemyAttackTaskPhase::AwaitingAbilityEnd
