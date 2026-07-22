@@ -140,10 +140,18 @@ FGP_VillageSelectionResult GPVillageSelectionPolicy::SelectSlots(
 		}
 
 		ConfiguredGroups.Add(Rule.GroupId);
-		if (Rule.PickCount <= 0)
+		if (!Rule.bUsePickCountRange && Rule.PickCount <= 0)
 		{
 			AddWarning(Result,
 				FString::Printf(TEXT("Village group '%s' has an invalid PickCount."), *Rule.GroupId.ToString()),
+				true);
+			continue;
+		}
+		if (Rule.bUsePickCountRange
+			&& (Rule.MinPickCount < 1 || Rule.MaxPickCount < Rule.MinPickCount))
+		{
+			AddWarning(Result,
+				FString::Printf(TEXT("Village group '%s' has an invalid pick-count range."), *Rule.GroupId.ToString()),
 				true);
 			continue;
 		}
@@ -174,18 +182,29 @@ FGP_VillageSelectionResult GPVillageSelectionPolicy::SelectSlots(
 			continue;
 		}
 
-		const int32 PickCount = FMath::Min(Rule.PickCount, GroupCandidates.Num());
-		if (Rule.bRequired && PickCount < Rule.PickCount)
+		int32 RequestedPickCount = Rule.PickCount;
+		int32 RequiredMinimumPickCount = Rule.PickCount;
+		if (Rule.bUsePickCountRange)
+		{
+			RequiredMinimumPickCount = Rule.MinPickCount;
+			const int32 EffectiveMinPickCount = FMath::Min(Rule.MinPickCount, GroupCandidates.Num());
+			const int32 EffectiveMaxPickCount = FMath::Min(Rule.MaxPickCount, GroupCandidates.Num());
+			RequestedPickCount = EffectiveMinPickCount == EffectiveMaxPickCount
+				? EffectiveMinPickCount
+				: RandomStream.RandRange(EffectiveMinPickCount, EffectiveMaxPickCount);
+		}
+
+		const int32 PickCount = FMath::Min(RequestedPickCount, GroupCandidates.Num());
+		if (Rule.bRequired && GroupCandidates.Num() < RequiredMinimumPickCount)
 		{
 			AddWarning(Result,
 				FString::Printf(
-					TEXT("Required village group '%s' requested %d slots but only %d are eligible."),
+					TEXT("Required village group '%s' requires at least %d slots but only %d are eligible."),
 					*Rule.GroupId.ToString(),
-					Rule.PickCount,
+					RequiredMinimumPickCount,
 					GroupCandidates.Num()),
 				true);
 		}
-
 		for (int32 PickIndex = 0; PickIndex < PickCount; ++PickIndex)
 		{
 			const int32 SelectedIndex = SelectWeightedIndex(GroupCandidates, RandomStream);

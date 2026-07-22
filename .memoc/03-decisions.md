@@ -15,6 +15,10 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 
 ## Decision Log
 
+### 2026-07-22
+- Preserve `PickCount` as the backward-compatible default for village group rules. Enable a separate `bUsePickCountRange` switch for inclusive `MinPickCount..MaxPickCount` selection so existing maps and their RNG sequence remain unchanged until explicitly migrated.
+- Keep zero-village probability separate from count range: use `bRequired=false` plus `SpawnChance`. Range Min must remain at least one; required groups fail below Min while optional groups select the available clamped count.
+
 ### 2026-07-21
 - Use an authored Level Instance preset rather than Runtime Data Layers for the first playable village activation. V1 loads only `/Game/WorldLayout/L_Village_00` at one selected slot, keeps it hidden until its PCG component is configured as On Demand/non-partitioned, then shows it and generates locally. The fixed source instance must remain absent from the main map.
 - Defer multiple active villages until Road/District discovery is isolated per instance through unique tags and PCG graph-parameter overrides. Multiplayer client streaming and explicit cook registration are also follow-up work.

@@ -36,6 +36,20 @@ namespace
 		return Rule;
 	}
 
+	FGP_VillageGroupRule MakeRangeRule(
+		FName GroupId,
+		bool bRequired,
+		float SpawnChance,
+		int32 MinPickCount,
+		int32 MaxPickCount)
+	{
+		FGP_VillageGroupRule Rule = MakeRule(GroupId, bRequired, SpawnChance);
+		Rule.bUsePickCountRange = true;
+		Rule.MinPickCount = MinPickCount;
+		Rule.MaxPickCount = MaxPickCount;
+		return Rule;
+	}
+
 	FName FindSelectedInGroup(
 		const FGP_VillageSelectionResult& Result,
 		const TArray<FGP_VillageCandidate>& Candidates,
@@ -192,6 +206,101 @@ bool FVillageSelectionPolicyTest::RunTest(const FString& Parameters)
 	{
 		TestNotEqual(TEXT("Selected slots are unique"), PickTwoResult.SelectedSlotIds[0], PickTwoResult.SelectedSlotIds[1]);
 	}
+	const TArray<FGP_VillageGroupRule> FixedRangeTwoRule = {
+		MakeRangeRule(TEXT("Main"), false, 1.0f, 2, 2)
+	};
+	TArray<FGP_VillageGroupRule> FixedRangeIgnoresLegacyCountRule = FixedRangeTwoRule;
+	FixedRangeIgnoresLegacyCountRule[0].PickCount = 99;
+	const FGP_VillageSelectionResult FixedRangeTwoResult =
+		GPVillageSelectionPolicy::SelectSlots(1337, MainCandidates, FixedRangeIgnoresLegacyCountRule);
+	TestTrue(TEXT("Equal range bounds preserve fixed-count selection"),
+		FixedRangeTwoResult.SelectedSlotIds == PickTwoResult.SelectedSlotIds);
+
+	const TArray<FGP_VillageCandidate> RangeCandidates = {
+		MakeCandidate(TEXT("Range_A"), TEXT("Range")),
+		MakeCandidate(TEXT("Range_B"), TEXT("Range")),
+		MakeCandidate(TEXT("Range_C"), TEXT("Range")),
+		MakeCandidate(TEXT("Range_D"), TEXT("Range")),
+		MakeCandidate(TEXT("Range_E"), TEXT("Range")),
+		MakeCandidate(TEXT("Range_F"), TEXT("Range")),
+		MakeCandidate(TEXT("Range_G"), TEXT("Range")),
+		MakeCandidate(TEXT("Range_H"), TEXT("Range"))
+	};
+	const TArray<FGP_VillageGroupRule> RangeRule = {
+		MakeRangeRule(TEXT("Range"), true, 1.0f, 2, 5)
+	};
+	bool bAllRangeSelectionsSucceeded = true;
+	bool bAllCountsWithinRange = true;
+	TSet<int32> ObservedRangeCounts;
+	for (int32 Seed = 0; Seed < 64; ++Seed)
+	{
+		const FGP_VillageSelectionResult RangeResult =
+			GPVillageSelectionPolicy::SelectSlots(Seed, RangeCandidates, RangeRule);
+		bAllRangeSelectionsSucceeded &= RangeResult.bSucceeded;
+		bAllCountsWithinRange &= RangeResult.SelectedSlotIds.Num() >= 2
+			&& RangeResult.SelectedSlotIds.Num() <= 5;
+		ObservedRangeCounts.Add(RangeResult.SelectedSlotIds.Num());
+	}
+	TestTrue(TEXT("Pick-count range succeeds across run seeds"), bAllRangeSelectionsSucceeded);
+	TestTrue(TEXT("Pick-count range stays within its authored bounds"), bAllCountsWithinRange);
+	TestTrue(TEXT("Pick-count range varies across run seeds"), ObservedRangeCounts.Num() > 1);
+
+	const FGP_VillageSelectionResult DeterministicRangeResult =
+		GPVillageSelectionPolicy::SelectSlots(4242, RangeCandidates, RangeRule);
+	const FGP_VillageSelectionResult RepeatedRangeResult =
+		GPVillageSelectionPolicy::SelectSlots(4242, RangeCandidates, RangeRule);
+	TestTrue(TEXT("Pick-count range is deterministic for the same run seed"),
+		DeterministicRangeResult.SelectedSlotIds == RepeatedRangeResult.SelectedSlotIds);
+
+	TArray<FGP_VillageCandidate> ShuffledRangeCandidates = RangeCandidates;
+	Algo::Reverse(ShuffledRangeCandidates);
+	const FGP_VillageSelectionResult ShuffledRangeResult =
+		GPVillageSelectionPolicy::SelectSlots(4242, ShuffledRangeCandidates, RangeRule);
+	TestTrue(TEXT("Pick-count range is independent of candidate enumeration order"),
+		DeterministicRangeResult.SelectedSlotIds == ShuffledRangeResult.SelectedSlotIds);
+
+	const TArray<FGP_VillageGroupRule> InvalidRangeRule = {
+		MakeRangeRule(TEXT("Main"), true, 1.0f, 3, 2)
+	};
+	const FGP_VillageSelectionResult InvalidRangeResult =
+		GPVillageSelectionPolicy::SelectSlots(1337, MainCandidates, InvalidRangeRule);
+	TestFalse(TEXT("Invalid pick-count range fails closed"), InvalidRangeResult.bSucceeded);
+	TestTrue(TEXT("Invalid pick-count range selects no slots"), InvalidRangeResult.SelectedSlotIds.IsEmpty());
+	const TArray<FGP_VillageGroupRule> ZeroMinimumRangeRule = {
+		MakeRangeRule(TEXT("Main"), false, 1.0f, 0, 2)
+	};
+	const FGP_VillageSelectionResult ZeroMinimumRangeResult =
+		GPVillageSelectionPolicy::SelectSlots(1337, MainCandidates, ZeroMinimumRangeRule);
+	TestFalse(TEXT("Pick-count range minimum must be positive"), ZeroMinimumRangeResult.bSucceeded);
+
+	const TArray<FGP_VillageGroupRule> TooManyRequiredRangeRule = {
+		MakeRangeRule(TEXT("Main"), true, 1.0f, 4, 8)
+	};
+	const FGP_VillageSelectionResult TooManyRequiredRangeResult =
+		GPVillageSelectionPolicy::SelectSlots(1337, MainCandidates, TooManyRequiredRangeRule);
+	TestFalse(TEXT("Required range reports an unsatisfied minimum"), TooManyRequiredRangeResult.bSucceeded);
+	TestEqual(TEXT("Required range still selects every eligible fallback"),
+		TooManyRequiredRangeResult.SelectedSlotIds.Num(),
+		MainCandidates.Num());
+
+	const TArray<FGP_VillageGroupRule> OptionalRangeAboveCandidatesRule = {
+		MakeRangeRule(TEXT("Main"), false, 1.0f, 4, 8)
+	};
+	const FGP_VillageSelectionResult OptionalRangeAboveCandidatesResult =
+		GPVillageSelectionPolicy::SelectSlots(1337, MainCandidates, OptionalRangeAboveCandidatesRule);
+	TestTrue(TEXT("Optional range clamps to available candidates"),
+		OptionalRangeAboveCandidatesResult.bSucceeded);
+	TestEqual(TEXT("Optional range selects every eligible fallback"),
+		OptionalRangeAboveCandidatesResult.SelectedSlotIds.Num(),
+		MainCandidates.Num());
+
+	TArray<FGP_VillageGroupRule> FixedRuleWithInvalidInactiveRange = PickTwoRule;
+	FixedRuleWithInvalidInactiveRange[0].MinPickCount = 9;
+	FixedRuleWithInvalidInactiveRange[0].MaxPickCount = 1;
+	const FGP_VillageSelectionResult FixedInvalidInactiveRangeResult =
+		GPVillageSelectionPolicy::SelectSlots(1337, MainCandidates, FixedRuleWithInvalidInactiveRange);
+	TestTrue(TEXT("Fixed mode ignores inactive range values"),
+		FixedInvalidInactiveRangeResult.SelectedSlotIds == PickTwoResult.SelectedSlotIds);
 
 	TArray<FGP_VillageCandidate> ShuffledCandidates = MainCandidates;
 	Algo::Reverse(ShuffledCandidates);
@@ -254,6 +363,17 @@ bool FVillageSelectionPolicyTest::RunTest(const FString& Parameters)
 		AGP_VillageSlot::StaticClass()->FindPropertyByName(TEXT("VillageDataLayer")));
 	TestNotNull(TEXT("VillageLayoutDirector exposes a single VillageLevelPreset property"),
 		AGP_VillageLayoutDirector::StaticClass()->FindPropertyByName(TEXT("VillageLevelPreset")));
+	TestNotNull(TEXT("Village group rules expose optional range mode"),
+		FGP_VillageGroupRule::StaticStruct()->FindPropertyByName(TEXT("bUsePickCountRange")));
+	TestNotNull(TEXT("Village group rules expose minimum pick count"),
+		FGP_VillageGroupRule::StaticStruct()->FindPropertyByName(TEXT("MinPickCount")));
+	TestNotNull(TEXT("Village group rules expose maximum pick count"),
+		FGP_VillageGroupRule::StaticStruct()->FindPropertyByName(TEXT("MaxPickCount")));
+	const FGP_VillageGroupRule DefaultGroupRule;
+	TestFalse(TEXT("Village group rules default to legacy fixed-count mode"),
+		DefaultGroupRule.bUsePickCountRange);
+	TestEqual(TEXT("Village range minimum defaults to one"), DefaultGroupRule.MinPickCount, 1);
+	TestEqual(TEXT("Village range maximum defaults to one"), DefaultGroupRule.MaxPickCount, 1);
 	TestEqual(TEXT("VillageLayoutDirector defaults to the first authored village preset"),
 		GetDefault<AGP_VillageLayoutDirector>()->GetVillageLevelPreset().ToSoftObjectPath(),
 		FSoftObjectPath(TEXT("/Game/WorldLayout/L_Village_00.L_Village_00")));

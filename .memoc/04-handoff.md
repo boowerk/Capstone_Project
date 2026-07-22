@@ -313,9 +313,9 @@ _None yet._
 
 Search first, then open only files named above.
 
-### 2026-07-21 Village streaming handoff
+### 2026-07-22 Village streaming handoff
 
-- Uncommitted implementation: `GP_VillageLayoutDirector.h/.cpp`, `VillageSelectionTests.cpp`; the saved main map also contains the user's fixed-Level-Instance removal.
-- Saved Director rule is now Required/PickCount=2. PCG generation was changed from parallel to deterministic sequential scheduling with slot-level managed-output diagnostics.
-- Build and both automation tests pass. Headless real-map runs produced distinct A/B outputs, then reproduced original RunSeed `815718662`: Village_B/C generated 314/274 managed ISM instances at different transforms/bounds, with B completing before C was requested.
-- Optional final check: open the map and visually inspect both villages in PIE. Variable 0-3 village counts, multiple different village presets, and network client replication remain future work.
+- Multi-instance isolation/sequential PCG is committed as `06017d09`; the saved map has three slots and fixed Required/PickCount=2.
+- Range selection is limited to `GP_VillageTypes.h`, `GP_VillageSelectionPolicy.cpp`, and `VillageSelectionTests.cpp`. It adds opt-in deterministic `MinPickCount..MaxPickCount` while leaving fixed mode and saved-map behavior unchanged.
+- Editor build and `ProjectEden.Game.WorldLayout.VillageSelection` / `ProjectEden.Game.RunSeed.Flow` passed on 2026-07-22 with the editor closed. Tests cover fixed compatibility, exact/ranged counts, determinism, candidate-order independence, validation, required/optional clamping, reflection, and defaults.
+- To permit zero villages, keep the group optional and tune `SpawnChance`; do not set Min to zero. Next content task is adding more authored slots/presets and explicitly enabling range mode when desired.
