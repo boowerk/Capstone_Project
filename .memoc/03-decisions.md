@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-21T17:32:45+09:00
+updated: 2026-07-23T02:22:54+09:00
 status: active
 tags:
   - memoc
@@ -14,6 +14,10 @@ tags:
 Durable project decisions live here. Keep entries short, dated, and useful to future agents.
 
 ## Decision Log
+
+### 2026-07-23
+- Keep the current single village preset's footprint beside `VillageLevelPreset`: default XY half extent is 130m, Z half extent 30m, and Z offset -15m. Preserve `AGP_VillageSlot`'s native root and render the footprint through a child box so existing placed-actor transforms remain compatible. When multiple presets are introduced, migrate Level + Footprint into one preset-definition struct.
+- Treat village placement as a unit-scale, yaw-aware 2D footprint problem. Use exact XY OBB SAT for editor warnings and selection; terrain height does not make two villages spatially compatible. Selection must prioritize required groups and use deterministic feasibility/lookahead so an early bridge slot cannot block a valid later combination.
 
 ### 2026-07-22
 - Preserve `PickCount` as the backward-compatible default for village group rules. Enable a separate `bUsePickCountRange` switch for inclusive `MinPickCount..MaxPickCount` selection so existing maps and their RNG sequence remain unchanged until explicitly migrated.

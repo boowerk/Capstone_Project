@@ -8,6 +8,7 @@
 class AGP_VillageSlot;
 class UBoxComponent;
 class UDataLayerAsset;
+struct FPropertyChangedEvent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
 	FGPOnVillageSlotSelectionChanged,
@@ -23,21 +24,30 @@ public:
 	AGP_VillageSlot();
 
 	FGP_VillageCandidate MakeCandidate() const;
+	void ApplyFootprint(const FGP_VillageFootprint& Footprint);
+	void SetFootprintConflict(bool bConflicting);
 	void SetSelectedForRun(bool bSelected);
 
 	FName GetSlotId() const { return SlotId; }
 	FName GetGroupId() const { return GroupId; }
 	bool IsCandidateEnabled() const { return bEnabled; }
 	bool IsSelectedForRun() const { return bSelectedForRun; }
-	UBoxComponent* GetSlotBounds() const { return SlotBounds; }
+	bool HasFootprintConflict() const { return bFootprintConflict; }
+	UBoxComponent* GetSlotBounds() const { return FootprintBounds; }
 	UDataLayerAsset* GetVillageDataLayer() const { return VillageDataLayer; }
+	FColor GetPreviewColor() const;
 
 	UPROPERTY(BlueprintAssignable, Category = "Village")
 	FGPOnVillageSlotSelectionChanged OnSelectionChanged;
 
 protected:
+	virtual void Destroyed() override;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Village")
 	TObjectPtr<UBoxComponent> SlotBounds;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Village|Footprint")
+	TObjectPtr<UBoxComponent> FootprintBounds;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Village")
 	FName SlotId = NAME_None;
@@ -60,8 +70,21 @@ protected:
 	UPROPERTY(Transient, BlueprintReadOnly, Category = "Village")
 	bool bSelectedForRun = false;
 
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "Village|Footprint")
+	bool bFootprintConflict = false;
+
 #if WITH_EDITOR
+	virtual void PostEditMove(bool bFinished) override;
+	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
+	virtual void PostEditUndo() override;
 	virtual bool ActorTypeSupportsDataLayer() const override { return false; }
 	virtual bool ActorTypeSupportsExternalDataLayer() const override { return false; }
+#endif
+
+private:
+	void UpdatePreviewColor();
+
+#if WITH_EDITOR
+	void NotifyLayoutDirectorsFootprintChanged() const;
 #endif
 };

@@ -29,6 +29,61 @@ namespace
 		const UDataLayerAsset* Asset = nullptr;
 		const UDataLayerInstance* Instance = nullptr;
 	};
+
+	struct FGPVillageFootprint2D
+	{
+		FVector2D Center = FVector2D::ZeroVector;
+		FVector2D AxisX = FVector2D(1.0f, 0.0f);
+		FVector2D AxisY = FVector2D(0.0f, 1.0f);
+		FVector2D Extent = FVector2D::ZeroVector;
+	};
+
+	FGPVillageFootprint2D MakeFootprint2D(
+		const AGP_VillageSlot& Slot,
+		const FGP_VillageFootprint& Footprint)
+	{
+		const FTransform SlotTransform(Slot.GetActorRotation(), Slot.GetActorLocation(), FVector::OneVector);
+		const FVector WorldCenter = SlotTransform.TransformPosition(Footprint.FootprintOffset);
+		const float YawRadians = FMath::DegreesToRadians(Slot.GetActorRotation().Yaw);
+
+		FGPVillageFootprint2D Result;
+		Result.Center = FVector2D(WorldCenter.X, WorldCenter.Y);
+		Result.AxisX = FVector2D(FMath::Cos(YawRadians), FMath::Sin(YawRadians));
+		Result.AxisY = FVector2D(-Result.AxisX.Y, Result.AxisX.X);
+		Result.Extent = FVector2D(
+			FMath::Max(FMath::Abs(Footprint.FootprintExtent.X), 1.0f),
+			FMath::Max(FMath::Abs(Footprint.FootprintExtent.Y), 1.0f));
+		return Result;
+	}
+
+	float ProjectedRadius(const FGPVillageFootprint2D& Footprint, const FVector2D& Axis)
+	{
+		return Footprint.Extent.X * FMath::Abs(FVector2D::DotProduct(Footprint.AxisX, Axis))
+			+ Footprint.Extent.Y * FMath::Abs(FVector2D::DotProduct(Footprint.AxisY, Axis));
+	}
+
+	bool DoFootprintsOverlap(
+		const AGP_VillageSlot& FirstSlot,
+		const AGP_VillageSlot& SecondSlot,
+		const FGP_VillageFootprint& Footprint)
+	{
+		const FGPVillageFootprint2D First = MakeFootprint2D(FirstSlot, Footprint);
+		const FGPVillageFootprint2D Second = MakeFootprint2D(SecondSlot, Footprint);
+		const FVector2D CenterDelta = Second.Center - First.Center;
+		const FVector2D Axes[] = {First.AxisX, First.AxisY, Second.AxisX, Second.AxisY};
+
+		for (const FVector2D& Axis : Axes)
+		{
+			const float CenterDistance = FMath::Abs(FVector2D::DotProduct(CenterDelta, Axis));
+			const float CombinedRadius = ProjectedRadius(First, Axis) + ProjectedRadius(Second, Axis);
+			if (CenterDistance >= CombinedRadius - KINDA_SMALL_NUMBER)
+			{
+				return false;
+			}
+		}
+
+		return true;
+	}
 }
 
 AGP_VillageLayoutDirector::AGP_VillageLayoutDirector()
@@ -47,6 +102,16 @@ AGP_VillageLayoutDirector::AGP_VillageLayoutDirector()
 #if WITH_EDITORONLY_DATA
 	bIsSpatiallyLoaded = false;
 #endif
+}
+
+void AGP_VillageLayoutDirector::OnConstruction(const FTransform& Transform)
+{
+	Super::OnConstruction(Transform);
+
+	if (GetWorld() && !GetWorld()->IsGameWorld())
+	{
+		RefreshFootprintPreview();
+	}
 }
 
 void AGP_VillageLayoutDirector::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -83,15 +148,19 @@ bool AGP_VillageLayoutDirector::BuildSelectionForSeed(int32 InRunSeed)
 	}
 
 	CollectSlots();
+	ApplyFootprintPreview();
 
 	TArray<FGP_VillageCandidate> Candidates;
+	TArray<AGP_VillageSlot*> CandidateSlots;
 	for (AGP_VillageSlot* Slot : CachedSlots)
 	{
 		if (IsValid(Slot) && Slot->IsCandidateEnabled())
 		{
 			Candidates.Add(Slot->MakeCandidate());
+			CandidateSlots.Add(Slot);
 		}
 	}
+	PopulateCandidateOverlaps(Candidates, CandidateSlots);
 
 	const FGP_VillageSelectionResult Result = GPVillageSelectionPolicy::SelectSlots(InRunSeed, Candidates, GroupRules);
 	SelectedSlotIds = Result.bSucceeded ? Result.SelectedSlotIds : TArray<FName>();
@@ -156,6 +225,22 @@ void AGP_VillageLayoutDirector::RebuildPreview()
 	BuildSelectionForSeed(PreviewSeed);
 }
 
+void AGP_VillageLayoutDirector::RefreshFootprintPreview()
+{
+	CollectSlots();
+	ApplyFootprintPreview();
+}
+
+void AGP_VillageLayoutDirector::RefreshFootprintPreviewIgnoringSlot(const AGP_VillageSlot* IgnoredSlot)
+{
+	CollectSlots();
+	CachedSlots.RemoveAll([IgnoredSlot](const AGP_VillageSlot* Slot)
+	{
+		return Slot == IgnoredSlot;
+	});
+	ApplyFootprintPreview();
+}
+
 void AGP_VillageLayoutDirector::CollectSlots()
 {
 	CachedSlots.Reset();
@@ -173,6 +258,73 @@ void AGP_VillageLayoutDirector::CollectSlots()
 	{
 		return A.GetSlotId().LexicalLess(B.GetSlotId());
 	});
+}
+
+void AGP_VillageLayoutDirector::ApplyFootprintPreview()
+{
+	for (AGP_VillageSlot* Slot : CachedSlots)
+	{
+		if (!IsValid(Slot))
+		{
+			continue;
+		}
+
+		Slot->ApplyFootprint(VillagePresetFootprint);
+		Slot->SetFootprintConflict(false);
+	}
+
+	for (int32 FirstIndex = 0; FirstIndex < CachedSlots.Num(); ++FirstIndex)
+	{
+		AGP_VillageSlot* FirstSlot = CachedSlots[FirstIndex];
+		if (!IsValid(FirstSlot) || !FirstSlot->IsCandidateEnabled())
+		{
+			continue;
+		}
+
+		for (int32 SecondIndex = FirstIndex + 1; SecondIndex < CachedSlots.Num(); ++SecondIndex)
+		{
+			AGP_VillageSlot* SecondSlot = CachedSlots[SecondIndex];
+			if (!IsValid(SecondSlot) || !SecondSlot->IsCandidateEnabled())
+			{
+				continue;
+			}
+
+			if (DoFootprintsOverlap(*FirstSlot, *SecondSlot, VillagePresetFootprint))
+			{
+				FirstSlot->SetFootprintConflict(true);
+				SecondSlot->SetFootprintConflict(true);
+			}
+		}
+	}
+}
+
+void AGP_VillageLayoutDirector::PopulateCandidateOverlaps(
+	TArray<FGP_VillageCandidate>& InOutCandidates,
+	const TArray<AGP_VillageSlot*>& CandidateSlots) const
+{
+	check(InOutCandidates.Num() == CandidateSlots.Num());
+
+	for (int32 FirstIndex = 0; FirstIndex < CandidateSlots.Num(); ++FirstIndex)
+	{
+		const AGP_VillageSlot* FirstSlot = CandidateSlots[FirstIndex];
+		if (!IsValid(FirstSlot))
+		{
+			continue;
+		}
+
+		for (int32 SecondIndex = FirstIndex + 1; SecondIndex < CandidateSlots.Num(); ++SecondIndex)
+		{
+			const AGP_VillageSlot* SecondSlot = CandidateSlots[SecondIndex];
+			if (!IsValid(SecondSlot)
+				|| !DoFootprintsOverlap(*FirstSlot, *SecondSlot, VillagePresetFootprint))
+			{
+				continue;
+			}
+
+			InOutCandidates[FirstIndex].OverlappingSlotIds.AddUnique(InOutCandidates[SecondIndex].SlotId);
+			InOutCandidates[SecondIndex].OverlappingSlotIds.AddUnique(InOutCandidates[FirstIndex].SlotId);
+		}
+	}
 }
 
 bool AGP_VillageLayoutDirector::ApplyDataLayerStates(const TSet<FName>& InSelectedSlotIds) const
@@ -1059,7 +1211,7 @@ void AGP_VillageLayoutDirector::DrawSelectionDebug() const
 		}
 
 		const UBoxComponent* Bounds = Slot->GetSlotBounds();
-		const FColor Color = Slot->IsSelectedForRun() ? FColor::Cyan : FColor(90, 90, 90);
+		const FColor Color = Slot->GetPreviewColor();
 		DrawDebugBox(
 			GetWorld(),
 			Bounds->GetComponentLocation(),
@@ -1072,10 +1224,11 @@ void AGP_VillageLayoutDirector::DrawSelectionDebug() const
 			20.0f);
 
 		const FString Label = FString::Printf(
-			TEXT("%s / %s / %s"),
+			TEXT("%s / %s / %s%s"),
 			*Slot->GetGroupId().ToString(),
 			*Slot->GetSlotId().ToString(),
-			Slot->IsSelectedForRun() ? TEXT("SELECTED") : TEXT("OFF"));
+			Slot->IsSelectedForRun() ? TEXT("SELECTED") : TEXT("OFF"),
+			Slot->HasFootprintConflict() ? TEXT(" / OVERLAP") : TEXT(""));
 		DrawDebugString(
 			GetWorld(),
 			Bounds->GetComponentLocation() + FVector(0.0f, 0.0f, Bounds->GetScaledBoxExtent().Z + 200.0f),

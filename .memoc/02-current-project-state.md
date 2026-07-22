@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-21T17:32:45+09:00
+updated: 2026-07-23T02:22:54+09:00
 status: active
 tags:
   - memoc
@@ -11,10 +11,11 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-07-21T17:32:45+09:00
+Last synced: 2026-07-23T02:22:54+09:00
 
 ## Current Status
 
+- Village footprint-aware selection is implemented in source. The current single village preset stores a default `FootprintExtent=(13000,13000,3000)` cm half extent and `FootprintOffset=(0,0,-1500)` cm; each slot displays that footprint with a child bounds component while preserving the original root/transform contract. Exact yaw-aware XY OBB overlap is shown red in the editor and overlapping slot combinations are excluded by deterministic feasibility search, including required-group lookahead. Full `Project_EdenEditor` build and `ProjectEden.Game.WorldLayout.VillageSelection` pass. Visual inspection of `L_LandscapeMap` shows all three current authored slots as large/red because their footprints overlap; the map was not saved by this task.
 - Village-layout streaming supports multiple simultaneous `/Game/WorldLayout/L_Village_00` instances. `AGP_VillageLayoutDirector` assigns per-slot Road/District tags, overrides only each component-local PCG graph instance, and generates selected villages sequentially; this path is committed as `06017d09`. The saved map has three slots and remains on legacy fixed `PickCount=2`. A backward-compatible range mode adds `bUsePickCountRange`, `MinPickCount`, and `MaxPickCount`; fixed mode consumes no extra RNG, while range mode deterministically chooses a count per RunSeed/group. Editor build plus `ProjectEden.Game.WorldLayout.VillageSelection` and `ProjectEden.Game.RunSeed.Flow` pass. Multiplayer client streaming, additional village presets, and explicit cook registration remain follow-up work.
 - Landscape Region V2.2 is active only on `MI_RegionLandscape_GameMap2`. The approved final preset is Candidate J: deterministic per-pair PCHIP boundary displacement with non-uniform 36-260m spacing, 4-26m random amplitudes, 50% sign persistence, 16m cap, and fixed junction/perimeter cores. Its blend half-width now varies independently and smoothly per region-pair from 18-32px around a 24px base, with 80-240m anchors; each region influence samples its own nearest boundary-side pixel. Hard `RegionID`, StateRT, PCG, topology, packed visual IDs, and the runtime shader remain unchanged. Authoritative source is `Project_Eden/ArtSource/RegionVisualSlotsV22`; the external V2.2 mirror is byte-identical.
 - Final generation passes 61/61 twice deterministically. Observed blend half-width is 18.105-31.112px (mean 23.935px) with 81.045-237.979m actual anchor gaps; unassigned boundary pixels, same-slot support/guard overlap, active-ID mismatch, and ID-transition violations are zero, with at most four active regions. Weight PNG is `8209CBD4...11917`; IDs01/IDs23 remain `5FAD10BB...E0B7` / `7A0E2CBF...0913`. Computer Use reimported and saved Weight as regular non-VT BGRA8, Bilinear, NoMipmaps/one mip, Clamp X/Y, sRGB off, VectorDisplacementmap (717,075 bytes, `F91AB7E1...53CC6`). `MI_RegionLandscape_GameMap2` remains `841EE208...D740`; the user-owned map remains `E8CE0B5D...B728C` and was not saved. Transient random-state refresh visibly applied the new boundary weights; no related material/texture error followed the save.

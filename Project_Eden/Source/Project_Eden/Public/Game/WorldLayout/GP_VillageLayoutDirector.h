@@ -26,6 +26,10 @@ public:
 	UFUNCTION(CallInEditor, BlueprintCallable, Category = "Village|Debug")
 	void RebuildPreview();
 
+	UFUNCTION(CallInEditor, BlueprintCallable, Category = "Village|Footprint")
+	void RefreshFootprintPreview();
+	void RefreshFootprintPreviewIgnoringSlot(const AGP_VillageSlot* IgnoredSlot);
+
 	UFUNCTION(BlueprintPure, Category = "Village")
 	TArray<FName> GetSelectedSlotIds() const { return SelectedSlotIds; }
 
@@ -35,7 +39,11 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Village|Level Instance")
 	TSoftObjectPtr<UWorld> GetVillageLevelPreset() const { return VillageLevelPreset; }
 
+	UFUNCTION(BlueprintPure, Category = "Village|Footprint")
+	FGP_VillageFootprint GetVillagePresetFootprint() const { return VillagePresetFootprint; }
+
 protected:
+	virtual void OnConstruction(const FTransform& Transform) override;
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
@@ -54,6 +62,9 @@ protected:
 	// Selected slots instance the same authored village map independently.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Village|Level Instance")
 	TSoftObjectPtr<UWorld> VillageLevelPreset;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Village|Level Instance", meta = (ShowOnlyInnerProperties))
+	FGP_VillageFootprint VillagePresetFootprint;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Village|Level Instance")
 	bool bStreamVillageLevelAtRuntime = true;
@@ -95,6 +106,10 @@ private:
 	int32 LastRunSeed = INDEX_NONE;
 
 	void CollectSlots();
+	void ApplyFootprintPreview();
+	void PopulateCandidateOverlaps(
+		TArray<FGP_VillageCandidate>& InOutCandidates,
+		const TArray<AGP_VillageSlot*>& CandidateSlots) const;
 	bool ApplyDataLayerStates(const TSet<FName>& InSelectedSlotIds) const;
 	bool StreamSelectedVillageLevels(const TSet<FName>& InSelectedSlotIds);
 	void UnloadActiveVillageLevels();

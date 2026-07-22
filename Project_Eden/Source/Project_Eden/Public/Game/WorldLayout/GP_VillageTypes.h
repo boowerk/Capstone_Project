@@ -4,6 +4,20 @@
 #include "GP_VillageTypes.generated.h"
 
 USTRUCT(BlueprintType)
+struct FGP_VillageFootprint
+{
+	GENERATED_BODY()
+
+	// Local-space center offset from the village slot origin.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Village|Footprint", meta = (Units = "cm"))
+	FVector FootprintOffset = FVector(0.0f, 0.0f, -1500.0f);
+
+	// Half extent. The default represents a 260 m x 260 m authored village area.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Village|Footprint", meta = (ClampMin = "1.0", Units = "cm"))
+	FVector FootprintExtent = FVector(13000.0f, 13000.0f, 3000.0f);
+};
+
+USTRUCT(BlueprintType)
 struct FGP_VillageGroupRule
 {
 	GENERATED_BODY()
@@ -45,6 +59,11 @@ struct FGP_VillageCandidate
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Village", meta = (ClampMin = "0.0"))
 	float SelectionWeight = 1.0f;
+
+	// Populated by the layout director from the active preset footprint. Keeping
+	// geometry out of the policy makes this usable by future preset types too.
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "Village|Footprint")
+	TArray<FName> OverlappingSlotIds;
 };
 
 USTRUCT(BlueprintType)

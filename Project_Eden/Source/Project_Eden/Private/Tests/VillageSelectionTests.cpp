@@ -17,12 +17,17 @@
 
 namespace
 {
-	FGP_VillageCandidate MakeCandidate(FName SlotId, FName GroupId, float Weight = 1.0f)
+	FGP_VillageCandidate MakeCandidate(
+		FName SlotId,
+		FName GroupId,
+		float Weight = 1.0f,
+		TArray<FName> OverlappingSlotIds = {})
 	{
 		FGP_VillageCandidate Candidate;
 		Candidate.SlotId = SlotId;
 		Candidate.GroupId = GroupId;
 		Candidate.SelectionWeight = Weight;
+		Candidate.OverlappingSlotIds = MoveTemp(OverlappingSlotIds);
 		return Candidate;
 	}
 
@@ -206,6 +211,132 @@ bool FVillageSelectionPolicyTest::RunTest(const FString& Parameters)
 	{
 		TestNotEqual(TEXT("Selected slots are unique"), PickTwoResult.SelectedSlotIds[0], PickTwoResult.SelectedSlotIds[1]);
 	}
+
+	const TArray<FGP_VillageCandidate> PartiallyOverlappingCandidates = {
+		MakeCandidate(TEXT("Overlap_A"), TEXT("Overlap"), 1.0f, {TEXT("Overlap_B")}),
+		MakeCandidate(TEXT("Overlap_B"), TEXT("Overlap"), 1.0f, {TEXT("Overlap_A")}),
+		MakeCandidate(TEXT("Overlap_C"), TEXT("Overlap"))
+	};
+	const TArray<FGP_VillageGroupRule> OverlapPickTwoRule = {
+		MakeRule(TEXT("Overlap"), false, 1.0f, 2)
+	};
+	const FGP_VillageSelectionResult PartiallyOverlappingResult =
+		GPVillageSelectionPolicy::SelectSlots(1337, PartiallyOverlappingCandidates, OverlapPickTwoRule);
+	TestTrue(TEXT("A clear two-slot footprint combination succeeds"), PartiallyOverlappingResult.bSucceeded);
+	TestEqual(TEXT("A clear two-slot footprint combination fills PickCount"),
+		PartiallyOverlappingResult.SelectedSlotIds.Num(),
+		2);
+	TestFalse(TEXT("Overlapping footprints are never selected together"),
+		PartiallyOverlappingResult.SelectedSlotIds.Contains(TEXT("Overlap_A"))
+			&& PartiallyOverlappingResult.SelectedSlotIds.Contains(TEXT("Overlap_B")));
+
+	TArray<FGP_VillageCandidate> ReversedOverlappingCandidates = PartiallyOverlappingCandidates;
+	Algo::Reverse(ReversedOverlappingCandidates);
+	const FGP_VillageSelectionResult ReversedOverlappingResult =
+		GPVillageSelectionPolicy::SelectSlots(1337, ReversedOverlappingCandidates, OverlapPickTwoRule);
+	TestTrue(TEXT("Footprint filtering is independent of candidate enumeration order"),
+		PartiallyOverlappingResult.SelectedSlotIds == ReversedOverlappingResult.SelectedSlotIds);
+
+	const TArray<FGP_VillageCandidate> BridgeOverlapCandidates = {
+		MakeCandidate(TEXT("Bridge_A"), TEXT("Bridge"), 1.0f, {TEXT("Bridge_B")}),
+		MakeCandidate(TEXT("Bridge_B"), TEXT("Bridge"), 1.0f, {TEXT("Bridge_C")}),
+		MakeCandidate(TEXT("Bridge_C"), TEXT("Bridge"))
+	};
+	const TArray<FGP_VillageGroupRule> BridgePickTwoRule = {
+		MakeRule(TEXT("Bridge"), false, 1.0f, 2)
+	};
+	bool bBridgeAlwaysFindsClearPair = true;
+	for (int32 Seed = 0; Seed < 32; ++Seed)
+	{
+		const FGP_VillageSelectionResult BridgeResult =
+			GPVillageSelectionPolicy::SelectSlots(Seed, BridgeOverlapCandidates, BridgePickTwoRule);
+		bBridgeAlwaysFindsClearPair &= BridgeResult.bSucceeded
+			&& BridgeResult.SelectedSlotIds.Num() == 2
+			&& BridgeResult.SelectedSlotIds.Contains(TEXT("Bridge_A"))
+			&& BridgeResult.SelectedSlotIds.Contains(TEXT("Bridge_C"));
+	}
+	TestTrue(TEXT("A bridge candidate cannot hide an available clear pair"), bBridgeAlwaysFindsClearPair);
+
+	const TArray<FGP_VillageCandidate> MutuallyOverlappingCandidates = {
+		MakeCandidate(TEXT("Mutual_A"), TEXT("Mutual"), 1.0f, {TEXT("Mutual_B"), TEXT("Mutual_C")}),
+		MakeCandidate(TEXT("Mutual_B"), TEXT("Mutual"), 1.0f, {TEXT("Mutual_A"), TEXT("Mutual_C")}),
+		MakeCandidate(TEXT("Mutual_C"), TEXT("Mutual"), 1.0f, {TEXT("Mutual_A"), TEXT("Mutual_B")})
+	};
+	const TArray<FGP_VillageGroupRule> OptionalMutualRule = {
+		MakeRule(TEXT("Mutual"), false, 1.0f, 2)
+	};
+	const FGP_VillageSelectionResult OptionalMutualResult =
+		GPVillageSelectionPolicy::SelectSlots(1337, MutuallyOverlappingCandidates, OptionalMutualRule);
+	TestTrue(TEXT("Optional group accepts the available non-overlapping subset"), OptionalMutualResult.bSucceeded);
+	TestEqual(TEXT("Mutually overlapping footprints reduce an optional group to one slot"),
+		OptionalMutualResult.SelectedSlotIds.Num(),
+		1);
+
+	const TArray<FGP_VillageGroupRule> RequiredMutualRule = {
+		MakeRule(TEXT("Mutual"), true, 1.0f, 2)
+	};
+	const FGP_VillageSelectionResult RequiredMutualResult =
+		GPVillageSelectionPolicy::SelectSlots(1337, MutuallyOverlappingCandidates, RequiredMutualRule);
+	TestFalse(TEXT("Required group fails when its non-overlapping minimum cannot be met"),
+		RequiredMutualResult.bSucceeded);
+	TestEqual(TEXT("Required overlap failure retains the one safe diagnostic selection"),
+		RequiredMutualResult.SelectedSlotIds.Num(),
+		1);
+
+	const TArray<FGP_VillageCandidate> RequiredPriorityCandidates = {
+		MakeCandidate(TEXT("Optional_A"), TEXT("A_Optional"), 1.0f, {TEXT("Required_Z")}),
+		MakeCandidate(TEXT("Required_Z"), TEXT("Z_Required"), 1.0f, {TEXT("Optional_A")})
+	};
+	const TArray<FGP_VillageGroupRule> RequiredPriorityRules = {
+		MakeRule(TEXT("A_Optional"), false, 1.0f),
+		MakeRule(TEXT("Z_Required"), true, 1.0f)
+	};
+	const FGP_VillageSelectionResult RequiredPriorityResult =
+		GPVillageSelectionPolicy::SelectSlots(1337, RequiredPriorityCandidates, RequiredPriorityRules);
+	TestTrue(TEXT("Required groups take footprint priority over optional groups"), RequiredPriorityResult.bSucceeded);
+	TestTrue(TEXT("Required footprint remains selected"),
+		RequiredPriorityResult.SelectedSlotIds.Contains(TEXT("Required_Z")));
+	TestFalse(TEXT("Conflicting optional footprint is excluded"),
+		RequiredPriorityResult.SelectedSlotIds.Contains(TEXT("Optional_A")));
+
+	const TArray<FGP_VillageCandidate> RequiredGroupBridgeCandidates = {
+		MakeCandidate(TEXT("First_Blocking"), TEXT("First"), 100.0f, {TEXT("Second_Only")}),
+		MakeCandidate(TEXT("First_Clear"), TEXT("First")),
+		MakeCandidate(TEXT("Second_Only"), TEXT("Second"), 1.0f, {TEXT("First_Blocking")})
+	};
+	const TArray<FGP_VillageGroupRule> RequiredGroupBridgeRules = {
+		MakeRule(TEXT("First"), true, 1.0f),
+		MakeRule(TEXT("Second"), true, 1.0f)
+	};
+	bool bRequiredGroupsAlwaysFindGlobalSolution = true;
+	for (int32 Seed = 0; Seed < 32; ++Seed)
+	{
+		const FGP_VillageSelectionResult RequiredGroupBridgeResult =
+			GPVillageSelectionPolicy::SelectSlots(
+				Seed,
+				RequiredGroupBridgeCandidates,
+				RequiredGroupBridgeRules);
+		bRequiredGroupsAlwaysFindGlobalSolution &= RequiredGroupBridgeResult.bSucceeded
+			&& RequiredGroupBridgeResult.SelectedSlotIds.Num() == 2
+			&& RequiredGroupBridgeResult.SelectedSlotIds.Contains(TEXT("First_Clear"))
+			&& RequiredGroupBridgeResult.SelectedSlotIds.Contains(TEXT("Second_Only"));
+	}
+	TestTrue(TEXT("Earlier required groups preserve feasible slots for later required groups"),
+		bRequiredGroupsAlwaysFindGlobalSolution);
+
+	const TArray<FGP_VillageCandidate> MissingLaterGroupCandidates = {
+		MakeCandidate(TEXT("First_Available"), TEXT("First"))
+	};
+	const FGP_VillageSelectionResult MissingLaterGroupResult =
+		GPVillageSelectionPolicy::SelectSlots(
+			1337,
+			MissingLaterGroupCandidates,
+			RequiredGroupBridgeRules);
+	TestFalse(TEXT("A missing later required group still fails the selection"),
+		MissingLaterGroupResult.bSucceeded);
+	TestTrue(TEXT("An unrelated earlier required group retains its diagnostic fallback"),
+		MissingLaterGroupResult.SelectedSlotIds.Contains(TEXT("First_Available")));
+
 	const TArray<FGP_VillageGroupRule> FixedRangeTwoRule = {
 		MakeRangeRule(TEXT("Main"), false, 1.0f, 2, 2)
 	};
@@ -363,6 +494,10 @@ bool FVillageSelectionPolicyTest::RunTest(const FString& Parameters)
 		AGP_VillageSlot::StaticClass()->FindPropertyByName(TEXT("VillageDataLayer")));
 	TestNotNull(TEXT("VillageLayoutDirector exposes a single VillageLevelPreset property"),
 		AGP_VillageLayoutDirector::StaticClass()->FindPropertyByName(TEXT("VillageLevelPreset")));
+	TestNotNull(TEXT("VillageLayoutDirector exposes its current preset footprint"),
+		AGP_VillageLayoutDirector::StaticClass()->FindPropertyByName(TEXT("VillagePresetFootprint")));
+	TestNotNull(TEXT("Village candidates expose footprint conflicts"),
+		FGP_VillageCandidate::StaticStruct()->FindPropertyByName(TEXT("OverlappingSlotIds")));
 	TestNotNull(TEXT("Village group rules expose optional range mode"),
 		FGP_VillageGroupRule::StaticStruct()->FindPropertyByName(TEXT("bUsePickCountRange")));
 	TestNotNull(TEXT("Village group rules expose minimum pick count"),
@@ -377,6 +512,17 @@ bool FVillageSelectionPolicyTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("VillageLayoutDirector defaults to the first authored village preset"),
 		GetDefault<AGP_VillageLayoutDirector>()->GetVillageLevelPreset().ToSoftObjectPath(),
 		FSoftObjectPath(TEXT("/Game/WorldLayout/L_Village_00.L_Village_00")));
+	const FGP_VillageFootprint DefaultFootprint =
+		GetDefault<AGP_VillageLayoutDirector>()->GetVillagePresetFootprint();
+	TestEqual(TEXT("Default village footprint uses a 130 m XY half extent"),
+		DefaultFootprint.FootprintExtent,
+		FVector(13000.0f, 13000.0f, 3000.0f));
+	TestEqual(TEXT("Default village footprint is centered below the slot origin"),
+		DefaultFootprint.FootprintOffset,
+		FVector(0.0f, 0.0f, -1500.0f));
+	TestEqual(TEXT("VillageSlot visualizes the default footprint extent"),
+		GetDefault<AGP_VillageSlot>()->GetSlotBounds()->GetUnscaledBoxExtent(),
+		DefaultFootprint.FootprintExtent);
 
 	UPCGGraph* CityGraph = LoadObject<UPCGGraph>(
 		nullptr,

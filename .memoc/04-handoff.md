@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-20T22:00:02+09:00
+updated: 2026-07-23T02:22:54+09:00
 status: active
 tags:
   - memoc
@@ -11,7 +11,13 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-07-20T22:00:02+09:00
+Last synced: 2026-07-23T02:22:54+09:00
+
+## Village Footprint Handoff
+
+- Source-only footprint work is complete. `AGP_VillageLayoutDirector` owns the current preset footprint; slots render it, red means overlap, and candidate conflict IDs feed deterministic non-overlap selection with required-group lookahead.
+- Default half extent is `13000,13000,3000` cm and offset is `0,0,-1500` cm, so the visible box is about 260m x 260m x 60m. `L_LandscapeMap` currently shows all three authored footprints red; reposition slots or tune the preset footprint, then use `Refresh Footprint Preview`/PIE. The task did not save the already user-modified map or other content assets.
+- Full `Project_EdenEditor Win64 Development` build and `ProjectEden.Game.WorldLayout.VillageSelection` automation pass. Future multi-preset work should store Level + Footprint together and perform the same pairwise check using each selected preset's footprint.
 
 ## Village Layout Runtime V1 Handoff
 
