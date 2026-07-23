@@ -23,13 +23,6 @@ AGP_CrystalShardProjectile::AGP_CrystalShardProjectile()
 	ShardMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ShardMesh"));
 	ShardMesh->SetupAttachment(ShardCollision);
 	ShardMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	ShardMesh->SetRelativeScale3D(FVector(0.35f, 0.35f, 0.8f));
-
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> ConeMeshFinder(TEXT("/Engine/BasicShapes/Cone.Cone"));
-	if (ConeMeshFinder.Succeeded())
-	{
-		ShardMesh->SetStaticMesh(ConeMeshFinder.Object);
-	}
 
 	if (ProjectileMovement)
 	{
@@ -43,22 +36,25 @@ AGP_CrystalShardProjectile::AGP_CrystalShardProjectile()
 		DamageEffectClass = DamageEffectFinder.Class;
 	}
 
-	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> ActiveVFXFinder(TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/VFX/NS_CrystalSeraph_Projectile2.NS_CrystalSeraph_Projectile2"));
-	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> ImpactVFXFinder(TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/VFX/NS_CrystalSeraph_Hit1.NS_CrystalSeraph_Hit1"));
-	if (ActiveVFXFinder.Succeeded())
-	{
-		VisualCueComponent->AddNiagaraCue(GPTags::GameplayCue::Ability::Active_Magic, ActiveVFXFinder.Object);
-	}
-	if (ImpactVFXFinder.Succeeded())
-	{
-		VisualCueComponent->AddNiagaraCue(GPTags::GameplayCue::Ability::Impact_Magic, ImpactVFXFinder.Object);
-	}
 }
 
 void AGP_CrystalShardProjectile::BeginPlay()
 {
 	Super::BeginPlay();
-	VisualCueComponent->ActivatePersistentCue(GPTags::GameplayCue::Ability::Active_Magic, ShardCollision, FVector::ZeroVector, FRotator::ZeroRotator, FVector(0.8f));
+	if (ShardMesh->GetStaticMesh() == nullptr && IsValid(ShardStaticMesh.Get()))
+	{
+		ShardMesh->SetStaticMesh(ShardStaticMesh);
+	}
+	ShardMesh->SetRelativeScale3D(ShardMeshScale);
+	if (IsValid(ProjectileActiveVFX.Get()))
+	{
+		VisualCueComponent->AddNiagaraCue(GPTags::GameplayCue::Ability::Active_Magic, ProjectileActiveVFX);
+	}
+	if (IsValid(ProjectileImpactVFX.Get()))
+	{
+		VisualCueComponent->AddNiagaraCue(GPTags::GameplayCue::Ability::Impact_Magic, ProjectileImpactVFX);
+	}
+	VisualCueComponent->ActivatePersistentCue(GPTags::GameplayCue::Ability::Active_Magic, ShardCollision, FVector::ZeroVector, FRotator::ZeroRotator, ProjectileActiveVFXScale);
 }
 
 void AGP_CrystalShardProjectile::OnProjectileOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
@@ -91,6 +87,6 @@ void AGP_CrystalShardProjectile::MulticastPlayShardImpactVFX_Implementation(cons
 {
 	if (IsValid(VisualCueComponent))
 	{
-		VisualCueComponent->PlayOneShotAtLocation(GPTags::GameplayCue::Ability::Impact_Magic, ImpactLocation, ImpactRotation);
+		VisualCueComponent->PlayOneShotAtLocation(GPTags::GameplayCue::Ability::Impact_Magic, ImpactLocation, ImpactRotation, ProjectileImpactVFXScale);
 	}
 }

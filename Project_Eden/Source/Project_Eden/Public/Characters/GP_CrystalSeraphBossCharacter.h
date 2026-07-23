@@ -9,6 +9,9 @@ class UGameplayAbility;
 class UAnimMontage;
 class UGP_BossTelegraphVFXComponent;
 class UGP_CrystalSeraphStateComponent;
+class AGP_CrystalPrismActor;
+class USphereComponent;
+class UStaticMeshComponent;
 class FCrystalSeraphGroggyLifecycleTest;
 
 UCLASS(Blueprintable)
@@ -34,6 +37,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Boss|Crystal Seraph")
 	bool RequestStartLaserPattern(AActor* PatternTargetActor);
+
+	/** Releases only the shield visuals owned by the currently spawned prism set. */
+	void ReleaseCrystalPrismShields();
 
 	UFUNCTION(BlueprintCallable, Category = "Boss|Crystal Seraph")
 	bool RequestSpawnCrystalShardPattern(AActor* PatternTargetActor);
@@ -144,8 +150,11 @@ private:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Crystal Seraph|Actors", meta = (AllowPrivateAccess = "true"))
 	TSubclassOf<AActor> SeraphLaserActorClass;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Crystal Seraph|Actors", meta = (AllowPrivateAccess = "true"))
-	TSubclassOf<AActor> WingCoreHitActorClass;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph|Core", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<USphereComponent> WingCoreCollision;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph|Core", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UStaticMeshComponent> WingCoreMesh;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Crystal Seraph|Actors", meta = (AllowPrivateAccess = "true"))
 	TSubclassOf<AActor> CrystalShardProjectileClass;
@@ -238,6 +247,7 @@ private:
 	float LastPatternStartTime = -BIG_NUMBER;
 	float LastTacticalTeleportTime = -BIG_NUMBER;
 	int32 TacticalTeleportSequence = 0;
+	TArray<TWeakObjectPtr<AGP_CrystalPrismActor>> ActiveCrystalPrisms;
 	FTimerHandle GroggyRecoveryTimerHandle;
 	bool bGroggyRecoveryScheduled = false;
 };

@@ -8,6 +8,7 @@
 class UAnimationAsset;
 class UMaterialInstanceDynamic;
 class UMaterialInterface;
+class UNiagaraComponent;
 class UNiagaraSystem;
 class USceneComponent;
 class USkeletalMesh;
@@ -96,7 +97,7 @@ private:
 	void StartSansPresentation();
 	void StartDarkArmorKnightPresentation();
 	void StartMatadorPresentation();
-	void SpawnBurstNiagara(UNiagaraSystem* NiagaraSystem, const FVector& Offset, const FVector& Scale);
+	UNiagaraComponent* SpawnBurstNiagara(UNiagaraSystem* NiagaraSystem, const FVector& Offset, const FVector& Scale);
 	void HideSourceMesh();
 	void AddStaticPiece(
 		UStaticMesh* Mesh,

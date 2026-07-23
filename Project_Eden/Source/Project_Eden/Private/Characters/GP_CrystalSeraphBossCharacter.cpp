@@ -12,12 +12,13 @@
 #include "Actors/GP_CrystalSanctuaryMarkerActor.h"
 #include "Actors/GP_CrystalShardProjectile.h"
 #include "Actors/GP_SeraphLaserActor.h"
-#include "Actors/GP_WingCoreHitActor.h"
 #include "BehaviorTree/BehaviorTree.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "BehaviorTree/BlackboardData.h"
 #include "BrainComponent.h"
 #include "Characters/GP_CrystalSeraphStateComponent.h"
+#include "Components/SphereComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -54,7 +55,25 @@ AGP_CrystalSeraphBossCharacter::AGP_CrystalSeraphBossCharacter()
 	TelegraphVFXPatterns.Add(GPTags::Ability::Boss::CrystalSeraph::Area, false);
 	CrystalPrismActorClass = AGP_CrystalPrismActor::StaticClass();
 	SeraphLaserActorClass = AGP_SeraphLaserActor::StaticClass();
-	WingCoreHitActorClass = AGP_WingCoreHitActor::StaticClass();
+	WingCoreCollision = CreateDefaultSubobject<USphereComponent>(TEXT("WingCoreCollision"));
+	WingCoreCollision->SetupAttachment(GetMesh());
+	WingCoreCollision->SetRelativeLocation(FVector(0.0f, -90.0f, 120.0f));
+	WingCoreCollision->SetSphereRadius(160.0f);
+	WingCoreCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	WingCoreCollision->SetCollisionResponseToAllChannels(ECR_Ignore);
+	WingCoreCollision->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
+	WingCoreCollision->SetCollisionResponseToChannel(ECC_WorldDynamic, ECR_Overlap);
+
+	WingCoreMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("WingCoreMesh"));
+	WingCoreMesh->SetupAttachment(WingCoreCollision);
+	WingCoreMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	WingCoreMesh->SetRelativeScale3D(FVector(1.6f));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> WingCoreMeshFinder(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+	if (WingCoreMeshFinder.Succeeded())
+	{
+		WingCoreMesh->SetStaticMesh(WingCoreMeshFinder.Object);
+	}
+	WingCoreMesh->SetHiddenInGame(true);
 	CrystalShardProjectileClass = AGP_CrystalShardProjectile::StaticClass();
 	AreaMarkerActorClass = AGP_CrystalSanctuaryMarkerActor::StaticClass();
 	CrystalShardAbilityClass = UGP_CrystalSeraphShardAbility::StaticClass();
@@ -250,6 +269,7 @@ AActor* AGP_CrystalSeraphBossCharacter::RequestSpawnCrystalPrism(AActor* Pattern
 		if (AGP_CrystalPrismActor* CrystalPrismActor = Cast<AGP_CrystalPrismActor>(PrismActor))
 		{
 			CrystalPrismActor->InitializePrism(this);
+			ActiveCrystalPrisms.AddUnique(CrystalPrismActor);
 		}
 		if (!IsValid(PrimaryPrismActor))
 		{
@@ -365,21 +385,7 @@ void AGP_CrystalSeraphBossCharacter::RequestExposeWingCore(float ExposureDuratio
 
 	CrystalSeraphStateComponent->BeginWingCoreExposure(BossMaxHealth, EffectiveExposureDuration);
 
-	if (!IsValid(CrystalSeraphStateComponent->GetWingCoreActor()))
-	{
-		const FVector CoreLocation = GetActorLocation() + FVector(0.0f, -90.0f, 120.0f);
-		AActor* CoreActor = SpawnConfiguredActor(WingCoreHitActorClass, CoreLocation, GetActorRotation(), TEXT("WingCore"));
-		if (IsValid(CoreActor))
-		{
-			CoreActor->AttachToActor(this, FAttachmentTransformRules::KeepWorldTransform);
-			if (AGP_WingCoreHitActor* WingCoreHitActor = Cast<AGP_WingCoreHitActor>(CoreActor))
-			{
-				WingCoreHitActor->InitializeWingCore(this, CrystalSeraphStateComponent);
-				WingCoreHitActor->SetCoreActive(true);
-			}
-			CrystalSeraphStateComponent->RegisterWingCoreActor(CoreActor);
-		}
-	}
+	HandleCrystalSeraphWingCoreExposedChanged(true);
 }
 
 void AGP_CrystalSeraphBossCharacter::RequestWingCoreBreak()
@@ -572,21 +578,33 @@ void AGP_CrystalSeraphBossCharacter::HandleCrystalSeraphGroggyChanged(bool bNewG
 
 void AGP_CrystalSeraphBossCharacter::HandleCrystalSeraphWingCoreExposedChanged(bool bNewExposed)
 {
+	if (IsValid(WingCoreMesh))
+	{
+		WingCoreMesh->SetHiddenInGame(!bNewExposed);
+	}
+	if (IsValid(WingCoreCollision))
+	{
+		WingCoreCollision->SetCollisionEnabled(HasAuthority() && bNewExposed ? ECollisionEnabled::QueryOnly : ECollisionEnabled::NoCollision);
+	}
+}
+
+void AGP_CrystalSeraphBossCharacter::ReleaseCrystalPrismShields()
+{
 	if (!HasAuthority())
 	{
 		return;
 	}
 
-	if (AActor* WingCoreActor = IsValid(CrystalSeraphStateComponent) ? CrystalSeraphStateComponent->GetWingCoreActor() : nullptr)
+	for (int32 PrismIndex = ActiveCrystalPrisms.Num() - 1; PrismIndex >= 0; --PrismIndex)
 	{
-		if (AGP_WingCoreHitActor* WingCoreHitActor = Cast<AGP_WingCoreHitActor>(WingCoreActor))
+		if (AGP_CrystalPrismActor* PrismActor = ActiveCrystalPrisms[PrismIndex].Get())
 		{
-			WingCoreHitActor->SetCoreActive(bNewExposed);
-			return;
+			PrismActor->BeginPrismShieldRelease();
 		}
-
-		WingCoreActor->SetActorHiddenInGame(!bNewExposed);
-		WingCoreActor->SetActorEnableCollision(bNewExposed);
+		else
+		{
+			ActiveCrystalPrisms.RemoveAtSwap(PrismIndex);
+		}
 	}
 }
 

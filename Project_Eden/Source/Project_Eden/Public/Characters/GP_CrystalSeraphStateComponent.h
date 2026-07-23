@@ -29,9 +29,6 @@ public:
 	void RegisterCrystalPrismActor(AActor* InCrystalPrismActor);
 
 	UFUNCTION(BlueprintCallable, Category = "Boss|Crystal Seraph")
-	void RegisterWingCoreActor(AActor* InWingCoreActor);
-
-	UFUNCTION(BlueprintCallable, Category = "Boss|Crystal Seraph")
 	void BeginWingCoreExposure(float BossMaxHealth, float ExposureDurationOverride = -1.0f);
 
 	UFUNCTION(BlueprintCallable, Category = "Boss|Crystal Seraph")
@@ -78,9 +75,6 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Boss|Crystal Seraph")
 	AActor* GetCrystalPrismActor() const { return CrystalPrismActor.Get(); }
-
-	UFUNCTION(BlueprintPure, Category = "Boss|Crystal Seraph")
-	AActor* GetWingCoreActor() const { return WingCoreActor.Get(); }
 
 	UPROPERTY(BlueprintAssignable, Category = "Boss|Crystal Seraph")
 	FGPCrystalSeraphWingCoreStageChangedSignature OnWingCoreStageChanged;
@@ -144,9 +138,6 @@ private:
 
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Boss|Crystal Seraph", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<AActor> CrystalPrismActor;
-
-	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Boss|Crystal Seraph", meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<AActor> WingCoreActor;
 
 	FTimerHandle WingCoreExposureTimerHandle;
 	bool bAppliedCrystalGuardedTag = false;
