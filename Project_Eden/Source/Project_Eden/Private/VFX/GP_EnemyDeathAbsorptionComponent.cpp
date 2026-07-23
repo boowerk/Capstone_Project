@@ -58,6 +58,7 @@ void UGP_EnemyDeathAbsorptionComponent::TickComponent(
 	++PlaybackTickCount;
 	UpdateTargetAndBounds();
 	UpdateAbsorbStrength();
+	UpdateFallGravity();
 	HideSourceMeshWhenReady();
 
 	if (!bEmissionStopped
@@ -166,6 +167,8 @@ void UGP_EnemyDeathAbsorptionComponent::PlayLocal(AActor* TargetPlayerActor)
 	ActiveNiagaraComponent->SetVariablePosition(AbsorbTargetPositionParameterName, LastTargetPosition);
 	ActiveNiagaraComponent->SetVariableFloat(AbsorbStrengthParameterName, 0.0f);
 	ActiveNiagaraComponent->SetVariableFloat(AbsorbKillRadiusParameterName, FMath::Max(0.0f, AbsorbKillRadius));
+	ActiveNiagaraComponent->SetVariableVec3(FallGravityParameterName, FallGravity);
+	ActiveNiagaraComponent->SetVariableFloat(AbsorbDragParameterName, FMath::Max(0.0f, AbsorbDrag));
 	ActiveNiagaraComponent->SetCustomTimeDilation(FMath::Max(0.1f, NiagaraPlaybackRate));
 	UpdateCorridorFixedBounds();
 	ActiveNiagaraComponent->Activate(true);
@@ -342,6 +345,30 @@ float UGP_EnemyDeathAbsorptionComponent::CalculateAbsorbStrength(
 	return SafeMaximumStrength * SmoothAlpha;
 }
 
+float UGP_EnemyDeathAbsorptionComponent::CalculateFallGravityScale(
+	float ElapsedSeconds,
+	float InFullGravityDurationSeconds,
+	float InGravityFadeEndSeconds)
+{
+	const float SafeFullDuration = FMath::Max(0.0f, InFullGravityDurationSeconds);
+	const float SafeFadeEnd = FMath::Max(SafeFullDuration, InGravityFadeEndSeconds);
+	if (ElapsedSeconds <= SafeFullDuration)
+	{
+		return 1.0f;
+	}
+	if (ElapsedSeconds >= SafeFadeEnd || SafeFadeEnd - SafeFullDuration <= KINDA_SMALL_NUMBER)
+	{
+		return 0.0f;
+	}
+
+	const float LinearAlpha = FMath::Clamp(
+		(ElapsedSeconds - SafeFullDuration) / (SafeFadeEnd - SafeFullDuration),
+		0.0f,
+		1.0f);
+	const float SmoothAlpha = LinearAlpha * LinearAlpha * (3.0f - (2.0f * LinearAlpha));
+	return 1.0f - SmoothAlpha;
+}
+
 FVector UGP_EnemyDeathAbsorptionComponent::ResolveTargetPosition(const AActor* TargetActor) const
 {
 	if (!IsValid(TargetActor))
@@ -384,6 +411,17 @@ void UGP_EnemyDeathAbsorptionComponent::UpdateAbsorbStrength()
 		AbsorbStrengthRampSeconds,
 		MaximumAbsorbStrength);
 	ActiveNiagaraComponent->SetVariableFloat(AbsorbStrengthParameterName, CurrentStrength);
+}
+
+void UGP_EnemyDeathAbsorptionComponent::UpdateFallGravity()
+{
+	const float GravityScale = CalculateFallGravityScale(
+		PlaybackElapsedSeconds,
+		FullGravityDurationSeconds,
+		GravityFadeEndSeconds);
+
+	// Fade gravity while attraction ramps so the grains arc upward instead of snapping directly to the chest.
+	ActiveNiagaraComponent->SetVariableVec3(FallGravityParameterName, FallGravity * GravityScale);
 }
 
 void UGP_EnemyDeathAbsorptionComponent::HideSourceMeshWhenReady()

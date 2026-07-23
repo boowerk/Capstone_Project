@@ -55,6 +55,7 @@ private:
 	FVector ResolveTargetPosition(const AActor* TargetActor) const;
 	void UpdateTargetAndBounds();
 	void UpdateAbsorbStrength();
+	void UpdateFallGravity();
 	void HideSourceMeshWhenReady();
 	void UpdateCorridorFixedBounds();
 
@@ -68,6 +69,10 @@ private:
 		float ScatterDelaySeconds,
 		float RampDurationSeconds,
 		float MaximumStrength);
+	static float CalculateFallGravityScale(
+		float ElapsedSeconds,
+		float FullGravityDurationSeconds,
+		float GravityFadeEndSeconds);
 
 	// This duplicate is authored from NS_Simple_SK; a missing optional asset leaves the enemy mesh untouched.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|Death Absorption",
@@ -82,26 +87,34 @@ private:
 		meta = (AllowPrivateAccess = "true", Units = "cm"))
 	FVector TargetBodyOffset = FVector::ZeroVector;
 
-	// A short scatter phase preserves the recognizable enemy silhouette before particles accelerate inward.
+	// Attraction waits while the particles begin falling, then overlaps the fading gravity to create a curved path.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|Death Absorption|Timing",
 		meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "s"))
-	float ScatterDelaySeconds = 0.20f;
+	float ScatterDelaySeconds = 0.38f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|Death Absorption|Timing",
 		meta = (AllowPrivateAccess = "true", ClampMin = "0.01", Units = "s"))
-	float AbsorbStrengthRampSeconds = 0.55f;
+	float AbsorbStrengthRampSeconds = 0.80f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|Death Absorption|Timing",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "s"))
+	float FullGravityDurationSeconds = 0.28f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|Death Absorption|Timing",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "s"))
+	float GravityFadeEndSeconds = 0.60f;
 
 	// The mesh stays visible for the first Niagara sampling frames, then the particles become the only corpse silhouette.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|Death Absorption|Timing",
 		meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "s"))
-	float SourceMeshHideDelaySeconds = 0.08f;
+	float SourceMeshHideDelaySeconds = 0.10f;
 
-	// Compress the original five-second dissolve curves into the regular enemy's two-second corpse window.
+	// Keep the authored five-second curves close to completion without recreating the previous overly fast 3x motion.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|Death Absorption|Timing",
 		meta = (AllowPrivateAccess = "true", ClampMin = "0.1"))
-	float NiagaraPlaybackRate = 3.0f;
+	float NiagaraPlaybackRate = 2.6f;
 
-	// With 3x Niagara time, this window limits the original 25k/s rate to roughly 4.5k particles per corpse.
+	// At 2.6x Niagara time, this limits the original 25k/s source to roughly 3.9k grains at steady frame pacing.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|Death Absorption|Timing",
 		meta = (AllowPrivateAccess = "true", ClampMin = "0.01", Units = "s"))
 	float EmissionStopTimeSeconds = 0.06f;
@@ -114,11 +127,22 @@ private:
 	// The default enemy corpse is destroyed at two seconds, so finish the complete effect before that boundary.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|Death Absorption|Timing",
 		meta = (AllowPrivateAccess = "true", ClampMin = "0.1", Units = "s"))
-	float EffectDeactivateTimeSeconds = 1.75f;
+	float EffectDeactivateTimeSeconds = 1.90f;
 
+	// Constant-acceleration attraction is intentionally much lower than the old distance-scaled spring strength.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|Death Absorption|Force",
 		meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
-	float MaximumAbsorbStrength = 9000.0f;
+	float MaximumAbsorbStrength = 800.0f;
+
+	// Niagara playback dilation amplifies acceleration, so this value produces a readable fall rather than a hard drop.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|Death Absorption|Force",
+		meta = (AllowPrivateAccess = "true"))
+	FVector FallGravity = FVector(0.0f, 0.0f, -160.0f);
+
+	// Drag prevents the constant attraction from rebuilding the previous high-speed snap near the player.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|Death Absorption|Force",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float AbsorbDrag = 1.4f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|Death Absorption|Force",
 		meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "cm"))
@@ -126,7 +150,7 @@ private:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|Death Absorption|Force",
 		meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "cm"))
-	float AbsorbKillRadius = 28.0f;
+	float AbsorbKillRadius = 45.0f;
 
 	// GPU particles need a fixed bounds corridor that covers both the corpse and a moving target.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|Death Absorption|Bounds",
@@ -152,6 +176,14 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|Death Absorption|Parameters",
 		meta = (AllowPrivateAccess = "true"))
 	FName AbsorbKillRadiusParameterName = TEXT("User.AbsorbKillRadius");
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|Death Absorption|Parameters",
+		meta = (AllowPrivateAccess = "true"))
+	FName FallGravityParameterName = TEXT("User.FallGravity");
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|Death Absorption|Parameters",
+		meta = (AllowPrivateAccess = "true"))
+	FName AbsorbDragParameterName = TEXT("User.AbsorbDrag");
 
 	UPROPERTY(Transient)
 	TObjectPtr<UNiagaraComponent> ActiveNiagaraComponent;

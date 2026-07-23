@@ -36,10 +36,19 @@ bool FEnemyDeathAbsorptionPolicyTest::RunTest(const FString& Parameters)
 		TEXT("Strength parameter contract"),
 		ComponentDefaults->AbsorbStrengthParameterName,
 		FName(TEXT("User.AbsorbStrength")));
+	TestEqual(
+		TEXT("Falling gravity parameter contract"),
+		ComponentDefaults->FallGravityParameterName,
+		FName(TEXT("User.FallGravity")));
+	TestEqual(
+		TEXT("Absorption drag parameter contract"),
+		ComponentDefaults->AbsorbDragParameterName,
+		FName(TEXT("User.AbsorbDrag")));
 	TestTrue(
 		TEXT("Five-second source curves are compressed inside the two-second corpse window"),
 		ComponentDefaults->NiagaraPlaybackRate >= 2.5f
-			&& ComponentDefaults->EffectDeactivateTimeSeconds <= 1.8f);
+			&& ComponentDefaults->NiagaraPlaybackRate <= 2.7f
+			&& ComponentDefaults->EffectDeactivateTimeSeconds <= 1.90f);
 	TestTrue(
 		TEXT("High-rate emission is stopped after a short authored burst"),
 		ComponentDefaults->EmissionStopTimeSeconds * ComponentDefaults->NiagaraPlaybackRate <= 0.25f);
@@ -47,21 +56,39 @@ bool FEnemyDeathAbsorptionPolicyTest::RunTest(const FString& Parameters)
 		TEXT("A first-frame hitch cannot stop emission before Niagara produces a visible sample"),
 		ComponentDefaults->MinimumEmissionFrames >= 3);
 
-	const float MaximumStrength = 4000.0f;
+	const float MaximumStrength = 800.0f;
 	TestEqual(
-		TEXT("Scatter phase has no attraction"),
-		UGP_EnemyDeathAbsorptionComponent::CalculateAbsorbStrength(0.20f, 0.20f, 0.50f, MaximumStrength),
+		TEXT("Falling phase has no attraction"),
+		UGP_EnemyDeathAbsorptionComponent::CalculateAbsorbStrength(0.38f, 0.38f, 0.80f, MaximumStrength),
 		0.0f);
 	TestTrue(
-		TEXT("Attraction ramps after scatter"),
+		TEXT("Attraction ramps while gravity fades"),
 		FMath::IsNearlyEqual(
-			UGP_EnemyDeathAbsorptionComponent::CalculateAbsorbStrength(0.45f, 0.20f, 0.50f, MaximumStrength),
+			UGP_EnemyDeathAbsorptionComponent::CalculateAbsorbStrength(0.78f, 0.38f, 0.80f, MaximumStrength),
 			MaximumStrength * 0.5f,
 			0.1f));
 	TestEqual(
 		TEXT("Attraction reaches its configured maximum"),
-		UGP_EnemyDeathAbsorptionComponent::CalculateAbsorbStrength(0.90f, 0.20f, 0.50f, MaximumStrength),
+		UGP_EnemyDeathAbsorptionComponent::CalculateAbsorbStrength(1.18f, 0.38f, 0.80f, MaximumStrength),
 		MaximumStrength);
+	TestEqual(
+		TEXT("Falling gravity starts fully enabled"),
+		UGP_EnemyDeathAbsorptionComponent::CalculateFallGravityScale(0.0f, 0.28f, 0.60f),
+		1.0f);
+	TestEqual(
+		TEXT("Falling gravity remains full through its hold"),
+		UGP_EnemyDeathAbsorptionComponent::CalculateFallGravityScale(0.28f, 0.28f, 0.60f),
+		1.0f);
+	TestTrue(
+		TEXT("Falling gravity is half strength midway through its smooth fade"),
+		FMath::IsNearlyEqual(
+			UGP_EnemyDeathAbsorptionComponent::CalculateFallGravityScale(0.44f, 0.28f, 0.60f),
+			0.5f,
+			0.001f));
+	TestEqual(
+		TEXT("Falling gravity is disabled before the final attraction"),
+		UGP_EnemyDeathAbsorptionComponent::CalculateFallGravityScale(0.60f, 0.28f, 0.60f),
+		0.0f);
 
 	UWorld* TestWorld = UWorld::CreateWorld(EWorldType::Game, false);
 	if (!TestNotNull(TEXT("Created transient selection policy world"), TestWorld))
@@ -148,6 +175,15 @@ bool FEnemyDeathAbsorptionAssetContractTest::RunTest(const FString& Parameters)
 	const FNiagaraVariable KillRadiusParameter(
 		FNiagaraTypeDefinition::GetFloatDef(),
 		TEXT("User.AbsorbKillRadius"));
+	const FNiagaraVariable FallGravityParameter(
+		FNiagaraTypeDefinition::GetVec3Def(),
+		TEXT("User.FallGravity"));
+	const FNiagaraVariable AbsorbDragParameter(
+		FNiagaraTypeDefinition::GetFloatDef(),
+		TEXT("User.AbsorbDrag"));
+	const FNiagaraVariable SpriteSizeParameter(
+		FNiagaraTypeDefinition::GetVec2Def(),
+		TEXT("User.SpriteSize"));
 
 	// These exact User contracts are consumed by the native component before Niagara activation.
 	TestTrue(TEXT("Source mesh data interface is exposed"), UserParameters.IndexOf(SourceMeshParameter) != INDEX_NONE);
@@ -156,6 +192,14 @@ bool FEnemyDeathAbsorptionAssetContractTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Runtime attraction strength is exposed"), UserParameters.IndexOf(StrengthParameter) != INDEX_NONE);
 	TestTrue(TEXT("Runtime attraction radius is exposed"), UserParameters.IndexOf(RadiusParameter) != INDEX_NONE);
 	TestTrue(TEXT("Arrival kill radius is exposed"), UserParameters.IndexOf(KillRadiusParameter) != INDEX_NONE);
+	TestTrue(TEXT("Runtime falling gravity is exposed"), UserParameters.IndexOf(FallGravityParameter) != INDEX_NONE);
+	TestTrue(TEXT("Runtime absorption drag is exposed"), UserParameters.IndexOf(AbsorbDragParameter) != INDEX_NONE);
+	TestTrue(TEXT("Visible grain size remains exposed"), UserParameters.IndexOf(SpriteSizeParameter) != INDEX_NONE);
+	TestTrue(
+		TEXT("Designer-tuned grains retain their visible 10x10 size"),
+		UserParameters.GetParameterValue<FVector2f>(SpriteSizeParameter).Equals(
+			FVector2f(10.0f, 10.0f),
+			KINDA_SMALL_NUMBER));
 	TestTrue(TEXT("Cross-actor GPU travel has authored fixed bounds"), AbsorptionSystem->bFixedBounds);
 	TestTrue(
 		TEXT("Authored fallback bounds exceed the original +/-100 cm sample"),
