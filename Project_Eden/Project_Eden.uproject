@@ -101,16 +101,6 @@
 		{
 			"Name": "DrawDebugLibrary",
 			"Enabled": true
-		},
-		{
-			"Name": "McpAutomationBridge",
-			"Enabled": true,
-			"TargetAllowList": [
-				"Editor"
-			]
 		}
-	],
-	"AdditionalPluginDirectories": [
-		"../../../GitHub/Unreal_mcp"
 	]
 }
