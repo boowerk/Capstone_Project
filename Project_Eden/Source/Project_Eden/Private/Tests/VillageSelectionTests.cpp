@@ -2,6 +2,7 @@
 
 #include "Algo/Reverse.h"
 #include "Components/BoxComponent.h"
+#include "Engine/World.h"
 #include "Game/WorldLayout/GP_VillageLayoutDirector.h"
 #include "Game/WorldLayout/GP_VillageSelectionPolicy.h"
 #include "Game/WorldLayout/GP_VillageSlot.h"
@@ -496,6 +497,8 @@ bool FVillageSelectionPolicyTest::RunTest(const FString& Parameters)
 		AGP_VillageLayoutDirector::StaticClass()->FindPropertyByName(TEXT("VillageLevelPreset")));
 	TestNotNull(TEXT("VillageLayoutDirector exposes its current preset footprint"),
 		AGP_VillageLayoutDirector::StaticClass()->FindPropertyByName(TEXT("VillagePresetFootprint")));
+	TestNotNull(TEXT("VillageLayoutDirector exposes a village preset pool"),
+		AGP_VillageLayoutDirector::StaticClass()->FindPropertyByName(TEXT("VillagePresetPool")));
 	TestNotNull(TEXT("Village candidates expose footprint conflicts"),
 		FGP_VillageCandidate::StaticStruct()->FindPropertyByName(TEXT("OverlappingSlotIds")));
 	TestNotNull(TEXT("Village group rules expose optional range mode"),
@@ -523,6 +526,136 @@ bool FVillageSelectionPolicyTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("VillageSlot visualizes the default footprint extent"),
 		GetDefault<AGP_VillageSlot>()->GetSlotBounds()->GetUnscaledBoxExtent(),
 		DefaultFootprint.FootprintExtent);
+
+	const TArray<FGP_VillagePresetDefinition> DefaultPresetPool =
+		GetDefault<AGP_VillageLayoutDirector>()->GetVillagePresetPool();
+	TestEqual(TEXT("Default village preset pool contains 00 and 01"), DefaultPresetPool.Num(), 2);
+	const FGP_VillagePresetDefinition* Village00Preset = DefaultPresetPool.FindByPredicate(
+		[](const FGP_VillagePresetDefinition& Preset)
+		{
+			return Preset.PresetId == FName(TEXT("Village_00"));
+		});
+	const FGP_VillagePresetDefinition* Village01Preset = DefaultPresetPool.FindByPredicate(
+		[](const FGP_VillagePresetDefinition& Preset)
+		{
+			return Preset.PresetId == FName(TEXT("Village_01"));
+		});
+	TestNotNull(TEXT("Village_00 preset is available"), Village00Preset);
+	TestNotNull(TEXT("Village_01 preset is available"), Village01Preset);
+	if (Village00Preset && Village01Preset)
+	{
+		TestEqual(TEXT("Village_00 preset keeps the legacy level"),
+			Village00Preset->VillageLevel.ToSoftObjectPath(),
+			FSoftObjectPath(TEXT("/Game/WorldLayout/L_Village_00.L_Village_00")));
+		TestEqual(TEXT("Village_01 preset uses the compact level"),
+			Village01Preset->VillageLevel.ToSoftObjectPath(),
+			FSoftObjectPath(TEXT("/Game/WorldLayout/L_Village_01.L_Village_01")));
+		TestEqual(TEXT("Village_01 uses the measured compact footprint"),
+			Village01Preset->Footprint.FootprintExtent,
+			FVector(6500.0f, 8500.0f, 3000.0f));
+
+		const int32 StableIndex = AGP_VillageLayoutDirector::SelectVillagePresetIndex(
+			1337,
+			FName(TEXT("Village_A")),
+			DefaultPresetPool);
+		TestTrue(TEXT("A valid preset is selected deterministically"),
+			DefaultPresetPool.IsValidIndex(StableIndex));
+		if (DefaultPresetPool.IsValidIndex(StableIndex))
+		{
+			TArray<FGP_VillagePresetDefinition> ReorderedPresetPool = DefaultPresetPool;
+			Algo::Reverse(ReorderedPresetPool);
+			const int32 ReorderedIndex = AGP_VillageLayoutDirector::SelectVillagePresetIndex(
+				1337,
+				FName(TEXT("Village_A")),
+				ReorderedPresetPool);
+			TestTrue(TEXT("Reordered preset pool still selects a valid preset"),
+				ReorderedPresetPool.IsValidIndex(ReorderedIndex));
+			if (ReorderedPresetPool.IsValidIndex(ReorderedIndex))
+			{
+				TestEqual(TEXT("Preset selection is independent of pool order"),
+					ReorderedPresetPool[ReorderedIndex].PresetId,
+					DefaultPresetPool[StableIndex].PresetId);
+			}
+		}
+
+		bool bSawVillage00 = false;
+		bool bSawVillage01 = false;
+		for (int32 Seed = 0; Seed < 128; ++Seed)
+		{
+			const int32 PresetIndex = AGP_VillageLayoutDirector::SelectVillagePresetIndex(
+				Seed,
+				FName(TEXT("Village_A")),
+				DefaultPresetPool);
+			if (DefaultPresetPool.IsValidIndex(PresetIndex))
+			{
+				bSawVillage00 |= DefaultPresetPool[PresetIndex].PresetId == FName(TEXT("Village_00"));
+				bSawVillage01 |= DefaultPresetPool[PresetIndex].PresetId == FName(TEXT("Village_01"));
+			}
+		}
+		TestTrue(TEXT("Run seeds can select Village_00"), bSawVillage00);
+		TestTrue(TEXT("Run seeds can select Village_01"), bSawVillage01);
+
+		TArray<FGP_VillagePresetDefinition> Village01OnlyPool = DefaultPresetPool;
+		Village01OnlyPool[Village01OnlyPool.IndexOfByPredicate(
+			[](const FGP_VillagePresetDefinition& Preset)
+			{
+				return Preset.PresetId == FName(TEXT("Village_00"));
+			})].SelectionWeight = 0.0f;
+		const int32 Village01OnlyIndex = AGP_VillageLayoutDirector::SelectVillagePresetIndex(
+			1337,
+			FName(TEXT("Village_A")),
+			Village01OnlyPool);
+		TestTrue(TEXT("Zero-weight presets are excluded"),
+			Village01OnlyPool.IsValidIndex(Village01OnlyIndex)
+				&& Village01OnlyPool[Village01OnlyIndex].PresetId == FName(TEXT("Village_01")));
+
+		bool bSawAlternateAttemptPreset = false;
+		for (int32 Attempt = 1; Attempt < 32; ++Attempt)
+		{
+			const int32 AttemptIndex = AGP_VillageLayoutDirector::SelectVillagePresetIndex(
+				1337,
+				FName(TEXT("Village_A")),
+				DefaultPresetPool,
+				Attempt);
+			bSawAlternateAttemptPreset |= DefaultPresetPool.IsValidIndex(AttemptIndex)
+				&& DefaultPresetPool.IsValidIndex(StableIndex)
+				&& DefaultPresetPool[AttemptIndex].PresetId != DefaultPresetPool[StableIndex].PresetId;
+		}
+		TestTrue(TEXT("Bounded assignment attempts can explore another preset"),
+			bSawAlternateAttemptPreset);
+
+		TArray<FGP_VillagePresetDefinition> DuplicatePresetPool = DefaultPresetPool;
+		FGP_VillagePresetDefinition DuplicateVillage00 = *Village00Preset;
+		DuplicateVillage00.Footprint.FootprintExtent = FVector(1000.0f);
+		DuplicatePresetPool.Add(DuplicateVillage00);
+		const int32 UniquePresetIndex = AGP_VillageLayoutDirector::SelectVillagePresetIndex(
+			1337,
+			FName(TEXT("Village_A")),
+			DuplicatePresetPool);
+		TestTrue(TEXT("Duplicate preset IDs and levels are ignored deterministically"),
+			DuplicatePresetPool.IsValidIndex(UniquePresetIndex)
+				&& DuplicatePresetPool[UniquePresetIndex].PresetId == FName(TEXT("Village_01")));
+
+		const FTransform FirstTransform(FRotator::ZeroRotator, FVector::ZeroVector);
+		const FTransform SecondTransform(FRotator::ZeroRotator, FVector(21000.0f, 0.0f, 0.0f));
+		TestTrue(TEXT("Two full village footprints overlap at 210 m"),
+			AGP_VillageLayoutDirector::DoVillageFootprintsOverlap(
+				FirstTransform,
+				Village00Preset->Footprint,
+				SecondTransform,
+				Village00Preset->Footprint));
+		TestFalse(TEXT("Compact Village_01 can fit beside Village_00 at 210 m"),
+			AGP_VillageLayoutDirector::DoVillageFootprintsOverlap(
+				FirstTransform,
+				Village00Preset->Footprint,
+				SecondTransform,
+				Village01Preset->Footprint));
+	}
+
+	UWorld* Village01World = LoadObject<UWorld>(
+		nullptr,
+		TEXT("/Game/WorldLayout/L_Village_01.L_Village_01"));
+	TestNotNull(TEXT("Compact village level is available for streaming"), Village01World);
 
 	UPCGGraph* CityGraph = LoadObject<UPCGGraph>(
 		nullptr,

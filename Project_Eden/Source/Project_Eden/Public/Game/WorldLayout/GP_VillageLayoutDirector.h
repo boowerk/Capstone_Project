@@ -42,6 +42,20 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Village|Footprint")
 	FGP_VillageFootprint GetVillagePresetFootprint() const { return VillagePresetFootprint; }
 
+	UFUNCTION(BlueprintPure, Category = "Village|Level Instance")
+	TArray<FGP_VillagePresetDefinition> GetVillagePresetPool() const;
+
+	static int32 SelectVillagePresetIndex(
+		int32 InRunSeed,
+		FName SlotId,
+		const TArray<FGP_VillagePresetDefinition>& Presets,
+		int32 AssignmentAttempt = 0);
+	static bool DoVillageFootprintsOverlap(
+		const FTransform& FirstSlotTransform,
+		const FGP_VillageFootprint& FirstFootprint,
+		const FTransform& SecondSlotTransform,
+		const FGP_VillageFootprint& SecondFootprint);
+
 protected:
 	virtual void OnConstruction(const FTransform& Transform) override;
 	virtual void BeginPlay() override;
@@ -65,6 +79,11 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Village|Level Instance", meta = (ShowOnlyInnerProperties))
 	FGP_VillageFootprint VillagePresetFootprint;
+
+	// Additional presets beyond the legacy VillageLevelPreset primary entry.
+	// Clearing this pool preserves exact single-preset behavior.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Village|Level Instance", meta = (TitleProperty = "PresetId"))
+	TArray<FGP_VillagePresetDefinition> VillagePresetPool;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Village|Level Instance")
 	bool bStreamVillageLevelAtRuntime = true;
@@ -94,6 +113,9 @@ private:
 	UPROPERTY(Transient)
 	TMap<FName, TObjectPtr<ULevelStreamingDynamic>> ActiveVillageLevels;
 
+	UPROPERTY(Transient)
+	TMap<FName, int32> AssignedVillagePresetIndices;
+
 	TSet<FName> ConfiguredVillageLevelIds;
 	TSet<FName> GenerationRequestedVillageLevelIds;
 	TSet<FName> GeneratedVillageLevelIds;
@@ -104,9 +126,17 @@ private:
 	bool bSchedulingVillagePCG = false;
 
 	int32 LastRunSeed = INDEX_NONE;
+	int32 LastPresetAssignmentAttempt = 0;
 
 	void CollectSlots();
+	void AssignVillagePresets(int32 InRunSeed, int32 AssignmentAttempt = 0);
+	TArray<FGP_VillagePresetDefinition> BuildEffectiveVillagePresetPool() const;
 	void ApplyFootprintPreview();
+	bool ResolveVillagePreset(
+		FName SlotId,
+		TSoftObjectPtr<UWorld>& OutLevel,
+		FGP_VillageFootprint& OutFootprint,
+		FName& OutPresetId) const;
 	void PopulateCandidateOverlaps(
 		TArray<FGP_VillageCandidate>& InOutCandidates,
 		const TArray<AGP_VillageSlot*>& CandidateSlots) const;

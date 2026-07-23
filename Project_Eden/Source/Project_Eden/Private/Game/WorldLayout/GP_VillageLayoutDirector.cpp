@@ -39,12 +39,15 @@ namespace
 	};
 
 	FGPVillageFootprint2D MakeFootprint2D(
-		const AGP_VillageSlot& Slot,
+		const FTransform& SlotTransform,
 		const FGP_VillageFootprint& Footprint)
 	{
-		const FTransform SlotTransform(Slot.GetActorRotation(), Slot.GetActorLocation(), FVector::OneVector);
-		const FVector WorldCenter = SlotTransform.TransformPosition(Footprint.FootprintOffset);
-		const float YawRadians = FMath::DegreesToRadians(Slot.GetActorRotation().Yaw);
+		const FTransform UnitScaleTransform(
+			SlotTransform.GetRotation(),
+			SlotTransform.GetLocation(),
+			FVector::OneVector);
+		const FVector WorldCenter = UnitScaleTransform.TransformPosition(Footprint.FootprintOffset);
+		const float YawRadians = FMath::DegreesToRadians(UnitScaleTransform.Rotator().Yaw);
 
 		FGPVillageFootprint2D Result;
 		Result.Center = FVector2D(WorldCenter.X, WorldCenter.Y);
@@ -62,28 +65,111 @@ namespace
 			+ Footprint.Extent.Y * FMath::Abs(FVector2D::DotProduct(Footprint.AxisY, Axis));
 	}
 
-	bool DoFootprintsOverlap(
-		const AGP_VillageSlot& FirstSlot,
-		const AGP_VillageSlot& SecondSlot,
-		const FGP_VillageFootprint& Footprint)
+	FString MakePresetSortKey(const FGP_VillagePresetDefinition& Preset)
 	{
-		const FGPVillageFootprint2D First = MakeFootprint2D(FirstSlot, Footprint);
-		const FGPVillageFootprint2D Second = MakeFootprint2D(SecondSlot, Footprint);
-		const FVector2D CenterDelta = Second.Center - First.Center;
-		const FVector2D Axes[] = {First.AxisX, First.AxisY, Second.AxisX, Second.AxisY};
+		return FString::Printf(
+			TEXT("%s|%s"),
+			*Preset.PresetId.ToString(),
+			*Preset.VillageLevel.ToSoftObjectPath().ToString());
+	}
 
-		for (const FVector2D& Axis : Axes)
+	FName ResolvePresetId(const FGP_VillagePresetDefinition& Preset)
+	{
+		return Preset.PresetId.IsNone()
+			? FName(*Preset.VillageLevel.ToSoftObjectPath().GetAssetName())
+			: Preset.PresetId;
+	}
+}
+
+int32 AGP_VillageLayoutDirector::SelectVillagePresetIndex(
+	int32 InRunSeed,
+	FName SlotId,
+	const TArray<FGP_VillagePresetDefinition>& Presets,
+	int32 AssignmentAttempt)
+{
+	TMap<FName, int32> PresetIdCounts;
+	TMap<FString, int32> LevelPathCounts;
+	for (const FGP_VillagePresetDefinition& Preset : Presets)
+	{
+		if (Preset.VillageLevel.IsNull() || Preset.SelectionWeight <= 0.0f)
 		{
-			const float CenterDistance = FMath::Abs(FVector2D::DotProduct(CenterDelta, Axis));
-			const float CombinedRadius = ProjectedRadius(First, Axis) + ProjectedRadius(Second, Axis);
-			if (CenterDistance >= CombinedRadius - KINDA_SMALL_NUMBER)
-			{
-				return false;
-			}
+			continue;
 		}
 
-		return true;
+		++PresetIdCounts.FindOrAdd(ResolvePresetId(Preset));
+		++LevelPathCounts.FindOrAdd(Preset.VillageLevel.ToSoftObjectPath().ToString());
 	}
+
+	TArray<int32> ValidPresetIndices;
+	for (int32 PresetIndex = 0; PresetIndex < Presets.Num(); ++PresetIndex)
+	{
+		const FGP_VillagePresetDefinition& Preset = Presets[PresetIndex];
+		const FName PresetId = ResolvePresetId(Preset);
+		const FString LevelPath = Preset.VillageLevel.ToSoftObjectPath().ToString();
+		if (!Preset.VillageLevel.IsNull()
+			&& Preset.SelectionWeight > 0.0f
+			&& PresetIdCounts.FindRef(PresetId) == 1
+			&& LevelPathCounts.FindRef(LevelPath) == 1)
+		{
+			ValidPresetIndices.Add(PresetIndex);
+		}
+	}
+
+	ValidPresetIndices.Sort([&Presets](int32 FirstIndex, int32 SecondIndex)
+	{
+		return MakePresetSortKey(Presets[FirstIndex]) < MakePresetSortKey(Presets[SecondIndex]);
+	});
+	if (ValidPresetIndices.IsEmpty())
+	{
+		return INDEX_NONE;
+	}
+
+	float TotalWeight = 0.0f;
+	for (int32 PresetIndex : ValidPresetIndices)
+	{
+		TotalWeight += Presets[PresetIndex].SelectionWeight;
+	}
+
+	const uint32 SlotHash = FCrc::StrCrc32(*SlotId.ToString());
+	FRandomStream RandomStream(static_cast<int32>(
+		HashCombineFast(
+			HashCombineFast(static_cast<uint32>(InRunSeed), SlotHash),
+			HashCombineFast(0xA511E9B3u, static_cast<uint32>(AssignmentAttempt)))));
+	float Roll = RandomStream.FRandRange(0.0f, TotalWeight);
+	for (int32 PresetIndex : ValidPresetIndices)
+	{
+		Roll -= Presets[PresetIndex].SelectionWeight;
+		if (Roll <= 0.0f)
+		{
+			return PresetIndex;
+		}
+	}
+
+	return ValidPresetIndices.Last();
+}
+
+bool AGP_VillageLayoutDirector::DoVillageFootprintsOverlap(
+	const FTransform& FirstSlotTransform,
+	const FGP_VillageFootprint& FirstFootprint,
+	const FTransform& SecondSlotTransform,
+	const FGP_VillageFootprint& SecondFootprint)
+{
+	const FGPVillageFootprint2D First = MakeFootprint2D(FirstSlotTransform, FirstFootprint);
+	const FGPVillageFootprint2D Second = MakeFootprint2D(SecondSlotTransform, SecondFootprint);
+	const FVector2D CenterDelta = Second.Center - First.Center;
+	const FVector2D Axes[] = {First.AxisX, First.AxisY, Second.AxisX, Second.AxisY};
+
+	for (const FVector2D& Axis : Axes)
+	{
+		const float CenterDistance = FMath::Abs(FVector2D::DotProduct(CenterDelta, Axis));
+		const float CombinedRadius = ProjectedRadius(First, Axis) + ProjectedRadius(Second, Axis);
+		if (CenterDistance >= CombinedRadius - KINDA_SMALL_NUMBER)
+		{
+			return false;
+		}
+	}
+
+	return true;
 }
 
 AGP_VillageLayoutDirector::AGP_VillageLayoutDirector()
@@ -99,9 +185,57 @@ AGP_VillageLayoutDirector::AGP_VillageLayoutDirector()
 	VillageLevelPreset = TSoftObjectPtr<UWorld>(
 		FSoftObjectPath(TEXT("/Game/WorldLayout/L_Village_00.L_Village_00")));
 
+	FGP_VillagePresetDefinition Village01;
+	Village01.PresetId = TEXT("Village_01");
+	Village01.VillageLevel = TSoftObjectPtr<UWorld>(
+		FSoftObjectPath(TEXT("/Game/WorldLayout/L_Village_01.L_Village_01")));
+	Village01.Footprint.FootprintOffset = FVector(0.0f, -2000.0f, -1500.0f);
+	Village01.Footprint.FootprintExtent = FVector(6500.0f, 8500.0f, 3000.0f);
+	VillagePresetPool.Add(Village01);
+
 #if WITH_EDITORONLY_DATA
 	bIsSpatiallyLoaded = false;
 #endif
+}
+
+TArray<FGP_VillagePresetDefinition> AGP_VillageLayoutDirector::GetVillagePresetPool() const
+{
+	return BuildEffectiveVillagePresetPool();
+}
+
+TArray<FGP_VillagePresetDefinition> AGP_VillageLayoutDirector::BuildEffectiveVillagePresetPool() const
+{
+	TArray<FGP_VillagePresetDefinition> EffectivePresets;
+	TSet<FName> SeenPresetIds;
+	TSet<FString> SeenLevelPaths;
+	if (!VillageLevelPreset.IsNull())
+	{
+		FGP_VillagePresetDefinition PrimaryPreset;
+		PrimaryPreset.PresetId = TEXT("Village_00");
+		PrimaryPreset.VillageLevel = VillageLevelPreset;
+		PrimaryPreset.Footprint = VillagePresetFootprint;
+		EffectivePresets.Add(PrimaryPreset);
+		SeenPresetIds.Add(PrimaryPreset.PresetId);
+		SeenLevelPaths.Add(PrimaryPreset.VillageLevel.ToSoftObjectPath().ToString());
+	}
+
+	for (const FGP_VillagePresetDefinition& Preset : VillagePresetPool)
+	{
+		const FName PresetId = ResolvePresetId(Preset);
+		const FString LevelPath = Preset.VillageLevel.ToSoftObjectPath().ToString();
+		if (Preset.VillageLevel.IsNull()
+			|| Preset.SelectionWeight <= 0.0f
+			|| SeenPresetIds.Contains(PresetId)
+			|| SeenLevelPaths.Contains(LevelPath))
+		{
+			continue;
+		}
+
+		EffectivePresets.Add(Preset);
+		SeenPresetIds.Add(PresetId);
+		SeenLevelPaths.Add(LevelPath);
+	}
+	return EffectivePresets;
 }
 
 void AGP_VillageLayoutDirector::OnConstruction(const FTransform& Transform)
@@ -148,21 +282,48 @@ bool AGP_VillageLayoutDirector::BuildSelectionForSeed(int32 InRunSeed)
 	}
 
 	CollectSlots();
-	ApplyFootprintPreview();
-
-	TArray<FGP_VillageCandidate> Candidates;
 	TArray<AGP_VillageSlot*> CandidateSlots;
 	for (AGP_VillageSlot* Slot : CachedSlots)
 	{
 		if (IsValid(Slot) && Slot->IsCandidateEnabled())
 		{
-			Candidates.Add(Slot->MakeCandidate());
 			CandidateSlots.Add(Slot);
 		}
 	}
-	PopulateCandidateOverlaps(Candidates, CandidateSlots);
 
-	const FGP_VillageSelectionResult Result = GPVillageSelectionPolicy::SelectSlots(InRunSeed, Candidates, GroupRules);
+	FGP_VillageSelectionResult Result;
+	TArray<FGP_VillageCandidate> Candidates;
+	TMap<FName, int32> BestPresetAssignments;
+	bool bHasSelectionAttempt = false;
+	const int32 AssignmentAttemptCount = BuildEffectiveVillagePresetPool().Num() > 1 ? 32 : 1;
+	for (int32 AssignmentAttempt = 0; AssignmentAttempt < AssignmentAttemptCount; ++AssignmentAttempt)
+	{
+		AssignVillagePresets(InRunSeed, AssignmentAttempt);
+		TArray<FGP_VillageCandidate> AttemptCandidates;
+		for (const AGP_VillageSlot* Slot : CandidateSlots)
+		{
+			AttemptCandidates.Add(Slot->MakeCandidate());
+		}
+		PopulateCandidateOverlaps(AttemptCandidates, CandidateSlots);
+
+		FGP_VillageSelectionResult AttemptResult =
+			GPVillageSelectionPolicy::SelectSlots(InRunSeed, AttemptCandidates, GroupRules);
+		const bool bAttemptIsBetter = !bHasSelectionAttempt
+			|| (AttemptResult.bSucceeded && !Result.bSucceeded)
+			|| (AttemptResult.bSucceeded == Result.bSucceeded
+				&& AttemptResult.SelectedSlotIds.Num() > Result.SelectedSlotIds.Num());
+		if (bAttemptIsBetter)
+		{
+			Result = MoveTemp(AttemptResult);
+			Candidates = MoveTemp(AttemptCandidates);
+			BestPresetAssignments = AssignedVillagePresetIndices;
+			LastPresetAssignmentAttempt = AssignmentAttempt;
+			bHasSelectionAttempt = true;
+		}
+	}
+
+	AssignedVillagePresetIndices = MoveTemp(BestPresetAssignments);
+	ApplyFootprintPreview();
 	SelectedSlotIds = Result.bSucceeded ? Result.SelectedSlotIds : TArray<FName>();
 	LastRunSeed = InRunSeed;
 
@@ -189,7 +350,14 @@ bool AGP_VillageLayoutDirector::BuildSelectionForSeed(int32 InRunSeed)
 	TArray<FString> SelectedNames;
 	for (FName SlotId : SelectedSlotIds)
 	{
-		SelectedNames.Add(SlotId.ToString());
+		TSoftObjectPtr<UWorld> AssignedLevel;
+		FGP_VillageFootprint AssignedFootprint;
+		FName AssignedPresetId;
+		ResolveVillagePreset(SlotId, AssignedLevel, AssignedFootprint, AssignedPresetId);
+		SelectedNames.Add(FString::Printf(
+			TEXT("%s=%s"),
+			*SlotId.ToString(),
+			AssignedPresetId.IsNone() ? TEXT("None") : *AssignedPresetId.ToString()));
 	}
 
 	const TCHAR* DataLayerStatus = !bIsGameWorld
@@ -199,8 +367,9 @@ bool AGP_VillageLayoutDirector::BuildSelectionForSeed(int32 InRunSeed)
 		? TEXT("Preview")
 		: (!bStreamVillageLevelAtRuntime ? TEXT("Disabled") : (bVillageLevelScheduled ? TEXT("Scheduled") : TEXT("Failed")));
 	LastSelectionSummary = FString::Printf(
-		TEXT("Seed=%d Candidates=%d Selected=[%s] DataLayers=%s LevelInstance=%s"),
+		TEXT("Seed=%d PresetAttempt=%d Candidates=%d Selected=[%s] DataLayers=%s LevelInstance=%s"),
 		InRunSeed,
+		LastPresetAssignmentAttempt,
 		Candidates.Num(),
 		*FString::Join(SelectedNames, TEXT(", ")),
 		DataLayerStatus,
@@ -228,6 +397,7 @@ void AGP_VillageLayoutDirector::RebuildPreview()
 void AGP_VillageLayoutDirector::RefreshFootprintPreview()
 {
 	CollectSlots();
+	AssignVillagePresets(PreviewSeed);
 	ApplyFootprintPreview();
 }
 
@@ -238,6 +408,7 @@ void AGP_VillageLayoutDirector::RefreshFootprintPreviewIgnoringSlot(const AGP_Vi
 	{
 		return Slot == IgnoredSlot;
 	});
+	AssignVillagePresets(PreviewSeed);
 	ApplyFootprintPreview();
 }
 
@@ -260,6 +431,59 @@ void AGP_VillageLayoutDirector::CollectSlots()
 	});
 }
 
+void AGP_VillageLayoutDirector::AssignVillagePresets(int32 InRunSeed, int32 AssignmentAttempt)
+{
+	AssignedVillagePresetIndices.Reset();
+	const TArray<FGP_VillagePresetDefinition> EffectivePresets = BuildEffectiveVillagePresetPool();
+	for (const AGP_VillageSlot* Slot : CachedSlots)
+	{
+		if (!IsValid(Slot))
+		{
+			continue;
+		}
+
+		const int32 PresetIndex = SelectVillagePresetIndex(
+			InRunSeed,
+			Slot->GetSlotId(),
+			EffectivePresets,
+			AssignmentAttempt);
+		if (PresetIndex != INDEX_NONE)
+		{
+			AssignedVillagePresetIndices.Add(Slot->GetSlotId(), PresetIndex);
+		}
+	}
+}
+
+bool AGP_VillageLayoutDirector::ResolveVillagePreset(
+	FName SlotId,
+	TSoftObjectPtr<UWorld>& OutLevel,
+	FGP_VillageFootprint& OutFootprint,
+	FName& OutPresetId) const
+{
+	const TArray<FGP_VillagePresetDefinition> EffectivePresets = BuildEffectiveVillagePresetPool();
+	if (const int32* PresetIndex = AssignedVillagePresetIndices.Find(SlotId);
+		PresetIndex && EffectivePresets.IsValidIndex(*PresetIndex))
+	{
+		const FGP_VillagePresetDefinition& Preset = EffectivePresets[*PresetIndex];
+		if (!Preset.VillageLevel.IsNull() && Preset.SelectionWeight > 0.0f)
+		{
+			OutLevel = Preset.VillageLevel;
+			OutFootprint = Preset.Footprint;
+			OutPresetId = Preset.PresetId.IsNone()
+				? FName(*Preset.VillageLevel.ToSoftObjectPath().GetAssetName())
+				: Preset.PresetId;
+			return true;
+		}
+	}
+
+	OutLevel = VillageLevelPreset;
+	OutFootprint = VillagePresetFootprint;
+	OutPresetId = VillageLevelPreset.IsNull()
+		? NAME_None
+		: FName(*VillageLevelPreset.ToSoftObjectPath().GetAssetName());
+	return !OutLevel.IsNull();
+}
+
 void AGP_VillageLayoutDirector::ApplyFootprintPreview()
 {
 	for (AGP_VillageSlot* Slot : CachedSlots)
@@ -269,7 +493,15 @@ void AGP_VillageLayoutDirector::ApplyFootprintPreview()
 			continue;
 		}
 
-		Slot->ApplyFootprint(VillagePresetFootprint);
+		TSoftObjectPtr<UWorld> AssignedLevel;
+		FGP_VillageFootprint AssignedFootprint;
+		FName AssignedPresetId;
+		ResolveVillagePreset(
+			Slot->GetSlotId(),
+			AssignedLevel,
+			AssignedFootprint,
+			AssignedPresetId);
+		Slot->ApplyFootprint(AssignedFootprint);
 		Slot->SetFootprintConflict(false);
 	}
 
@@ -289,7 +521,27 @@ void AGP_VillageLayoutDirector::ApplyFootprintPreview()
 				continue;
 			}
 
-			if (DoFootprintsOverlap(*FirstSlot, *SecondSlot, VillagePresetFootprint))
+			TSoftObjectPtr<UWorld> FirstLevel;
+			TSoftObjectPtr<UWorld> SecondLevel;
+			FGP_VillageFootprint FirstFootprint;
+			FGP_VillageFootprint SecondFootprint;
+			FName FirstPresetId;
+			FName SecondPresetId;
+			ResolveVillagePreset(
+				FirstSlot->GetSlotId(),
+				FirstLevel,
+				FirstFootprint,
+				FirstPresetId);
+			ResolveVillagePreset(
+				SecondSlot->GetSlotId(),
+				SecondLevel,
+				SecondFootprint,
+				SecondPresetId);
+			if (DoVillageFootprintsOverlap(
+				FirstSlot->GetActorTransform(),
+				FirstFootprint,
+				SecondSlot->GetActorTransform(),
+				SecondFootprint))
 			{
 				FirstSlot->SetFootprintConflict(true);
 				SecondSlot->SetFootprintConflict(true);
@@ -315,8 +567,32 @@ void AGP_VillageLayoutDirector::PopulateCandidateOverlaps(
 		for (int32 SecondIndex = FirstIndex + 1; SecondIndex < CandidateSlots.Num(); ++SecondIndex)
 		{
 			const AGP_VillageSlot* SecondSlot = CandidateSlots[SecondIndex];
-			if (!IsValid(SecondSlot)
-				|| !DoFootprintsOverlap(*FirstSlot, *SecondSlot, VillagePresetFootprint))
+			if (!IsValid(SecondSlot))
+			{
+				continue;
+			}
+
+			TSoftObjectPtr<UWorld> FirstLevel;
+			TSoftObjectPtr<UWorld> SecondLevel;
+			FGP_VillageFootprint FirstFootprint;
+			FGP_VillageFootprint SecondFootprint;
+			FName FirstPresetId;
+			FName SecondPresetId;
+			ResolveVillagePreset(
+				FirstSlot->GetSlotId(),
+				FirstLevel,
+				FirstFootprint,
+				FirstPresetId);
+			ResolveVillagePreset(
+				SecondSlot->GetSlotId(),
+				SecondLevel,
+				SecondFootprint,
+				SecondPresetId);
+			if (!DoVillageFootprintsOverlap(
+				FirstSlot->GetActorTransform(),
+				FirstFootprint,
+				SecondSlot->GetActorTransform(),
+				SecondFootprint))
 			{
 				continue;
 			}
@@ -459,12 +735,6 @@ bool AGP_VillageLayoutDirector::StreamSelectedVillageLevels(const TSet<FName>& I
 		return true;
 	}
 
-	if (VillageLevelPreset.IsNull())
-	{
-		UE_LOG(LogTemp, Error, TEXT("[VillageLayout] VillageLevelPreset is not assigned."));
-		return false;
-	}
-
 	UWorld* World = GetWorld();
 	if (!World)
 	{
@@ -481,11 +751,23 @@ bool AGP_VillageLayoutDirector::StreamSelectedVillageLevels(const TSet<FName>& I
 		}
 
 		const FName SlotId = Slot->GetSlotId();
+		TSoftObjectPtr<UWorld> AssignedLevel;
+		FGP_VillageFootprint AssignedFootprint;
+		FName AssignedPresetId;
+		if (!ResolveVillagePreset(SlotId, AssignedLevel, AssignedFootprint, AssignedPresetId))
+		{
+			UE_LOG(LogTemp, Error,
+				TEXT("[VillageLayout] No valid village preset is assigned to slot '%s'."),
+				*SlotId.ToString());
+			UnloadActiveVillageLevels();
+			return false;
+		}
+
 		const FTransform SpawnTransform(Slot->GetActorRotation(), Slot->GetActorLocation(), FVector::OneVector);
 		const FString StableLevelName = MakeStreamingLevelName(SlotId);
 		ULevelStreamingDynamic::FLoadLevelInstanceParams Params(
 			World,
-			VillageLevelPreset.ToSoftObjectPath().GetLongPackageName(),
+			AssignedLevel.ToSoftObjectPath().GetLongPackageName(),
 			SpawnTransform);
 		Params.OptionalLevelNameOverride = &StableLevelName;
 		Params.bInitiallyVisible = false;
@@ -507,8 +789,9 @@ bool AGP_VillageLayoutDirector::StreamSelectedVillageLevels(const TSet<FName>& I
 		if (!bLoadScheduled || !StreamingLevel)
 		{
 			UE_LOG(LogTemp, Error,
-				TEXT("[VillageLayout] Failed to schedule village preset '%s' for slot '%s'."),
-				*VillageLevelPreset.ToString(),
+				TEXT("[VillageLayout] Failed to schedule village preset '%s' (%s) for slot '%s'."),
+				*AssignedPresetId.ToString(),
+				*AssignedLevel.ToString(),
 				*SlotId.ToString());
 			UnloadActiveVillageLevels();
 			return false;
@@ -517,8 +800,9 @@ bool AGP_VillageLayoutDirector::StreamSelectedVillageLevels(const TSet<FName>& I
 		ActiveVillageLevels.Add(SlotId, StreamingLevel);
 		++ScheduledLevelCount;
 		UE_LOG(LogTemp, Log,
-			TEXT("[VillageLayout] Scheduled village preset '%s' at slot '%s' Location=%s."),
-			*VillageLevelPreset.ToString(),
+			TEXT("[VillageLayout] Scheduled village preset '%s' (%s) at slot '%s' Location=%s."),
+			*AssignedPresetId.ToString(),
+			*AssignedLevel.ToString(),
 			*SlotId.ToString(),
 			*Slot->GetActorLocation().ToCompactString());
 	}
@@ -1212,6 +1496,14 @@ void AGP_VillageLayoutDirector::DrawSelectionDebug() const
 
 		const UBoxComponent* Bounds = Slot->GetSlotBounds();
 		const FColor Color = Slot->GetPreviewColor();
+		TSoftObjectPtr<UWorld> AssignedLevel;
+		FGP_VillageFootprint AssignedFootprint;
+		FName AssignedPresetId;
+		ResolveVillagePreset(
+			Slot->GetSlotId(),
+			AssignedLevel,
+			AssignedFootprint,
+			AssignedPresetId);
 		DrawDebugBox(
 			GetWorld(),
 			Bounds->GetComponentLocation(),
@@ -1224,9 +1516,10 @@ void AGP_VillageLayoutDirector::DrawSelectionDebug() const
 			20.0f);
 
 		const FString Label = FString::Printf(
-			TEXT("%s / %s / %s%s"),
+			TEXT("%s / %s / %s / %s%s"),
 			*Slot->GetGroupId().ToString(),
 			*Slot->GetSlotId().ToString(),
+			AssignedPresetId.IsNone() ? TEXT("NoPreset") : *AssignedPresetId.ToString(),
 			Slot->IsSelectedForRun() ? TEXT("SELECTED") : TEXT("OFF"),
 			Slot->HasFootprintConflict() ? TEXT(" / OVERLAP") : TEXT(""));
 		DrawDebugString(

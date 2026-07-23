@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-23T02:22:54+09:00
+updated: 2026-07-23T11:19:05+09:00
 status: active
 tags:
   - memoc
@@ -11,13 +11,19 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-07-23T02:22:54+09:00
+Last synced: 2026-07-23T11:19:05+09:00
+
+## Village Multi-Preset Handoff
+
+- Mixed `L_Village_00`/`L_Village_01` selection is committed. The legacy fields define primary 00; the additional preset pool contains compact 01 with offset `(0,-2000,-1500)` and half extent `(6500,8500,3000)` cm. Duplicate IDs/paths are ignored and deterministic bounded assignment retries maximize the selected count before streaming.
+- Final PIE: Seed `1372115260`, attempt 0, `Village_B=Village_01` and `Village_C=Village_00`; 01 isolated Road 3/District 1, 00 isolated Road 5/District 2, and sequential PCG completed `(2/2)`. Full Editor build and `ProjectEden.Game.WorldLayout.VillageSelection` automation pass.
+- `Project_Eden/Content/WorldLayout/L_Village_01.umap` is tracked in the same commit as the source/tests. The editor is open on `L_LandscapeMap` with PIE stopped; the task did not save the already user-modified map or unrelated region/material/memoc changes.
 
 ## Village Footprint Handoff
 
 - Source-only footprint work is complete. `AGP_VillageLayoutDirector` owns the current preset footprint; slots render it, red means overlap, and candidate conflict IDs feed deterministic non-overlap selection with required-group lookahead.
 - Default half extent is `13000,13000,3000` cm and offset is `0,0,-1500` cm, so the visible box is about 260m x 260m x 60m. `L_LandscapeMap` currently shows all three authored footprints red; reposition slots or tune the preset footprint, then use `Refresh Footprint Preview`/PIE. The task did not save the already user-modified map or other content assets.
-- Full `Project_EdenEditor Win64 Development` build and `ProjectEden.Game.WorldLayout.VillageSelection` automation pass. Future multi-preset work should store Level + Footprint together and perform the same pairwise check using each selected preset's footprint.
+- Full `Project_EdenEditor Win64 Development` build and `ProjectEden.Game.WorldLayout.VillageSelection` automation pass. Multi-preset support now uses each assigned preset's own footprint as described above.
 
 ## Village Layout Runtime V1 Handoff
 

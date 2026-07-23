@@ -3,6 +3,8 @@
 #include "CoreMinimal.h"
 #include "GP_VillageTypes.generated.h"
 
+class UWorld;
+
 USTRUCT(BlueprintType)
 struct FGP_VillageFootprint
 {
@@ -15,6 +17,24 @@ struct FGP_VillageFootprint
 	// Half extent. The default represents a 260 m x 260 m authored village area.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Village|Footprint", meta = (ClampMin = "1.0", Units = "cm"))
 	FVector FootprintExtent = FVector(13000.0f, 13000.0f, 3000.0f);
+};
+
+USTRUCT(BlueprintType)
+struct FGP_VillagePresetDefinition
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Village|Preset")
+	FName PresetId = NAME_None;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Village|Preset")
+	TSoftObjectPtr<UWorld> VillageLevel;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Village|Preset", meta = (ShowOnlyInnerProperties))
+	FGP_VillageFootprint Footprint;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Village|Preset", meta = (ClampMin = "0.0"))
+	float SelectionWeight = 1.0f;
 };
 
 USTRUCT(BlueprintType)

@@ -2,7 +2,7 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-07-23T02:22:54+09:00
+updated: 2026-07-23T11:19:05+09:00
 status: active
 tags:
   - memoc
@@ -12,13 +12,12 @@ created: 2026-07-18T13:21:02
 # Session Summary
 
 ## Status
-- Village preset footprint is implemented in source: default half extent 130m XY, offset -15m Z.
-- Slots show footprint boxes; XY OBB overlaps are red and overlapping combinations are excluded deterministically.
+- Footprint checks committed as `f32ef1a2`.
+- Mixed 00/01 preset selection is committed; 01 uses a measured 130m x 170m footprint.
 
 ## Verified
-- `Project_EdenEditor` build succeeded.
-- `ProjectEden.Game.WorldLayout.VillageSelection` passed.
-- `L_LandscapeMap` shows all three current slot footprints as large/red; the map was not saved.
+- Editor build and `VillageSelection` automation pass.
+- PIE spawned `Village_B=Village_01` plus `Village_C=Village_00`; isolated PCG completed 2/2.
 
 ## Next
-- Reposition slots or tune `VillagePresetFootprint`, then run Refresh Footprint Preview/PIE.
+- Add more authored presets/slots; later verify multiplayer streaming and explicit cook registration.

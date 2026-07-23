@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-23T02:22:54+09:00
+updated: 2026-07-23T11:19:05+09:00
 status: active
 tags:
   - memoc
@@ -16,7 +16,9 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 ## Decision Log
 
 ### 2026-07-23
-- Keep the current single village preset's footprint beside `VillageLevelPreset`: default XY half extent is 130m, Z half extent 30m, and Z offset -15m. Preserve `AGP_VillageSlot`'s native root and render the footprint through a child box so existing placed-actor transforms remain compatible. When multiple presets are introduced, migrate Level + Footprint into one preset-definition struct.
+- Keep the legacy `VillageLevelPreset` + footprint as the canonical primary preset so existing instance overrides remain valid. Store additional choices as `FGP_VillagePresetDefinition { PresetId, Level, Footprint, Weight }`; the first additional preset is compact `L_Village_01`. Ignore duplicate preset IDs or level paths deterministically.
+- Assign presets before calculating conflicts, but retry up to 32 deterministic RunSeed/SlotId assignment salts and keep the successful result with the largest selected count. This preserves random visual variety without letting an unlucky large-preset assignment hide a valid mixed/small-preset layout.
+- Preserve `AGP_VillageSlot`'s native root and render the assigned preset footprint through a child box so existing placed-actor transforms remain compatible.
 - Treat village placement as a unit-scale, yaw-aware 2D footprint problem. Use exact XY OBB SAT for editor warnings and selection; terrain height does not make two villages spatially compatible. Selection must prioritize required groups and use deterministic feasibility/lookahead so an early bridge slot cannot block a valid later combination.
 
 ### 2026-07-22
