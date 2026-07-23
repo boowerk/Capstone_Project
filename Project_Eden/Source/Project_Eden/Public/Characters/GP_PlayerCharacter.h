@@ -145,6 +145,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "GAS|Combat")
 	void EquipSkill(UGP_SkillData* NewSkillData, FGameplayTag SlotTag, bool bIgnoreRestrictions = false);
 
+	bool ApplySkillLoadout(
+		UGP_SkillData* Slot01SkillData,
+		UGP_SkillData* Slot02SkillData);
+
 	UFUNCTION(BlueprintCallable, Category = "GAS|Combat", meta = (DeprecatedFunction, DeprecationMessage = "Use DataAsset version instead"))
 	void EquipSkillByClass(FGameplayTag SlotTag, TSubclassOf<UGameplayAbility> NewAbilityClass);
 

@@ -343,3 +343,14 @@ Search first, then open only files named above.
 - Range selection is limited to `GP_VillageTypes.h`, `GP_VillageSelectionPolicy.cpp`, and `VillageSelectionTests.cpp`. It adds opt-in deterministic `MinPickCount..MaxPickCount` while leaving fixed mode and saved-map behavior unchanged.
 - Editor build and `ProjectEden.Game.WorldLayout.VillageSelection` / `ProjectEden.Game.RunSeed.Flow` passed on 2026-07-22 with the editor closed. Tests cover fixed compatibility, exact/ranged counts, determinism, candidate-order independence, validation, required/optional clamping, reflection, and defaults.
 - To permit zero villages, keep the group optional and tune `SpawnChance`; do not set Min to zero. Next content task is adding more authored slots/presets and explicitly enabling range mode when desired.
+
+### 2026-07-23 Radial skill selection handoff
+
+- C++ implementation covers the eight-slot runtime wheel, center detail, Q/E click/key assignment, duplicate prevention with opposite-slot swap, K/Escape close, and local input blocking without world pause.
+- UHT and all changed C++ translation units compiled successfully. The final build stopped only at `LNK1104` because the running editor owns `Binaries/Win64/UnrealEditor-Project_Eden.dll`.
+- Seven final PNGs live under `Content/UI/Asset/SkillIcons/Radial/Source`; their exact importer/SkillData linker is `Scripts/Editor/import_radial_skill_icons.py`.
+- 2026-07-24 screenshot review found the old authored screen still visible under the runtime wheel and entry labels spilling sideways. The fallback now collapses every existing host-canvas child before adding itself, and compact wheel entries hide their redundant label while the center detail retains the selected skill name.
+- Compact wheel mode now replaces the authored button content with a dedicated centered `96x96` icon inside each `112x112` slot; the center-detail icon host is `128x128`.
+- The importer has not run: `Content/UI/Asset/SkillIcons/Radial/Textures` and `[RadialSkillIcons]` log output are absent. Do not diagnose this as a runtime brush problem until the importer completes.
+- Pending: stop PIE, execute the importer in the editor, confirm `[RadialSkillIcons] Completed successfully`, close the editor, run a normal build, then PIE-check K/Q/E, swap/move behavior, the inactive eighth slot, and 1280x720 plus another DPI scale.
+- Do not stage the unrelated user-owned `Content/Asset/Nature/Materials/Bark_DeadTree_011.uasset`.

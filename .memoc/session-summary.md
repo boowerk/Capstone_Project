@@ -2,21 +2,20 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-07-23T19:03:00+09:00
+updated: 2026-07-24T01:25:00+09:00
 status: active
 tags: [memoc, memoc/state]
 ---
 # Session Summary
 
 ## Status
-- B2 player top-left HUD restyle is applied and saved on `feature/no-mcp-work`.
-- Health/Mana/Stamina share Track/FillMask brushes with per-bar tints; the existing TopLeftFrame Border draws the soft Backplate.
-- `Vignette`, `CrestText`, `LocationTextBlock`, and `StatusHint` were removed so the top-left panel contains only the three status bars.
+- Eight-slot radial skill selection is implemented; seven approved RGBA icons are ready.
+- Runtime fallback hides the legacy screen; wheel icons use a centered 96px layer and the center-detail icon is 128px.
 
 ## Verified
-- Four textures imported with UI/no-mip/clamp settings.
-- All four related Widget Blueprints compiled and saved successfully.
+- Prior UHT/changed C++ compile passed; latest layout edits pass `git diff --check`.
+- All PNGs pass 256x256, RGBA, transparency, and alpha checks.
 
 ## Next
-- PIE-check 1280x720 plus another DPI scale; tune backplate strength if bright terrain reduces readability.
-- Stamina remains a likely visual placeholder because no Stamina GAS attributes exist.
+- Stop PIE and run `Scripts/Editor/import_radial_skill_icons.py`; no texture uassets or completion log exist yet.
+- Close the editor, build normally, then PIE-check clean background, new icons, K/Q/E, and layout.

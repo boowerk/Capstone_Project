@@ -11,7 +11,7 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-07-23T19:03:00+09:00
+Last synced: 2026-07-24T01:25:00+09:00
 
 ## Current Status
 
@@ -216,7 +216,7 @@ Last synced: 2026-05-23T00:00:00
 ## Project Snapshot
 
 <!-- memoc:snapshot:start -->
-- Last synced: 2026-06-17T04:47:15
+- Last synced: 2026-07-24T01:25:00+09:00
 - Detected stack: Not detected
 
 ### Source Directories
@@ -260,6 +260,8 @@ Last synced: 2026-05-23T00:00:00
 
 ## Commands
 
+- Unreal Python: execute `Scripts/Editor/import_radial_skill_icons.py` to import the seven radial textures and assign every player-pool SkillData icon.
+- Editor build: close Unreal Editor before the final link; the changed radial-skill C++ already passes UHT and compilation.
 - Unreal Python: created `/Game/Characters/PlayerCharacter/ABP_UEFNSource_Player`
 - Unreal BP edit: assigned `BP_GP_PlayerCharacter.UEFNSourceMesh.AnimClass = ABP_UEFNSource_Player`
 - C++ edit: added `PoseSearch`/`Chooser` support, runtime trajectory bridging, runtime pose-search DB fallback, and chooser-facing context variables in `GP_CharacterAnimInstance`
@@ -307,3 +309,10 @@ See `.memoc/worklog/` and generated `.memoc/activity.md`.
 
 - The top-left HUD uses the B2 backplate and shared track/fill-mask textures with distinct health, mana, and stamina tints.
 - `Vignette`, `CrestText`, `LocationTextBlock`, and `StatusHint` were removed from `WBP_PlayerHUDWidget`; the panel now retains only the three status bars.
+
+### 2026-07-23 Radial skill selection redesign
+
+- `UGP_SkillSelectWidget` now presents the player pool in a fixed eight-slot radial wheel, keeping the pool array order and showing an inactive future slot when only seven skills exist.
+- Selecting a wheel entry updates center icon/name/description/cooldown; Q/E click or key equips it, and assigning the opposite equipped skill swaps the two slots instead of duplicating it.
+- The local picker uses UI-only input and blocks move/look/skill input without pausing the multiplayer world. The runtime fallback collapses the complete legacy screen; each `112x112` outer slot owns a centered `96x96` icon layer, names stay in the centered detail panel, and the detail icon is `128x128`.
+- The approved PNG importer has not yet run; `/Game/UI/Asset/SkillIcons/Radial/Textures` must be created and the seven SkillData icons assigned before the new art can appear.

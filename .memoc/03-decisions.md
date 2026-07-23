@@ -130,3 +130,7 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 ### 2026-07-23
 
 - Keep the player top-left HUD focused on health, mana, and stamina. Remove the vignette, crest label, location label, and status hint; `LocationTextBlock` is optional in native code, so its absence is supported.
+- Keep the player skill wheel at exactly eight clockwise slots using `DA_SkillPool_Player` order. With the current seven skills, the last slot is visible but inactive for future content.
+- Use select-first equipment flow: choose a wheel skill, review it in the center, then click or press Q/E. The same skill cannot occupy both slots; selecting a skill from the opposite slot swaps the displaced skills, or moves it when the target is empty.
+- Keep K as a toggle. While the menu is open, block only the local player's movement, look, and skill input through UI-only focus; never pause the multiplayer world.
+- Preserve the legacy Widget Blueprints and construct the approved radial presentation as a defensive runtime fallback until an authored wheel hierarchy replaces it.

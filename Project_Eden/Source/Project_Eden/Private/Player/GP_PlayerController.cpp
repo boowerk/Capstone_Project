@@ -27,6 +27,32 @@
 #include "UI/GP_SkillSelectWidget.h"
 #include "UI/GP_PlayerHUDWidget.h"
 
+namespace
+{
+bool AreSameEquippedSkill(
+	const UGP_SkillData* Left,
+	const UGP_SkillData* Right)
+{
+	if (!IsValid(Left) || !IsValid(Right))
+	{
+		return false;
+	}
+
+	if (Left == Right)
+	{
+		return true;
+	}
+
+	if (Left->SkillIdTag.IsValid() && Right->SkillIdTag.IsValid())
+	{
+		return Left->SkillIdTag.MatchesTagExact(Right->SkillIdTag);
+	}
+
+	return Left->AbilityClass
+		&& Left->AbilityClass == Right->AbilityClass;
+}
+}
+
 AGP_PlayerController::AGP_PlayerController()
 {
 	PrimaryActorTick.bCanEverTick = true;
@@ -126,7 +152,13 @@ void AGP_PlayerController::ClientOpenRegionEventAugmentSelect_Implementation()
 
 bool AGP_PlayerController::RequestEquipSkill(UGP_SkillData* SkillData, FGameplayTag SlotTag)
 {
-	if (!CanEquipSkill(SkillData, SlotTag))
+	UGP_SkillData* Slot01Skill = nullptr;
+	UGP_SkillData* Slot02Skill = nullptr;
+	if (!BuildSkillLoadoutAfterEquip(
+		SkillData,
+		SlotTag,
+		Slot01Skill,
+		Slot02Skill))
 	{
 		return false;
 	}
@@ -137,14 +169,20 @@ bool AGP_PlayerController::RequestEquipSkill(UGP_SkillData* SkillData, FGameplay
 
 void AGP_PlayerController::Server_EquipSkill_Implementation(UGP_SkillData* SkillData, FGameplayTag SlotTag)
 {
-	if (!CanEquipSkill(SkillData, SlotTag))
+	UGP_SkillData* Slot01Skill = nullptr;
+	UGP_SkillData* Slot02Skill = nullptr;
+	if (!BuildSkillLoadoutAfterEquip(
+		SkillData,
+		SlotTag,
+		Slot01Skill,
+		Slot02Skill))
 	{
 		return;
 	}
 
 	if (AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetPawn()))
 	{
-		PlayerCharacter->EquipSkill(SkillData, SlotTag);
+		PlayerCharacter->ApplySkillLoadout(Slot01Skill, Slot02Skill);
 	}
 }
 
@@ -164,6 +202,72 @@ bool AGP_PlayerController::CanEquipSkill(UGP_SkillData* SkillData, FGameplayTag 
 	}
 
 	return SkillData->SupportedSlotTags.IsEmpty() || SkillData->SupportedSlotTags.HasTagExact(SlotTag);
+}
+
+bool AGP_PlayerController::BuildSkillLoadoutAfterEquip(
+	UGP_SkillData* SkillData,
+	FGameplayTag SlotTag,
+	UGP_SkillData*& OutSlot01Skill,
+	UGP_SkillData*& OutSlot02Skill) const
+{
+	OutSlot01Skill = nullptr;
+	OutSlot02Skill = nullptr;
+
+	if (!CanEquipSkill(SkillData, SlotTag))
+	{
+		return false;
+	}
+
+	const AGP_PlayerState* GPPlayerState =
+		GetPlayerState<AGP_PlayerState>();
+	if (!IsValid(GPPlayerState))
+	{
+		return false;
+	}
+
+	OutSlot01Skill = GPPlayerState->GetEquippedSkillData(
+		GPTags::Ability::Skill::Slot01);
+	OutSlot02Skill = GPPlayerState->GetEquippedSkillData(
+		GPTags::Ability::Skill::Slot02);
+
+	const bool bTargetIsSlot01 =
+		SlotTag.MatchesTagExact(GPTags::Ability::Skill::Slot01);
+	const FGameplayTag OppositeSlotTag =
+		bTargetIsSlot01
+			? GPTags::Ability::Skill::Slot02
+			: GPTags::Ability::Skill::Slot01;
+	UGP_SkillData*& TargetSkill =
+		bTargetIsSlot01
+			? OutSlot01Skill
+			: OutSlot02Skill;
+	UGP_SkillData*& OppositeSkill =
+		bTargetIsSlot01
+			? OutSlot02Skill
+			: OutSlot01Skill;
+
+	if (AreSameEquippedSkill(OppositeSkill, SkillData))
+	{
+		if (AreSameEquippedSkill(TargetSkill, SkillData))
+		{
+			// Repair any legacy duplicate by keeping the requested slot and
+			// clearing the opposite one.
+			OppositeSkill = nullptr;
+		}
+		else
+		{
+			// Moving an equipped skill onto the other slot swaps the displaced
+			// skill back. If the target was empty, this naturally becomes a move.
+			if (IsValid(TargetSkill)
+				&& !CanEquipSkill(TargetSkill, OppositeSlotTag))
+			{
+				return false;
+			}
+			OppositeSkill = TargetSkill;
+		}
+	}
+
+	TargetSkill = SkillData;
+	return !AreSameEquippedSkill(OutSlot01Skill, OutSlot02Skill);
 }
 
 bool AGP_PlayerController::OpenAugmentSelectWidget(const TArray<UGP_SkillAugmentData*>& Candidates)
@@ -1113,20 +1217,36 @@ void AGP_PlayerController::CloseSkillSelect()
 
 void AGP_PlayerController::ApplySkillSelectInputMode(bool bMenuOpen)
 {
-	// Multiplayer: never freeze movement/look — the skill picker is non-blocking,
-	// so the player (and everyone else) keeps moving while it is open. Only the
-	// mouse cursor is toggled so the picker can be clicked.
+	// Keep the multiplayer world running, but route this local player's input
+	// exclusively to the picker until it closes.
 	bShowMouseCursor = bMenuOpen;
 
 	if (bMenuOpen)
 	{
-		FInputModeGameAndUI InputMode;
+		if (!bSkillSelectInputBlocked)
+		{
+			Input_MoveCompleted(FInputActionValue());
+			SetIgnoreMoveInput(true);
+			SetIgnoreLookInput(true);
+			bSkillSelectInputBlocked = true;
+		}
+
+		FInputModeUIOnly InputMode;
+		if (IsValid(SkillSelectWidget))
+		{
+			InputMode.SetWidgetToFocus(SkillSelectWidget->TakeWidget());
+		}
 		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-		InputMode.SetHideCursorDuringCapture(false);
 		SetInputMode(InputMode);
 	}
 	else
 	{
+		if (bSkillSelectInputBlocked)
+		{
+			SetIgnoreMoveInput(false);
+			SetIgnoreLookInput(false);
+			bSkillSelectInputBlocked = false;
+		}
 		SetInputMode(FInputModeGameOnly());
 	}
 }

@@ -1658,6 +1658,130 @@ void AGP_PlayerCharacter::EquipSkill(UGP_SkillData* NewSkillData, FGameplayTag S
 	}
 }
 
+bool AGP_PlayerCharacter::ApplySkillLoadout(
+	UGP_SkillData* Slot01SkillData,
+	UGP_SkillData* Slot02SkillData)
+{
+	if (!HasAuthority())
+	{
+		return false;
+	}
+
+	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+	AGP_PlayerState* GPPlayerState = GetPlayerState<AGP_PlayerState>();
+	if (!IsValid(ASC) || !IsValid(GPPlayerState))
+	{
+		return false;
+	}
+
+	auto IsValidSkillForSlot =
+		[](const UGP_SkillData* SkillData, const FGameplayTag& SlotTag)
+		{
+			return !IsValid(SkillData)
+				|| (SkillData->AbilityClass
+					&& (SkillData->SupportedSlotTags.IsEmpty()
+						|| SkillData->SupportedSlotTags.HasTagExact(SlotTag)));
+		};
+	if (!IsValidSkillForSlot(
+			Slot01SkillData,
+			GPTags::Ability::Skill::Slot01)
+		|| !IsValidSkillForSlot(
+			Slot02SkillData,
+			GPTags::Ability::Skill::Slot02))
+	{
+		return false;
+	}
+
+	const auto AreSameSkill =
+		[](const UGP_SkillData* Left, const UGP_SkillData* Right)
+		{
+			if (!IsValid(Left) || !IsValid(Right))
+			{
+				return false;
+			}
+			if (Left == Right)
+			{
+				return true;
+			}
+			if (Left->SkillIdTag.IsValid() && Right->SkillIdTag.IsValid())
+			{
+				return Left->SkillIdTag.MatchesTagExact(Right->SkillIdTag);
+			}
+			return Left->AbilityClass
+				&& Left->AbilityClass == Right->AbilityClass;
+		};
+	if (AreSameSkill(Slot01SkillData, Slot02SkillData))
+	{
+		return false;
+	}
+
+	UGP_SkillData* CurrentSlot01Skill =
+		GPPlayerState->GetEquippedSkillData(
+			GPTags::Ability::Skill::Slot01);
+	UGP_SkillData* CurrentSlot02Skill =
+		GPPlayerState->GetEquippedSkillData(
+			GPTags::Ability::Skill::Slot02);
+	const bool bChangeSlot01 = CurrentSlot01Skill != Slot01SkillData;
+	const bool bChangeSlot02 = CurrentSlot02Skill != Slot02SkillData;
+	if (!bChangeSlot01 && !bChangeSlot02)
+	{
+		return true;
+	}
+
+	// Clear every changed slot before granting either replacement so swaps never
+	// leave two active specs carrying the same skill identity.
+	if (bChangeSlot01)
+	{
+		ClearAbilitySlot(GPTags::Ability::Skill::Slot01);
+	}
+	if (bChangeSlot02)
+	{
+		ClearAbilitySlot(GPTags::Ability::Skill::Slot02);
+	}
+
+	if (bChangeSlot01 && IsValid(Slot01SkillData))
+	{
+		if (!GiveAbilityToSlot(
+				GPTags::Ability::Skill::Slot01,
+				Slot01SkillData->AbilityClass,
+				Slot01SkillData))
+		{
+			return false;
+		}
+	}
+	if (bChangeSlot02 && IsValid(Slot02SkillData))
+	{
+		if (!GiveAbilityToSlot(
+				GPTags::Ability::Skill::Slot02,
+				Slot02SkillData->AbilityClass,
+				Slot02SkillData))
+		{
+			return false;
+		}
+	}
+
+	if (bChangeSlot01)
+	{
+		GPPlayerState->SetEquippedSkillData(
+			GPTags::Ability::Skill::Slot01,
+			Slot01SkillData);
+		OnSkillEquipped.Broadcast(
+			GPTags::Ability::Skill::Slot01,
+			Slot01SkillData);
+	}
+	if (bChangeSlot02)
+	{
+		GPPlayerState->SetEquippedSkillData(
+			GPTags::Ability::Skill::Slot02,
+			Slot02SkillData);
+		OnSkillEquipped.Broadcast(
+			GPTags::Ability::Skill::Slot02,
+			Slot02SkillData);
+	}
+
+	return true;
+}
+
 void AGP_PlayerCharacter::EquipSkillByClass(FGameplayTag SlotTag, TSubclassOf<UGameplayAbility> NewAbilityClass)
 {
 	GiveAbilityToSlot(SlotTag, NewAbilityClass);

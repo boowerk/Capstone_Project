@@ -50,6 +50,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "UI|Skill")
 	bool RequestEquipSkill(UGP_SkillData* SkillData, FGameplayTag SlotTag);
 
+	UFUNCTION(BlueprintCallable, Category = "UI|Skill")
+	void CloseSkillSelect();
+
 	UFUNCTION(BlueprintPure, Category = "UI|Skill")
 	UGP_SkillPoolData* GetSkillPoolData() const { return SkillPoolData; }
 
@@ -226,6 +229,11 @@ private:
 	void Server_EquipSkill(UGP_SkillData* SkillData, FGameplayTag SlotTag);
 
 	bool CanEquipSkill(UGP_SkillData* SkillData, FGameplayTag SlotTag) const;
+	bool BuildSkillLoadoutAfterEquip(
+		UGP_SkillData* SkillData,
+		FGameplayTag SlotTag,
+		UGP_SkillData*& OutSlot01Skill,
+		UGP_SkillData*& OutSlot02Skill) const;
 	bool ActivateAbilityByTag(const FGameplayTag& AbilityTag) const;
 	bool IsSkillSelectionActive() const;
 	bool IsGroundPositionSelectionActive() const;
@@ -245,7 +253,6 @@ private:
 	void Input_ToggleSkillSelect();
 	bool EnsureSkillSelectWidget();
 	void OpenSkillSelect();
-	void CloseSkillSelect();
 	void ApplySkillSelectInputMode(bool bMenuOpen);
 	FVector2D ResolveEffectiveMoveInput(const AGP_PlayerCharacter* PlayerCharacter) const;
 	void UpdateMovementSpeed(float DeltaSeconds);
@@ -255,6 +262,7 @@ private:
 	int32 TestSkillPresetIndex = 0;
 	bool bIsCharacterStatsMenuOpen = false;
 	bool bWasGroundPositionSelectionActive = false;
+	bool bSkillSelectInputBlocked = false;
 
 	// --- Movement Input Smoothing ---
 	FVector SmoothedMoveWorldDirection = FVector::ZeroVector;
