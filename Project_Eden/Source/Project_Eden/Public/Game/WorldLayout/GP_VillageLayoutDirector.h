@@ -9,6 +9,7 @@
 class AGP_VillageSlot;
 class ALevelInstance;
 class UPCGComponent;
+class UGP_VillagePresetCatalog;
 class USceneComponent;
 class ULevelStreamingDynamic;
 class UWorld;
@@ -49,12 +50,22 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Village|Level Instance")
 	TArray<FGP_VillagePresetDefinition> GetVillagePresetPool() const;
 
+	UFUNCTION(BlueprintPure, Category = "Village|Level Instance")
+	UGP_VillagePresetCatalog* GetVillagePresetCatalog() const
+	{
+		return VillagePresetCatalog;
+	}
+
 	static int32 SelectVillagePresetIndex(
 		int32 InRunSeed,
 		FName SlotId,
 		const TArray<FGP_VillagePresetDefinition>& Presets,
 		int32 AssignmentAttempt = 0,
 		EGP_VillageSlotSizeClass SlotSizeClass = EGP_VillageSlotSizeClass::Medium);
+	static TArray<FGP_VillagePresetDefinition> MergeVillagePresetSources(
+		const TArray<FGP_VillagePresetDefinition>& PrimaryPresets,
+		const TArray<FGP_VillagePresetDefinition>& CatalogPresets,
+		const TArray<FGP_VillagePresetDefinition>& LegacyPresets);
 	static bool DoesVillageFootprintFitSlot(
 		const FGP_VillageFootprint& Footprint,
 		EGP_VillageSlotSizeClass SlotSizeClass);
@@ -89,8 +100,13 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Village|Level Instance", meta = (ShowOnlyInnerProperties))
 	FGP_VillageFootprint VillagePresetFootprint;
 
-	// Additional presets beyond the legacy VillageLevelPreset primary entry.
-	// Clearing this pool preserves exact single-preset behavior.
+	// Content-owned preset list. Add new village levels to this asset rather than
+	// changing the Director defaults or resaving every map that contains one.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Village|Level Instance")
+	TObjectPtr<UGP_VillagePresetCatalog> VillagePresetCatalog = nullptr;
+
+	// Legacy per-Director additions. The shared catalog is authoritative when an
+	// ID or level path is duplicated; unique legacy entries are still appended.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Village|Level Instance", meta = (TitleProperty = "PresetId"))
 	TArray<FGP_VillagePresetDefinition> VillagePresetPool;
 

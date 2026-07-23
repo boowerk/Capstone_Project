@@ -10,6 +10,7 @@
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "Game/GP_GameState.h"
+#include "Game/WorldLayout/GP_VillagePresetCatalog.h"
 #include "Game/WorldLayout/GP_VillageSelectionPolicy.h"
 #include "Game/WorldLayout/GP_VillageSlot.h"
 #include "Misc/Crc.h"
@@ -17,6 +18,7 @@
 #include "PCGComponent.h"
 #include "PCGGraph.h"
 #include "PCGManagedResource.h"
+#include "UObject/ConstructorHelpers.h"
 #include "WorldPartition/DataLayer/DataLayerAsset.h"
 #include "WorldPartition/DataLayer/DataLayerManager.h"
 
@@ -208,22 +210,10 @@ AGP_VillageLayoutDirector::AGP_VillageLayoutDirector()
 
 	VillageLevelPreset = TSoftObjectPtr<UWorld>(
 		FSoftObjectPath(TEXT("/Game/WorldLayout/L_Village_00.L_Village_00")));
-
-	FGP_VillagePresetDefinition Village01;
-	Village01.PresetId = TEXT("Village_01");
-	Village01.VillageLevel = TSoftObjectPtr<UWorld>(
-		FSoftObjectPath(TEXT("/Game/WorldLayout/L_Village_01.L_Village_01")));
-	Village01.Footprint.FootprintOffset = FVector(0.0f, 0.0f, -1500.0f);
-	Village01.Footprint.FootprintExtent = FVector(6500.0f, 6500.0f, 3000.0f);
-	VillagePresetPool.Add(Village01);
-
-	FGP_VillagePresetDefinition Village02;
-	Village02.PresetId = TEXT("Village_02");
-	Village02.VillageLevel = TSoftObjectPtr<UWorld>(
-		FSoftObjectPath(TEXT("/Game/WorldLayout/L_Village_02.L_Village_02")));
-	Village02.Footprint.FootprintOffset = FVector(0.0f, 0.0f, -1500.0f);
-	Village02.Footprint.FootprintExtent = FVector(6500.0f, 6500.0f, 3000.0f);
-	VillagePresetPool.Add(Village02);
+	static ConstructorHelpers::FObjectFinder<UGP_VillagePresetCatalog>
+		DefaultPresetCatalogFinder(
+			TEXT("/Game/WorldLayout/DA_VillagePresetCatalog.DA_VillagePresetCatalog"));
+	VillagePresetCatalog = DefaultPresetCatalogFinder.Object;
 
 #if WITH_EDITORONLY_DATA
 	bIsSpatiallyLoaded = false;
@@ -235,39 +225,84 @@ TArray<FGP_VillagePresetDefinition> AGP_VillageLayoutDirector::GetVillagePresetP
 	return BuildEffectiveVillagePresetPool();
 }
 
-TArray<FGP_VillagePresetDefinition> AGP_VillageLayoutDirector::BuildEffectiveVillagePresetPool() const
+TArray<FGP_VillagePresetDefinition> AGP_VillageLayoutDirector::MergeVillagePresetSources(
+	const TArray<FGP_VillagePresetDefinition>& PrimaryPresets,
+	const TArray<FGP_VillagePresetDefinition>& CatalogPresets,
+	const TArray<FGP_VillagePresetDefinition>& LegacyPresets)
 {
 	TArray<FGP_VillagePresetDefinition> EffectivePresets;
 	TSet<FName> SeenPresetIds;
 	TSet<FString> SeenLevelPaths;
+
+	const auto AddPreset =
+		[&EffectivePresets, &SeenPresetIds, &SeenLevelPaths](
+			const FGP_VillagePresetDefinition& Preset,
+			bool bReserveDisabledIdentity)
+		{
+			if (Preset.VillageLevel.IsNull())
+			{
+				return;
+			}
+
+			const FName PresetId = ResolvePresetId(Preset);
+			const FString LevelPath = Preset.VillageLevel.ToSoftObjectPath().ToString();
+			if (SeenPresetIds.Contains(PresetId)
+				|| SeenLevelPaths.Contains(LevelPath))
+			{
+				return;
+			}
+
+			if (bReserveDisabledIdentity)
+			{
+				SeenPresetIds.Add(PresetId);
+				SeenLevelPaths.Add(LevelPath);
+			}
+
+			if (Preset.SelectionWeight <= 0.0f)
+			{
+				return;
+			}
+
+			EffectivePresets.Add(Preset);
+			if (!bReserveDisabledIdentity)
+			{
+				SeenPresetIds.Add(PresetId);
+				SeenLevelPaths.Add(LevelPath);
+			}
+		};
+
+	for (const FGP_VillagePresetDefinition& Preset : PrimaryPresets)
+	{
+		AddPreset(Preset, false);
+	}
+	for (const FGP_VillagePresetDefinition& Preset : CatalogPresets)
+	{
+		// A disabled catalog row is a tombstone for matching legacy entries.
+		AddPreset(Preset, true);
+	}
+	for (const FGP_VillagePresetDefinition& Preset : LegacyPresets)
+	{
+		AddPreset(Preset, false);
+	}
+	return EffectivePresets;
+}
+
+TArray<FGP_VillagePresetDefinition> AGP_VillageLayoutDirector::BuildEffectiveVillagePresetPool() const
+{
+	TArray<FGP_VillagePresetDefinition> PrimaryPresets;
 	if (!VillageLevelPreset.IsNull())
 	{
 		FGP_VillagePresetDefinition PrimaryPreset;
 		PrimaryPreset.PresetId = TEXT("Village_00");
 		PrimaryPreset.VillageLevel = VillageLevelPreset;
 		PrimaryPreset.Footprint = VillagePresetFootprint;
-		EffectivePresets.Add(PrimaryPreset);
-		SeenPresetIds.Add(PrimaryPreset.PresetId);
-		SeenLevelPaths.Add(PrimaryPreset.VillageLevel.ToSoftObjectPath().ToString());
+		PrimaryPresets.Add(PrimaryPreset);
 	}
 
-	for (const FGP_VillagePresetDefinition& Preset : VillagePresetPool)
-	{
-		const FName PresetId = ResolvePresetId(Preset);
-		const FString LevelPath = Preset.VillageLevel.ToSoftObjectPath().ToString();
-		if (Preset.VillageLevel.IsNull()
-			|| Preset.SelectionWeight <= 0.0f
-			|| SeenPresetIds.Contains(PresetId)
-			|| SeenLevelPaths.Contains(LevelPath))
-		{
-			continue;
-		}
-
-		EffectivePresets.Add(Preset);
-		SeenPresetIds.Add(PresetId);
-		SeenLevelPaths.Add(LevelPath);
-	}
-	return EffectivePresets;
+	const TArray<FGP_VillagePresetDefinition> EmptyCatalog;
+	const TArray<FGP_VillagePresetDefinition>& CatalogPresets =
+		VillagePresetCatalog ? VillagePresetCatalog->Presets : EmptyCatalog;
+	return MergeVillagePresetSources(PrimaryPresets, CatalogPresets, VillagePresetPool);
 }
 
 void AGP_VillageLayoutDirector::OnConstruction(const FTransform& Transform)
