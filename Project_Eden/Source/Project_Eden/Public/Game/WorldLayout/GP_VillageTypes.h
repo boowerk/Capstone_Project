@@ -5,6 +5,25 @@
 
 class UWorld;
 
+UENUM(BlueprintType)
+enum class EGP_VillageSlotSizeClass : uint8
+{
+	Small UMETA(DisplayName = "Small (130 m)"),
+	Medium UMETA(DisplayName = "Medium (230 m)")
+};
+
+inline FVector2D GPGetVillageSlotCapacityHalfExtent(EGP_VillageSlotSizeClass SizeClass)
+{
+	switch (SizeClass)
+	{
+	case EGP_VillageSlotSizeClass::Small:
+		return FVector2D(6500.0f, 6500.0f);
+	case EGP_VillageSlotSizeClass::Medium:
+	default:
+		return FVector2D(11500.0f, 11500.0f);
+	}
+}
+
 USTRUCT(BlueprintType)
 struct FGP_VillageFootprint
 {

@@ -53,7 +53,11 @@ public:
 		int32 InRunSeed,
 		FName SlotId,
 		const TArray<FGP_VillagePresetDefinition>& Presets,
-		int32 AssignmentAttempt = 0);
+		int32 AssignmentAttempt = 0,
+		EGP_VillageSlotSizeClass SlotSizeClass = EGP_VillageSlotSizeClass::Medium);
+	static bool DoesVillageFootprintFitSlot(
+		const FGP_VillageFootprint& Footprint,
+		EGP_VillageSlotSizeClass SlotSizeClass);
 	static bool DoVillageFootprintsOverlap(
 		const FTransform& FirstSlotTransform,
 		const FGP_VillageFootprint& FirstFootprint,

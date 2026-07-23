@@ -489,9 +489,18 @@ bool FVillageSelectionPolicyTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Required group still selects every eligible fallback"), TooManyRequiredResult.SelectedSlotIds.Num(), 3);
 
 	TestNotNull(TEXT("VillageSlot owns an editor footprint box"), GetDefault<AGP_VillageSlot>()->GetSlotBounds());
+	TestNotNull(TEXT("VillageSlot owns a separate editor capacity box"),
+		GetDefault<AGP_VillageSlot>()->GetCapacityBounds());
 #if WITH_EDITORONLY_DATA
 	TestTrue(TEXT("VillageSlot footprint box is editor visualization only"),
 		GetDefault<AGP_VillageSlot>()->GetSlotBounds()->IsVisualizationComponent());
+	TestTrue(TEXT("VillageSlot capacity box is editor visualization only"),
+		GetDefault<AGP_VillageSlot>()->GetCapacityBounds()->IsVisualizationComponent());
+	TestFalse(TEXT("VillageSlot runtime root is not an editor visualization component"),
+		GetDefault<AGP_VillageSlot>()->GetRootComponent()->IsVisualizationComponent());
+	TestTrue(TEXT("VillageSlot capacity visualization is separate from its runtime root"),
+		GetDefault<AGP_VillageSlot>()->GetCapacityBounds()
+			!= GetDefault<AGP_VillageSlot>()->GetRootComponent());
 #endif
 	const UFunction* RebuildPreviewFunction =
 		AGP_VillageLayoutDirector::StaticClass()->FindFunctionByName(TEXT("RebuildPreview"));
@@ -540,6 +549,8 @@ bool FVillageSelectionPolicyTest::RunTest(const FString& Parameters)
 		AGP_VillageLayoutDirector::StaticClass()->FindPropertyByName(TEXT("VillagePresetFootprint")));
 	TestNotNull(TEXT("VillageLayoutDirector exposes a village preset pool"),
 		AGP_VillageLayoutDirector::StaticClass()->FindPropertyByName(TEXT("VillagePresetPool")));
+	TestNotNull(TEXT("VillageSlot exposes a size-class capacity"),
+		AGP_VillageSlot::StaticClass()->FindPropertyByName(TEXT("SlotSizeClass")));
 	TestNotNull(TEXT("Village candidates expose footprint conflicts"),
 		FGP_VillageCandidate::StaticStruct()->FindPropertyByName(TEXT("OverlappingSlotIds")));
 	TestNotNull(TEXT("Village group rules expose optional range mode"),
@@ -570,6 +581,12 @@ bool FVillageSelectionPolicyTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("VillageSlot keeps the flat preview at the placement origin"),
 		GetDefault<AGP_VillageSlot>()->GetSlotBounds()->GetRelativeLocation(),
 		FVector(DefaultFootprint.FootprintOffset.X, DefaultFootprint.FootprintOffset.Y, 0.0f));
+	TestTrue(TEXT("Village slots default to Medium capacity"),
+		GetDefault<AGP_VillageSlot>()->GetSlotSizeClass()
+			== EGP_VillageSlotSizeClass::Medium);
+	TestEqual(TEXT("Medium slot capacity is a 230 m flat XY box"),
+		GetDefault<AGP_VillageSlot>()->GetCapacityBounds()->GetUnscaledBoxExtent(),
+		FVector(11500.0f, 11500.0f, 1.0f));
 
 	const TArray<FGP_VillagePresetDefinition> DefaultPresetPool =
 		GetDefault<AGP_VillageLayoutDirector>()->GetVillagePresetPool();
@@ -607,6 +624,29 @@ bool FVillageSelectionPolicyTest::RunTest(const FString& Parameters)
 				Village01Preset->Footprint.FootprintOffset.X,
 				Village01Preset->Footprint.FootprintOffset.Y),
 			FVector2D::ZeroVector);
+		TestTrue(TEXT("Village_01 fits a Small slot"),
+			AGP_VillageLayoutDirector::DoesVillageFootprintFitSlot(
+				Village01Preset->Footprint,
+				EGP_VillageSlotSizeClass::Small));
+		TestTrue(TEXT("Village_01 fits a Medium slot"),
+			AGP_VillageLayoutDirector::DoesVillageFootprintFitSlot(
+				Village01Preset->Footprint,
+				EGP_VillageSlotSizeClass::Medium));
+		TestFalse(TEXT("Village_00 does not fit a Small slot"),
+			AGP_VillageLayoutDirector::DoesVillageFootprintFitSlot(
+				Village00Preset->Footprint,
+				EGP_VillageSlotSizeClass::Small));
+		TestTrue(TEXT("Village_00 fits a Medium slot"),
+			AGP_VillageLayoutDirector::DoesVillageFootprintFitSlot(
+				Village00Preset->Footprint,
+				EGP_VillageSlotSizeClass::Medium));
+
+		FGP_VillageFootprint OffsetCompactFootprint = Village01Preset->Footprint;
+		OffsetCompactFootprint.FootprintOffset.X = 100.0f;
+		TestFalse(TEXT("Preset offset is included in slot-capacity fit"),
+			AGP_VillageLayoutDirector::DoesVillageFootprintFitSlot(
+				OffsetCompactFootprint,
+				EGP_VillageSlotSizeClass::Small));
 
 		const int32 StableIndex = AGP_VillageLayoutDirector::SelectVillagePresetIndex(
 			1337,
@@ -648,6 +688,37 @@ bool FVillageSelectionPolicyTest::RunTest(const FString& Parameters)
 		}
 		TestTrue(TEXT("Run seeds can select Village_00"), bSawVillage00);
 		TestTrue(TEXT("Run seeds can select Village_01"), bSawVillage01);
+
+		bool bSmallSlotSelectedOnlyVillage01 = true;
+		for (int32 Seed = 0; Seed < 128; ++Seed)
+		{
+			const int32 PresetIndex = AGP_VillageLayoutDirector::SelectVillagePresetIndex(
+				Seed,
+				FName(TEXT("Village_A")),
+				DefaultPresetPool,
+				0,
+				EGP_VillageSlotSizeClass::Small);
+			bSmallSlotSelectedOnlyVillage01 &=
+				DefaultPresetPool.IsValidIndex(PresetIndex)
+				&& DefaultPresetPool[PresetIndex].PresetId == FName(TEXT("Village_01"));
+		}
+		TestTrue(TEXT("Small slots reject Medium presets for every seed"),
+			bSmallSlotSelectedOnlyVillage01);
+
+		TArray<FGP_VillagePresetDefinition> MediumOnlyPool = DefaultPresetPool;
+		MediumOnlyPool[MediumOnlyPool.IndexOfByPredicate(
+			[](const FGP_VillagePresetDefinition& Preset)
+			{
+				return Preset.PresetId == FName(TEXT("Village_01"));
+			})].SelectionWeight = 0.0f;
+		TestEqual(TEXT("Small slots fail closed when no compatible preset exists"),
+			AGP_VillageLayoutDirector::SelectVillagePresetIndex(
+				1337,
+				FName(TEXT("Village_A")),
+				MediumOnlyPool,
+				0,
+				EGP_VillageSlotSizeClass::Small),
+			INDEX_NONE);
 
 		TArray<FGP_VillagePresetDefinition> Village01OnlyPool = DefaultPresetPool;
 		Village01OnlyPool[Village01OnlyPool.IndexOfByPredicate(

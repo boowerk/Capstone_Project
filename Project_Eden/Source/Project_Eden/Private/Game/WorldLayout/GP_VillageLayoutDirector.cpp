@@ -93,7 +93,8 @@ int32 AGP_VillageLayoutDirector::SelectVillagePresetIndex(
 	int32 InRunSeed,
 	FName SlotId,
 	const TArray<FGP_VillagePresetDefinition>& Presets,
-	int32 AssignmentAttempt)
+	int32 AssignmentAttempt,
+	EGP_VillageSlotSizeClass SlotSizeClass)
 {
 	TMap<FName, int32> PresetIdCounts;
 	TMap<FString, int32> LevelPathCounts;
@@ -117,7 +118,8 @@ int32 AGP_VillageLayoutDirector::SelectVillagePresetIndex(
 		if (!Preset.VillageLevel.IsNull()
 			&& Preset.SelectionWeight > 0.0f
 			&& PresetIdCounts.FindRef(PresetId) == 1
-			&& LevelPathCounts.FindRef(LevelPath) == 1)
+			&& LevelPathCounts.FindRef(LevelPath) == 1
+			&& DoesVillageFootprintFitSlot(Preset.Footprint, SlotSizeClass))
 		{
 			ValidPresetIndices.Add(PresetIndex);
 		}
@@ -154,6 +156,20 @@ int32 AGP_VillageLayoutDirector::SelectVillagePresetIndex(
 	}
 
 	return ValidPresetIndices.Last();
+}
+
+bool AGP_VillageLayoutDirector::DoesVillageFootprintFitSlot(
+	const FGP_VillageFootprint& Footprint,
+	EGP_VillageSlotSizeClass SlotSizeClass)
+{
+	const FVector2D CapacityHalfExtent = GPGetVillageSlotCapacityHalfExtent(SlotSizeClass);
+	const FVector2D RequiredHalfExtent(
+		FMath::Abs(Footprint.FootprintOffset.X)
+			+ FMath::Abs(Footprint.FootprintExtent.X),
+		FMath::Abs(Footprint.FootprintOffset.Y)
+			+ FMath::Abs(Footprint.FootprintExtent.Y));
+	return RequiredHalfExtent.X <= CapacityHalfExtent.X + KINDA_SMALL_NUMBER
+		&& RequiredHalfExtent.Y <= CapacityHalfExtent.Y + KINDA_SMALL_NUMBER;
 }
 
 bool AGP_VillageLayoutDirector::DoVillageFootprintsOverlap(
@@ -330,12 +346,21 @@ bool AGP_VillageLayoutDirector::BuildSelectionForSeed(int32 InRunSeed)
 	for (int32 AssignmentAttempt = 0; AssignmentAttempt < AssignmentAttemptCount; ++AssignmentAttempt)
 	{
 		AssignVillagePresets(InRunSeed, AssignmentAttempt);
+		TArray<AGP_VillageSlot*> AttemptCandidateSlots;
 		TArray<FGP_VillageCandidate> AttemptCandidates;
-		for (const AGP_VillageSlot* Slot : CandidateSlots)
+		for (AGP_VillageSlot* Slot : CandidateSlots)
 		{
+			const int32* AssignedPresetIndex =
+				AssignedVillagePresetIndices.Find(Slot->GetSlotId());
+			if (!AssignedPresetIndex || *AssignedPresetIndex == INDEX_NONE)
+			{
+				continue;
+			}
+
+			AttemptCandidateSlots.Add(Slot);
 			AttemptCandidates.Add(Slot->MakeCandidate());
 		}
-		PopulateCandidateOverlaps(AttemptCandidates, CandidateSlots);
+		PopulateCandidateOverlaps(AttemptCandidates, AttemptCandidateSlots);
 
 		FGP_VillageSelectionResult AttemptResult =
 			GPVillageSelectionPolicy::SelectSlots(InRunSeed, AttemptCandidates, GroupRules);
@@ -873,11 +898,9 @@ void AGP_VillageLayoutDirector::AssignVillagePresets(int32 InRunSeed, int32 Assi
 			InRunSeed,
 			Slot->GetSlotId(),
 			EffectivePresets,
-			AssignmentAttempt);
-		if (PresetIndex != INDEX_NONE)
-		{
-			AssignedVillagePresetIndices.Add(Slot->GetSlotId(), PresetIndex);
-		}
+			AssignmentAttempt,
+			Slot->GetSlotSizeClass());
+		AssignedVillagePresetIndices.Add(Slot->GetSlotId(), PresetIndex);
 	}
 }
 
@@ -889,18 +912,26 @@ bool AGP_VillageLayoutDirector::ResolveVillagePreset(
 {
 	const TArray<FGP_VillagePresetDefinition> EffectivePresets = BuildEffectiveVillagePresetPool();
 	if (const int32* PresetIndex = AssignedVillagePresetIndices.Find(SlotId);
-		PresetIndex && EffectivePresets.IsValidIndex(*PresetIndex))
+		PresetIndex)
 	{
-		const FGP_VillagePresetDefinition& Preset = EffectivePresets[*PresetIndex];
-		if (!Preset.VillageLevel.IsNull() && Preset.SelectionWeight > 0.0f)
+		if (EffectivePresets.IsValidIndex(*PresetIndex))
 		{
-			OutLevel = Preset.VillageLevel;
-			OutFootprint = Preset.Footprint;
-			OutPresetId = Preset.PresetId.IsNone()
-				? FName(*Preset.VillageLevel.ToSoftObjectPath().GetAssetName())
-				: Preset.PresetId;
-			return true;
+			const FGP_VillagePresetDefinition& Preset = EffectivePresets[*PresetIndex];
+			if (!Preset.VillageLevel.IsNull() && Preset.SelectionWeight > 0.0f)
+			{
+				OutLevel = Preset.VillageLevel;
+				OutFootprint = Preset.Footprint;
+				OutPresetId = Preset.PresetId.IsNone()
+					? FName(*Preset.VillageLevel.ToSoftObjectPath().GetAssetName())
+					: Preset.PresetId;
+				return true;
+			}
 		}
+
+		OutLevel.Reset();
+		OutFootprint = FGP_VillageFootprint();
+		OutPresetId = NAME_None;
+		return false;
 	}
 
 	OutLevel = VillageLevelPreset;
@@ -923,11 +954,15 @@ void AGP_VillageLayoutDirector::ApplyFootprintPreview()
 		TSoftObjectPtr<UWorld> AssignedLevel;
 		FGP_VillageFootprint AssignedFootprint;
 		FName AssignedPresetId;
-		ResolveVillagePreset(
+		if (!ResolveVillagePreset(
 			Slot->GetSlotId(),
 			AssignedLevel,
 			AssignedFootprint,
-			AssignedPresetId);
+			AssignedPresetId))
+		{
+			Slot->ClearFootprintPreview();
+			continue;
+		}
 		Slot->ApplyFootprint(AssignedFootprint);
 		Slot->SetFootprintConflict(false);
 	}
@@ -954,16 +989,19 @@ void AGP_VillageLayoutDirector::ApplyFootprintPreview()
 			FGP_VillageFootprint SecondFootprint;
 			FName FirstPresetId;
 			FName SecondPresetId;
-			ResolveVillagePreset(
+			if (!ResolveVillagePreset(
 				FirstSlot->GetSlotId(),
 				FirstLevel,
 				FirstFootprint,
-				FirstPresetId);
-			ResolveVillagePreset(
+				FirstPresetId)
+				|| !ResolveVillagePreset(
 				SecondSlot->GetSlotId(),
 				SecondLevel,
 				SecondFootprint,
-				SecondPresetId);
+				SecondPresetId))
+			{
+				continue;
+			}
 			if (DoVillageFootprintsOverlap(
 				FirstSlot->GetActorTransform(),
 				FirstFootprint,
@@ -1926,11 +1964,14 @@ void AGP_VillageLayoutDirector::DrawSelectionDebug() const
 		TSoftObjectPtr<UWorld> AssignedLevel;
 		FGP_VillageFootprint AssignedFootprint;
 		FName AssignedPresetId;
-		ResolveVillagePreset(
+		if (!ResolveVillagePreset(
 			Slot->GetSlotId(),
 			AssignedLevel,
 			AssignedFootprint,
-			AssignedPresetId);
+			AssignedPresetId))
+		{
+			continue;
+		}
 		DrawDebugBox(
 			GetWorld(),
 			Bounds->GetComponentLocation(),

@@ -16,6 +16,16 @@ AGP_VillageSlot::AGP_VillageSlot()
 	SlotBounds->SetHiddenInGame(true);
 	SlotBounds->SetVisibility(false, false);
 
+	CapacityBounds = CreateDefaultSubobject<UBoxComponent>(TEXT("CapacityBounds"));
+	CapacityBounds->SetupAttachment(SlotBounds);
+	CapacityBounds->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	CapacityBounds->SetGenerateOverlapEvents(false);
+	CapacityBounds->SetHiddenInGame(true);
+#if WITH_EDITORONLY_DATA
+	CapacityBounds->SetIsVisualizationComponent(true);
+#endif
+	CapacityBounds->ShapeColor = FColor(255, 170, 0);
+
 	FootprintBounds = CreateDefaultSubobject<UBoxComponent>(TEXT("FootprintBounds"));
 	FootprintBounds->SetupAttachment(SlotBounds);
 	FootprintBounds->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -24,6 +34,7 @@ AGP_VillageSlot::AGP_VillageSlot()
 #if WITH_EDITORONLY_DATA
 	FootprintBounds->SetIsVisualizationComponent(true);
 #endif
+	UpdateCapacityPreview();
 	ApplyFootprint(FGP_VillageFootprint());
 
 #if WITH_EDITORONLY_DATA
@@ -55,6 +66,28 @@ void AGP_VillageSlot::Destroyed()
 	Super::Destroyed();
 }
 
+void AGP_VillageSlot::UpdateCapacityPreview()
+{
+	if (!CapacityBounds)
+	{
+		return;
+	}
+
+	const FVector2D CapacityHalfExtent = GPGetVillageSlotCapacityHalfExtent(SlotSizeClass);
+	const FVector ActorScale = GetActorScale3D();
+	const FVector InverseActorScale(
+		FMath::IsNearlyZero(ActorScale.X) ? 1.0f : 1.0f / ActorScale.X,
+		FMath::IsNearlyZero(ActorScale.Y) ? 1.0f : 1.0f / ActorScale.Y,
+		FMath::IsNearlyZero(ActorScale.Z) ? 1.0f : 1.0f / ActorScale.Z);
+	CapacityBounds->SetRelativeLocation(FVector::ZeroVector);
+	CapacityBounds->SetRelativeScale3D(InverseActorScale);
+	CapacityBounds->SetBoxExtent(
+		FVector(CapacityHalfExtent.X, CapacityHalfExtent.Y, 1.0f),
+		false);
+	CapacityBounds->UpdateBounds();
+	CapacityBounds->MarkRenderStateDirty();
+}
+
 void AGP_VillageSlot::ApplyFootprint(const FGP_VillageFootprint& Footprint)
 {
 	if (!FootprintBounds)
@@ -83,8 +116,21 @@ void AGP_VillageSlot::ApplyFootprint(const FGP_VillageFootprint& Footprint)
 	FootprintBounds->SetRelativeLocation(PreviewOffset * InverseActorScale);
 	FootprintBounds->SetRelativeScale3D(InverseActorScale);
 	FootprintBounds->SetBoxExtent(PreviewExtent, false);
+	FootprintBounds->SetVisibility(true, false);
 	FootprintBounds->UpdateBounds();
 	UpdatePreviewColor();
+}
+
+void AGP_VillageSlot::ClearFootprintPreview()
+{
+	if (!FootprintBounds)
+	{
+		return;
+	}
+
+	bFootprintConflict = false;
+	FootprintBounds->SetVisibility(false, false);
+	FootprintBounds->MarkRenderStateDirty();
 }
 
 void AGP_VillageSlot::SetFootprintConflict(bool bConflicting)
@@ -144,12 +190,14 @@ void AGP_VillageSlot::PostEditMove(bool bFinished)
 void AGP_VillageSlot::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
 	Super::PostEditChangeProperty(PropertyChangedEvent);
+	UpdateCapacityPreview();
 	NotifyLayoutDirectorsFootprintChanged();
 }
 
 void AGP_VillageSlot::PostEditUndo()
 {
 	Super::PostEditUndo();
+	UpdateCapacityPreview();
 	NotifyLayoutDirectorsFootprintChanged();
 }
 

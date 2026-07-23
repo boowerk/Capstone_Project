@@ -25,15 +25,18 @@ public:
 
 	FGP_VillageCandidate MakeCandidate() const;
 	void ApplyFootprint(const FGP_VillageFootprint& Footprint);
+	void ClearFootprintPreview();
 	void SetFootprintConflict(bool bConflicting);
 	void SetSelectedForRun(bool bSelected);
 
 	FName GetSlotId() const { return SlotId; }
 	FName GetGroupId() const { return GroupId; }
+	EGP_VillageSlotSizeClass GetSlotSizeClass() const { return SlotSizeClass; }
 	bool IsCandidateEnabled() const { return bEnabled; }
 	bool IsSelectedForRun() const { return bSelectedForRun; }
 	bool HasFootprintConflict() const { return bFootprintConflict; }
 	UBoxComponent* GetSlotBounds() const { return FootprintBounds; }
+	UBoxComponent* GetCapacityBounds() const { return CapacityBounds; }
 	UDataLayerAsset* GetVillageDataLayer() const { return VillageDataLayer; }
 	FColor GetPreviewColor() const;
 
@@ -46,6 +49,9 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Village")
 	TObjectPtr<UBoxComponent> SlotBounds;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Village|Capacity")
+	TObjectPtr<UBoxComponent> CapacityBounds;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Village|Footprint")
 	TObjectPtr<UBoxComponent> FootprintBounds;
 
@@ -57,6 +63,9 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Village", meta = (ClampMin = "0.0"))
 	float SelectionWeight = 1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Village|Capacity")
+	EGP_VillageSlotSizeClass SlotSizeClass = EGP_VillageSlotSizeClass::Medium;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Village")
 	bool bEnabled = true;
@@ -82,6 +91,7 @@ protected:
 #endif
 
 private:
+	void UpdateCapacityPreview();
 	void UpdatePreviewColor();
 
 #if WITH_EDITOR
