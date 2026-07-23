@@ -40,11 +40,13 @@ AGP_SkillTargetPreviewActor::AGP_SkillTargetPreviewActor()
 	AreaDecal->DecalSize = FVector(96.0f, PreviewRadius, PreviewRadius);
 	AreaDecal->SetSortOrder(20);
 	AreaDecal->SetFadeScreenSize(0.001f);
+	AreaDecal->SetVisibility(true);
 
 	AccentEffect = CreateDefaultSubobject<UNiagaraComponent>(TEXT("AccentEffect"));
 	AccentEffect->SetupAttachment(SceneRoot);
 	AccentEffect->SetRelativeLocation(FVector(0.0f, 0.0f, 4.0f));
 	AccentEffect->SetAutoActivate(false);
+	AccentEffect->SetVisibility(false);
 	AccentEffect->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	AccentEffect->SetGenerateOverlapEvents(false);
 
@@ -117,6 +119,7 @@ void AGP_SkillTargetPreviewActor::InitializePreview(
 	if (AreaDecal)
 	{
 		AreaDecal->DecalSize = FVector(96.0f, PreviewRadius, PreviewRadius);
+		AreaDecal->SetVisibility(true);
 		AreaDecal->MarkRenderStateDirty();
 	}
 
@@ -137,6 +140,7 @@ void AGP_SkillTargetPreviewActor::UpdatePreview(
 	if (AreaDecal)
 	{
 		AreaDecal->DecalSize = FVector(96.0f, PreviewRadius, PreviewRadius);
+		AreaDecal->SetVisibility(true);
 		AreaDecal->MarkRenderStateDirty();
 	}
 
@@ -190,39 +194,10 @@ void AGP_SkillTargetPreviewActor::RefreshPresentation()
 			-1.0f);
 	}
 
-	if (!AccentEffect)
-	{
-		return;
-	}
-
-	UNiagaraSystem* DesiredSystem = nullptr;
-	switch (PreviewStyle)
-	{
-	case EGP_SkillTargetPreviewStyle::Lightning:
-		DesiredSystem = LightningPreviewSystem;
-		break;
-	case EGP_SkillTargetPreviewStyle::HeavyImpact:
-		DesiredSystem = HeavyImpactPreviewSystem;
-		break;
-	default:
-		DesiredSystem = HeavyImpactPreviewSystem;
-		break;
-	}
-
-	if (AccentEffect->GetAsset() != DesiredSystem)
+	if (AccentEffect)
 	{
 		AccentEffect->DeactivateImmediate();
-		AccentEffect->SetAsset(DesiredSystem);
-	}
-
-	const float NiagaraScale =
-		(PreviewRadius / 100.0f) * AccentScaleFraction;
-	AccentEffect->SetVariableFloat(NiagaraScaleParameter, NiagaraScale);
-	ApplyNiagaraColor(StyleColor);
-
-	if (DesiredSystem)
-	{
-		AccentEffect->ReinitializeSystem();
+		AccentEffect->SetVisibility(false);
 	}
 }
 

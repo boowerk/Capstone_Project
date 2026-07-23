@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
@@ -70,6 +70,8 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "UI|Middle Travel")
 	void CloseMiddleTravelMap();
+
+	bool GetSkillSelectionCursorLocation(FVector& OutTargetLocation) const;
 
 protected:
 	virtual void BeginPlay() override;
@@ -263,7 +265,6 @@ private:
 	bool IsGroundPositionSelectionActive() const;
 	bool SendSkillSelectionEvent(const FGameplayTag& EventTag) const;
 	void FillSkillSelectionTargetData(FGameplayEventData& Payload, const FVector& TargetLocation) const;
-	bool GetSkillSelectionCursorLocation(FVector& OutTargetLocation) const;
 	void UpdateSkillSelectionInputMode();
 	void CancelSkillSelectionIfActive() const;
 	void ClearTestSkillSlots(UAbilitySystemComponent* ASC);
