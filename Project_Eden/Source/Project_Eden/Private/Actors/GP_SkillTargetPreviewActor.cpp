@@ -15,6 +15,7 @@ namespace
 	const FName NormalizedRadiusParameter(TEXT("NormalizedRadius"));
 	const FName HalfAngleCosParameter(TEXT("HalfAngleCos"));
 	const FName NiagaraScaleParameter(TEXT("User.Scale_All"));
+	constexpr float AccentScaleFraction = 0.60f;
 
 	const FLinearColor LightningColor(0.08f, 0.58f, 1.0f, 1.0f);
 	const FLinearColor HeavyImpactColor(1.0f, 0.42f, 0.055f, 1.0f);
@@ -214,7 +215,8 @@ void AGP_SkillTargetPreviewActor::RefreshPresentation()
 		AccentEffect->SetAsset(DesiredSystem);
 	}
 
-	const float NiagaraScale = PreviewRadius / 100.0f;
+	const float NiagaraScale =
+		(PreviewRadius / 100.0f) * AccentScaleFraction;
 	AccentEffect->SetVariableFloat(NiagaraScaleParameter, NiagaraScale);
 	ApplyNiagaraColor(StyleColor);
 

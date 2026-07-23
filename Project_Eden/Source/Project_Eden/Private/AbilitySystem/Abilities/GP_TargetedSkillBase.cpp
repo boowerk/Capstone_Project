@@ -196,6 +196,9 @@ bool UGP_TargetedSkillBase::ResolveGroundLocation(
 
 	FCollisionObjectQueryParams ObjectQueryParams;
 	ObjectQueryParams.AddObjectTypesToQuery(ECC_WorldStatic);
+	// Runtime-generated and test-map floors may use WorldDynamic while still
+	// being valid ground for targeted skills.
+	ObjectQueryParams.AddObjectTypesToQuery(ECC_WorldDynamic);
 
 	FHitResult GroundHit;
 	if (!AvatarActor->GetWorld()->LineTraceSingleByObjectType(
@@ -402,6 +405,19 @@ void UGP_TargetedSkillBase::BeginSelection()
 	{
 		if (AActor* AvatarActor = GetAvatarActorFromActorInfo())
 		{
+			const FGP_SkillTargetData InitialTargetData =
+				GetCurrentTargetData();
+			const FVector PreviewSpawnLocation =
+				bUseProductionTargetPreview
+					? InitialTargetData.TargetLocation
+					: AvatarActor->GetActorLocation();
+			const FRotator PreviewSpawnRotation =
+				bUseProductionTargetPreview
+					? (SelectionMode == EGP_SkillSelectionMode::GroundPosition
+						? FRotator::ZeroRotator
+						: InitialTargetData.AimDirection.Rotation())
+					: AvatarActor->GetActorRotation();
+
 			FActorSpawnParameters SpawnParams;
 			SpawnParams.Owner = AvatarActor;
 			SpawnParams.Instigator = Cast<APawn>(AvatarActor);
@@ -409,8 +425,8 @@ void UGP_TargetedSkillBase::BeginSelection()
 
 			PreviewActor = AvatarActor->GetWorld()->SpawnActor<AActor>(
 				EffectivePreviewActorClass,
-				AvatarActor->GetActorLocation(),
-				AvatarActor->GetActorRotation(),
+				PreviewSpawnLocation,
+				PreviewSpawnRotation,
 				SpawnParams);
 
 			if (IsValid(PreviewActor))
@@ -418,8 +434,6 @@ void UGP_TargetedSkillBase::BeginSelection()
 				if (AGP_SkillTargetPreviewActor* ProductionPreview =
 					Cast<AGP_SkillTargetPreviewActor>(PreviewActor))
 				{
-					const FGP_SkillTargetData InitialTargetData =
-						GetCurrentTargetData();
 					ProductionPreview->InitializePreview(
 						PreviewVisualStyle,
 						GetPreviewActorRadius(),
