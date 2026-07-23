@@ -198,7 +198,7 @@ AGP_VillageLayoutDirector::AGP_VillageLayoutDirector()
 	Village01.VillageLevel = TSoftObjectPtr<UWorld>(
 		FSoftObjectPath(TEXT("/Game/WorldLayout/L_Village_01.L_Village_01")));
 	Village01.Footprint.FootprintOffset = FVector(0.0f, -2000.0f, -1500.0f);
-	Village01.Footprint.FootprintExtent = FVector(6500.0f, 8500.0f, 3000.0f);
+	Village01.Footprint.FootprintExtent = FVector(6500.0f, 6500.0f, 3000.0f);
 	VillagePresetPool.Add(Village01);
 
 #if WITH_EDITORONLY_DATA

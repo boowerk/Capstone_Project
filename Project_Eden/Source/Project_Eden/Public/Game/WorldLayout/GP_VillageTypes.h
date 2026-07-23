@@ -14,9 +14,9 @@ struct FGP_VillageFootprint
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Village|Footprint", meta = (Units = "cm"))
 	FVector FootprintOffset = FVector(0.0f, 0.0f, -1500.0f);
 
-	// Half extent. The default represents a 260 m x 260 m authored village area.
+	// Half extent. The default represents a 230 m x 230 m authored village area.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Village|Footprint", meta = (ClampMin = "1.0", Units = "cm"))
-	FVector FootprintExtent = FVector(13000.0f, 13000.0f, 3000.0f);
+	FVector FootprintExtent = FVector(11500.0f, 11500.0f, 3000.0f);
 };
 
 USTRUCT(BlueprintType)

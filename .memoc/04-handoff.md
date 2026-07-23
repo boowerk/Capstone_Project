@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-23T13:39:22+09:00
+updated: 2026-07-23T14:09:49+09:00
 status: active
 tags:
   - memoc
@@ -11,7 +11,7 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-07-23T13:39:22+09:00
+Last synced: 2026-07-23T14:09:49+09:00
 
 ## Village Multi-Preset Handoff
 
@@ -19,14 +19,14 @@ Last synced: 2026-07-23T13:39:22+09:00
 - `bUsePreviewSeedInPIE` is an enabled-by-default Director debug switch. PIE now builds village selection from `PreviewSeed` before requiring GameState RunSeed, while non-PIE and packaged runtime continue using GameState RunSeed. The log prints both values when the override is active. Full Editor build and `ProjectEden.Game.WorldLayout.VillageSelection` pass.
 - `L_LandscapeMap` has five unique SlotIds `Village_A..E`. The duplicated `GP_VillageSlot4/5` values were changed from `Village_C` to `Village_D/E` and the map was saved. Director `Rebuild Preview` at PreviewSeed 186 succeeded with `Village_A=Village_01` plus `Village_E=Village_00`; the log confirms two transient Level Instances and two sequential PCG components, with no duplicate-ID warnings.
 - `AGP_VillageSlot::FootprintBounds` is a visualization-only flat XY preview at slot-local Z=0 (1cm half-height). This prevents the preview child from being snapped independently while the Director later spawns from the unchanged slot actor location.
-- Mixed `L_Village_00`/`L_Village_01` selection is committed. The legacy fields define primary 00; the additional preset pool contains compact 01 with offset `(0,-2000,-1500)` and half extent `(6500,8500,3000)` cm. Duplicate IDs/paths are ignored and deterministic bounded assignment retries maximize the selected count before streaming.
+- Mixed `L_Village_00`/`L_Village_01` selection is committed. The legacy fields define primary 00 with half extent `(11500,11500,3000)` cm (230x230m full XY); the additional preset pool contains compact 01 with offset `(0,-2000,-1500)` and half extent `(6500,6500,3000)` cm (130x130m full XY). The saved `L_LandscapeMap` Director overrides were updated to the same values. Duplicate IDs/paths are ignored and deterministic bounded assignment retries maximize the selected count before streaming.
 - Final PIE: Seed `1372115260`, attempt 0, `Village_B=Village_01` and `Village_C=Village_00`; 01 isolated Road 3/District 1, 00 isolated Road 5/District 2, and sequential PCG completed `(2/2)`. Full Editor build and `ProjectEden.Game.WorldLayout.VillageSelection` automation pass.
 - `Project_Eden/Content/WorldLayout/L_Village_01.umap` is tracked in the same commit as the source/tests. The editor is open on `L_LandscapeMap` with PIE stopped; the task did not save the already user-modified map or unrelated region/material/memoc changes.
 
 ## Village Footprint Handoff
 
 - Source-only footprint work is complete. `AGP_VillageLayoutDirector` owns the current preset footprint; slots render it, red means overlap, and candidate conflict IDs feed deterministic non-overlap selection with required-group lookahead.
-- Default half extent is `13000,13000,3000` cm and offset is `0,0,-1500` cm, so the visible box is about 260m x 260m x 60m. `L_LandscapeMap` currently shows all three authored footprints red; reposition slots or tune the preset footprint, then use `Refresh Footprint Preview`/PIE. The task did not save the already user-modified map or other content assets.
+- Default half extent is `11500,11500,3000` cm and offset is `0,0,-1500` cm, so Village_00's visible XY footprint is 230m x 230m. Village_01 uses `6500,6500,3000` cm with offset `0,-2000,-1500`, so its visible XY footprint is 130m x 130m. Use `Refresh Footprint Preview` or `Rebuild Preview` after reopening the map.
 - Full `Project_EdenEditor Win64 Development` build and `ProjectEden.Game.WorldLayout.VillageSelection` automation pass. Multi-preset support now uses each assigned preset's own footprint as described above.
 
 ## Village Layout Runtime V1 Handoff

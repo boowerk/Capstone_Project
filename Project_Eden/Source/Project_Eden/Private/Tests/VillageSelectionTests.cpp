@@ -558,9 +558,9 @@ bool FVillageSelectionPolicyTest::RunTest(const FString& Parameters)
 		FSoftObjectPath(TEXT("/Game/WorldLayout/L_Village_00.L_Village_00")));
 	const FGP_VillageFootprint DefaultFootprint =
 		GetDefault<AGP_VillageLayoutDirector>()->GetVillagePresetFootprint();
-	TestEqual(TEXT("Default village footprint uses a 130 m XY half extent"),
+	TestEqual(TEXT("Default Village_00 footprint uses a 115 m XY half extent"),
 		DefaultFootprint.FootprintExtent,
-		FVector(13000.0f, 13000.0f, 3000.0f));
+		FVector(11500.0f, 11500.0f, 3000.0f));
 	TestEqual(TEXT("Default village footprint is centered below the slot origin"),
 		DefaultFootprint.FootprintOffset,
 		FVector(0.0f, 0.0f, -1500.0f));
@@ -594,9 +594,9 @@ bool FVillageSelectionPolicyTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("Village_01 preset uses the compact level"),
 			Village01Preset->VillageLevel.ToSoftObjectPath(),
 			FSoftObjectPath(TEXT("/Game/WorldLayout/L_Village_01.L_Village_01")));
-		TestEqual(TEXT("Village_01 uses the measured compact footprint"),
+		TestEqual(TEXT("Village_01 uses a 130 m square compact footprint"),
 			Village01Preset->Footprint.FootprintExtent,
-			FVector(6500.0f, 8500.0f, 3000.0f));
+			FVector(6500.0f, 6500.0f, 3000.0f));
 
 		const int32 StableIndex = AGP_VillageLayoutDirector::SelectVillagePresetIndex(
 			1337,

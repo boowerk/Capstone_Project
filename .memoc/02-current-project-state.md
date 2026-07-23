@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-23T13:39:22+09:00
+updated: 2026-07-23T14:09:49+09:00
 status: active
 tags:
   - memoc
@@ -11,13 +11,13 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-07-23T13:39:22+09:00
+Last synced: 2026-07-23T14:09:49+09:00
 
 ## Current Status
 
 - Village authoring now has a Director-owned transient editor preview. `Rebuild Preview` runs the deterministic selection with `PreviewSeed`, loads one non-saveable Level Instance per selected slot at the exact runtime transform, applies the same instance-unique Road/District tags and graph overrides, and optionally schedules PCG sequentially in Preview mode. `Clear Village Preview`, footprint refresh, and Director destruction unload/clean the preview. `bUsePreviewSeedInPIE` defaults on, so PIE village selection matches Rebuild Preview even when GameState generated another RunSeed; packaged games still use their real RunSeed. Runtime remains Generate On Demand. The slot Footprint is also a flat visualization-only XY box at local Z=0. Full `Project_EdenEditor` build and `ProjectEden.Game.WorldLayout.VillageSelection` pass. `L_LandscapeMap` now has five unique SlotIds `Village_A..E`; PreviewSeed 186 selects `Village_A=Village_01` and `Village_E=Village_00`, loads two transient Level Instances, and schedules two isolated PCG components.
-- Village footprint-aware selection is committed as `f32ef1a2`. Slots display yaw-aware XY OBB footprints, red means overlap, and deterministic feasibility selection excludes conflicting combinations while preserving required-group lookahead. The legacy `/Game/WorldLayout/L_Village_00` primary uses half extent `(13000,13000,3000)` cm and offset `(0,0,-1500)` cm.
-- Mixed village presets are committed. The legacy level/footprint remains the canonical primary, while the additional `/Game/WorldLayout/L_Village_01` uses measured offset `(0,-2000,-1500)` cm and half extent `(6500,8500,3000)` cm. Each slot receives a deterministic preset from RunSeed/SlotId; up to 32 deterministic assignment attempts select the successful result with the most villages before per-preset overlap filtering and sequential PCG generation. Final PIE loaded `Village_B=Village_01` (Road 3/District 1) plus `Village_C=Village_00` (Road 5/District 2), and both completed `(2/2)`. Full Editor build and `ProjectEden.Game.WorldLayout.VillageSelection` pass. Multiplayer client streaming and explicit cook registration remain follow-up work.
+- Village footprint-aware selection is committed as `f32ef1a2`. Slots display yaw-aware XY OBB footprints, red means overlap, and deterministic feasibility selection excludes conflicting combinations while preserving required-group lookahead. The `/Game/WorldLayout/L_Village_00` primary now uses half extent `(11500,11500,3000)` cm (230x230m full XY) and offset `(0,0,-1500)` cm.
+- Mixed village presets are committed. The legacy level/footprint remains the canonical primary, while `/Game/WorldLayout/L_Village_01` now uses offset `(0,-2000,-1500)` cm and half extent `(6500,6500,3000)` cm (130x130m full XY). Source defaults, automation expectations, and the saved `L_LandscapeMap` Director overrides match these sizes. Full Editor build and `ProjectEden.Game.WorldLayout.VillageSelection` pass. Multiplayer client streaming and explicit cook registration remain follow-up work.
 - Landscape Region V2.2 is active only on `MI_RegionLandscape_GameMap2`. The approved final preset is Candidate J: deterministic per-pair PCHIP boundary displacement with non-uniform 36-260m spacing, 4-26m random amplitudes, 50% sign persistence, 16m cap, and fixed junction/perimeter cores. Its blend half-width now varies independently and smoothly per region-pair from 18-32px around a 24px base, with 80-240m anchors; each region influence samples its own nearest boundary-side pixel. Hard `RegionID`, StateRT, PCG, topology, packed visual IDs, and the runtime shader remain unchanged. Authoritative source is `Project_Eden/ArtSource/RegionVisualSlotsV22`; the external V2.2 mirror is byte-identical.
 - Final generation passes 61/61 twice deterministically. Observed blend half-width is 18.105-31.112px (mean 23.935px) with 81.045-237.979m actual anchor gaps; unassigned boundary pixels, same-slot support/guard overlap, active-ID mismatch, and ID-transition violations are zero, with at most four active regions. Weight PNG is `8209CBD4...11917`; IDs01/IDs23 remain `5FAD10BB...E0B7` / `7A0E2CBF...0913`. Computer Use reimported and saved Weight as regular non-VT BGRA8, Bilinear, NoMipmaps/one mip, Clamp X/Y, sRGB off, VectorDisplacementmap (717,075 bytes, `F91AB7E1...53CC6`). `MI_RegionLandscape_GameMap2` remains `841EE208...D740`; the user-owned map remains `E8CE0B5D...B728C` and was not saved. Transient random-state refresh visibly applied the new boundary weights; no related material/texture error followed the save.
 
