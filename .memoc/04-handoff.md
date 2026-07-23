@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-24T06:02:46+09:00
+updated: 2026-07-24T07:01:06+09:00
 status: active
 tags:
   - memoc
@@ -11,7 +11,7 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-07-24T06:02:46+09:00
+Last synced: 2026-07-24T07:01:06+09:00
 
 ## Regular Enemy Death Absorption Handoff
 
@@ -146,6 +146,8 @@ Last synced: 2026-07-24T06:02:46+09:00
 
 ## Sans Ground Hands Handoff
 
+- Commits `10451155` and `6ffa4614` add `/Game/Effects/M_BossGroundHandTelegraph_Decal` and route the actual production BP CDO to it. The material uses `length(UV-0.5)` with radius `0.48`, edge softness `0.025`, pure-red `TelegraphColor`, and opacity `0.62`; it is independent of the Sweep fan material. The hand's `0.75s` warning, `115cm` radius, floor trace, reveal, collision, damage, and replication are unchanged.
+- `Project_EdenEditor Win64 Development` passed. All 13 `ProjectEden.AI.Boss` tests passed, including the new production-BP material/path/domain/radial-mask/color contract and the existing Sweep decal regression. PIE-check flat and sloped floors for square corners, red readability, and all three decals per wave; no server test was run.
 - Commit `e080f16c` updates `UGP_BossSummonAdds` to spawn `Basic/BP_BasicEnemy_Melee`; full editor build passed and startup logs showed no class-finder failure for the new path.
 - Commits `f4e75d83` and `8a7fbc60` add the native strike actor plus `Attack_BossGroundHands` GAS ability/selector/default grant. Defaults are 3 hands per wave, 3 waves, 0.22s hand stagger, 1.55s wave interval, 0.75s red decal warning, and 8s ability cooldown.
 - Commits `72ed5c6c`, `d7cc3dc4`, and `7a25612b` replace the primitive hand with `/Game/Meshes/PLAZA_DE_TOROS/ActorMesh/SK_RightHand`, remove legacy static-mesh placeholders, and preserve the independent box hit settings. The previously stale editor DLL was fully relinked; `ProjectEden.AI.Boss.GroundHands.UsesRightHandMesh` passes.
