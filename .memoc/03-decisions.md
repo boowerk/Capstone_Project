@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-24T01:57:40+09:00
+updated: 2026-07-24T05:11:23+09:00
 status: active
 tags:
   - memoc
@@ -16,6 +16,9 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 ## Decision Log
 
 ### 2026-07-24
+- For regular-enemy death absorption, use the dead enemy as `User.SourceMesh` and a moving player chest `Position` as the destination instead of matching particles to a target skeletal mesh. Different enemy/player topology makes vertex correspondence brittle; one converging point reads more clearly and is cheaper.
+- In the fixed three-player game, authority latches the valid killer once and otherwise chooses the nearest living connected player. Multicast that actor reliably; clients update only its live chest position and never rescore locally.
+- Keep the absorption cosmetic within the default two-second corpse lifetime: compress the original five-second dissolve curves to 3x playback, stop the high-rate emission after a short window and at least three update frames, and hard-stop at 1.75 seconds. Boss death presentation remains separate.
 - Supersede the 2026-07-14 corruption/exploration decisions: the product has no world-corruption value or ambient/random Region Event path. Do not restore their timers, weighted selection, random placement, enemy scaling, outcome deltas, or presentation.
 - Supersede the fixed-demo decisions dated 2026-07-21 and 2026-07-18 plus the remaining 2026-07-09 Region Event design: remove the seed-varied outer route, Red Rift/Defense/Shrine lifecycle, quorum/reward logic, gold objective marker, and automatic center boss/result path.
 - Keep `RegionState` as an independent authored biome-ID/PCG contract, and keep general Zone/Portal/FinishRun code available. Neither system may implicitly restart the removed demo.

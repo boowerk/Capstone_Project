@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-24T01:57:40+09:00
+updated: 2026-07-24T05:11:23+09:00
 status: active
 tags:
   - memoc
@@ -11,9 +11,11 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-07-24T01:57:40+09:00
+Last synced: 2026-07-24T05:11:23+09:00
 
 ## Current Status
+
+- Regular enemy death absorption is current at `34c84570` and `3633f215`. `/Game/Niagara/Dissolve_SK/NS_EnemyDeath_Absorb` samples the actual dead enemy through `User.SourceMesh`, preserves its initial silhouette, then uses Point Attraction to converge on the server-selected killer's live chest position. If the killer is unusable, authority selects the nearest living connected player once; a reliable multicast gives all three clients the same target. GPU bounds cover the corpse-to-player corridor, the five-second source curves run at 3x inside the two-second corpse window, emission requires at least three update frames before stopping, and bosses keep their bespoke death effects. Editor build and the policy, production-asset contract, and enemy-death lifecycle tests pass; no relevant Niagara warning/error occurred. PIE visual tuning remains.
 
 - Crystal Seraph projectile/reflection VFX is current: `AGP_CrystalShardProjectile` uses `/Game/Meshes/FX_Meshes/ICE/SM_IceShard_03` instead of the prototype cone. `AGP_SeraphLaserActor` has no prototype mesh or runtime Niagara asset paths; `BP_SeraphLaser` owns Telegraph/Active/Reflection Impact/Reflection Beam Niagara defaults, and `BP_Crystal_Seraph` selects it as `SeraphLaserActorClass`. Active VFX now attaches to `SceneRoot` (firing origin), not the collision box centered along the beam. For visible-pipeline validation, `ActiveVFX` and `ReflectionBeamVFX` use `NS_Free_Magic_Attack2`; it was originally assigned only to reflection, which does not play until prism contact. Restart PIE before testing so newly spawned laser actors read updated defaults. All native pattern VFX and death shards/burst use shared `#59ADFF` (`GPCrystalSeraphVFXDefaults`) tint; material assets remain untouched. Rider-equivalent `Build.bat Project_EdenEditor Win64 Development ... -WaitMutex -FromMsBuild -architecture=x64` passed. PIE visual check remains: no rectangular mesh, all four cues visible, shard silhouette, reflection-point brightness.
 

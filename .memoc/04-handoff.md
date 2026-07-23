@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-24T01:57:40+09:00
+updated: 2026-07-24T05:11:23+09:00
 status: active
 tags:
   - memoc
@@ -11,7 +11,15 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-07-24T01:57:40+09:00
+Last synced: 2026-07-24T05:11:23+09:00
+
+## Regular Enemy Death Absorption Handoff
+
+- Commits `34c84570` and `3633f215` add `/Game/Niagara/Dissolve_SK/NS_EnemyDeath_Absorb` plus `UGP_EnemyDeathAbsorptionComponent`, automatic regular-enemy death hookup, and policy/asset tests. Bosses remain on `UGP_BossDeathPresentationComponent`.
+- Niagara uses `User.SourceMesh` for the actual corpse and Point Attraction toward `User.AbsorbTargetPosition`; the existing normalized-age Lerp keeps the early mesh silhouette and increasingly preserves the attracted solver position. Runtime follows the latched player's `spine_03`, updates fixed bounds over the source-target corridor, hides the source only after successful activation, and finishes before the default two-second despawn.
+- Three-player policy is authority-only killer selection with nearest living connected-player fallback, then reliable multicast of that one actor. Dedicated servers skip local VFX; no client performs its own target selection.
+- Verified after the final three-frame emission guard: `Project_EdenEditor Win64 Development` build passed; `ProjectEden.VFX.EnemyDeathAbsorption.Policy`, `.ProductionAssetContract`, and `ProjectEden.Combat.EnemyDeath.Lifecycle` passed. Compiled Niagara bindings/order and inactive-response behavior were independently inspected; relevant Niagara warnings/errors were zero. No live server/PIE run by request.
+- Manual gate: kill several FurnaceWalker/Cyclops enemies while the killer runs away and visually tune playback rate, strength, scatter delay, sprite size, or chest offset if needed. Keep the default enemy `DeathDespawnDelay` at least two seconds; lowering it can cut the attached effect short.
 
 ## Enemy Live-Target Combat Handoff
 
