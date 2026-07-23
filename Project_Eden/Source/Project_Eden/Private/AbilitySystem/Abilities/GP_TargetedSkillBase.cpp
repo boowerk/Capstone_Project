@@ -10,6 +10,11 @@
 #include "GameFramework/PlayerController.h"
 #include "GameplayTags/GP_Tags.h"
 #include "Components/PrimitiveComponent.h"
+#include "Engine/TriggerBase.h"
+#include "Game/GP_EnemySpawnVolume.h"
+#include "Game/WorldLayout/GP_VillageSlot.h"
+#include "GameFramework/Volume.h"
+#include "Player/GP_PlayerController.h"
 #include "TimerManager.h"
 #include "Utils/GP_BlueprintLibrary.h"
 
@@ -196,9 +201,6 @@ bool UGP_TargetedSkillBase::ResolveGroundLocation(
 
 	FCollisionObjectQueryParams ObjectQueryParams;
 	ObjectQueryParams.AddObjectTypesToQuery(ECC_WorldStatic);
-	// Runtime-generated and test-map floors may use WorldDynamic while still
-	// being valid ground for targeted skills.
-	ObjectQueryParams.AddObjectTypesToQuery(ECC_WorldDynamic);
 
 	FHitResult GroundHit;
 	if (!AvatarActor->GetWorld()->LineTraceSingleByObjectType(

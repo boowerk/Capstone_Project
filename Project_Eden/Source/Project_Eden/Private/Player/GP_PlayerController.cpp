@@ -27,6 +27,10 @@
 #include "UI/GP_CharacterStatsMenuWidget.h"
 #include "UI/GP_MiddleTravelMapWidget.h"
 #include "UI/GP_SkillSelectWidget.h"
+#include "Engine/TriggerBase.h"
+#include "Game/GP_EnemySpawnVolume.h"
+#include "Game/WorldLayout/GP_VillageSlot.h"
+#include "GameFramework/Volume.h"
 #include "UI/GP_PlayerHUDWidget.h"
 
 namespace
