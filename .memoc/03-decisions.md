@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-21T22:24:01+09:00
+updated: 2026-07-24T01:20:09+09:00
 status: active
 tags:
   - memoc
@@ -14,6 +14,11 @@ tags:
 Durable project decisions live here. Keep entries short, dated, and useful to future agents.
 
 ## Decision Log
+
+### 2026-07-24
+- Supersede the 2026-07-14 corruption/exploration decisions: the product has no world-corruption value or ambient/random Region Event path. Do not restore their timers, weighted selection, random placement, enemy scaling, outcome deltas, or presentation.
+- Keep `RegionState` as the independent authored biome-ID contract. The thematic `CorruptionRift` enum label on the fixed Red Rift asset does not represent a numeric corruption system.
+- Preserve only the deterministic graduation-demo event lifecycle: explicit Red Rift, Structure Defense, and Shrine IDs, two-of-three approach quorum, three-player Shrine reward, and seed-varied outer-to-center route.
 
 ### 2026-07-21
 - Lock enemy attack target identity at ability activation in the three-player game. Preparation and windup may sample that same actor's live position, but `AttackHit` locks direction and no target rescore may redirect the strike or projectile to a teammate.

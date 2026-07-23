@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-21T22:24:01+09:00
+updated: 2026-07-24T01:20:09+09:00
 status: active
 tags:
   - memoc
@@ -11,7 +11,7 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-07-21T22:24:01+09:00
+Last synced: 2026-07-24T01:20:09+09:00
 
 ## Enemy Live-Target Combat Handoff
 
@@ -54,32 +54,16 @@ Last synced: 2026-07-21T22:24:01+09:00
 - `166b5e93` keeps the existing dedicated-server Cook maps and adds `/Game/Maps/MainMap/L_LandscapeMap` through `COOK_MAPS`, preventing the dynamic ServerTravel destination from being omitted by discovery.
 - Verified: `Project_EdenEditor Win64 Development` build, lobby travel configuration automation, Landscape integrity automation, exact Cook-map declarations, UAT `COOK_MAPS` consumption, and destination package existence.
 - Cook/package and the three-client Lobby-to-Landscape baseline now pass. Further live server testing is intentionally omitted per user request; retain only manual presentation gates and local build/automation checks unless asked otherwise.
-- Existing user work in `TestMap.umap`, `DA_RegionEventData.uasset`, and `L_MainMap.umap` remains intentionally unstaged/uncommitted.
+- Protected `TestMap.umap`, `DA_RegionEventData.uasset`, and `L_MainMap.umap` remain untouched by this cleanup.
 
-## Production Landscape Corruption/Event Handoff
+## Fixed Demo Event Cleanup Handoff
 
-- `L_LandscapeMap` is ready to open and Play without test-deck setup: PlayerStart Z `860`, full Landscape NavMesh bounds, navigation invokers, 15 region seeds, and placed `BP_EventDirector` are present.
-- Production director values are `25s` initial delay, `5s` evaluation, `12s` dwell, `0.30` base chance, `0.35` full-corruption bonus, `80s` global cooldown, one active exploration event, `1400-2200cm` placement, and random seed mode off.
-- `/Game/RegionEvents/Runtime` contains four production definitions. They use native runtime event classes and stable `world_*` IDs rather than `/Examples` test Blueprints.
-- Exploration event enemies do not increment `AliveZoneEnemies`. Completed/expired events retire remaining enemies through GAS, while terminal-death delegates keep legacy zone accounting correct.
-- Spawn points are revalidated after NavMesh projection and must remain outside the minimum distance of every connected player's pawn.
-- No editor assignment is required. Optional art polish can replace each native marker/decal/VFX through BP children without changing event ownership or corruption rules.
-- Verified: full `Project_EdenEditor` build; 7 Region Event tests; Landscape integrity; Region spatial subsystem; player navigation invoker; corruption state. PIE Structure Defense spawned 12 AI across four waves, completed at 35s, then reported zero event and enemy actors.
-- Existing user work in `TestMap.umap`, `DA_RegionEventData.uasset`, and `L_MainMap.umap` remains intentionally unstaged/uncommitted.
-
-## Region Event System Handoff
-
-- Commits `28c677a5`, `726bb5ad`, `ea6ae331`, `b25dbac2`, `e1472c42`, `def21134`, and `873eab0c` add a new region event foundation for PCG/zone presentation.
-- Commits `537c98b5`, `5a4ebe70`, `c298595f`, `c766d154`, `aea66ecb`, `f80f5fd5`, `30345aaf`, `907c5b19`, `1edaa439`, `7bb9c092`, and `c24402f5` add the concrete example events requested for final-presentation polish.
-- Runtime flow: place/configure `AGP_RegionEventDirector` with `EventPool`; `AGP_GameMode` finds it at BeginPlay, initializes it with `RegionCount`, and starts a weighted `ZoneStarted` event when a zone begins. `ZoneCompleted` rolls are available but disabled by default on GameMode because reward-style events should avoid spawning extra clear-blocking enemies unless intentionally enabled.
-- `UGP_RegionEventData` fields to author first: `EventId`, `DisplayName`, `EventType`, `Trigger`, `SelectionWeight`, `DurationSeconds`, `EventActorClass`, optional active/completed region state, and optional `EnemySpawns`.
-- Example `EventActorClass` values:
-  - `AGP_RedRiftRegionEventActor`: uses `EnemySpawns`; one initial base wave, then periodic waves.
-  - `AGP_CrystalCorruptionRegionEventActor`: spawns destructible crystal nodes and slows players inside radius until all nodes break.
-  - `AGP_ShrineRuinsRegionEventActor`: opens `AGP_PlayerController::ClientOpenRegionEventAugmentSelect()` when a player overlaps the shrine.
-  - `AGP_StructureDefenseRegionEventActor`: completes after `DefenseDurationSeconds`, while periodically spawning waves from `EnemySpawns`.
-- `AGP_RegionEventActor` owns BP hooks `BP_OnRegionEventInitialized`, `BP_OnRegionEventActivated`, `BP_OnRegionEventCompleted`, and `BP_OnRegionEventExpired`; create BP children for VFX/decal/UI polish. Event-spawned enemies are forwarded to GameMode and count toward the current zone clear.
-- Verified: `Project_EdenEditor Win64 Development` build succeeded and `ProjectEden.Game.RegionEvents.Selection` passed. PIE-check remains: for each Region Event DataAsset, set `EventActorClass`, add it to the director pool, enter a zone, and confirm event-specific behavior/spawn composition/multiplayer UI.
+- Commits `ebd6847d` and `08861a81` remove the world-corruption system and every ambient/random Region Event entry point, policy, timer, outcome, Crystal Corruption objective, example tool, and example asset.
+- `AGP_RegionEventDirector` now resolves only three explicit production IDs: `world_red_rift`, `world_structure_defense`, and `world_shrine_ruins`. It retains the replicated event actor lifecycle required by `AGP_DemoRunDirector`; do not delete that shared lifecycle without replacing the fixed demo beats.
+- `DemoRunSeed` still varies the collision-checked outer start and inward route. It does not choose a random event. Three-player approach quorum remains two possessed players, and the guided Shrine still rewards all three controllers.
+- `RegionState` and `DA_NatureCorruptedVegetation` remain independent biome content. Do not remove them as part of corruption cleanup.
+- Resaved assets contain no `GP_EnemyCorruptionComponent`, Crystal Corruption class, removed selection property, or removed corruption property imports. Protected `L_LandscapeMap`, `TestMap`, `DA_RegionEventData`, and `L_MainMap` were not modified.
+- Verified without a server/PIE run: `Project_EdenEditor Win64 Development`; RegionEvents 5/5; DemoFlow 7/7; Landscape integrity 1/1; enemy production animation 1/1; Crystal Seraph animation setup 1/1. Commandlet startup still reports pre-existing missing Knight/Fab/audio assets.
 
 ## Basic Enemy Cadence and Hearing Handoff
 
