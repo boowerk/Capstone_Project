@@ -4,9 +4,12 @@
 #include "GameFramework/GameStateBase.h"
 #include "GP_GameState.generated.h"
 
+<<<<<<< HEAD
 class UGP_WorldCorruptionComponent;
 class APlayerState;
 
+=======
+>>>>>>> origin/main
 // Replicated phase of the linear city-progression run. Drives HUD and client-side presentation.
 UENUM(BlueprintType)
 enum class EGPMatchPhase : uint8
@@ -38,11 +41,6 @@ class PROJECT_EDEN_API AGP_GameState : public AGameStateBase
 	GENERATED_BODY()
 
 public:
-	AGP_GameState();
-
-	UFUNCTION(BlueprintPure, Category = "Run|Corruption")
-	UGP_WorldCorruptionComponent* GetWorldCorruptionComponent() const { return WorldCorruptionComponent; }
-
 	UFUNCTION(BlueprintPure, Category = "Run")
 	EGPMatchPhase GetMatchPhase() const { return MatchPhase; }
 
@@ -81,6 +79,9 @@ public:
 	// (e.g. all regions dead at run start). Broadcasts a reset (-1).
 	void InitRegionStates(int32 Count, uint8 InitialState);
 
+	// Server-only. Preserves an authored per-region biome array instead of flattening every region to one state.
+	void InitRegionStatesFromArray(const TArray<uint8>& InitialStates);
+
 	// Server-only. Sets one region's state (e.g. revive on zone clear).
 	void SetRegionState(int32 RegionId, uint8 NewState);
 
@@ -98,10 +99,6 @@ public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 protected:
-	// The GameState owns the only replicated corruption state for the current run.
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Run|Corruption", meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UGP_WorldCorruptionComponent> WorldCorruptionComponent;
-
 	UPROPERTY(ReplicatedUsing = OnRep_MatchPhase, BlueprintReadOnly, Category = "Run", meta = (AllowPrivateAccess = "true"))
 	EGPMatchPhase MatchPhase = EGPMatchPhase::Preparing;
 
@@ -136,4 +133,7 @@ protected:
 
 	UFUNCTION()
 	void OnRep_RegionStates();
+
+	// Emits one compact reset for uniform arrays and per-region changes for authored heterogeneous biome arrays.
+	void BroadcastFullRegionState();
 };

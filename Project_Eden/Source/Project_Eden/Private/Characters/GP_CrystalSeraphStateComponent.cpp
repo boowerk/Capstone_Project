@@ -54,7 +54,6 @@ void UGP_CrystalSeraphStateComponent::GetLifetimeReplicatedProps(TArray<FLifetim
 	DOREPLIFETIME(UGP_CrystalSeraphStateComponent, WingCoreMaxHealth);
 	DOREPLIFETIME(UGP_CrystalSeraphStateComponent, MainBossActor);
 	DOREPLIFETIME(UGP_CrystalSeraphStateComponent, CrystalPrismActor);
-	DOREPLIFETIME(UGP_CrystalSeraphStateComponent, WingCoreActor);
 }
 
 void UGP_CrystalSeraphStateComponent::InitializeCrystalSeraphState(AActor* InMainBossActor)
@@ -66,7 +65,6 @@ void UGP_CrystalSeraphStateComponent::InitializeCrystalSeraphState(AActor* InMai
 
 	MainBossActor = InMainBossActor ? InMainBossActor : GetOwner();
 	CrystalPrismActor = nullptr;
-	WingCoreActor = nullptr;
 	ResetWingCoreBreakCount();
 	SetWingCoreExposedInternal(false);
 	SetGroggyInternal(false);
@@ -78,14 +76,6 @@ void UGP_CrystalSeraphStateComponent::RegisterCrystalPrismActor(AActor* InCrysta
 	if (GetOwnerRole() == ROLE_Authority)
 	{
 		CrystalPrismActor = InCrystalPrismActor;
-	}
-}
-
-void UGP_CrystalSeraphStateComponent::RegisterWingCoreActor(AActor* InWingCoreActor)
-{
-	if (GetOwnerRole() == ROLE_Authority)
-	{
-		WingCoreActor = InWingCoreActor;
 	}
 }
 

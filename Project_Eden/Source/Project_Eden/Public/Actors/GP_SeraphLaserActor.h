@@ -8,6 +8,7 @@ class AGP_CrystalSeraphBossCharacter;
 class UBoxComponent;
 class UGameplayEffect;
 class UGP_VisualCueComponent;
+class UNiagaraSystem;
 class UStaticMeshComponent;
 
 UCLASS(Blueprintable)
@@ -50,6 +51,7 @@ private:
 	bool TryReflectFromPrism();
 	void SpawnReflectedSegment(const FVector& ReflectionOrigin, const FVector& ReflectedDirection);
 	void UpdateLaserShape();
+	void ConfigureVisualCues();
 
 private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph", meta = (AllowPrivateAccess = "true"))
@@ -58,11 +60,26 @@ private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph|VFX", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UGP_VisualCueComponent> VisualCueComponent;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph|VFX", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UGP_VisualCueComponent> ReflectionBeamVFXComponent;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UBoxComponent> DamageBox;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UStaticMeshComponent> LaserMesh;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Crystal Seraph|VFX", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UNiagaraSystem> TelegraphVFX;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Crystal Seraph|VFX", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UNiagaraSystem> ActiveVFX;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Crystal Seraph|VFX", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UNiagaraSystem> ReflectionImpactVFX;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Crystal Seraph|VFX", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UNiagaraSystem> ReflectionBeamVFX;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "s"))
 	float TelegraphDuration = 1.2f;
@@ -98,4 +115,7 @@ private:
 	FTimerHandle EndTimerHandle;
 	bool bLaserActive = false;
 	bool bHasReflected = false;
+	/** Reflected beams are presentation-only; only an unreflected incoming beam may damage the player. */
+	bool bCanDealDamage = true;
+	bool bReleasesPrismShields = true;
 };

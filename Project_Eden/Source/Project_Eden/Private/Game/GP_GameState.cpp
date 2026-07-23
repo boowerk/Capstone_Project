@@ -1,14 +1,11 @@
 #include "Game/GP_GameState.h"
 
+<<<<<<< HEAD
 #include "Game/Corruption/GP_WorldCorruptionComponent.h"
 #include "GameFramework/PlayerState.h"
+=======
+>>>>>>> origin/main
 #include "Net/UnrealNetwork.h"
-
-AGP_GameState::AGP_GameState()
-{
-	// A replicated default subobject keeps corruption available to every GameState client without a map actor dependency.
-	WorldCorruptionComponent = CreateDefaultSubobject<UGP_WorldCorruptionComponent>(TEXT("WorldCorruptionComponent"));
-}
 
 void AGP_GameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
@@ -73,6 +70,19 @@ void AGP_GameState::InitRegionStates(int32 Count, uint8 InitialState)
 
 	// Server gets no OnRep; broadcast a full reset locally for the listen host.
 	OnRegionStateChanged.Broadcast(INDEX_NONE, InitialState);
+}
+
+void AGP_GameState::InitRegionStatesFromArray(const TArray<uint8>& InitialStates)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	RegionStates = InitialStates;
+	LocalRegionStatesShadow = RegionStates;
+	// The listen server has no OnRep, so publish the complete authored state immediately.
+	BroadcastFullRegionState();
 }
 
 void AGP_GameState::SetRegionState(int32 RegionId, uint8 NewState)
@@ -143,7 +153,8 @@ void AGP_GameState::OnRep_RegionStates()
 	if (LocalRegionStatesShadow.Num() != RegionStates.Num())
 	{
 		LocalRegionStatesShadow = RegionStates;
-		OnRegionStateChanged.Broadcast(INDEX_NONE, RegionStates.Num() > 0 ? RegionStates[0] : 0);
+		// A heterogeneous authored array cannot be represented by the legacy single reset value.
+		BroadcastFullRegionState();
 		return;
 	}
 
@@ -156,4 +167,28 @@ void AGP_GameState::OnRep_RegionStates()
 	}
 
 	LocalRegionStatesShadow = RegionStates;
+}
+
+void AGP_GameState::BroadcastFullRegionState()
+{
+	if (RegionStates.IsEmpty())
+	{
+		OnRegionStateChanged.Broadcast(INDEX_NONE, 0);
+		return;
+	}
+
+	const uint8 FirstState = RegionStates[0];
+	const bool bUniformState = RegionStates.FindByPredicate(
+		[FirstState](const uint8 State) { return State != FirstState; }) == nullptr;
+	if (bUniformState)
+	{
+		// Keep the existing one-notification reset path for legacy maps initialized to one state.
+		OnRegionStateChanged.Broadcast(INDEX_NONE, FirstState);
+		return;
+	}
+
+	for (int32 RegionId = 0; RegionId < RegionStates.Num(); ++RegionId)
+	{
+		OnRegionStateChanged.Broadcast(RegionId, RegionStates[RegionId]);
+	}
 }

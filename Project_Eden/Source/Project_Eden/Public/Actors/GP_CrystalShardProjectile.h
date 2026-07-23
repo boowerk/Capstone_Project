@@ -7,6 +7,8 @@
 class USphereComponent;
 class UStaticMeshComponent;
 class UGP_VisualCueComponent;
+class UNiagaraSystem;
+class UStaticMesh;
 
 UCLASS(Blueprintable)
 class PROJECT_EDEN_API AGP_CrystalShardProjectile : public AGP_Projectile
@@ -32,6 +34,24 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UStaticMeshComponent> ShardMesh;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Crystal Seraph|Visual", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UStaticMesh> ShardStaticMesh;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph|Visual", meta = (AllowPrivateAccess = "true"))
+	FVector ShardMeshScale = FVector(0.35f, 0.35f, 0.8f);
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Crystal Seraph|VFX", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UNiagaraSystem> ProjectileActiveVFX;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Crystal Seraph|VFX", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UNiagaraSystem> ProjectileImpactVFX;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph|VFX", meta = (AllowPrivateAccess = "true"))
+	FVector ProjectileActiveVFXScale = FVector(0.8f);
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph|VFX", meta = (AllowPrivateAccess = "true"))
+	FVector ProjectileImpactVFXScale = FVector::OneVector;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
 	float AttackPowerDamageCoefficient = 0.8f;

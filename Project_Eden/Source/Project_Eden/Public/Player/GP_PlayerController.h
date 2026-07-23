@@ -37,11 +37,9 @@ public:
 	bool ShouldResumeHeldSprint() const { return !bIsSprintToggle && bSprintInputHeld; }
 	bool IsCrouchInputHeld() const { return bCrouchInputHeld; }
 
+	// General skill progression still opens this picker without depending on a scripted world event.
 	UFUNCTION(BlueprintCallable, Category = "UI|Augment")
 	bool RequestOpenAugmentSelect();
-
-	UFUNCTION(Client, Reliable, BlueprintCallable, Category = "UI|Augment")
-	void ClientOpenRegionEventAugmentSelect();
 
 	UFUNCTION(BlueprintCallable, Category = "UI|Augment")
 	bool OpenAugmentSelectWidget(const TArray<UGP_SkillAugmentData*>& Candidates);
@@ -308,4 +306,12 @@ private:
 	// client travel). Called from both SetupInputComponent and BeginPlay so a
 	// null subsystem at input-setup time on clients does not leave input unbound.
 	void AddInputMappingContexts();
+
+#if !UE_BUILD_SHIPPING
+	// Headless three-client QA waits for possession, GAS, HUD, and Enhanced Input after seamless travel.
+	void BeginThreePlayerGameplaySmokeProbe();
+	void TryThreePlayerGameplaySmokeProbe();
+	FTimerHandle ThreePlayerGameplaySmokeTimerHandle;
+	int32 ThreePlayerGameplaySmokeAttempts = 0;
+#endif
 };

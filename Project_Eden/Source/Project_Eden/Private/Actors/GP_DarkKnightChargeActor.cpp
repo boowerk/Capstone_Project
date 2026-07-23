@@ -114,7 +114,7 @@ void AGP_DarkKnightChargeActor::Tick(float DeltaSeconds)
 		return;
 	}
 
-	if (bUseMontageRootMotion)
+	if (bActiveUsesMontageRootMotion)
 	{
 		ChargeElapsed += DeltaSeconds;
 		SetActorLocation(Boss->GetActorLocation());
@@ -170,9 +170,12 @@ void AGP_DarkKnightChargeActor::StartCharge()
 		return;
 	}
 	bChargeActive = true;
+	DistanceTravelled = 0.0f;
 	ChargeElapsed = 0.0f;
 	TelegraphMesh->SetVisibility(false, true);
-	Boss->PlayPatternMontage(GPTags::Ability::Boss::DarkKnight::Charge);
+	const bool bMontageStarted = Boss->PlayPatternMontage(GPTags::Ability::Boss::DarkKnight::Charge);
+	// Root motion can own travel only when this exact montage invocation started.
+	bActiveUsesMontageRootMotion = bUseMontageRootMotion && bMontageStarted;
 	SetActorTickEnabled(true);
 	BP_OnChargeStarted();
 }

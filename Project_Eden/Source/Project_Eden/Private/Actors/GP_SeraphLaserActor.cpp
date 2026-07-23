@@ -24,6 +24,8 @@ AGP_SeraphLaserActor::AGP_SeraphLaserActor()
 	SetRootComponent(SceneRoot);
 	VisualCueComponent = CreateDefaultSubobject<UGP_VisualCueComponent>(TEXT("VisualCueComponent"));
 	VisualCueComponent->SetNiagaraTintOverride(true, GPCrystalSeraphVFXDefaults::GetCrystalTintColor());
+	ReflectionBeamVFXComponent = CreateDefaultSubobject<UGP_VisualCueComponent>(TEXT("ReflectionBeamVFXComponent"));
+	ReflectionBeamVFXComponent->SetNiagaraTintOverride(true, GPCrystalSeraphVFXDefaults::GetCrystalTintColor());
 
 	DamageBox = CreateDefaultSubobject<UBoxComponent>(TEXT("DamageBox"));
 	DamageBox->SetupAttachment(SceneRoot);
@@ -35,39 +37,19 @@ AGP_SeraphLaserActor::AGP_SeraphLaserActor()
 	LaserMesh->SetupAttachment(DamageBox);
 	LaserMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMeshFinder(TEXT("/Engine/BasicShapes/Cube.Cube"));
-	if (CubeMeshFinder.Succeeded())
-	{
-		LaserMesh->SetStaticMesh(CubeMeshFinder.Object);
-	}
-
 	static ConstructorHelpers::FClassFinder<UGameplayEffect> DamageEffectFinder(TEXT("/Game/GAS_Pattern/AbilitySystem/GameplayEffects/Damage/GE_PrimaryDamage"));
 	if (DamageEffectFinder.Succeeded())
 	{
 		DamageEffectClass = DamageEffectFinder.Class;
 	}
 
-	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> TelegraphVFXFinder(TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/VFX/NS_CrystalSeraph_Attack_Line.NS_CrystalSeraph_Attack_Line"));
-	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> ActiveVFXFinder(TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/VFX/NS_CrystalSeraph_Attack_Line_Brute.NS_CrystalSeraph_Attack_Line_Brute"));
-	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> ReflectVFXFinder(TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/VFX/NS_CrystalSeraph_Hit2.NS_CrystalSeraph_Hit2"));
-	if (TelegraphVFXFinder.Succeeded())
-	{
-		VisualCueComponent->AddNiagaraCue(GPTags::GameplayCue::Ability::Telegraph_Magic, TelegraphVFXFinder.Object);
-	}
-	if (ActiveVFXFinder.Succeeded())
-	{
-		VisualCueComponent->AddNiagaraCue(GPTags::GameplayCue::Ability::Active_Magic, ActiveVFXFinder.Object);
-	}
-	if (ReflectVFXFinder.Succeeded())
-	{
-		VisualCueComponent->AddNiagaraCue(GPTags::GameplayCue::Ability::Reflect_Magic, ReflectVFXFinder.Object);
-	}
 }
 
 void AGP_SeraphLaserActor::BeginPlay()
 {
 	Super::BeginPlay();
 
+	ConfigureVisualCues();
 	UpdateLaserShape();
 	VisualCueComponent->ActivatePersistentCue(GPTags::GameplayCue::Ability::Telegraph_Magic, DamageBox);
 	BP_OnLaserTelegraphStarted();
@@ -113,26 +95,34 @@ void AGP_SeraphLaserActor::ActivateLaser()
 {
 	bLaserActive = true;
 	VisualCueComponent->DeactivatePersistentCue(GPTags::GameplayCue::Ability::Telegraph_Magic);
-	VisualCueComponent->ActivatePersistentCue(GPTags::GameplayCue::Ability::Active_Magic, DamageBox);
-	DamageBox->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	// DamageBox is centered along the beam for collision, while the active VFX must begin at the firing origin.
+	VisualCueComponent->ActivatePersistentCue(GPTags::GameplayCue::Ability::Active_Magic, SceneRoot);
+	DamageBox->SetCollisionEnabled(bCanDealDamage ? ECollisionEnabled::QueryOnly : ECollisionEnabled::NoCollision);
 	BP_OnLaserActivated();
 	TryReflectFromPrism();
 	ApplyLaserDamageTick();
 
-	if (UWorld* World = GetWorld())
+	if (bCanDealDamage)
 	{
-		World->GetTimerManager().SetTimer(DamageTimerHandle, this, &ThisClass::ApplyLaserDamageTick, FMath::Max(0.01f, DamageTickInterval), true);
+		if (UWorld* World = GetWorld())
+		{
+			World->GetTimerManager().SetTimer(DamageTimerHandle, this, &ThisClass::ApplyLaserDamageTick, FMath::Max(0.01f, DamageTickInterval), true);
+		}
 	}
 }
 
 void AGP_SeraphLaserActor::FinishLaser()
 {
+	if (HasAuthority() && bReleasesPrismShields && IsValid(BossOwner))
+	{
+		BossOwner->ReleaseCrystalPrismShields();
+	}
 	Destroy();
 }
 
 void AGP_SeraphLaserActor::ApplyLaserDamageTick()
 {
-	if (!HasAuthority() || !bLaserActive)
+	if (!HasAuthority() || !bLaserActive || !bCanDealDamage)
 	{
 		return;
 	}
@@ -162,6 +152,7 @@ bool AGP_SeraphLaserActor::TryReflectFromPrism()
 
 	AGP_CrystalPrismActor* BestPrism = nullptr;
 	float BestDistanceAlongLaser = TNumericLimits<float>::Max();
+	FVector BestReflectionLocation = FVector::ZeroVector;
 	const FVector LaserStart = GetActorLocation();
 	const FVector SafeDirection = LaserDirection.GetSafeNormal();
 
@@ -173,7 +164,8 @@ bool AGP_SeraphLaserActor::TryReflectFromPrism()
 			continue;
 		}
 
-		const FVector ToPrism = PrismActor->GetActorLocation() - LaserStart;
+		const FVector PrismCenter = PrismActor->GetReflectionCenter();
+		const FVector ToPrism = PrismCenter - LaserStart;
 		const float DistanceAlongLaser = FVector::DotProduct(ToPrism, SafeDirection);
 		if (DistanceAlongLaser < 0.0f || DistanceAlongLaser > LaserLength)
 		{
@@ -181,16 +173,33 @@ bool AGP_SeraphLaserActor::TryReflectFromPrism()
 		}
 
 		const FVector ClosestPoint = LaserStart + SafeDirection * DistanceAlongLaser;
-		const float DistanceFromLine = FVector::Dist(ClosestPoint, PrismActor->GetActorLocation());
-		if (DistanceFromLine > PrismActor->GetCollisionRadius() + LaserWidth * 0.5f)
+		const float ShieldRadius = PrismActor->GetCollisionRadius();
+		const float DistanceFromLine = FVector::Dist(ClosestPoint, PrismCenter);
+		if (DistanceFromLine > ShieldRadius + LaserWidth * 0.5f)
 		{
 			continue;
+		}
+
+		FVector ReflectionLocation = FVector::ZeroVector;
+		if (DistanceFromLine <= ShieldRadius)
+		{
+			const float HalfChordLength = FMath::Sqrt(FMath::Max(0.0f, FMath::Square(ShieldRadius) - FMath::Square(DistanceFromLine)));
+			const float EntryDistance = DistanceAlongLaser - HalfChordLength;
+			const float ExitDistance = DistanceAlongLaser + HalfChordLength;
+			const float SurfaceDistance = EntryDistance >= 0.0f ? EntryDistance : ExitDistance;
+			ReflectionLocation = LaserStart + SafeDirection * FMath::Clamp(SurfaceDistance, 0.0f, LaserLength);
+		}
+		else
+		{
+			// The beam width grazed the shield. Place feedback on the nearest point of the visible sphere.
+			ReflectionLocation = PrismCenter + (ClosestPoint - PrismCenter).GetSafeNormal() * ShieldRadius;
 		}
 
 		if (DistanceAlongLaser < BestDistanceAlongLaser)
 		{
 			BestDistanceAlongLaser = DistanceAlongLaser;
 			BestPrism = PrismActor;
+			BestReflectionLocation = ReflectionLocation;
 		}
 	}
 
@@ -199,16 +208,25 @@ bool AGP_SeraphLaserActor::TryReflectFromPrism()
 		return false;
 	}
 
-	bHasReflected = BestPrism->NotifyLaserHit(this, LaserDirection);
+	bHasReflected = BestPrism->NotifyLaserHitAtLocation(this, LaserDirection, BestReflectionLocation);
 	if (!bHasReflected)
 	{
 		return false;
 	}
 
+	// The shield consumed the incoming beam. Keep its visuals for the pattern, but do not let the full
+	// pre-reflection DamageBox or the new outbound beam continue hurting the player.
+	bCanDealDamage = false;
+	DamageBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(DamageTimerHandle);
+	}
+
 	const FVector ReflectedDirection = BestPrism->ResolveReflectedDirection(LaserDirection);
-	SpawnReflectedSegment(BestPrism->GetActorLocation(), ReflectedDirection);
-	MulticastPlayReflectedVFX(BestPrism->GetActorLocation(), ReflectedDirection.Rotation());
-	BP_OnLaserReflected(BestPrism->GetActorLocation(), ReflectedDirection);
+	SpawnReflectedSegment(BestReflectionLocation, ReflectedDirection);
+	MulticastPlayReflectedVFX(BestReflectionLocation, ReflectedDirection.Rotation());
+	BP_OnLaserReflected(BestReflectionLocation, ReflectedDirection);
 	return true;
 }
 
@@ -217,6 +235,31 @@ void AGP_SeraphLaserActor::MulticastPlayReflectedVFX_Implementation(const FVecto
 	if (IsValid(VisualCueComponent))
 	{
 		VisualCueComponent->PlayOneShotAtLocation(GPTags::GameplayCue::Ability::Reflect_Magic, ReflectionOrigin, ReflectionRotation, FVector(1.35f));
+	}
+	if (IsValid(ReflectionBeamVFXComponent))
+	{
+		// Keep crystal impact burst, then layer beam/lightning energy over each reflected segment origin.
+		ReflectionBeamVFXComponent->PlayOneShotAtLocation(GPTags::GameplayCue::Ability::Reflect_Magic, ReflectionOrigin, ReflectionRotation, FVector(1.1f));
+	}
+}
+
+void AGP_SeraphLaserActor::ConfigureVisualCues()
+{
+	if (IsValid(TelegraphVFX.Get()))
+	{
+		VisualCueComponent->AddNiagaraCue(GPTags::GameplayCue::Ability::Telegraph_Magic, TelegraphVFX);
+	}
+	if (IsValid(ActiveVFX.Get()))
+	{
+		VisualCueComponent->AddNiagaraCue(GPTags::GameplayCue::Ability::Active_Magic, ActiveVFX);
+	}
+	if (IsValid(ReflectionImpactVFX.Get()))
+	{
+		VisualCueComponent->AddNiagaraCue(GPTags::GameplayCue::Ability::Reflect_Magic, ReflectionImpactVFX);
+	}
+	if (IsValid(ReflectionBeamVFX.Get()))
+	{
+		ReflectionBeamVFXComponent->AddNiagaraCue(GPTags::GameplayCue::Ability::Reflect_Magic, ReflectionBeamVFX);
 	}
 }
 
@@ -247,6 +290,8 @@ void AGP_SeraphLaserActor::SpawnReflectedSegment(const FVector& ReflectionOrigin
 		ReflectedLaser->DamageTickInterval = DamageTickInterval;
 		ReflectedLaser->MaxHealthDamagePerTick = MaxHealthDamagePerTick;
 		ReflectedLaser->DamageEffectClass = DamageEffectClass;
+		ReflectedLaser->bCanDealDamage = false;
+		ReflectedLaser->bReleasesPrismShields = false;
 		ReflectedLaser->InitializeLaser(BossOwner, TargetActor.Get(), ReflectedDirection, RemainingReflections - 1);
 	}
 }

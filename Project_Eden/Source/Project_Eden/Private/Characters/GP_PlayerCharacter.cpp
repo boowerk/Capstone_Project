@@ -18,6 +18,7 @@
 #include "Camera/PlayerCameraManager.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "NavigationInvokerComponent.h"
 #include "Player/GP_PlayerController.h"
 
 // Animation Headers
@@ -97,6 +98,10 @@ AGP_PlayerCharacter::AGP_PlayerCharacter()
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
 	FollowCamera->bUsePawnControlRotation = false;
 
+	// Every authoritative player becomes a navigation seed; the wider removal radius prevents tile churn at the generation boundary.
+	NavigationInvoker = CreateDefaultSubobject<UNavigationInvokerComponent>(TEXT("NavigationInvoker"));
+	NavigationInvoker->SetGenerationRadii(5000.0f, 7000.0f);
+
 	WhiteVoidSetClass = AGP_WhiteVoidSetActor::StaticClass();
 
 	// 태그 추가 함수 추가후 호출 예정지
@@ -117,6 +122,9 @@ void AGP_PlayerCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 
+	// A replicated slot can already be present when this pawn enters play. Reapply it
+	// after the base animation set has initialized the default MaskMan appearance.
+	ApplyPartyVisualSlot();
 	ApplyMovementSpeedFromAnimationSet();
 	ApplyRetargetVisualScaleFromAnimationSet();
 	if (bAutoSpawnWhiteVoidSet)
@@ -950,6 +958,55 @@ void AGP_PlayerCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME_CONDITION(AGP_PlayerCharacter, bIsInWhiteVoid, COND_SkipOwner);
+	DOREPLIFETIME(AGP_PlayerCharacter, PartyVisualSlot);
+}
+
+void AGP_PlayerCharacter::SetPartyVisualSlot(int32 NewPartyVisualSlot)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	PartyVisualSlot = FMath::Clamp(NewPartyVisualSlot, 0, 2);
+	ApplyPartyVisualSlot();
+	ForceNetUpdate();
+}
+
+void AGP_PlayerCharacter::OnRep_PartyVisualSlot()
+{
+	ApplyPartyVisualSlot();
+}
+
+void AGP_PlayerCharacter::ApplyPartyVisualSlot()
+{
+	USkeletalMesh* PartyMesh = nullptr;
+	if (PartyVisualSlot == 1)
+	{
+		PartyMesh = SecondPlayerSkeletalMesh;
+	}
+	else if (PartyVisualSlot == 2)
+	{
+		PartyMesh = ThirdPlayerSkeletalMesh;
+	}
+
+	if (!PartyMesh || !GetMesh() || GetMesh()->GetSkeletalMeshAsset() == PartyMesh)
+	{
+		return;
+	}
+
+	// Mirror the AnimationSet setup used by the default MaskMan appearance. Changing only
+	// the mesh can leave the component without its runtime-retarget AnimBP on clients.
+	GetMesh()->SetSkeletalMeshAsset(PartyMesh);
+	if (AnimationSet && AnimationSet->AnimBlueprintClass)
+	{
+		GetMesh()->SetAnimInstanceClass(AnimationSet->AnimBlueprintClass);
+	}
+	if (UGP_CharacterAnimInstance* AnimInstance = Cast<UGP_CharacterAnimInstance>(GetMesh()->GetAnimInstance()))
+	{
+		AnimInstance->SetAnimationSet(AnimationSet);
+	}
+	ApplyRetargetVisualScaleFromAnimationSet();
 }
 
 void AGP_PlayerCharacter::StopUEFNSourceFallbackMontage(float BlendOutTime)
@@ -1280,7 +1337,16 @@ void AGP_PlayerCharacter::ApplyRetargetVisualScaleFromAnimationSet()
 	}
 
 	const float CharacterMeshScale = FMath::Max(VisualScaleProfile.CharacterMeshScale, 0.01f);
-	GetMesh()->SetRelativeScale3D(FVector(CharacterMeshScale / UEFNSourceScale));
+	float PartyVisualScale = 1.0f;
+	if (PartyVisualSlot == 1)
+	{
+		PartyVisualScale = SecondPlayerVisualScale;
+	}
+	else if (PartyVisualSlot == 2)
+	{
+		PartyVisualScale = ThirdPlayerVisualScale;
+	}
+	GetMesh()->SetRelativeScale3D(FVector((CharacterMeshScale / UEFNSourceScale) * FMath::Max(PartyVisualScale, 0.01f)));
 }
 
 void AGP_PlayerCharacter::UpdateCameraMotion(float DeltaSeconds)

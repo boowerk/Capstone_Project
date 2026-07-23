@@ -7,7 +7,19 @@
 
 class UGameplayEffect;
 class UAnimMontage;
+class UCharacterMovementComponent;
+class UCapsuleComponent;
+class AActor;
 struct FGameplayEventData;
+
+// Gameplay-window notifies and montage presentation events have different lifetimes.
+enum class EEnemyAttackPresentationSignal : uint8
+{
+	ActionEnd,
+	MontageBlendOut,
+	MontageCompleted,
+	MontageInterrupted
+};
 
 UCLASS()
 class PROJECT_EDEN_API UGP_EnemyAttack : public UGP_SkillBase
@@ -23,9 +35,18 @@ public:
 		const FGameplayAbilityActivationInfo ActivationInfo,
 		const FGameplayEventData* TriggerEventData) override;
 
+	virtual void EndAbility(
+		const FGameplayAbilitySpecHandle Handle,
+		const FGameplayAbilityActorInfo* ActorInfo,
+		const FGameplayAbilityActivationInfo ActivationInfo,
+		bool bReplicateEndAbility,
+		bool bWasCancelled) override;
+
 protected:
 	// Derived enemy archetypes can replace the shared overlap hit while keeping montage and gameplay-event timing.
 	virtual void PerformAttackHit();
+	// Derived hits keep one activation-time actor identity while sampling that same actor's live hit-frame location.
+	AActor* GetLockedAttackTarget() const { return LockedAttackTarget.Get(); }
 
 	// Animation notifies can send this event when a montage should apply the hit.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS|Skill|Mechanics")
@@ -48,19 +69,67 @@ private:
 	void OnMontageCompleted();
 
 	UFUNCTION()
+	void OnMontageBlendOut();
+
+	UFUNCTION()
+	void OnMontageCancelled();
+
+	UFUNCTION()
 	void OnAttackEventReceived(FGameplayEventData Payload);
 
 	UFUNCTION()
 	void OnActionEndEventReceived(FGameplayEventData Payload);
 
+	// Latch before virtual dispatch so every derived attack, including ranged projectiles, can apply at most one hit.
+	void TryPerformAttackHitOnce();
 	void FinishAttackAbility(bool bWasCancelled);
+	static bool ShouldFinishAttackForPresentationSignal(EEnemyAttackPresentationSignal Signal);
+	static bool ShouldApplyFallbackHit(bool bAlreadyApplied, bool bWasCancelled);
+	static bool ShouldContinueAbilityForwardStep(
+		float ElapsedSeconds,
+		float MaximumDurationSeconds,
+		float TravelledDistance,
+		float MaximumDistance,
+		bool bRequiresLiveTarget,
+		bool bTargetIsValid,
+		float DistanceToTarget,
+		float StopDistance);
+
+	// The authored forward step is ability-owned so every completion and cancellation path restores movement state.
+	UFUNCTION() void BeginAbilityForwardStep();
+	void TickAbilityForwardStep();
+	void EndAbilityForwardStep();
+	void PushOverlappingForwardStepTargets();
 
 	bool bHasAppliedAttackHit = false;
 	bool bHasFinishedAttackAbility = false;
+	TWeakObjectPtr<AActor> LockedAttackTarget;
+
+	friend class FEnemyAttackCancellationPolicyTest;
+	friend class FEnemyAttackPresentationLifetimeTest;
+	friend class FEnemyAttackForwardStepPolicyTest;
 
 	// Per-actor ability instance state. Prevents the same configured attack montage repeating twice in a row.
 	TObjectPtr<UAnimMontage> LastSelectedAttackMontage = nullptr;
 
 	// -1 = left, 1 = right, 0 = unknown. Used to prefer left/right alternation for named attack montages.
 	int8 LastSelectedAttackSide = 0;
+	FVector AbilityForwardStepDirection = FVector::ZeroVector;
+	float AbilityForwardStepDistance = 0.0f;
+	float AbilityForwardStepDurationSeconds = 0.0f;
+	float AbilityForwardStepStopDistance = 0.0f;
+	float AbilityForwardStepElapsedSeconds = 0.0f;
+	float AbilityForwardStepStartWorldTimeSeconds = 0.0f;
+	float AbilityForwardStepTravelledDistance = 0.0f;
+	float AbilityForwardStepPushSpeed = 0.0f;
+	bool bAbilityForwardStepActive = false;
+	bool bAbilityForwardStepTracksCommittedTarget = false;
+	TWeakObjectPtr<AActor> AbilityForwardStepTarget;
+	FVector AbilityForwardStepPreviousLocation = FVector::ZeroVector;
+	TObjectPtr<UCharacterMovementComponent> AbilityForwardStepMovementComponent = nullptr;
+	TObjectPtr<UCapsuleComponent> AbilityForwardStepCapsuleComponent = nullptr;
+	ECollisionResponse AbilityForwardStepPreviousPawnResponse = ECR_Block;
+	bool bAbilityForwardStepPreviousGenerateOverlapEvents = false;
+	TSet<TWeakObjectPtr<AActor>> AbilityForwardStepPushedActors;
+	FTimerHandle AbilityForwardStepTimerHandle;
 };

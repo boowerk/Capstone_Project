@@ -5,6 +5,7 @@
 #include "AbilitySystem/Abilities/Enemy/GP_DarkKnightPatternAbility.h"
 #include "AbilitySystemComponent.h"
 #include "AIController.h"
+#include "AI/Tasks/BossAttackPatternSelector.h"
 #include "Actors/GP_BossCombatUtils.h"
 #include "Actors/GP_DarkKnightChargeActor.h"
 #include "Actors/GP_DarkKnightGroundCrackActor.h"
@@ -27,6 +28,57 @@
 #include "UObject/ConstructorHelpers.h"
 #include "VFX/GP_BossDeathPresentationComponent.h"
 #include "VFX/GP_BossTelegraphVFXComponent.h"
+
+namespace
+{
+	bool HasGrantedAbilityWithExactTag(
+		const UAbilitySystemComponent* AbilitySystemComponent,
+		const FGameplayTag& AbilityTag)
+	{
+		if (!IsValid(AbilitySystemComponent) || !AbilityTag.IsValid())
+		{
+			return false;
+		}
+
+		for (const FGameplayAbilitySpec& AbilitySpec : AbilitySystemComponent->GetActivatableAbilities())
+		{
+			const UGameplayAbility* Ability = AbilitySpec.Ability;
+			if (IsValid(Ability) && Ability->GetAssetTags().HasTagExact(AbilityTag))
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	void GrantConfiguredAbilityWithoutTagOverlap(
+		UAbilitySystemComponent* AbilitySystemComponent,
+		const TSubclassOf<UGameplayAbility>& AbilityClass)
+	{
+		if (!IsValid(AbilitySystemComponent)
+			|| !*AbilityClass
+			|| AbilitySystemComponent->FindAbilitySpecFromClass(AbilityClass) != nullptr)
+		{
+			return;
+		}
+
+		const UGameplayAbility* AbilityDefaults = AbilityClass->GetDefaultObject<UGameplayAbility>();
+		if (IsValid(AbilityDefaults))
+		{
+			for (const FGameplayTag& AbilityTag : AbilityDefaults->GetAssetTags())
+			{
+				if (HasGrantedAbilityWithExactTag(AbilitySystemComponent, AbilityTag))
+				{
+					// Tag activation must resolve to one spec even when a Blueprint replaces a native pattern class.
+					return;
+				}
+			}
+		}
+
+		AbilitySystemComponent->GiveAbility(FGameplayAbilitySpec(AbilityClass));
+	}
+}
 
 AGP_DarkArmorKnightBossCharacter::AGP_DarkArmorKnightBossCharacter()
 {
@@ -129,6 +181,13 @@ void AGP_DarkArmorKnightBossCharacter::BeginPlay()
 
 void AGP_DarkArmorKnightBossCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	ClearPatternTimers();
+	ActiveChargeActor.Reset();
+	Super::EndPlay(EndPlayReason);
+}
+
+void AGP_DarkArmorKnightBossCharacter::ClearPatternTimers()
+{
 	if (UWorld* World = GetWorld())
 	{
 		for (FTimerHandle& TimerHandle : PatternTimerHandles)
@@ -137,7 +196,65 @@ void AGP_DarkArmorKnightBossCharacter::EndPlay(const EEndPlayReason::Type EndPla
 		}
 	}
 	PatternTimerHandles.Reset();
-	Super::EndPlay(EndPlayReason);
+}
+
+bool AGP_DarkArmorKnightBossCharacter::IsPatternInterrupted() const
+{
+	return IsDead()
+		|| !IsValid(DarkKnightStateComponent)
+		|| DarkKnightStateComponent->IsGroggy()
+		|| DarkKnightStateComponent->IsGuardBroken();
+}
+
+float AGP_DarkArmorKnightBossCharacter::GetDarkWaveMaxRange() const
+{
+	// Older Blueprint saves can retain the former 2200cm value. The authored DarkSlash is a 520cm cone,
+	// so clamp serialized overrides to the real damage reach instead of reopening a stationary whiff.
+	return FMath::Clamp(
+		DarkWaveMaxRange,
+		0.0f,
+		FGPBossAttackPatternRanges::DarkKnightDarkWaveMaxRange);
+}
+
+bool AGP_DarkArmorKnightBossCharacter::CanStartPatternAtTargetRange(
+	FGameplayTag PatternTag,
+	AActor* ExplicitTarget) const
+{
+	const bool bUsesTargetRange = PatternTag.MatchesTagExact(GPTags::Ability::Boss::DarkKnight::Basic)
+		|| PatternTag.MatchesTagExact(GPTags::Ability::Boss::DarkKnight::Heavy)
+		|| PatternTag.MatchesTagExact(GPTags::Ability::Boss::DarkKnight::Charge)
+		|| PatternTag.MatchesTagExact(GPTags::Ability::Boss::DarkKnight::DarkWave)
+		|| PatternTag.MatchesTagExact(GPTags::Ability::Boss::DarkKnight::GroundCrack);
+	if (!bUsesTargetRange)
+	{
+		return true;
+	}
+
+	const AActor* TargetActor = ResolvePatternTarget(ExplicitTarget);
+	if (!IsValid(TargetActor))
+	{
+		return false;
+	}
+
+	const float DistanceToTarget = FVector::Dist2D(GetActorLocation(), TargetActor->GetActorLocation());
+	if (PatternTag.MatchesTagExact(GPTags::Ability::Boss::DarkKnight::Basic))
+	{
+		return DistanceToTarget <= GetBasicAttackRange();
+	}
+	if (PatternTag.MatchesTagExact(GPTags::Ability::Boss::DarkKnight::Heavy))
+	{
+		return DistanceToTarget <= GetHeavyAttackRange();
+	}
+	if (PatternTag.MatchesTagExact(GPTags::Ability::Boss::DarkKnight::Charge))
+	{
+		return DistanceToTarget >= FMath::Max(0.0f, ChargeMinRange)
+			&& DistanceToTarget <= FGPBossAttackPatternRanges::DarkKnightChargeMaxRange;
+	}
+	if (PatternTag.MatchesTagExact(GPTags::Ability::Boss::DarkKnight::DarkWave))
+	{
+		return DistanceToTarget <= GetDarkWaveMaxRange();
+	}
+	return DistanceToTarget <= FMath::Max(0.0f, GroundCrackMaxRange);
 }
 
 UGP_BossTelegraphVFXComponent* AGP_DarkArmorKnightBossCharacter::GetBossTelegraphVFXComponent() const
@@ -241,7 +358,7 @@ bool AGP_DarkArmorKnightBossCharacter::ExecuteBasicAttack(AActor* TargetActor)
 		const float Coefficient = Index == 0 ? 0.7f : (Index == 1 ? 0.9f : 1.0f);
 		GetWorldTimerManager().SetTimer(Handle, [WeakThis = TWeakObjectPtr<AGP_DarkArmorKnightBossCharacter>(this), Coefficient]()
 		{
-			if (WeakThis.IsValid() && !WeakThis->IsDead())
+			if (WeakThis.IsValid() && !WeakThis->IsPatternInterrupted())
 			{
 				WeakThis->ApplyConeDamage(WeakThis->BasicAttackRange, 40.0f, Coefficient);
 			}
@@ -262,9 +379,9 @@ bool AGP_DarkArmorKnightBossCharacter::ExecuteHeavyAttack(AActor* TargetActor)
 	FTimerHandle& Handle = PatternTimerHandles.AddDefaulted_GetRef();
 	GetWorldTimerManager().SetTimer(Handle, [WeakThis = TWeakObjectPtr<AGP_DarkArmorKnightBossCharacter>(this)]()
 	{
-		if (WeakThis.IsValid() && !WeakThis->IsDead())
+		if (WeakThis.IsValid() && !WeakThis->IsPatternInterrupted())
 		{
-			WeakThis->ApplyConeDamage(420.0f, 55.0f, 1.6f, 350.0f);
+			WeakThis->ApplyConeDamage(WeakThis->GetHeavyAttackRange(), 55.0f, 1.6f, 350.0f);
 		}
 	}, 1.1f, false);
 	return true;
@@ -282,7 +399,7 @@ bool AGP_DarkArmorKnightBossCharacter::ExecuteSweepAttack(AActor* TargetActor)
 	FTimerHandle& Handle = PatternTimerHandles.AddDefaulted_GetRef();
 	GetWorldTimerManager().SetTimer(Handle, [WeakThis = TWeakObjectPtr<AGP_DarkArmorKnightBossCharacter>(this)]()
 	{
-		if (WeakThis.IsValid() && !WeakThis->IsDead())
+		if (WeakThis.IsValid() && !WeakThis->IsPatternInterrupted())
 		{
 			// A 180-degree half-angle produces the full circular sweep described by the melee pressure pattern.
 			WeakThis->ApplyConeDamage(420.0f, 180.0f, 1.1f, 250.0f);
@@ -323,7 +440,7 @@ bool AGP_DarkArmorKnightBossCharacter::ExecuteCounterAttack(AActor* TargetActor)
 	FTimerHandle& Handle = PatternTimerHandles.AddDefaulted_GetRef();
 	GetWorldTimerManager().SetTimer(Handle, [WeakThis = TWeakObjectPtr<AGP_DarkArmorKnightBossCharacter>(this), WeakTarget = TWeakObjectPtr<AActor>(TargetActor)]()
 	{
-		if (!WeakThis.IsValid() || WeakThis->IsDead())
+		if (!WeakThis.IsValid() || WeakThis->IsPatternInterrupted())
 		{
 			return;
 		}
@@ -340,7 +457,7 @@ bool AGP_DarkArmorKnightBossCharacter::ExecuteCounterAttack(AActor* TargetActor)
 bool AGP_DarkArmorKnightBossCharacter::ExecuteChargeAttack(AActor* TargetActor)
 {
 	TargetActor = ResolvePatternTarget(TargetActor);
-	if (!HasAuthority() || !IsValid(TargetActor) || !*ChargeActorClass)
+	if (!HasAuthority() || !IsValid(TargetActor) || !*ChargeActorClass || ActiveChargeActor.IsValid())
 	{
 		return false;
 	}
@@ -354,6 +471,8 @@ bool AGP_DarkArmorKnightBossCharacter::ExecuteChargeAttack(AActor* TargetActor)
 		return false;
 	}
 	RecordPatternUse(GPTags::Ability::Boss::DarkKnight::Charge);
+	// Track the coordinator so guard break can interrupt its timer/root-motion lifecycle.
+	ActiveChargeActor = Charge;
 	Charge->InitializeCharge(this, TargetActor);
 	return true;
 }
@@ -373,9 +492,9 @@ bool AGP_DarkArmorKnightBossCharacter::ExecuteDarkWave(AActor* TargetActor)
 		FTimerHandle& Handle = PatternTimerHandles.AddDefaulted_GetRef();
 		GetWorldTimerManager().SetTimer(Handle, [WeakThis = TWeakObjectPtr<AGP_DarkArmorKnightBossCharacter>(this)]()
 		{
-			if (WeakThis.IsValid() && !WeakThis->IsDead())
+			if (WeakThis.IsValid() && !WeakThis->IsPatternInterrupted())
 			{
-				WeakThis->ApplyConeDamage(520.0f, 60.0f, 1.35f, 325.0f);
+				WeakThis->ApplyConeDamage(WeakThis->GetDarkWaveMaxRange(), 60.0f, 1.35f, 325.0f);
 			}
 		}, 0.78f + Index * 0.30f, false);
 	}
@@ -393,7 +512,7 @@ bool AGP_DarkArmorKnightBossCharacter::ExecuteGroundCrack(AActor* TargetActor)
 	FTimerHandle& Handle = PatternTimerHandles.AddDefaulted_GetRef();
 	GetWorldTimerManager().SetTimer(Handle, [WeakThis = TWeakObjectPtr<AGP_DarkArmorKnightBossCharacter>(this), WeakTarget = TWeakObjectPtr<AActor>(TargetActor)]()
 	{
-		if (WeakThis.IsValid() && !WeakThis->IsDead() && WeakTarget.IsValid())
+		if (WeakThis.IsValid() && !WeakThis->IsPatternInterrupted() && WeakTarget.IsValid())
 		{
 			WeakThis->SpawnGroundCracks(WeakTarget.Get());
 		}
@@ -444,7 +563,7 @@ bool AGP_DarkArmorKnightBossCharacter::StartPatternWithWindup(FGameplayTag Patte
 	FTimerHandle& Handle = PatternTimerHandles.AddDefaulted_GetRef();
 	GetWorldTimerManager().SetTimer(Handle, [WeakThis = TWeakObjectPtr<AGP_DarkArmorKnightBossCharacter>(this), WeakTarget = TWeakObjectPtr<AActor>(TargetActor), PatternTag]()
 	{
-		if (!WeakThis.IsValid() || WeakThis->IsDead())
+		if (!WeakThis.IsValid() || WeakThis->IsPatternInterrupted())
 		{
 			return;
 		}
@@ -489,8 +608,9 @@ bool AGP_DarkArmorKnightBossCharacter::PlayPatternMontage(FGameplayTag PatternTa
 void AGP_DarkArmorKnightBossCharacter::HandleChargeFinished(bool bHitTarget, AActor* TargetActor)
 {
 	(void)bHitTarget;
+	ActiveChargeActor.Reset();
 
-	if (!HasAuthority() || !IsValid(TargetActor))
+	if (!HasAuthority() || !IsValid(TargetActor) || IsPatternInterrupted())
 	{
 		return;
 	}
@@ -506,7 +626,7 @@ void AGP_DarkArmorKnightBossCharacter::HandleChargeFinished(bool bHitTarget, AAc
 	FTimerHandle& Handle = PatternTimerHandles.AddDefaulted_GetRef();
 	GetWorldTimerManager().SetTimer(Handle, [WeakThis = TWeakObjectPtr<AGP_DarkArmorKnightBossCharacter>(this), FollowUpTag]()
 	{
-		if (WeakThis.IsValid() && !WeakThis->IsDead())
+		if (WeakThis.IsValid() && !WeakThis->IsPatternInterrupted())
 		{
 			// Follow-ups re-enter through GAS so grants, ability rules, and cooldowns remain the single execution path.
 			if (UGP_AbilitySystemComponent* ASC = Cast<UGP_AbilitySystemComponent>(WeakThis->GetAbilitySystemComponent()))
@@ -534,6 +654,7 @@ void AGP_DarkArmorKnightBossCharacter::GrantDarkKnightAbilities()
 		return;
 	}
 
+<<<<<<< HEAD
 	// Canonical native list is authoritative. A Blueprint child that re-saves DarkKnightAbilityClasses can serialize a
 	// stale/empty array (e.g. a single None) that overrides the constructor default and silently ungrants patterns,
 	// which leaves the pattern selector with candidates it can never activate and the boss frozen. Always grant natives,
@@ -549,11 +670,37 @@ void AGP_DarkArmorKnightBossCharacter::GrantDarkKnightAbilities()
 	};
 
 	auto GrantAbility = [ASC](const TSubclassOf<UGameplayAbility>& AbilityClass)
+=======
+	// Give designer-authored replacements first so their exact tags suppress the native fallback.
+	for (const TSubclassOf<UGameplayAbility>& AbilityClass : DarkKnightAbilityClasses)
+>>>>>>> origin/main
 	{
-		if (*AbilityClass && ASC->FindAbilitySpecFromClass(AbilityClass) == nullptr)
+		GrantConfiguredAbilityWithoutTagOverlap(ASC, AbilityClass);
+	}
+
+	struct FRequiredDarkKnightAbility
+	{
+		FGameplayTag AbilityTag;
+		TSubclassOf<UGameplayAbility> NativeClass;
+	};
+
+	const FRequiredDarkKnightAbility RequiredAbilities[] =
+	{
+		{ GPTags::Ability::Boss::DarkKnight::Basic, UGP_DarkKnightBasicAbility::StaticClass() },
+		{ GPTags::Ability::Boss::DarkKnight::Heavy, UGP_DarkKnightHeavyAbility::StaticClass() },
+		{ GPTags::Ability::Boss::DarkKnight::Charge, UGP_DarkKnightChargeAbility::StaticClass() },
+		{ GPTags::Ability::Boss::DarkKnight::DarkWave, UGP_DarkKnightDarkWaveAbility::StaticClass() },
+		{ GPTags::Ability::Boss::DarkKnight::GroundCrack, UGP_DarkKnightGroundCrackAbility::StaticClass() },
+		{ GPTags::Ability::Boss::DarkKnight::Groggy, UGP_DarkKnightGroggyAbility::StaticClass() },
+	};
+
+	for (const FRequiredDarkKnightAbility& RequiredAbility : RequiredAbilities)
+	{
+		if (!HasGrantedAbilityWithExactTag(ASC, RequiredAbility.AbilityTag))
 		{
-			// Native grants make the C++ boss playable before polished GameplayAbility Blueprint children exist.
-			ASC->GiveAbility(FGameplayAbilitySpec(AbilityClass));
+			// Blueprint arrays can retain an empty serialized override after native defaults change, so gameplay-critical
+			// patterns are restored by tag while preserving any configured replacement that was granted above.
+			ASC->GiveAbility(FGameplayAbilitySpec(RequiredAbility.NativeClass));
 		}
 	};
 
@@ -572,6 +719,12 @@ AActor* AGP_DarkArmorKnightBossCharacter::ResolvePatternTarget(AActor* ExplicitT
 	if (IsValid(ExplicitTarget))
 	{
 		return ExplicitTarget;
+	}
+	if (AActor* CommittedTarget = GetBehaviorAttackCommittedTarget())
+	{
+		// Preserve the BT target from telegraph through impact so multiplayer
+		// fallback selection cannot snap the pattern toward player index zero.
+		return CommittedTarget;
 	}
 	if (const AAIController* AIController = Cast<AAIController>(GetController()))
 	{
@@ -688,6 +841,22 @@ void AGP_DarkArmorKnightBossCharacter::HandleGroggyChanged(bool bNewGroggy)
 	if (!HasAuthority())
 	{
 		return;
+	}
+	if (bNewGroggy)
+	{
+		// Boss-owned callbacks outlive their short GAS activations, so cancel
+		// them here together with the visible montage and charge coordinator.
+		ClearPatternTimers();
+		PendingCounterTarget.Reset();
+		if (ActiveChargeActor.IsValid())
+		{
+			ActiveChargeActor->Destroy();
+		}
+		ActiveChargeActor.Reset();
+		if (UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr)
+		{
+			AnimInstance->Montage_Stop(0.12f);
+		}
 	}
 	if (UCharacterMovementComponent* Movement = GetCharacterMovement())
 	{

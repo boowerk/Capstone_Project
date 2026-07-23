@@ -32,13 +32,6 @@ AGP_CrystalSanctuaryMarkerActor::AGP_CrystalSanctuaryMarkerActor()
 	MarkerMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MarkerMesh"));
 	MarkerMesh->SetupAttachment(SceneRoot);
 	MarkerMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	MarkerMesh->SetRelativeScale3D(FVector(4.4f, 4.4f, 0.05f));
-
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> CylinderMeshFinder(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
-	if (CylinderMeshFinder.Succeeded())
-	{
-		MarkerMesh->SetStaticMesh(CylinderMeshFinder.Object);
-	}
 
 	static ConstructorHelpers::FClassFinder<UGameplayEffect> DamageEffectFinder(TEXT("/Game/GAS_Pattern/AbilitySystem/GameplayEffects/Damage/GE_PrimaryDamage"));
 	if (DamageEffectFinder.Succeeded())
@@ -46,24 +39,27 @@ AGP_CrystalSanctuaryMarkerActor::AGP_CrystalSanctuaryMarkerActor()
 		DamageEffectClass = DamageEffectFinder.Class;
 	}
 
-	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> TelegraphVFXFinder(TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/VFX/NS_CrystalSeraph_Circle2.NS_CrystalSeraph_Circle2"));
-	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> ImpactVFXFinder(TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/VFX/NS_CrystalSeraph_Area2.NS_CrystalSeraph_Area2"));
-	if (TelegraphVFXFinder.Succeeded())
-	{
-		VisualCueComponent->AddNiagaraCue(GPTags::GameplayCue::Ability::Telegraph_Magic, TelegraphVFXFinder.Object);
-	}
-	if (ImpactVFXFinder.Succeeded())
-	{
-		VisualCueComponent->AddNiagaraCue(GPTags::GameplayCue::Ability::Impact_Magic, ImpactVFXFinder.Object);
-	}
 }
 
 void AGP_CrystalSanctuaryMarkerActor::BeginPlay()
 {
 	Super::BeginPlay();
 
+	if (MarkerMesh->GetStaticMesh() == nullptr && IsValid(MarkerStaticMesh.Get()))
+	{
+		MarkerMesh->SetStaticMesh(MarkerStaticMesh);
+	}
+	MarkerMesh->SetRelativeScale3D(MarkerMeshScale);
+	if (IsValid(TelegraphVFX.Get()))
+	{
+		VisualCueComponent->AddNiagaraCue(GPTags::GameplayCue::Ability::Telegraph_Magic, TelegraphVFX);
+	}
+	if (IsValid(ExplosionVFX.Get()))
+	{
+		VisualCueComponent->AddNiagaraCue(GPTags::GameplayCue::Ability::Impact_Magic, ExplosionVFX);
+	}
 	DamageArea->SetSphereRadius(FMath::Max(0.0f, MarkerRadius));
-	VisualCueComponent->ActivatePersistentCue(GPTags::GameplayCue::Ability::Telegraph_Magic, MarkerMesh, FVector::ZeroVector, FRotator::ZeroRotator, FVector(2.2f));
+	VisualCueComponent->ActivatePersistentCue(GPTags::GameplayCue::Ability::Telegraph_Magic, MarkerMesh, FVector::ZeroVector, FRotator::ZeroRotator, TelegraphVFXScale);
 	BP_OnTelegraphStarted();
 
 	if (UWorld* World = GetWorld())
@@ -116,6 +112,6 @@ void AGP_CrystalSanctuaryMarkerActor::MulticastPlayExplosionVFX_Implementation(c
 {
 	if (IsValid(VisualCueComponent))
 	{
-		VisualCueComponent->PlayOneShotAtLocation(GPTags::GameplayCue::Ability::Impact_Magic, ExplosionLocation, FRotator::ZeroRotator, FVector(2.0f));
+		VisualCueComponent->PlayOneShotAtLocation(GPTags::GameplayCue::Ability::Impact_Magic, ExplosionLocation, FRotator::ZeroRotator, ExplosionVFXScale);
 	}
 }

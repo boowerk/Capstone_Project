@@ -31,6 +31,7 @@ AGP_BossGroundHandActor::AGP_BossGroundHandActor()
 	WarningDecal->SetRelativeRotation(FRotator(-90.0f, 0.0f, 0.0f));
 	WarningDecal->DecalColor = FLinearColor(1.0f, 0.0f, 0.0f, 0.62f);
 	WarningDecal->SetFadeScreenSize(0.001f);
+	WarningDecal->SetSortOrder(8);
 
 	HandCollision = CreateDefaultSubobject<UBoxComponent>(TEXT("HandCollision"));
 	HandCollision->SetupAttachment(HandVisualRoot);
@@ -53,8 +54,9 @@ AGP_BossGroundHandActor::AGP_BossGroundHandActor()
 		HandMesh->SetSkeletalMeshAsset(HandMeshFinder.Object);
 	}
 
+	// A dedicated radial opacity mask keeps the square projector from appearing as the attack warning.
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> DecalMaterialFinder(
-		TEXT("/Engine/EngineMaterials/DefaultDeferredDecalMaterial.DefaultDeferredDecalMaterial"));
+		TEXT("/Game/Effects/M_BossGroundHandTelegraph_Decal.M_BossGroundHandTelegraph_Decal"));
 	if (DecalMaterialFinder.Succeeded())
 	{
 		WarningDecalMaterial = DecalMaterialFinder.Object;

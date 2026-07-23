@@ -7,6 +7,8 @@
 class USphereComponent;
 class UGameplayEffect;
 class UGP_VisualCueComponent;
+class UNiagaraSystem;
+class UStaticMesh;
 class UStaticMeshComponent;
 
 UCLASS(Blueprintable)
@@ -48,6 +50,24 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UStaticMeshComponent> MarkerMesh;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Crystal Seraph|Visual", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UStaticMesh> MarkerStaticMesh;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph|Visual", meta = (AllowPrivateAccess = "true"))
+	FVector MarkerMeshScale = FVector(4.4f, 4.4f, 0.05f);
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Crystal Seraph|VFX", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UNiagaraSystem> TelegraphVFX;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Crystal Seraph|VFX", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UNiagaraSystem> ExplosionVFX;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph|VFX", meta = (AllowPrivateAccess = "true"))
+	FVector TelegraphVFXScale = FVector(2.2f);
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph|VFX", meta = (AllowPrivateAccess = "true"))
+	FVector ExplosionVFXScale = FVector(2.0f);
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "cm"))
 	float MarkerRadius = 220.0f;

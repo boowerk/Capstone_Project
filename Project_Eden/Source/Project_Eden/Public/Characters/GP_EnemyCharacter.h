@@ -7,6 +7,7 @@
 #include "GameplayTagContainer.h"
 #include "GP_EnemyCharacter.generated.h"
 
+class AActor;
 class UAbilitySystemComponent;
 class UAttributeSet;
 class UBehaviorTree;
@@ -15,10 +16,12 @@ class UEnemyAIRangeVisualizationComponent;
 class UEnemyArchetypeData;
 class UGP_BossDeathPresentationComponent;
 class UGP_BossTargetMarkerVFXComponent;
-class UGP_EnemyCorruptionComponent;
+class UGP_EnemyDeathAbsorptionComponent;
 class UGP_EnemyDeathAbility;
 class UGP_WidgetComponent;
 class UPDA_EnemyAnimationSet;
+class UAnimMontage;
+class UAnimSequence;
 class AGP_EnemyCharacter;
 class AGP_PlayerState;
 struct FOnAttributeChangeData;
@@ -36,6 +39,45 @@ enum class EGPEnemyCombatArchetype : uint8
 	Flying UMETA(DisplayName = "Flying")
 };
 
+/** Replicated cosmetic bridge owned by the authoritative attack BT task. */
+UENUM(BlueprintType)
+enum class EGPEnemyCombatTransitionPhase : uint8
+{
+	None,
+	AttackPrepare,
+	ChaseResume
+};
+
+USTRUCT(BlueprintType)
+struct FGPEnemyTurnInPlaceAnimationSet
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Turn")
+	TObjectPtr<UAnimSequence> Turn45Left;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Turn")
+	TObjectPtr<UAnimSequence> Turn45Right;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Turn")
+	TObjectPtr<UAnimSequence> Turn90Left;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Turn")
+	TObjectPtr<UAnimSequence> Turn90Right;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Turn")
+	TObjectPtr<UAnimSequence> Turn135Left;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Turn")
+	TObjectPtr<UAnimSequence> Turn135Right;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Turn")
+	TObjectPtr<UAnimSequence> Turn180Left;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Turn")
+	TObjectPtr<UAnimSequence> Turn180Right;
+};
+
 // Broadcast on the server the first time this enemy's health reaches zero, so the GameMode can track zone clears.
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FGPOnEnemyDied, AGP_EnemyCharacter*, DeadEnemy);
 
@@ -46,12 +88,14 @@ class PROJECT_EDEN_API AGP_EnemyCharacter : public AGP_BaseCharacter
 
 public:
 	AGP_EnemyCharacter();
+	virtual void Tick(float DeltaSeconds) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 	virtual UAttributeSet* GetAttributeSet() const override;
 	virtual void UpdateAnimationSet() override;
 
 	UPDA_EnemyAnimationSet* GetEnemyAnimationSet() const { return EnemyAnimationSet; }
+	const TSoftObjectPtr<UPDA_EnemyAnimationSet>& GetDefaultEnemyAnimationSet() const { return DefaultEnemyAnimationSet; }
 
 	UFUNCTION(BlueprintPure, Category = "Boss")
 	bool IsBossEnemy() const { return bIsBossEnemy; }
@@ -68,6 +112,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Boss|Death Presentation")
 	UGP_BossDeathPresentationComponent* GetBossDeathPresentationComponent() const { return BossDeathPresentationComponent; }
+
+	UFUNCTION(BlueprintPure, Category = "Enemy|Death Absorption")
+	UGP_EnemyDeathAbsorptionComponent* GetEnemyDeathAbsorptionComponent() const { return EnemyDeathAbsorptionComponent; }
 
 	// AIController calls this only when TargetActor is first acquired or changes to another valid player.
 	void NotifyBossTargetSelected(AActor* TargetActor);
@@ -102,26 +149,72 @@ public:
 	UFUNCTION(BlueprintPure, Category = "AI|Combat")
 	FGameplayTag GetDefaultAttackAbilityTag() const { return DefaultAttackAbilityTag; }
 
+	UFUNCTION(BlueprintPure, Category = "AI|Combat|Range")
+	float GetBasicMeleeAttackStartRange() const;
+
+	UFUNCTION(BlueprintPure, Category = "AI|Combat|Range")
+	float GetBasicMeleeAttackExitHysteresis() const { return FMath::Max(0.0f, BasicMeleeAttackExitHysteresis); }
+
+	UFUNCTION(BlueprintPure, Category = "AI|Combat|Range")
+	float GetBasicMeleeCadenceHoldRange() const { return FMath::Max(0.0f, BasicMeleeCadenceHoldRange); }
+	// The tactics service opens this explicit state; Tick then samples the same actor every frame for smooth close-hold facing.
+	void BeginBasicEnemyCombatHoldFacing(AActor* TargetActor, float TurnRateDegreesPerSecond);
+	void ClearBasicEnemyCombatHoldFacing();
+
 	// Regular-enemy BT tasks use this server-side gate instead of a fixed shared Wait node.
 	UFUNCTION(BlueprintPure, Category = "AI|Combat|Cadence")
 	bool IsBasicEnemyAttackReady() const;
+	bool IsBasicEnemyAttackInProgress() const { return bBasicEnemyAttackInProgress; }
+	bool IsBasicEnemyAttackAimTracking() const { return bBasicEnemyAttackAimTracking; }
+	// The attack ability opens this server-side window so the BT can follow only its committed player until AttackHit.
+	void BeginBasicEnemyAttackAimTracking() { bBasicEnemyAttackAimTracking = true; }
+	// Locking at AttackHit prevents a melee strike from homing during its contact and recovery frames.
+	void LockBasicEnemyAttackAim() { bBasicEnemyAttackAimTracking = false; }
+	bool IsTurnInPlaceActive() const { return bTurnInPlaceActive; }
+	void StartTurnInPlaceForTarget(const AActor* TargetActor);
+	float BeginCombatTransitionAnimation(EGPEnemyCombatTransitionPhase TransitionPhase);
+	void EndCombatTransitionAnimation();
+	float GetCombatTransitionDurationSeconds(EGPEnemyCombatTransitionPhase TransitionPhase) const;
+	void SetBasicEnemyAttackInProgress(bool bInProgress)
+	{
+		bBasicEnemyAttackInProgress = bInProgress;
+		if (bInProgress)
+		{
+			ClearBasicEnemyCombatHoldFacing();
+			StopTurnInPlace(true);
+		}
+		else
+		{
+			// Cancellation and natural completion both close any windup-facing ownership left by the ability.
+			bBasicEnemyAttackAimTracking = false;
+		}
+	}
 
 	// Returns the newly rolled delay so attack logs and tests can inspect the selected cadence.
 	float ScheduleNextBasicEnemyAttack();
 
 	const FGPEnemyAttackCadenceSettings& GetAttackCadenceSettings() const { return AttackCadenceSettings; }
 
+	// 서비스가 적별 거리 히스테리시스를 유지하도록 마지막 공격 밴드 판정을 캐릭터에 저장한다.
+	bool UpdateBehaviorAttackBandLatch(
+		float DistanceToTarget,
+		float MinAttackRange,
+		float MaxAttackRange,
+		bool bAllowAttacksInsidePreferredRange,
+		float ExitHysteresis);
+	void ResetBehaviorAttackBandLatch();
+
+	// BT 공격 태스크가 실제 액션 종료까지 이동 분기와 타깃 교체를 잠그는 서버 전용 계약이다.
+	void BeginBehaviorAttackCommit(AActor* TargetActor, float MaximumDurationSeconds);
+	void FinishBehaviorAttackCommit(float RecoverySeconds);
+	bool IsBehaviorAttackCommitted() const;
+	AActor* GetBehaviorAttackCommittedTarget() const;
+
 	UFUNCTION(BlueprintPure, Category = "Enemy|Death")
 	bool IsDead() const { return bIsDead; }
 
 	UFUNCTION(BlueprintPure, Category = "Enemy|UI")
 	UGP_WidgetComponent* GetWorldHealthBarComponent() const { return WorldHealthBarComponent; }
-
-	UFUNCTION(BlueprintPure, Category = "World Corruption|Enemy")
-	UGP_EnemyCorruptionComponent* GetEnemyCorruptionComponent() const { return EnemyCorruptionComponent; }
-
-	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "World Corruption|Enemy")
-	void SetCorruptionRegionId(int32 RegionId);
 
 	// Public authority entry point also supports scripted kills while zero-health deaths arrive through AttributeSet.
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Enemy|Death")
@@ -147,6 +240,33 @@ protected:
 	/** Enemy-only visual and combat animation data. Leave the legacy base AnimationSet empty for new enemies. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation")
 	TObjectPtr<UPDA_EnemyAnimationSet> EnemyAnimationSet;
+
+	/**
+	 * Native archetypes use a soft default so animation-heavy packages are not
+	 * loaded while class default objects are still being constructed.
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Animation")
+	TSoftObjectPtr<UPDA_EnemyAnimationSet> DefaultEnemyAnimationSet;
+
+	// Disabled by default so existing enemies retain their current locomotion behavior.
+	// Opt-in children supply their retargeted sequences and route the named full-body slot in their AnimBP.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Turn In Place")
+	bool bEnableTurnInPlace = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Turn In Place", meta = (EditCondition = "bEnableTurnInPlace"))
+	FGPEnemyTurnInPlaceAnimationSet TurnInPlaceAnimations;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Turn In Place", meta = (EditCondition = "bEnableTurnInPlace", ClampMin = "0.0", Units = "deg"))
+	float TurnInPlaceMinAngleDegrees = 45.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Turn In Place", meta = (EditCondition = "bEnableTurnInPlace", ClampMin = "0.0", Units = "cm/s"))
+	float TurnInPlaceMaxStartSpeed = 5.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Turn In Place", meta = (EditCondition = "bEnableTurnInPlace", ClampMin = "0.1"))
+	float TurnInPlacePlayRate = 1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Turn In Place", meta = (EditCondition = "bEnableTurnInPlace"))
+	FName TurnInPlaceSlotName = TEXT("Unused_DefaultSlot");
 
 	// 향후 EQS나 복귀 로직에서 사용할 기준 위치를 월드에 배치할 수 있도록 유지한다.
 	UPROPERTY(EditInstanceOnly, Category = "AI", meta = (MakeEditWidget = "true"))
@@ -181,6 +301,22 @@ protected:
 	// Each native archetype provides a different sub-three-second range; Blueprint children may fine-tune it.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AI|Combat|Cadence")
 	FGPEnemyAttackCadenceSettings AttackCadenceSettings;
+
+	// Physical melee execution range is separate from personality PreferredRange, which may be changed by runtime evaluation.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AI|Combat|Range", meta = (ClampMin = "0.0", Units = "cm"))
+	float BasicMeleeAttackStartRange = 350.0f;
+
+	// In-place melee has only the shared overlap reach, so it must enter closer than a forward-step archetype.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AI|Combat|Range", meta = (ClampMin = "0.0", Units = "cm"))
+	float BasicMeleeStationaryAttackStartRange = 240.0f;
+
+	// A small exit margin prevents chase/attack flicker after a target crosses the start boundary.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AI|Combat|Range", meta = (ClampMin = "0.0", Units = "cm"))
+	float BasicMeleeAttackExitHysteresis = 50.0f;
+
+	// During cadence recovery, melee enemies inside this distance hold and face; outside it they resume pursuit.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AI|Combat|Range", meta = (ClampMin = "0.0", Units = "cm"))
+	float BasicMeleeCadenceHoldRange = 225.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AI|Debug")
 	bool bShowAIRangesInEditor = true;
@@ -269,6 +405,7 @@ protected:
 
 private:
 	friend class UGP_EnemyDeathAbility;
+	friend class FEnemyRuntimeMovementPolicyTest;
 
 #if WITH_EDITORONLY_DATA
 	UPROPERTY(VisibleAnywhere, Category = "AI|Debug", meta = (AllowPrivateAccess = "true"))
@@ -287,12 +424,11 @@ private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Death Presentation", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UGP_BossDeathPresentationComponent> BossDeathPresentationComponent;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Enemy|Death Absorption", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UGP_EnemyDeathAbsorptionComponent> EnemyDeathAbsorptionComponent;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Enemy|UI", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UGP_WidgetComponent> WorldHealthBarComponent;
-
-	// This adapter applies only the regional corruption contribution as a GAS effect.
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Corruption|Enemy", meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UGP_EnemyCorruptionComponent> EnemyCorruptionComponent;
 
 	FVector BehaviorAnchorLocation = FVector::ZeroVector;
 	bool bHasBehaviorAnchorLocation = false;
@@ -306,7 +442,24 @@ private:
 	TObjectPtr<AActor> DeathInstigatorActor;
 
 	bool bDeathStateApplied = false;
+	bool bBasicEnemyAttackInProgress = false;
+	bool bBasicEnemyAttackAimTracking = false;
+	bool bTurnInPlaceActive = false;
+
+	UPROPERTY(ReplicatedUsing = OnRep_CombatTransitionPhase)
+	EGPEnemyCombatTransitionPhase CombatTransitionPhase = EGPEnemyCombatTransitionPhase::None;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UAnimMontage> ActiveCombatTransitionMontage;
+	bool bRestoreOrientRotationToMovementAfterTurn = false;
+	float TurnInPlaceElapsedSeconds = 0.0f;
+	float TurnInPlaceDurationSeconds = 0.0f;
 	float BasicEnemyAttackReadyTimeSeconds = 0.0f;
+	bool bBehaviorAttackBandLatched = false;
+	float BehaviorAttackCommitUntilTimeSeconds = 0.0f;
+	TWeakObjectPtr<AActor> BehaviorAttackCommittedTarget;
+	TWeakObjectPtr<AActor> BasicEnemyCombatHoldFacingTarget;
+	float BasicEnemyCombatHoldFacingTurnRateDegreesPerSecond = 0.0f;
 	FRandomStream AttackCadenceRandomStream;
 
 	const FEnemyArchetypeTuning* ResolveEnemyArchetypeTuning() const;
@@ -334,6 +487,19 @@ private:
 	void BindMoveSpeedAttribute();
 	void UnbindMoveSpeedAttribute();
 	void InitializeBasicEnemyAttackCadence();
+	void ApplyRuntimeMovementPolicy();
+	void UpdateTurnInPlace(float DeltaSeconds);
+	void UpdateBasicEnemyCombatHoldFacing(float DeltaSeconds);
+	void TryStartTurnInPlace(const FVector* OverrideTargetLocation = nullptr);
+	void StopTurnInPlace(bool bStopAnimation);
+	UAnimSequence* SelectTurnInPlaceAnimation(float SignedYawDeltaDegrees) const;
+	void SetTurnInPlaceAnimGraphFlag(bool bActive) const;
+	UAnimSequence* ResolveCombatTransitionAnimation(EGPEnemyCombatTransitionPhase TransitionPhase) const;
+	void ApplyCombatTransitionAnimation();
+	void StopActiveCombatTransitionMontage();
+
+	UFUNCTION()
+	void OnRep_CombatTransitionPhase();
 
 	FDelegateHandle MoveSpeedAttributeDelegateHandle;
 };

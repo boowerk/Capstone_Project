@@ -752,6 +752,14 @@ void AEnemyAIController::RequestTargetActorReevaluation()
 
 void AEnemyAIController::RefreshTargetActorFromPerception()
 {
+	if (const AGP_EnemyCharacter* EnemyPawn = Cast<AGP_EnemyCharacter>(GetPawn());
+		IsValid(EnemyPawn) && EnemyPawn->IsBehaviorAttackCommitted())
+	{
+		// 승인된 공격 중에는 원래 타깃만 유지하며, 파괴된 경우에도 다른 플레이어로 판정을 돌리지 않는다.
+		SetBlackboardTargetActor(EnemyPawn->GetBehaviorAttackCommittedTarget());
+		return;
+	}
+
 	if (bLeashReturnHomeActive)
 	{
 		// The tactics service owns re-engagement using anchor-distance hysteresis; perception only records candidates here.
@@ -981,6 +989,13 @@ void AEnemyAIController::SetBlackboardTargetActor(AActor* NewTargetActor)
 		return;
 	}
 
+	if (AGP_EnemyCharacter* EnemyPawn = Cast<AGP_EnemyCharacter>(GetPawn()))
+	{
+		// A newly selected player must enter the attack band on their own distance,
+		// instead of inheriting the previous player's exit hysteresis in multiplayer.
+		EnemyPawn->ResetBehaviorAttackBandLatch();
+	}
+
 	if (!IsValid(CurrentTargetActor) && IsValid(NewTargetActor))
 	{
 		UE_LOG(LogEnemyAI, Log, TEXT("[Perception] Target acquired: %s"), *EnemyAIDebugUtils::DescribeActor(NewTargetActor));
@@ -1003,9 +1018,12 @@ void AEnemyAIController::SetBlackboardTargetActor(AActor* NewTargetActor)
 	{
 		BlackboardComponent->SetValueAsObject(EnemyBlackboardKeys::TargetActor, NewTargetActor);
 
-		// Boss pawns present the selected player only on first acquisition or a real target swap.
+		// This branch only runs when TargetActor changes, so target acquisition can
+		// request one transition turn.  Passive Pawn Tick must not re-request it
+		// while idle, recovering, or otherwise stationary.
 		if (AGP_EnemyCharacter* EnemyPawn = Cast<AGP_EnemyCharacter>(GetPawn()))
 		{
+			EnemyPawn->StartTurnInPlaceForTarget(NewTargetActor);
 			EnemyPawn->NotifyBossTargetSelected(NewTargetActor);
 		}
 	}

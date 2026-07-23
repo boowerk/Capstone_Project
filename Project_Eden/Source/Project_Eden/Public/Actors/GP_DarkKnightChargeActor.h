@@ -35,6 +35,11 @@ protected:
 	void BP_OnChargeFinished(bool bHitTarget);
 
 private:
+#if WITH_DEV_AUTOMATION_TESTS
+	// Lets the deterministic fallback test bypass transient-world timer startup.
+	friend class FDarkArmorKnightChargeMovementFallbackTest;
+#endif
+
 	void StartCharge();
 	void FinishCharge(bool bHitTarget);
 
@@ -81,6 +86,10 @@ private:
 	float DistanceTravelled = 0.0f;
 	float ChargeElapsed = 0.0f;
 	FTimerHandle TelegraphTimerHandle;
+
+	// Runtime result for this charge only. A failed montage must fall back to
+	// swept movement without changing the designer's root-motion preference.
+	bool bActiveUsesMontageRootMotion = false;
 
 	/** Initial-only handoff prevents the coordinator from replaying a cue already completed on the boss component. */
 	UPROPERTY(ReplicatedUsing = OnRep_SkipInternalTelegraph)

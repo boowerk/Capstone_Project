@@ -200,6 +200,8 @@ void UGP_VisualCueComponent::ApplyNiagaraTintOverride(UNiagaraComponent* Niagara
 		TEXT("User.Color_Sparks1"),
 		TEXT("User.Color_Sparks2"),
 		TEXT("User.Color_Spiral1"),
+		TEXT("User.Color_Spiral2"),
+		TEXT("User.Color_Circle"),
 		TEXT("User.Color_Trace"),
 		TEXT("User.Color_Wave")
 	};

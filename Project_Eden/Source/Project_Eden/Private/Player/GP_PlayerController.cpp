@@ -22,7 +22,10 @@
 #include "InputCoreTypes.h"
 #include "Kismet/GameplayStatics.h"
 #include "Logging/LogMacros.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #include "Player/GP_PlayerState.h"
+#include "TimerManager.h"
 #include "UI/GP_AugmentSelectWidget.h"
 #include "UI/GP_CharacterStatsMenuWidget.h"
 #include "UI/GP_MiddleTravelMapWidget.h"
@@ -82,6 +85,10 @@ void AGP_PlayerController::BeginPlay()
 		SetShowMouseCursor(false);
 	}
 
+#if !UE_BUILD_SHIPPING
+	BeginThreePlayerGameplaySmokeProbe();
+#endif
+
 	if (!IsLocalController() || HUDWidget)
 	{
 		return;
@@ -121,8 +128,115 @@ void AGP_PlayerController::BeginPlay()
 	}
 }
 
+#if !UE_BUILD_SHIPPING
+void AGP_PlayerController::BeginThreePlayerGameplaySmokeProbe()
+{
+	UWorld* World = GetWorld();
+	if (!IsLocalController()
+		|| !IsValid(World)
+		|| !World->GetMapName().Contains(TEXT("L_LandscapeMap"))
+		|| !FParse::Param(FCommandLine::Get(), TEXT("LobbySmokeAutoReady")))
+	{
+		return;
+	}
+
+	ThreePlayerGameplaySmokeAttempts = 0;
+	World->GetTimerManager().SetTimer(
+		ThreePlayerGameplaySmokeTimerHandle,
+		this,
+		&ThisClass::TryThreePlayerGameplaySmokeProbe,
+		0.25f,
+		false);
+}
+
+void AGP_PlayerController::TryThreePlayerGameplaySmokeProbe()
+{
+	++ThreePlayerGameplaySmokeAttempts;
+	constexpr int32 MaxAttempts = 80;
+
+	AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetPawn());
+	AGP_PlayerState* GameplayPlayerState = GetPlayerState<AGP_PlayerState>();
+	UAbilitySystemComponent* ASC = PlayerCharacter ? PlayerCharacter->GetAbilitySystemComponent() : nullptr;
+	UEnhancedInputLocalPlayerSubsystem* InputSubsystem =
+		ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer());
+
+	int32 ConfiguredMappingCount = 0;
+	int32 AppliedMappingCount = 0;
+	for (const UInputMappingContext* Context : InputMappingContexts)
+	{
+		if (Context)
+		{
+			++ConfiguredMappingCount;
+			AppliedMappingCount += InputSubsystem && InputSubsystem->HasMappingContext(Context) ? 1 : 0;
+		}
+	}
+
+	const bool bPawnOwned = PlayerCharacter && PlayerCharacter->GetController() == this;
+	const bool bASCReady = ASC && ASC->GetAvatarActor() == PlayerCharacter;
+	const bool bHUDReady = IsValid(HUDWidget) && HUDWidget->IsInViewport();
+	const bool bInputComponentReady = IsValid(Cast<UEnhancedInputComponent>(InputComponent));
+	const bool bMappingsReady =
+		IsValid(InputSubsystem)
+		&& ConfiguredMappingCount > 0
+		&& AppliedMappingCount == ConfiguredMappingCount;
+	const bool bInputModeReady = !ShouldShowMouseCursor() && !IsMoveInputIgnored() && !IsLookInputIgnored();
+	const bool bGameplayReady =
+		IsValid(PlayerCharacter)
+		&& IsValid(GameplayPlayerState)
+		&& bPawnOwned
+		&& bASCReady
+		&& bHUDReady
+		&& bInputComponentReady
+		&& bMappingsReady
+		&& bInputModeReady;
+
+	const int32 PlayerId = GameplayPlayerState ? GameplayPlayerState->GetPlayerId() : INDEX_NONE;
+	if (bGameplayReady)
+	{
+		UE_LOG(
+			LogTemp,
+			Display,
+			TEXT("[Network3PSmoke] client-gameplay-ready playerId=%d controller=%s pawn=%s hud=true asc=true input=true mappings=%d/%d"),
+			PlayerId,
+			*GetNameSafe(this),
+			*GetNameSafe(PlayerCharacter),
+			AppliedMappingCount,
+			ConfiguredMappingCount);
+		return;
+	}
+
+	if (ThreePlayerGameplaySmokeAttempts >= MaxAttempts)
+	{
+		UE_LOG(
+			LogTemp,
+			Error,
+			TEXT("[Network3PSmoke] client-gameplay-timeout attempts=%d playerId=%d pawn=%s playerState=%s owned=%s hud=%s asc=%s inputComponent=%s inputMode=%s mappings=%d/%d"),
+			ThreePlayerGameplaySmokeAttempts,
+			PlayerId,
+			*GetNameSafe(PlayerCharacter),
+			*GetNameSafe(GameplayPlayerState),
+			bPawnOwned ? TEXT("true") : TEXT("false"),
+			bHUDReady ? TEXT("true") : TEXT("false"),
+			bASCReady ? TEXT("true") : TEXT("false"),
+			bInputComponentReady ? TEXT("true") : TEXT("false"),
+			bInputModeReady ? TEXT("true") : TEXT("false"),
+			AppliedMappingCount,
+			ConfiguredMappingCount);
+		return;
+	}
+
+	GetWorldTimerManager().SetTimer(
+		ThreePlayerGameplaySmokeTimerHandle,
+		this,
+		&ThisClass::TryThreePlayerGameplaySmokeProbe,
+		0.25f,
+		false);
+}
+#endif
+
 bool AGP_PlayerController::RequestOpenAugmentSelect()
 {
+	// Keep augment selection local and reusable by ordinary progression/UI callers.
 	if (!IsLocalController())
 	{
 		return false;
@@ -150,6 +264,7 @@ bool AGP_PlayerController::RequestOpenAugmentSelect()
 	return OpenAugmentSelectWidget(CandidateAugments);
 }
 
+<<<<<<< HEAD
 void AGP_PlayerController::ClientOpenRegionEventAugmentSelect_Implementation()
 {
 	// Region shrine rewards are chosen locally so each client sees the regular augment picker flow.
@@ -245,6 +360,8 @@ void AGP_PlayerController::Server_RequestMiddleTravel_Implementation(
 	}
 }
 
+=======
+>>>>>>> origin/main
 bool AGP_PlayerController::RequestEquipSkill(UGP_SkillData* SkillData, FGameplayTag SlotTag)
 {
 	UGP_SkillData* Slot01Skill = nullptr;

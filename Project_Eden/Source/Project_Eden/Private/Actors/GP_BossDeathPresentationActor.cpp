@@ -1,5 +1,6 @@
 #include "Actors/GP_BossDeathPresentationActor.h"
 
+#include "Actors/GP_CrystalSeraphVFXDefaults.h"
 #include "Animation/AnimationAsset.h"
 #include "Components/SceneComponent.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -9,9 +10,45 @@
 #include "Engine/World.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
+#include "NiagaraComponent.h"
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraSystem.h"
 #include "UObject/ConstructorHelpers.h"
+
+namespace
+{
+	void ApplyCrystalSeraphTint(UNiagaraComponent* NiagaraComponent)
+	{
+		if (!IsValid(NiagaraComponent))
+		{
+			return;
+		}
+
+		const FLinearColor CrystalTint = GPCrystalSeraphVFXDefaults::GetCrystalTintColor();
+		static const FName TintParameterNames[] =
+		{
+			TEXT("User.Color"),
+			TEXT("User.Tint"),
+			TEXT("User.TintColor"),
+			TEXT("User.ParticleColor"),
+			TEXT("User.Color_Main"),
+			TEXT("User.Color1"),
+			TEXT("User.Color2"),
+			TEXT("User.Color_Ray"),
+			TEXT("User.Color_Smoke"),
+			TEXT("User.Color_Sparks1"),
+			TEXT("User.Color_Sparks2"),
+			TEXT("User.Color_Spiral1"),
+			TEXT("User.Color_Trace"),
+			TEXT("User.Color_Wave")
+		};
+
+		for (const FName TintParameterName : TintParameterNames)
+		{
+			NiagaraComponent->SetVariableLinearColor(TintParameterName, CrystalTint);
+		}
+	}
+}
 
 AGP_BossDeathPresentationActor::AGP_BossDeathPresentationActor()
 {
@@ -195,8 +232,8 @@ void AGP_BossDeathPresentationActor::StartPresentation()
 void AGP_BossDeathPresentationActor::StartCrystalSeraphPresentation()
 {
 	const FVector Center = GetActorLocation() + FVector(0.0f, 0.0f, GetScaled(180.0f));
-	const FLinearColor CrystalTint(0.34f, 0.68f, 1.0f, 1.0f);
-	SpawnBurstNiagara(Settings.OverrideBurstNiagara, FVector(0.0f, 0.0f, GetScaled(120.0f)), FVector(GetScaled(1.25f)));
+	const FLinearColor CrystalTint = GPCrystalSeraphVFXDefaults::GetCrystalTintColor();
+	ApplyCrystalSeraphTint(SpawnBurstNiagara(Settings.OverrideBurstNiagara, FVector(0.0f, 0.0f, GetScaled(120.0f)), FVector(GetScaled(1.25f))));
 
 	for (int32 Index = 0; Index < 38; ++Index)
 	{
@@ -358,14 +395,14 @@ void AGP_BossDeathPresentationActor::StartMatadorPresentation()
 	}
 }
 
-void AGP_BossDeathPresentationActor::SpawnBurstNiagara(UNiagaraSystem* NiagaraSystem, const FVector& Offset, const FVector& Scale)
+UNiagaraComponent* AGP_BossDeathPresentationActor::SpawnBurstNiagara(UNiagaraSystem* NiagaraSystem, const FVector& Offset, const FVector& Scale)
 {
 	if (!IsValid(NiagaraSystem))
 	{
-		return;
+		return nullptr;
 	}
 
-	UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+	return UNiagaraFunctionLibrary::SpawnSystemAtLocation(
 		this,
 		NiagaraSystem,
 		GetActorLocation() + Offset,

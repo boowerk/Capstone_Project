@@ -3,7 +3,11 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
+<<<<<<< HEAD
 updated: 2026-07-23T19:03:00+09:00
+=======
+updated: 2026-07-24T07:01:06+09:00
+>>>>>>> origin/main
 status: active
 tags:
   - memoc
@@ -15,6 +19,7 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 
 ## Decision Log
 
+<<<<<<< HEAD
 ### 2026-07-23
 - Keep player attribute values live and reusable: Health/Mana/Stamina share one grayscale fill mask and one track brush, with color supplied by each ProgressBar tint. Preserve the existing `GP_AttributeWidget`, inner `HealthBar`, and parent HUD instance names. Apply the soft top-left backplate through the existing `TopLeftFrame` Border instead of rebuilding the UMG hierarchy; leave the optional accent unplaced unless later visual review asks for it.
 - Keep village runtime PCG as Generate On Demand so the Director can apply instance-unique tags, graph parameters, and deterministic seeds before sequential generation. For immediate editor authoring feedback, use transient `ALevelInstance` previews owned by the Director, with PCG Preview editing mode and DuplicateTransient flags; do not change the production component to Generate At Runtime merely to see layouts.
@@ -55,6 +60,44 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 - Runtime vegetation uses hierarchical grids with `GRID128` for the graph default and the current shared grass node at `GRID32`; `L_GameMap1`'s earlier 7,135-instance verification was performed before that authored grass change, at `GRID64`. Keep engine-default 2x generation radii, cleanup multiplier `1.5`, and bounded Surface Samplers.
 - Keep the PCG Landscape Cache at `SerializeOnlyAtCook`: it works in PIE, serializes automatically while cooking, and avoids permanently embedding the cache in the editor map. `NeverSerialize` is invalid for Landscape-backed runtime PCG.
 - Each map's placed `BP_VegetationSpawner` must have a Box that covers its Landscape. `L_LandscapeMap` uses `64000,64000,8000`, aligned horizontally to both 32m grass and 128m default grids while covering its 1.071km Landscape.
+=======
+### 2026-07-24
+- Give Sans Ground Hands a dedicated deferred-decal material with a centered radial opacity mask, pure-red material parameter, and equal footprint axes. Do not reuse or parameter-hack the Sans Sweep fan material; the two warning silhouettes have separate production contracts.
+- Keep the regular-enemy death grains at the designer-approved `User.SpriteSize=(10,10)`. Stage the motion as a readable fall followed by absorption: full gravity through `0.28s`, gravity fade to `0.60s`, attraction from `0.38s`, and a `0.80s` strength ramp.
+- Use Niagara Point Attraction with falloff enabled and exponent `0` for constant acceleration, followed by Drag. This supersedes the original distance-scaled spring behavior, which synchronized distant grains and made them snap to the chest together.
+- Revise the corpse-window tuning to `2.6x` playback, attraction strength `800`, drag `1.4`, kill radius `45cm`, and hard stop `1.90s`. Keep the existing two-second enemy despawn boundary and three-player target-latch policy.
+- For regular-enemy death absorption, use the dead enemy as `User.SourceMesh` and a moving player chest `Position` as the destination instead of matching particles to a target skeletal mesh. Different enemy/player topology makes vertex correspondence brittle; one converging point reads more clearly and is cheaper.
+- In the fixed three-player game, authority latches the valid killer once and otherwise chooses the nearest living connected player. Multicast that actor reliably; clients update only its live chest position and never rescore locally.
+- Keep the absorption cosmetic within the default two-second corpse lifetime, stop the high-rate emission after a short window and at least three update frames, and use the latest timing values recorded above. Boss death presentation remains separate.
+- Supersede the 2026-07-14 corruption/exploration decisions: the product has no world-corruption value or ambient/random Region Event path. Do not restore their timers, weighted selection, random placement, enemy scaling, outcome deltas, or presentation.
+- Supersede the fixed-demo decisions dated 2026-07-21 and 2026-07-18 plus the remaining 2026-07-09 Region Event design: remove the seed-varied outer route, Red Rift/Defense/Shrine lifecycle, quorum/reward logic, gold objective marker, and automatic center boss/result path.
+- Keep `RegionState` as an independent authored biome-ID/PCG contract, and keep general Zone/Portal/FinishRun code available. Neither system may implicitly restart the removed demo.
+- Preserve the fixed three-player session and authored-anchor start expansion. Because protected `L_LandscapeMap` has no authored zones, its current post-lobby behavior is intentional free exploration until a separate gameplay-flow ticket is approved.
+- Keep empty `GP_RegionEventDirector` and `GP_RegionEventData` serialization shells only while protected `L_LandscapeMap`/`DA_RegionEventData` retain those class references. They expose no event configuration or callable runtime API.
+
+### 2026-07-21
+- Lock enemy attack target identity at ability activation in the three-player game. Preparation and windup may sample that same actor's live position, but `AttackHit` locks direction and no target rescore may redirect the strike or projectile to a teammate.
+- Keep regular-melee physical reach separate from runtime personality `PreferredRange`: forward-step melee starts at 350cm, in-place melee at 240cm, and cadence uses 275cm pursuit-entry / 225cm close-hold edges. Target changes reset attack-band hysteresis.
+- One BT attack request activates exactly one exact-tag GAS spec, and one ability activation can apply its hit only once even when notify and fallback signals both fire.
+- Treat enemy `ActionEnd` as gameplay-window closure, not montage completion. A shared enemy attack remains ability/BT-committed through the real montage end, recovery, and its exit bridge; only explicit incapacitation cancels it. Keep `AttackPrepare` and `ChaseResume` as optional per-enemy DataAsset seams with same-skeleton Idle fallbacks, and replicate the semantic phase rather than a runtime-created montage.
+- Crystal Seraph's native shard projectile uses existing VFX mesh `SM_IceShard_03`, not the engine cone. The laser actor has no runtime VFX/mesh hardcoding: `BP_SeraphLaser` owns all four Niagara defaults and the production boss selects that child class. Use shared `#59ADFF` VFX tint for native pattern effects, reflected-beam lightning, and death shards/burst without modifying source Niagara or material assets.
+- Keep the production Landscape architecture intact and layer the demo flow over it. The run uses one replicated authority director only on `L_LandscapeMap` when no legacy linear zones exist; it never calls the zero-zone `StartRun()` path.
+- Preserve a fixed authored beat order while varying spatial execution by `RunSeed`: shared safe outer start, Red Rift, Structure Defense, Shrine, center rally, and Dark Armor Knight. This makes runs recognizable but not position-identical.
+- Guided objectives use a two-of-three quorum clamped to currently possessed players. The Shrine rewards every connected party controller; the final rally normally requires two players but accepts one nearby player after a 45-second demo-safety watchdog.
+- Reuse the existing minimap marker canvas and gold point texture for route guidance. Off-map objectives clamp in pixel space to the circular edge; red points remain enemy markers.
+
+### 2026-07-18
+- Treat Project Eden as a fixed three-player network game, not a minimum-three session: server admission is `3` players, `0` spectators, and `1` player per connection; only an exact three-player Ready party may travel.
+- Keep ForceStart as an opt-in development escape hatch only. Shipping and remote clients always reject it; a non-Shipping local listen/standalone host must launch with `-AllowLobbyForceStart`.
+- Once an enemy attack is committed, let it finish through ordinary target loss, disconnect, or leash reevaluation; only explicit incapacitating states such as death or groggy may interrupt it immediately. Never synthesize a fallback hit when a cancelled montage did not reach its hit event.
+- While Matador's bull actor is live, the boss body stays stationary and the shared tactics service keeps the Attack branch committed. The bull actor owns an 18-second absolute lifecycle cap, while the BT task owns a 20-second external-action stuck cap and force-cleans the pattern on timeout/interruption.
+- The July demo uses Dark Armor Knight as the representative boss and prioritizes basic melee/ranged enemies. Flying enemies and Motion/Pose Warping remain gated behind runtime proof; Motion Warping is only a post-P0 Dark Knight Charge pilot with a retained manual swept-movement fallback.
+- Use the current `[EDEN-MAIN]` Codex thread as the single implementation and integration authority. Permanent DESIGN, CLIENT, WORLD, and QA threads provide read-only analysis and cross-review; the main thread relays messages because separate threads do not automatically share context.
+- Split implementation into the smallest independently reviewable functional units. One unit normally becomes one `type(scope): short summary` commit with its directly related tests; unrelated changes stay in separate commits.
+- Keep AI/GAS/network architecture and bulk-log specialists temporary rather than permanent, selecting a model and reasoning level from the bounded ticket risk.
+- Build the graduation golden path around Lobby ready travel into `L_LandscapeMap`, then one discoverable corruption objective, cleanse feedback, augment, boss, and result. Expand breadth only after this 15–20 minute path is reliable.
+- Treat dynamically named ServerTravel destinations as explicit Cook inputs. Editor package loading is not release proof; keep release status conditional until Cooked server/client travel passes.
+>>>>>>> origin/main
 
 ### 2026-07-09
 - Region events are a separate run-layer system, not a PCG graph mutation. `AGP_GameMode` only asks the placed/optional `AGP_RegionEventDirector` to roll events at zone boundaries; selected `AGP_RegionEventActor` instances own replicated presentation, optional enemy waves, and temporary/final region-state writes through `AGP_GameState`.
@@ -120,6 +163,7 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 - Minimap correctness should not depend on level-authored PCG completion wiring. Keep a startup fallback full-map capture, allow later PCG-ready notifications to restart it, and make the HUD map image resolver tolerate production widget renames such as `MiniMapImage`.
 - The minimap map texture should be clipped by the UI material, not only hidden under ring art. Player cursor heading should default to controller/view yaw so camera-facing a target matches the visible minimap direction.
 
+<<<<<<< HEAD
 ### 2026-07-21
 
 - Isolate streamed village PCG with per-slot Actor Tags plus component-local `UPCGGraphInstance` `RoadTag`/`DistrictTag` overrides. Remove template tags after retagging so legacy/global searches cannot mix simultaneous villages; do not mutate the shared base graph.
@@ -134,3 +178,9 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 - Use select-first equipment flow: choose a wheel skill, review it in the center, then click or press Q/E. The same skill cannot occupy both slots; selecting a skill from the opposite slot swaps the displaced skills, or moves it when the target is empty.
 - Keep K as a toggle. While the menu is open, block only the local player's movement, look, and skill input through UI-only focus; never pause the multiplayer world.
 - Preserve the legacy Widget Blueprints and construct the approved radial presentation as a defensive runtime fallback until an authored wheel hierarchy replaces it.
+=======
+### 2026-07-14
+- Open-world exploration events are separate from the legacy linear-zone enemy budget. The event actor owns its spawned combatants and retires survivors through `RequestDeath`; zone/event tracking listens to the terminal `OnEnemyDeathStarted` delegate so scripted and combat deaths share one accounting path without granting cleanup XP.
+- Preserve authored region seed biome values. Corruption affects event eligibility, probability, enemy GAS scaling, and outcome deltas; it does not flatten seed `State` values or write generic active/completed biome states.
+- Production exploration pacing belongs to the placed `L_LandscapeMap` director: delayed/dwell-based evaluation, one active objective, global and per-region cooldowns, party-wide safe spawn distance, and non-deterministic event choice. Temporary PIE acceleration must remain unsaved and is guarded by map automation.
+>>>>>>> origin/main

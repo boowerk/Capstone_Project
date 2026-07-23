@@ -47,6 +47,8 @@ bool UGP_DarkKnightPatternAbility::CanActivateAbility(
 	return IsValid(State)
 		&& !State->IsGroggy()
 		&& !State->IsGuardBroken()
+		// BT commits the target before GAS activation; reject stale/out-of-range starts before cadence is reserved.
+		&& Boss->CanStartPatternAtTargetRange(PatternTag)
 		&& (!UsesSharedPatternCadence() || Boss->CanStartDarkKnightPattern())
 		&& Boss->IsPatternCooldownReady(PatternTag);
 }

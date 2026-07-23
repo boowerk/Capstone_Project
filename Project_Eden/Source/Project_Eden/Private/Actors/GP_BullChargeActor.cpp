@@ -150,7 +150,27 @@ void AGP_BullChargeActor::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
-	if (!HasAuthority() || !bChargeStarted || bChargeFinished)
+	if (!HasAuthority() || bChargeFinished)
+	{
+		return;
+	}
+
+	TotalActionElapsedSeconds += FMath::Max(0.0f, DeltaSeconds);
+	if (TotalActionElapsedSeconds >= FMath::Max(0.1f, MaximumTotalActionLifeSeconds))
+	{
+		// Redirect가 단계별 lifespan을 반복 갱신해도 고장 난 패턴은 유한 시간 안에 반드시 정리한다.
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("[MatadorBull] Absolute action lifetime reached; forcing cleanup. Bull=%s Elapsed=%.2f State=%d"),
+			*GetNameSafe(this),
+			TotalActionElapsedSeconds,
+			static_cast<int32>(ChargeState));
+		FinishCharge(false);
+		return;
+	}
+
+	if (!bChargeStarted)
 	{
 		return;
 	}
@@ -202,6 +222,14 @@ void AGP_BullChargeActor::Tick(float DeltaSeconds)
 	SetActorRotation(ChargeDirection.Rotation());
 
 	TryHandleDecoyProximity(&PreviousLocation);
+}
+
+void AGP_BullChargeActor::Destroyed()
+{
+	GetWorldTimerManager().ClearTimer(ChargeStartTimerHandle);
+	// Lifespan 만료·외부 Destroy·owner 정리에서도 active pointer와 loose tag를 남기지 않는다.
+	ClearRegisteredBullState();
+	Super::Destroyed();
 }
 
 void AGP_BullChargeActor::InitializeBullCharge(AActor* InInitialTargetActor, AActor* InPlayerTargetActor, AGP_MatadorBossDecoyActor* InDecoyActor, UGP_MatadorBossStateComponent* InStateComponent, const FVector& InChargeDirection)
@@ -855,14 +883,22 @@ void AGP_BullChargeActor::FinishCharge(bool bHitDecoy)
 	BP_OnBullChargeEnded(bHitDecoy);
 	SetChargeState(EGPMatadorBullChargeState::Finished);
 
-	if (IsValid(MatadorStateComponent.Get()) && MatadorStateComponent->GetActiveBullActor() == this)
-	{
-		MatadorStateComponent->RegisterActiveBullActor(nullptr);
-	}
+	ClearRegisteredBullState();
 
 	if (HasAuthority())
 	{
 		Destroy();
+	}
+}
+
+void AGP_BullChargeActor::ClearRegisteredBullState()
+{
+	if (HasAuthority()
+		&& IsValid(MatadorStateComponent.Get())
+		&& MatadorStateComponent->GetActiveBullActor() == this)
+	{
+		// 새 황소가 이미 등록된 경우에는 이전 actor의 늦은 Destroy가 새 상태를 지우지 않는다.
+		MatadorStateComponent->RegisterActiveBullActor(nullptr);
 	}
 }
 

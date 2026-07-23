@@ -58,11 +58,6 @@ bool FCrystalSeraphVisualCueTest::RunTest(const FString& Parameters)
 	const UGP_VisualCueComponent* LaserCues = PatternActors[2]->FindComponentByClass<UGP_VisualCueComponent>();
 	const UGP_VisualCueComponent* SanctuaryCues = PatternActors[3]->FindComponentByClass<UGP_VisualCueComponent>();
 
-	const auto IsCrystalSeraphCopy = [](const UNiagaraSystem* NiagaraSystem) -> bool
-	{
-		return NiagaraSystem
-			&& NiagaraSystem->GetPathName().Contains(TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/VFX/NS_CrystalSeraph_"));
-	};
 	const auto HasCrystalSeraphTint = [](const UGP_VisualCueComponent* VisualCueComponent) -> bool
 	{
 		return VisualCueComponent
@@ -80,20 +75,28 @@ bool FCrystalSeraphVisualCueTest::RunTest(const FString& Parameters)
 	UNiagaraSystem* SanctuaryTelegraph = SanctuaryCues->ResolveNiagara(GPTags::GameplayCue::Ability::Telegraph_Magic);
 	UNiagaraSystem* SanctuaryImpact = SanctuaryCues->ResolveNiagara(GPTags::GameplayCue::Ability::Impact_Magic);
 
-	TestTrue(TEXT("Prism uses Crystal Seraph aura VFX copy"), IsCrystalSeraphCopy(PrismAura));
-	TestTrue(TEXT("Prism uses Crystal Seraph reflection VFX copy"), IsCrystalSeraphCopy(PrismReflect));
-	TestTrue(TEXT("Shard uses Crystal Seraph projectile VFX copy"), IsCrystalSeraphCopy(ShardActive));
-	TestTrue(TEXT("Shard uses Crystal Seraph impact VFX copy"), IsCrystalSeraphCopy(ShardImpact));
-	TestTrue(TEXT("Laser uses Crystal Seraph telegraph VFX copy"), IsCrystalSeraphCopy(LaserTelegraph));
-	TestTrue(TEXT("Laser uses Crystal Seraph active VFX copy"), IsCrystalSeraphCopy(LaserActive));
-	TestTrue(TEXT("Laser uses Crystal Seraph reflection VFX copy"), IsCrystalSeraphCopy(LaserReflect));
-	TestTrue(TEXT("Sanctuary uses Crystal Seraph telegraph VFX copy"), IsCrystalSeraphCopy(SanctuaryTelegraph));
-	TestTrue(TEXT("Sanctuary uses Crystal Seraph explosion VFX copy"), IsCrystalSeraphCopy(SanctuaryImpact));
+	TestNull(TEXT("Native prism leaves aura VFX for its Blueprint child"), PrismAura);
+	TestNull(TEXT("Native prism leaves reflection VFX for its Blueprint child"), PrismReflect);
+	TestNull(TEXT("Native shard leaves active VFX for its Blueprint child"), ShardActive);
+	TestNull(TEXT("Native shard leaves impact VFX for its Blueprint child"), ShardImpact);
+	TestNull(TEXT("Native laser leaves telegraph VFX for its Blueprint child"), LaserTelegraph);
+	TestNull(TEXT("Native laser leaves active VFX for its Blueprint child"), LaserActive);
+	TestNull(TEXT("Native laser leaves reflection VFX for its Blueprint child"), LaserReflect);
+	TestNull(TEXT("Native sanctuary leaves telegraph VFX for its Blueprint child"), SanctuaryTelegraph);
+	TestNull(TEXT("Native sanctuary leaves explosion VFX for its Blueprint child"), SanctuaryImpact);
 	// Crystal Seraph actors tint their copied Niagara components at spawn time so the original Free_Magic assets remain untouched.
 	TestTrue(TEXT("Prism applies Crystal Seraph tint"), HasCrystalSeraphTint(PrismCues));
 	TestTrue(TEXT("Shard applies Crystal Seraph tint"), HasCrystalSeraphTint(ShardCues));
 	TestTrue(TEXT("Laser applies Crystal Seraph tint"), HasCrystalSeraphTint(LaserCues));
 	TestTrue(TEXT("Sanctuary applies Crystal Seraph tint"), HasCrystalSeraphTint(SanctuaryCues));
+
+	TInlineComponentArray<UGP_VisualCueComponent*> LaserCueComponents;
+	PatternActors[2]->GetComponents(LaserCueComponents);
+	TestEqual(TEXT("Laser owns primary and reflection-beam VFX cue components"), LaserCueComponents.Num(), 2);
+	for (const UGP_VisualCueComponent* LaserCueComponent : LaserCueComponents)
+	{
+		TestTrue(TEXT("Every laser VFX cue applies Crystal Seraph tint"), HasCrystalSeraphTint(LaserCueComponent));
+	}
 
 	TestWorld->DestroyWorld(false);
 	return true;

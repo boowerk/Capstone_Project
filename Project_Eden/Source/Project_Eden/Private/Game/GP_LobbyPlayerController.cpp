@@ -3,11 +3,19 @@
 #include "Blueprint/UserWidget.h"
 #include "Engine/World.h"
 #include "Game/GP_LobbyGameMode.h"
+#include "Game/GP_LobbyPlayerState.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
+#include "TimerManager.h"
 #include "UI/GP_LobbyWidget.h"
 
 void AGP_LobbyPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
+
+#if !UE_BUILD_SHIPPING
+	BeginLobbySmokeAutoReady();
+#endif
 
 	if (!IsLocalController() || !LobbyWidgetClass)
 	{
@@ -32,6 +40,66 @@ void AGP_LobbyPlayerController::BeginPlay()
 	}
 }
 
+#if !UE_BUILD_SHIPPING
+void AGP_LobbyPlayerController::BeginLobbySmokeAutoReady()
+{
+	const UWorld* World = GetWorld();
+	// Seamless travel 뒤 목적지 컨트롤러에서 테스트 준비 RPC가 다시 실행되지 않도록 로비에서만 허용한다.
+	if (!IsLocalController()
+		|| !IsValid(World)
+		|| !World->GetMapName().Contains(TEXT("LobbyMap"))
+		|| !FParse::Param(FCommandLine::Get(), TEXT("LobbySmokeAutoReady")))
+	{
+		return;
+	}
+
+	LobbySmokeReadyAttempts = 0;
+	// Delay the first attempt until the server has completed PostLogin and
+	// bound the PlayerState Ready delegate.
+	GetWorldTimerManager().SetTimer(
+		LobbySmokeReadyTimerHandle,
+		this,
+		&ThisClass::TryLobbySmokeAutoReady,
+		0.75f,
+		false);
+}
+
+void AGP_LobbyPlayerController::TryLobbySmokeAutoReady()
+{
+	++LobbySmokeReadyAttempts;
+	if (AGP_LobbyPlayerState* LobbyPlayerState = GetPlayerState<AGP_LobbyPlayerState>())
+	{
+		UE_LOG(
+			LogTemp,
+			Display,
+			TEXT("[LobbySmoke] client-ready controller=%s attempt=%d"),
+			*GetNameSafe(this),
+			LobbySmokeReadyAttempts);
+		LobbyPlayerState->ServerSetReady(true);
+		return;
+	}
+
+	constexpr int32 MaxReadyAttempts = 20;
+	if (LobbySmokeReadyAttempts >= MaxReadyAttempts)
+	{
+		UE_LOG(
+			LogTemp,
+			Error,
+			TEXT("[LobbySmoke] client-ready-timeout controller=%s attempts=%d"),
+			*GetNameSafe(this),
+			LobbySmokeReadyAttempts);
+		return;
+	}
+
+	GetWorldTimerManager().SetTimer(
+		LobbySmokeReadyTimerHandle,
+		this,
+		&ThisClass::TryLobbySmokeAutoReady,
+		0.25f,
+		false);
+}
+#endif
+
 void AGP_LobbyPlayerController::ClientRefreshPlayerList_Implementation()
 {
 	if (IsValid(LobbyWidget))
@@ -53,6 +121,8 @@ void AGP_LobbyPlayerController::ServerForceStart_Implementation()
 	UWorld* World = GetWorld();
 	if (AGP_LobbyGameMode* GM = World ? World->GetAuthGameMode<AGP_LobbyGameMode>() : nullptr)
 	{
-		GM->ForceStartGame();
+		// The GameMode validates Shipping state, the explicit launch flag, and
+		// that this server-side controller belongs to the local host.
+		GM->TryForceStartGame(this);
 	}
 }

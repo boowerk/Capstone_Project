@@ -43,6 +43,9 @@ public:
 	bool RequestStartBullPattern(AActor* PatternTargetActor);
 
 	UFUNCTION(BlueprintCallable, Category = "Boss|Matador")
+	void ForceEndBullPattern();
+
+	UFUNCTION(BlueprintCallable, Category = "Boss|Matador")
 	void RequestEnterGroggy();
 
 	UFUNCTION(BlueprintCallable, Category = "Boss|Matador")

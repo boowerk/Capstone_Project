@@ -10,6 +10,7 @@
 #include "Misc/AutomationTest.h"
 #include "UI/GP_MinimapCaptureActor.h"
 #include "UI/GP_MinimapSubsystem.h"
+#include "UI/GP_PlayerHUDWidget.h"
 #include "Blueprint/WidgetBlueprintGeneratedClass.h"
 #include "Blueprint/WidgetTree.h"
 
@@ -216,7 +217,7 @@ bool FMinimapCaptureStabilityTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("Static minimap material supports circular opacity"), StaticMapMaterial->BlendMode, BLEND_Translucent);
 	}
 
-	// Validate the production HUD contract so the subsystem always has a visible Image to receive the render target.
+	// Validate only the persistent minimap contract now that scripted route objectives no longer exist.
 	UClass* HUDWidgetClass = LoadClass<UUserWidget>(nullptr, TEXT("/Game/UI/HUD/WBP_PlayerHUDWidget.WBP_PlayerHUDWidget_C"));
 	UWidgetBlueprintGeneratedClass* HUDGeneratedClass = Cast<UWidgetBlueprintGeneratedClass>(HUDWidgetClass);
 	UWidgetTree* HUDWidgetTree = HUDGeneratedClass ? HUDGeneratedClass->GetWidgetTreeArchetype() : nullptr;
