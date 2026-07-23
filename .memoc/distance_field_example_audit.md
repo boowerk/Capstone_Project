@@ -1,3 +1,14 @@
+---
+memoc: true
+type: core
+scope: project-memory
+created: 2026-07-21T12:29:05
+updated: 2026-07-21T12:29:05
+status: active
+tags:
+  - memoc
+  - memoc/core
+---
 # Distance Field 기초 예제 감사 보고서
 
 ## 1. 결론

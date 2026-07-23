@@ -302,6 +302,8 @@ _None yet._
 
 ## Not Verified
 
+- 2026-07-23 Prism shield-surface reflection and `PrismBodyCollision` passed full UBT. PIE-check body blocking, foot IK, and surface reflection location.
+- 2026-07-23 Reflection now disables the incoming laser `DamageBox` and spawns its outbound segment visual-only. The source compiled successfully, but final DLL linking is pending because `UnrealEditor.exe` still holds `UnrealEditor-Project_Eden.dll`. PIE-check that shielded reflection deals no player damage while an unreflected beam still does.
 - 2026-06-24 boss target marker VFX death cleanup is built and automated, but PIE still needs a multiplayer visual check for death, first acquisition, and target swaps.
 - 2026-06-24 Crystal Seraph BP LFS restore is committed locally; editor visual check is still needed because commandlet startup hit unrelated project load issues (`EventMap2.umap`, missing Fab fence meshes).
 - 2026-06-23 Sans Ground Hands decal/visibility fixes are built and automated coverage passes; PIE-check all three decals per wave and confirm each hand appears only as its rise begins.

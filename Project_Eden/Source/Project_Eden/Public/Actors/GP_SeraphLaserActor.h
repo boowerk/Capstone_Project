@@ -115,5 +115,7 @@ private:
 	FTimerHandle EndTimerHandle;
 	bool bLaserActive = false;
 	bool bHasReflected = false;
+	/** Reflected beams are presentation-only; only an unreflected incoming beam may damage the player. */
+	bool bCanDealDamage = true;
 	bool bReleasesPrismShields = true;
 };

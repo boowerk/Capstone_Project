@@ -1,3 +1,14 @@
+---
+memoc: true
+type: core
+scope: project-memory
+created: 2026-07-21T12:29:05
+updated: 2026-07-21T12:29:05
+status: active
+tags:
+  - memoc
+  - memoc/core
+---
 # Skeletal Mesh Niagara 전체 검수 결과
 
 ## 1. 검수 요약

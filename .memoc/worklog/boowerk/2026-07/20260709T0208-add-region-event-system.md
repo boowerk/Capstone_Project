@@ -8,6 +8,10 @@ tags:
   - region-events
   - pcg
   - gameplay
+  - memoc
+scope: project-memory
+updated: 2026-07-21T12:29:05
+status: active
 ---
 # Add Region Event System
 

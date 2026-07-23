@@ -7,6 +7,7 @@
 class AGP_CrystalSeraphBossCharacter;
 class AGP_SeraphLaserActor;
 class UGP_VisualCueComponent;
+class UBoxComponent;
 class UMaterialInstanceDynamic;
 class UNiagaraComponent;
 class UNiagaraSystem;
@@ -32,11 +33,18 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Boss|Crystal Seraph")
 	bool NotifyLaserHit(AGP_SeraphLaserActor* LaserActor, const FVector& IncomingDirection);
 
+	/** Native laser path supplies the actual shield-surface contact for reflection VFX. */
+	bool NotifyLaserHitAtLocation(AGP_SeraphLaserActor* LaserActor, const FVector& IncomingDirection, const FVector& ReflectionLocation);
+
 	UFUNCTION(BlueprintPure, Category = "Boss|Crystal Seraph")
 	FVector ResolveReflectedDirection(const FVector& IncomingDirection) const;
 
 	UFUNCTION(BlueprintPure, Category = "Boss|Crystal Seraph")
 	float GetCollisionRadius() const;
+
+	/** Shared visual/gameplay center for the shield and laser reflection. */
+	UFUNCTION(BlueprintPure, Category = "Boss|Crystal Seraph|Shield")
+	FVector GetReflectionCenter() const;
 
 	/** Starts the short shield break sequence. The boss owns the pattern timing; the prism owns its visual. */
 	UFUNCTION(BlueprintCallable, Category = "Boss|Crystal Seraph|Shield")
@@ -62,6 +70,7 @@ private:
 	void ActivatePrismShield();
 	void UpdatePrismShieldVisual(float DeltaSeconds);
 	void UpdatePrismShieldDirection();
+	FVector GetPrismShieldCenterOffset() const;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USceneComponent> SceneRoot;
@@ -74,6 +83,10 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UStaticMeshComponent> PrismMesh;
+
+	/** Solid collision for the crystal body only; the large shield sphere remains query-only and IK-safe. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UBoxComponent> PrismBodyCollision;
 
 	/** Assigned directly in BP_CrystalPrism with the shield material; this is the primary shield renderer. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph|Shield", meta = (AllowPrivateAccess = "true"))
@@ -89,7 +102,7 @@ private:
 	float ReflectionAngleDegrees = 120.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "cm"))
-	float CollisionRadius = 150.0f;
+	float CollisionRadius = 250.0f;
 
 	// Keep the prototype crystal readable while allowing a Blueprint child to replace or retune its visual footprint.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph", meta = (AllowPrivateAccess = "true"))
@@ -114,11 +127,13 @@ private:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Crystal Seraph|Shield", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UNiagaraSystem> PrismShieldVFX;
 
+	/** Optional local adjustment added after the shield is centered on the prism body bounds. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph|Shield", meta = (AllowPrivateAccess = "true"))
-	FVector PrismShieldRelativeLocation = FVector(0.0f, 0.0f, 180.0f);
+	FVector PrismShieldRelativeLocation = FVector::ZeroVector;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph|Shield", meta = (AllowPrivateAccess = "true"))
-	FVector PrismShieldVisualScale = FVector(3.2f, 3.2f, 2.6f);
+	// Engine Sphere has a 50cm base radius; 5x matches the 250cm reflection collision radius.
+	FVector PrismShieldVisualScale = FVector(5.0f);
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph|Shield", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "s"))
 	float PrismShieldFadeInDuration = 0.2f;

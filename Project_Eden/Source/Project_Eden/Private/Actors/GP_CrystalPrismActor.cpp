@@ -3,6 +3,7 @@
 #include "Actors/GP_CrystalSeraphVFXDefaults.h"
 #include "Actors/GP_SeraphLaserActor.h"
 #include "Characters/GP_CrystalSeraphBossCharacter.h"
+#include "Components/BoxComponent.h"
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "GameplayTags/GP_Tags.h"
@@ -31,11 +32,20 @@ AGP_CrystalPrismActor::AGP_CrystalPrismActor()
 	ReflectionCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 	ReflectionCollision->SetCollisionResponseToAllChannels(ECR_Ignore);
 	ReflectionCollision->SetCollisionResponseToChannel(ECC_WorldDynamic, ECR_Overlap);
-	ReflectionCollision->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
+	// Foot IK commonly uses Visibility traces. The prism's laser reflection uses its explicit radius test,
+	// so it must not present the shield sphere as a walkable/hittable Visibility surface.
+	ReflectionCollision->SetCollisionResponseToChannel(ECC_Visibility, ECR_Ignore);
 
 	PrismMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("PrismMesh"));
 	PrismMesh->SetupAttachment(SceneRoot);
 	PrismMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+	PrismBodyCollision = CreateDefaultSubobject<UBoxComponent>(TEXT("PrismBodyCollision"));
+	PrismBodyCollision->SetupAttachment(SceneRoot);
+	PrismBodyCollision->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	PrismBodyCollision->SetCollisionObjectType(ECC_WorldDynamic);
+	PrismBodyCollision->SetCollisionResponseToAllChannels(ECR_Block);
+	PrismBodyCollision->SetGenerateOverlapEvents(false);
 
 	PrismShieldMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("PrismShieldMesh"));
 	PrismShieldMesh->SetupAttachment(SceneRoot);
@@ -70,6 +80,18 @@ void AGP_CrystalPrismActor::BeginPlay()
 		FMath::Max(0.01f, PrismVisualScale.Y),
 		FMath::Max(0.01f, PrismVisualScale.Z)));
 	ReflectionCollision->SetSphereRadius(GetCollisionRadius());
+	// Keep gameplay reflection and the shield sphere on the same body-centered transform.
+	ReflectionCollision->SetRelativeLocation(GetPrismShieldCenterOffset());
+	if (IsValid(PrismBodyCollision))
+	{
+		// Do not depend on authored simple collision on the decorative Sculpture mesh.
+		// This creates a solid, scaled body volume while keeping the large shield sphere out of foot-IK traces.
+		const FTransform RootTransform = SceneRoot->GetComponentTransform();
+		PrismBodyCollision->SetRelativeLocation(RootTransform.InverseTransformPosition(PrismMesh->Bounds.Origin));
+		PrismBodyCollision->SetBoxExtent(PrismMesh->Bounds.BoxExtent.ComponentMax(FVector(1.0f)));
+		PrismBodyCollision->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+		PrismBodyCollision->SetCollisionResponseToAllChannels(ECR_Block);
+	}
 	const FVector SafeAuraScale(
 		FMath::Max(0.01f, PrismAuraScale.X),
 		FMath::Max(0.01f, PrismAuraScale.Y),
@@ -112,8 +134,10 @@ void AGP_CrystalPrismActor::ActivatePrismShield()
 		return;
 	}
 
-	PrismShieldMesh->SetRelativeLocation(PrismShieldRelativeLocation);
+	const FVector ShieldCenterOffset = GetPrismShieldCenterOffset();
+	PrismShieldMesh->SetRelativeLocation(ShieldCenterOffset);
 	PrismShieldMesh->SetRelativeScale3D(PrismShieldVisualScale.ComponentMax(FVector(0.01f)));
+	ReflectionCollision->SetRelativeLocation(ShieldCenterOffset);
 	PrismShieldMesh->SetHiddenInGame(false);
 	PrismShieldMaterialInstance = PrismShieldMesh->CreateDynamicMaterialInstance(0);
 	if (IsValid(PrismShieldMaterialInstance))
@@ -215,7 +239,7 @@ void AGP_CrystalPrismActor::UpdatePrismShieldDirection()
 		return;
 	}
 
-	const FVector SeraphDirection = (BossOwner->GetActorLocation() - GetActorLocation()).GetSafeNormal();
+	const FVector SeraphDirection = (BossOwner->GetActorLocation() - GetReflectionCenter()).GetSafeNormal();
 	if (SeraphDirection.IsNearlyZero())
 	{
 		return;
@@ -235,6 +259,14 @@ void AGP_CrystalPrismActor::UpdatePrismShieldDirection()
 
 bool AGP_CrystalPrismActor::NotifyLaserHit(AGP_SeraphLaserActor* LaserActor, const FVector& IncomingDirection)
 {
+	return NotifyLaserHitAtLocation(LaserActor, IncomingDirection, GetReflectionCenter());
+}
+
+bool AGP_CrystalPrismActor::NotifyLaserHitAtLocation(
+	AGP_SeraphLaserActor* LaserActor,
+	const FVector& IncomingDirection,
+	const FVector& ReflectionLocation)
+{
 	if (!HasAuthority() || !IsValid(BossOwner))
 	{
 		return false;
@@ -249,7 +281,7 @@ bool AGP_CrystalPrismActor::NotifyLaserHit(AGP_SeraphLaserActor* LaserActor, con
 	// Every successful reflected laser breaks one wing-core stage; the third stage drops the boss into groggy.
 	BossOwner->RequestWingCoreBreak();
 	BP_OnLaserReflected(LaserActor, ReflectedDirection);
-	MulticastPlayReflectionVFX(GetActorLocation(), ReflectedDirection.Rotation());
+	MulticastPlayReflectionVFX(ReflectionLocation, ReflectedDirection.Rotation());
 	return true;
 }
 
@@ -265,7 +297,7 @@ FVector AGP_CrystalPrismActor::ResolveReflectedDirection(const FVector& Incoming
 {
 	if (IsValid(BossOwner))
 	{
-		return (BossOwner->GetActorLocation() - GetActorLocation()).GetSafeNormal();
+		return (BossOwner->GetActorLocation() - GetReflectionCenter()).GetSafeNormal();
 	}
 
 	const FVector SafeIncoming = IncomingDirection.GetSafeNormal();
@@ -281,4 +313,21 @@ FVector AGP_CrystalPrismActor::ResolveReflectedDirection(const FVector& Incoming
 float AGP_CrystalPrismActor::GetCollisionRadius() const
 {
 	return FMath::Max(0.0f, CollisionRadius);
+}
+
+FVector AGP_CrystalPrismActor::GetReflectionCenter() const
+{
+	return IsValid(ReflectionCollision) ? ReflectionCollision->GetComponentLocation() : GetActorTransform().TransformPosition(GetPrismShieldCenterOffset());
+}
+
+FVector AGP_CrystalPrismActor::GetPrismShieldCenterOffset() const
+{
+	if (IsValid(PrismMesh) && IsValid(SceneRoot))
+	{
+		// The spawned prism root is nav-ground level. Centering on the mesh bounds puts the sphere around
+		// the crystal body instead of leaving its center buried at the ground origin.
+		return SceneRoot->GetComponentTransform().InverseTransformPosition(PrismMesh->Bounds.Origin) + PrismShieldRelativeLocation;
+	}
+
+	return PrismShieldRelativeLocation;
 }
