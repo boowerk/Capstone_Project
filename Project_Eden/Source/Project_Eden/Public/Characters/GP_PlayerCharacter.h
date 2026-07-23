@@ -285,8 +285,16 @@ private:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Network|Party Visuals", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USkeletalMesh> SecondPlayerSkeletalMesh;
 
+	// Per-slot import correction. Keep this on the Blueprint so artists can adjust an
+	// imported character without changing the shared MaskMan animation scale profile.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Network|Party Visuals", meta = (AllowPrivateAccess = "true", ClampMin = "0.01"))
+	float SecondPlayerVisualScale = 1.0f;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Network|Party Visuals", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USkeletalMesh> ThirdPlayerSkeletalMesh;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Network|Party Visuals", meta = (AllowPrivateAccess = "true", ClampMin = "0.01"))
+	float ThirdPlayerVisualScale = 1.0f;
 
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, ReplicatedUsing = OnRep_PartyVisualSlot, Category = "Network|Party Visuals", meta = (AllowPrivateAccess = "true"))
 	int32 PartyVisualSlot = 0;
