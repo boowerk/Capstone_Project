@@ -2,19 +2,21 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-07-23T14:09:49+09:00
+updated: 2026-07-23T19:03:00+09:00
 status: active
 tags: [memoc, memoc/state]
-created: 2026-07-18T13:21:02
 ---
 # Session Summary
 
 ## Status
-- Village_00 footprint is now 230x230m; Village_01 is 130x130m. The source defaults, saved `L_LandscapeMap` Director overrides, and automation expectations match.
-- Offsets are unchanged: 00 `(0,0,-1500)`, 01 `(0,-2000,-1500)` cm.
+- B2 player top-left HUD restyle is applied and saved on `feature/no-mcp-work`.
+- Health/Mana/Stamina share Track/FillMask brushes with per-bar tints; the existing TopLeftFrame Border draws the soft Backplate.
+- `Vignette`, `CrestText`, `LocationTextBlock`, and `StatusHint` were removed so the top-left panel contains only the three status bars.
 
 ## Verified
-- Full Editor build and `ProjectEden.Game.WorldLayout.VillageSelection` pass on 2026-07-23.
+- Four textures imported with UI/no-mip/clamp settings.
+- All four related Widget Blueprints compiled and saved successfully.
 
 ## Next
-- Reopen the map and refresh/rebuild the preview when visual slot sizing is needed.
+- PIE-check 1280x720 plus another DPI scale; tune backplate strength if bright terrain reduces readability.
+- Stamina remains a likely visual placeholder because no Stamina GAS attributes exist.

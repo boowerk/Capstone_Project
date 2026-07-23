@@ -130,6 +130,12 @@ Last synced: 2026-07-23T14:09:49+09:00
 - Commits `d64bc60c` and `88d85765` prevent attack-time flicker with front/back render targets, RHI-fence promotion, and player exclusion. Build and `ProjectEden.UI.Minimap.CaptureStability` passed; PIE-check repeated attacks with production VFX. No editor setup is required.
 - Commits `2641dbab`, `c46e718f`, and tests fix FullMap Z accumulation, preserve Follow mode, stop brush reflow, and use flat opaque FinalColorLDR. BaseColor was rejected because its alpha can make direct UMG display transparent. Build and `ProjectEden.UI.Minimap.CaptureStability` passed; PIE-check final contrast.
 
+## Player HUD Restyle Handoff
+
+- The B2 top-left HUD styling is saved but still needs PIE visual confirmation at 1280x720 and another DPI scale. The three attribute WBP assets share `T_UI_HUD_AttributeTrack_B` and `T_UI_HUD_AttributeFillMask_B`; `WBP_PlayerHUDWidget.TopLeftFrame` uses `T_UI_HUD_TopLeft_Backplate_B2` as `Draw As: Image`, `No Tile`. The editor reported successful compile/save for all four widgets.
+- Source/import automation is `Project_Eden/Scripts/Editor/apply_player_status_hud.py`. It is idempotent and preserves the existing GAS bindings/widget names. `T_UI_HUD_TopLeft_Accent_B2` is imported but unused. If the background is too weak on bright terrain, tune the Backplate PNG/Brush tint after PIE rather than adding another opaque panel.
+- Existing data caveat: `UGP_AttributeSet` has Health/MaxHealth and Mana/MaxMana but no Stamina pair; the Stamina WBP is likely a visual placeholder. Do not treat the successful visual restyle as proof that stamina gameplay data is implemented.
+
 ## Enemy Leash Handoff
 
 - Commits `93ac0b15` and `177bc9ad` finalize anchor leash behavior: crossing the outer distance starts return, and a visible player re-engages inside the default 75% inner boundary. Editor build and `ProjectEden.AI.Enemy.LeashPolicy` passed; PIE-check actual BT movement at both boundaries.
@@ -318,6 +324,8 @@ _None yet._
 - PIE validation of `SourceRootMotionTranslationYawOffset = -90` on `AM_UEFN_Roll_RM`; if movement flips left instead, set the PDA value to `90`, and if the asset is already authored in UE forward axis set it to `0`.
 
 ## Resume Notes
+
+- PIE-check the simplified top-left HUD after removing `Vignette`, `CrestText`, `LocationTextBlock`, and `StatusHint`; verify the remaining frame height and padding do not leave excess empty space.
 
 - `ABP_UEFNSource_Player` EventGraph already does `Try Get Pawn Owner -> Cast BP_GP_PlayerCharacter -> Get CharacterTrajectory -> Set Character Trajectory`.
 - `GP_CharacterAnimInstance` now reflects `CharacterTrajectory` off the owning character class instead of requiring a fragile nested property-access node in the AnimGraph.

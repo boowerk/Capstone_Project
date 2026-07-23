@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-23T14:09:49+09:00
+updated: 2026-07-23T19:03:00+09:00
 status: active
 tags:
   - memoc
@@ -11,10 +11,11 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-07-23T14:09:49+09:00
+Last synced: 2026-07-23T19:03:00+09:00
 
 ## Current Status
 
+- Player top-left HUD restyle is applied but not yet PIE-verified. `/Game/UI/HUD/PlayerStatus/Textures` contains the shared grayscale fill mask, dark track, B2 backplate, and optional accent. `WBP_PlayerHealthBar`, `WBP_PlayerManaBar`, and `WBP_PlayerStaminaBar` keep their existing `GP_AttributeWidget`/`HealthBar` contracts while sharing the track/fill brushes and using dark red, muted blue, and ochre/olive tints. `WBP_PlayerHUDWidget.TopLeftFrame` keeps its existing Border hierarchy and now draws `T_UI_HUD_TopLeft_Backplate_B2` as an untiled Image. All four Widget Blueprints compiled and saved in the editor; `T_UI_HUD_TopLeft_Accent_B2` is imported but intentionally not placed.
 - Village authoring now has a Director-owned transient editor preview. `Rebuild Preview` runs the deterministic selection with `PreviewSeed`, loads one non-saveable Level Instance per selected slot at the exact runtime transform, applies the same instance-unique Road/District tags and graph overrides, and optionally schedules PCG sequentially in Preview mode. `Clear Village Preview`, footprint refresh, and Director destruction unload/clean the preview. `bUsePreviewSeedInPIE` defaults on, so PIE village selection matches Rebuild Preview even when GameState generated another RunSeed; packaged games still use their real RunSeed. Runtime remains Generate On Demand. The slot Footprint is also a flat visualization-only XY box at local Z=0. Full `Project_EdenEditor` build and `ProjectEden.Game.WorldLayout.VillageSelection` pass. `L_LandscapeMap` now has five unique SlotIds `Village_A..E`; PreviewSeed 186 selects `Village_A=Village_01` and `Village_E=Village_00`, loads two transient Level Instances, and schedules two isolated PCG components.
 - Village footprint-aware selection is committed as `f32ef1a2`. Slots display yaw-aware XY OBB footprints, red means overlap, and deterministic feasibility selection excludes conflicting combinations while preserving required-group lookahead. The `/Game/WorldLayout/L_Village_00` primary now uses half extent `(11500,11500,3000)` cm (230x230m full XY) and offset `(0,0,-1500)` cm.
 - Mixed village presets are committed. The legacy level/footprint remains the canonical primary, while `/Game/WorldLayout/L_Village_01` now uses offset `(0,-2000,-1500)` cm and half extent `(6500,6500,3000)` cm (130x130m full XY). Source defaults, automation expectations, and the saved `L_LandscapeMap` Director overrides match these sizes. Full Editor build and `ProjectEden.Game.WorldLayout.VillageSelection` pass. Multiplayer client streaming and explicit cook registration remain follow-up work.
@@ -301,3 +302,8 @@ See `.memoc/worklog/` and generated `.memoc/activity.md`.
 - `FGPVillageGroupRule` keeps fixed `PickCount` as the default contract and optionally selects a deterministic count from inclusive `MinPickCount..MaxPickCount`.
 - `Min==Max` consumes no count RNG and matches fixed selection exactly. Required groups fail when eligible candidates are below Min; optional groups clamp. Use optional group plus `SpawnChance` for a zero-village outcome.
 - Editor build and both village-selection/run-seed automation tests pass with the editor closed. No map/content asset was changed by this feature or its tests.
+
+### 2026-07-23 Player status HUD restyle
+
+- The top-left HUD uses the B2 backplate and shared track/fill-mask textures with distinct health, mana, and stamina tints.
+- `Vignette`, `CrestText`, `LocationTextBlock`, and `StatusHint` were removed from `WBP_PlayerHUDWidget`; the panel now retains only the three status bars.

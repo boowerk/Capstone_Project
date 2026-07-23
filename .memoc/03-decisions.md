@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-23T12:38:00+09:00
+updated: 2026-07-23T19:03:00+09:00
 status: active
 tags:
   - memoc
@@ -16,6 +16,7 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 ## Decision Log
 
 ### 2026-07-23
+- Keep player attribute values live and reusable: Health/Mana/Stamina share one grayscale fill mask and one track brush, with color supplied by each ProgressBar tint. Preserve the existing `GP_AttributeWidget`, inner `HealthBar`, and parent HUD instance names. Apply the soft top-left backplate through the existing `TopLeftFrame` Border instead of rebuilding the UMG hierarchy; leave the optional accent unplaced unless later visual review asks for it.
 - Keep village runtime PCG as Generate On Demand so the Director can apply instance-unique tags, graph parameters, and deterministic seeds before sequential generation. For immediate editor authoring feedback, use transient `ALevelInstance` previews owned by the Director, with PCG Preview editing mode and DuplicateTransient flags; do not change the production component to Generate At Runtime merely to see layouts.
 - Treat the village Footprint component as a flat XY editor preview, not the runtime spawn origin or a selectable placement component. Keep it at slot-local Z=0 with minimal thickness and mark it visualization-only; the `AGP_VillageSlot` actor transform remains the authoritative Level Instance transform. Use pivot snapping (`Alt+End`) for authored ground placement.
 - Keep the legacy `VillageLevelPreset` + footprint as the canonical primary preset so existing instance overrides remain valid. Store additional choices as `FGP_VillagePresetDefinition { PresetId, Level, Footprint, Weight }`; the first additional preset is compact `L_Village_01`. Ignore duplicate preset IDs or level paths deterministically.
@@ -125,3 +126,7 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 - Keep the automatically managed `PCGWorldActor` in `L_Village_00`; the Director only configures the explicitly identified `PCG_CityGen_FromAnchor` component. Remove fixed village Level Instances from the main map so the Director is the sole runtime owner.
 - Treat multiple villages as an atomic presentation batch: all loaded/configured before visibility, all shown before generation, completion/cancellation delegates before success, and timeout/failure rollback. Multiplayer replication is a separate future feature.
 - Run streamed city PCG sequentially after the all-shown barrier. Complex hierarchical graphs and engine PCG services are shared at world scope; one in-flight city graph removes cross-instance concurrency as a failure variable and spreads the generation spike. Preserve slot-unique tags and log PCG-managed output counts/bounds for runtime proof.
+
+### 2026-07-23
+
+- Keep the player top-left HUD focused on health, mana, and stamina. Remove the vignette, crest label, location label, and status hint; `LocationTextBlock` is optional in native code, so its absence is supported.
