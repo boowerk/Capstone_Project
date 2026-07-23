@@ -224,6 +224,7 @@ private:
 	void RegisterZoneEnemy(
 		AGP_EnemyCharacter* Enemy,
 		AGP_EnemySpawnVolume* OwningZone = nullptr,
+		int32 CorruptionRegionId = INDEX_NONE);
 	void MaybeCompleteZone();
 	void CompleteCurrentZone();
 	void AdvanceZone();
@@ -257,22 +258,6 @@ private:
 	bool IsPlayerNearMiddleSelectionPortal(
 		const AGP_PlayerController* PlayerController) const;
 	void AssignPlayersToOuterVillageStarts();
-
-#if !UE_BUILD_SHIPPING
-	// End-to-end QA continues past seamless travel until the authoritative three-player gameplay state is usable.
-	void BeginThreePlayerGameplaySmokeProbe();
-	void TryThreePlayerGameplaySmokeProbe();
-	FTimerHandle ThreePlayerGameplaySmokeTimerHandle;
-	int32 ThreePlayerGameplaySmokeAttempts = 0;
-#endif
-
-#if !UE_BUILD_SHIPPING
-	// End-to-end QA continues past seamless travel until the authoritative three-player gameplay state is usable.
-	void BeginThreePlayerGameplaySmokeProbe();
-	void TryThreePlayerGameplaySmokeProbe();
-	FTimerHandle ThreePlayerGameplaySmokeTimerHandle;
-	int32 ThreePlayerGameplaySmokeAttempts = 0;
-#endif
 
 #if !UE_BUILD_SHIPPING
 	// End-to-end QA continues past seamless travel until the authoritative three-player gameplay state is usable.
