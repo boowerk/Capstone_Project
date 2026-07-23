@@ -955,6 +955,47 @@ void AGP_PlayerCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME_CONDITION(AGP_PlayerCharacter, bIsInWhiteVoid, COND_SkipOwner);
+	DOREPLIFETIME(AGP_PlayerCharacter, PartyVisualSlot);
+}
+
+void AGP_PlayerCharacter::SetPartyVisualSlot(int32 NewPartyVisualSlot)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	PartyVisualSlot = FMath::Clamp(NewPartyVisualSlot, 0, 2);
+	ApplyPartyVisualSlot();
+	ForceNetUpdate();
+}
+
+void AGP_PlayerCharacter::OnRep_PartyVisualSlot()
+{
+	ApplyPartyVisualSlot();
+}
+
+void AGP_PlayerCharacter::ApplyPartyVisualSlot()
+{
+	USkeletalMesh* PartyMesh = nullptr;
+	if (PartyVisualSlot == 1)
+	{
+		PartyMesh = SecondPlayerSkeletalMesh;
+	}
+	else if (PartyVisualSlot == 2)
+	{
+		PartyMesh = ThirdPlayerSkeletalMesh;
+	}
+
+	if (!PartyMesh || !GetMesh() || GetMesh()->GetSkeletalMeshAsset() == PartyMesh)
+	{
+		return;
+	}
+
+	// The component keeps the existing runtime-retarget AnimBP. The two party meshes are
+	// explicitly marked compatible with the MaskMan skeleton in their imported skeleton assets.
+	GetMesh()->SetSkeletalMeshAsset(PartyMesh);
+	ApplyRetargetVisualScaleFromAnimationSet();
 }
 
 void AGP_PlayerCharacter::StopUEFNSourceFallbackMontage(float BlendOutTime)

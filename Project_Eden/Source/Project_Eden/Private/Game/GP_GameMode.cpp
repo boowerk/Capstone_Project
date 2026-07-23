@@ -65,6 +65,16 @@ AActor* AGP_GameMode::ChoosePlayerStart_Implementation(AController* Player)
 	return Super::ChoosePlayerStart_Implementation(Player);
 }
 
+void AGP_GameMode::RestartPlayer(AController* NewPlayer)
+{
+	Super::RestartPlayer(NewPlayer);
+
+	if (AGP_PlayerCharacter* PlayerCharacter = NewPlayer ? Cast<AGP_PlayerCharacter>(NewPlayer->GetPawn()) : nullptr)
+	{
+		PlayerCharacter->SetPartyVisualSlot(ResolvePartyStartSlot(NewPlayer));
+	}
+}
+
 void AGP_GameMode::Logout(AController* Exiting)
 {
 	// Release the deterministic slot immediately so a reconnect does not wait for garbage collection.

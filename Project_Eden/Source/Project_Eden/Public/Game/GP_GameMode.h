@@ -48,6 +48,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Run")
 	void NotifyAllPlayersDead();
 
+	virtual void RestartPlayer(AController* NewPlayer) override;
+
 protected:
 	virtual void BeginPlay() override;
 	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
