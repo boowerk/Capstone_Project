@@ -134,18 +134,22 @@ acceptance_criteria:
 
 - `Project_Eden/Content/Maps/DemoMap/TestMap.umap`
 - `Project_Eden/Content/Maps/MainMap/DA_RegionEventData.uasset`
+- `Project_Eden/Content/Maps/MainMap/L_LandscapeMap.umap`
 - `Project_Eden/Content/Maps/MainMap/L_MainMap.umap`
 
-## 첫 티켓
+## 현재 게임 흐름 경계
 
-`EDEN-20260718-001`은 졸업작품 Vertical Slice의 최종 코어 루프와 컷라인을
-확정한다. 초기 검토 후보는 다음과 같다.
+2026-07-24 사용자 결정으로 고정 데모 흐름은 제거됐다. 현재 기본 진입은
+다음과 같으며, 새로운 자동 진행을 추가하려면 별도 티켓과 사용자 승인이
+필요하다.
 
 ```text
 메인/로비
-→ L_LandscapeMap 탐험
-→ 오염 기반 지역 이벤트
-→ 전투·보상·증강
-→ 보스
-→ 결과
+→ 3인 Ready 및 L_LandscapeMap 이동
+→ authored PlayerStart 주변의 안전한 3인 시작
+→ 자유 탐험
 ```
+
+`L_LandscapeMap`에는 일반 Zone이 없으므로 자동 목표·이벤트·보스·승리 전환이
+발생하지 않는다. 일반 Zone/Portal/결과 코드는 유지되며, 실제 진행형 맵에
+사용하려면 Zone을 저작하거나 목적 맵을 변경하는 별도 작업으로 다룬다.

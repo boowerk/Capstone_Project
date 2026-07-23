@@ -4,8 +4,6 @@
 #include "GameFramework/GameStateBase.h"
 #include "GP_GameState.generated.h"
 
-class UGP_WorldCorruptionComponent;
-
 // Replicated phase of the linear city-progression run. Drives HUD and client-side presentation.
 UENUM(BlueprintType)
 enum class EGPMatchPhase : uint8
@@ -37,11 +35,6 @@ class PROJECT_EDEN_API AGP_GameState : public AGameStateBase
 	GENERATED_BODY()
 
 public:
-	AGP_GameState();
-
-	UFUNCTION(BlueprintPure, Category = "Run|Corruption")
-	UGP_WorldCorruptionComponent* GetWorldCorruptionComponent() const { return WorldCorruptionComponent; }
-
 	UFUNCTION(BlueprintPure, Category = "Run")
 	EGPMatchPhase GetMatchPhase() const { return MatchPhase; }
 
@@ -86,10 +79,6 @@ public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 protected:
-	// The GameState owns the only replicated corruption state for the current run.
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Run|Corruption", meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UGP_WorldCorruptionComponent> WorldCorruptionComponent;
-
 	UPROPERTY(ReplicatedUsing = OnRep_MatchPhase, BlueprintReadOnly, Category = "Run", meta = (AllowPrivateAccess = "true"))
 	EGPMatchPhase MatchPhase = EGPMatchPhase::Preparing;
 

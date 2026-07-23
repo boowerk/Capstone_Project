@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-21T22:24:01+09:00
+updated: 2026-07-24T01:57:40+09:00
 status: active
 tags:
   - memoc
@@ -11,7 +11,7 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-07-21T22:24:01+09:00
+Last synced: 2026-07-24T01:57:40+09:00
 
 ## Enemy Live-Target Combat Handoff
 
@@ -20,14 +20,13 @@ Last synced: 2026-07-21T22:24:01+09:00
 - Verified: `Project_EdenEditor Win64 Development` build succeeded and `ProjectEden.AI` passed 25/25. No content/map asset changed.
 - Still manual: PIE-check Furnace lunge, Cyclops in-place hit, and ranged/flying shots against a strafing player. Live/server testing was intentionally skipped by request. Existing Cyclops AnimBP duplicate `DefaultSlot` warnings are unrelated and remain.
 
-## Seeded Inward Demo Flow Handoff
+## Fixed Demo Removal Handoff
 
-- Commits `fdf070fc` through `e81a7b34` implement the production golden path without modifying `L_LandscapeMap`, `TestMap`, `DA_RegionEventData`, or `L_MainMap`.
-- Flow: one safe shared outer party cluster -> `world_red_rift` -> `world_structure_defense` -> `world_shrine_ruins` -> center rally -> production `BP_DarkArmorKnight` -> existing victory/result travel. Beat roles are fixed; route regions vary deterministically with the run seed.
-- `AGP_DemoRunDirector` is authority-only orchestration with replicated stage/location/region/event/seed. It suppresses future ambient discoveries during the guided run, advances only for the exact current event actor, retries temporary capacity conflicts until the 180-second stage watchdog, verifies the Dark Knight AI brain before entering BossFight, and terminates callbacks/boss/event state on defeat.
-- The HUD lazily resolves the replicated director and draws one gold objective point on the existing minimap marker canvas. Distant objectives clamp to the circular edge in pixel space; BossFight and terminal stages hide it.
-- Verified locally: Editor build; DemoFlow 7/7; RegionEvents 8/8; Minimap 1/1; Dark Knight 6/6 plus selector; three-player runtime start; Landscape integrity. No live server or multiplayer PIE test was run per user instruction.
-- P0 manual PIE: traverse the route with three players; confirm two-player activation at every guided event, all three Shrine pickers, objective marker direction/readability, center boss reveal without overlap, Dark Knight chase/attacks, boss death, and lobby return. Use `?DemoSeed=12345` to reproduce a failed route.
+- Commits `c78e88a9`, `ba0f2bfa`, and `29baec37` remove the gold guided marker, DemoRun policy/director, run seed, peripheral start route, Red Rift/Defense/Shrine actors and DataAssets, event-specific augment RPC, automatic center Dark Armor Knight, and their dedicated tests.
+- General three-player behavior remains: lobby/session cap, seamless travel, authored PlayerStart collection, collision-safe expansion to three stable slots, reconnect slot release, and the non-Shipping readiness probe.
+- General Zone/Portal/Victory/Defeat/result/lobby-return code and RegionState/RegionSpatial/PCG biome state remain independent. `L_LandscapeMap` authors no enemy zones, so its current post-lobby state is three-player free exploration without an automatic objective, boss, or completion.
+- Protected `L_LandscapeMap`, `TestMap`, `DA_RegionEventData`, and `L_MainMap` remain untouched. The placed `BP_EventDirector` and legacy data asset load through empty serialization-only native shells; those shells have no scheduling, spawn, reward, state, or completion API.
+- Verified without a server/PIE session: full Editor build succeeded; `ProjectEden.Game.LandscapeMap.Integrity`, `ProjectEden.Game.Network.ThreePlayerRuntimeStarts`, `ProjectEden.UI.Minimap.CaptureStability`, and `ProjectEden.AI.Enemy.ProductionAnimationContract` passed 4/4 under `NullRHI`.
 
 ## Three-Player Network/Lobby Handoff
 
@@ -44,7 +43,7 @@ Last synced: 2026-07-21T22:24:01+09:00
 - `1ce0f79d` separates the gameplay `ActionEnd` signal from real montage completion; BlendOut no longer ends the ability and cuts its tail. `9e7dfeaf` adds `Face -> AttackPrepare -> GAS -> Recovery -> ChaseResume` inside the existing attack task. Both regular-enemy bridges use the owning DataAsset's Idle as a temporary same-skeleton fallback (`0.30/0.20s`) and expose replaceable clips/timing/blends/slot. A replicated phase lets three-player clients create the cosmetic dynamic montage locally while the server remains authoritative over timing.
 - Verified: `Project_EdenEditor Win64 Development` build and all 23 `ProjectEden.AI` automation tests. No live server or PIE session was run by request. Existing missing Fab/UEFN assets and the Cyclops duplicate `DefaultSlot` warnings are not resolved by these commits.
 - P0 before July 22/27: record three `Move -> AttackPrepare -> Hit -> full montage tail -> ChaseResume -> Move` cycles for each included enemy. Confirm one hit, no `Interrupted` callback on normal completion, no movement before the tail finishes, and visible preparation on FurnaceWalker/Cyclops. The loaded Furnace BT currently has editor strings for turn tasks but no compiled runtime turn-task instances; the new in-task bridge still runs, but compile/save that BT later if its separate turn nodes are expected. Do not run additional live network sessions unless the user explicitly asks; the product contract remains three players.
-- Script the demo in `EventMap` rather than the corrupt `TestMap` or randomized production landscape events. Use Dark Armor Knight plus melee/ranged basics; exclude flying unless its chase/altitude/re-entry loop passes PIE.
+- The fixed demo flow is removed. For isolated AI presentation checks, use a temporary authored encounter without reconnecting DemoRun/RegionEvent systems; exclude flying unless its chase/altitude/re-entry loop passes PIE.
 - Remaining engineering risks are exact GAS ability-spec tracking when duplicate attack-tag grants exist and simulated-proxy montage/yaw/root-motion behavior. Do not start the Motion Warping pilot until every P0 gate above is green.
 - Preserve existing user edits in `TestMap.umap`, `DA_RegionEventData.uasset`, and `L_MainMap.umap`.
 
@@ -54,32 +53,13 @@ Last synced: 2026-07-21T22:24:01+09:00
 - `166b5e93` keeps the existing dedicated-server Cook maps and adds `/Game/Maps/MainMap/L_LandscapeMap` through `COOK_MAPS`, preventing the dynamic ServerTravel destination from being omitted by discovery.
 - Verified: `Project_EdenEditor Win64 Development` build, lobby travel configuration automation, Landscape integrity automation, exact Cook-map declarations, UAT `COOK_MAPS` consumption, and destination package existence.
 - Cook/package and the three-client Lobby-to-Landscape baseline now pass. Further live server testing is intentionally omitted per user request; retain only manual presentation gates and local build/automation checks unless asked otherwise.
-- Existing user work in `TestMap.umap`, `DA_RegionEventData.uasset`, and `L_MainMap.umap` remains intentionally unstaged/uncommitted.
+- Protected `TestMap.umap`, `DA_RegionEventData.uasset`, and `L_MainMap.umap` remain untouched by this cleanup.
 
-## Production Landscape Corruption/Event Handoff
+## Corruption and Event Runtime Removal History
 
-- `L_LandscapeMap` is ready to open and Play without test-deck setup: PlayerStart Z `860`, full Landscape NavMesh bounds, navigation invokers, 15 region seeds, and placed `BP_EventDirector` are present.
-- Production director values are `25s` initial delay, `5s` evaluation, `12s` dwell, `0.30` base chance, `0.35` full-corruption bonus, `80s` global cooldown, one active exploration event, `1400-2200cm` placement, and random seed mode off.
-- `/Game/RegionEvents/Runtime` contains four production definitions. They use native runtime event classes and stable `world_*` IDs rather than `/Examples` test Blueprints.
-- Exploration event enemies do not increment `AliveZoneEnemies`. Completed/expired events retire remaining enemies through GAS, while terminal-death delegates keep legacy zone accounting correct.
-- Spawn points are revalidated after NavMesh projection and must remain outside the minimum distance of every connected player's pawn.
-- No editor assignment is required. Optional art polish can replace each native marker/decal/VFX through BP children without changing event ownership or corruption rules.
-- Verified: full `Project_EdenEditor` build; 7 Region Event tests; Landscape integrity; Region spatial subsystem; player navigation invoker; corruption state. PIE Structure Defense spawned 12 AI across four waves, completed at 35s, then reported zero event and enemy actors.
-- Existing user work in `TestMap.umap`, `DA_RegionEventData.uasset`, and `L_MainMap.umap` remains intentionally unstaged/uncommitted.
-
-## Region Event System Handoff
-
-- Commits `28c677a5`, `726bb5ad`, `ea6ae331`, `b25dbac2`, `e1472c42`, `def21134`, and `873eab0c` add a new region event foundation for PCG/zone presentation.
-- Commits `537c98b5`, `5a4ebe70`, `c298595f`, `c766d154`, `aea66ecb`, `f80f5fd5`, `30345aaf`, `907c5b19`, `1edaa439`, `7bb9c092`, and `c24402f5` add the concrete example events requested for final-presentation polish.
-- Runtime flow: place/configure `AGP_RegionEventDirector` with `EventPool`; `AGP_GameMode` finds it at BeginPlay, initializes it with `RegionCount`, and starts a weighted `ZoneStarted` event when a zone begins. `ZoneCompleted` rolls are available but disabled by default on GameMode because reward-style events should avoid spawning extra clear-blocking enemies unless intentionally enabled.
-- `UGP_RegionEventData` fields to author first: `EventId`, `DisplayName`, `EventType`, `Trigger`, `SelectionWeight`, `DurationSeconds`, `EventActorClass`, optional active/completed region state, and optional `EnemySpawns`.
-- Example `EventActorClass` values:
-  - `AGP_RedRiftRegionEventActor`: uses `EnemySpawns`; one initial base wave, then periodic waves.
-  - `AGP_CrystalCorruptionRegionEventActor`: spawns destructible crystal nodes and slows players inside radius until all nodes break.
-  - `AGP_ShrineRuinsRegionEventActor`: opens `AGP_PlayerController::ClientOpenRegionEventAugmentSelect()` when a player overlaps the shrine.
-  - `AGP_StructureDefenseRegionEventActor`: completes after `DefenseDurationSeconds`, while periodically spawning waves from `EnemySpawns`.
-- `AGP_RegionEventActor` owns BP hooks `BP_OnRegionEventInitialized`, `BP_OnRegionEventActivated`, `BP_OnRegionEventCompleted`, and `BP_OnRegionEventExpired`; create BP children for VFX/decal/UI polish. Event-spawned enemies are forwarded to GameMode and count toward the current zone clear.
-- Verified: `Project_EdenEditor Win64 Development` build succeeded and `ProjectEden.Game.RegionEvents.Selection` passed. PIE-check remains: for each Region Event DataAsset, set `EventActorClass`, add it to the director pool, enter a zone, and confirm event-specific behavior/spawn composition/multiplayer UI.
+- `ebd6847d`/`08861a81` removed world corruption and ambient/random events; `c78e88a9`/`ba0f2bfa`/`29baec37` then removed the remaining fixed demo event path.
+- `RegionState`, `DA_NatureCorruptedVegetation`, and the 15 region seeds remain independent biome content. Do not remove them as part of event cleanup.
+- If the protected map and legacy data asset are intentionally migrated later, remove the placed `BP_EventDirector`, `BP_EventDirector.uasset`, `DA_RegionEventData.uasset`, and then the two serialization-only native shells in one reviewed content ticket.
 
 ## Basic Enemy Cadence and Hearing Handoff
 

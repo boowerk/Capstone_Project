@@ -9,7 +9,6 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/SkeletalMesh.h"
 #include "Engine/World.h"
-#include "Game/RegionEvents/GP_RegionEventData.h"
 #include "GameplayTags/GP_Tags.h"
 #include "Misc/AutomationTest.h"
 
@@ -351,28 +350,7 @@ bool FEnemyProductionAnimationContractTest::RunTest(const FString& Parameters)
 			BasicEnemyCase.ExpectedUniformScale);
 	}
 
-	const TCHAR* ProductionEventPaths[] =
-	{
-		TEXT("/Game/RegionEvents/Runtime/DA_RE_World_RedRift.DA_RE_World_RedRift"),
-		TEXT("/Game/RegionEvents/Runtime/DA_RE_World_StructureDefense.DA_RE_World_StructureDefense")
-	};
-	for (const TCHAR* EventPath : ProductionEventPaths)
-	{
-		const UGP_RegionEventData* EventData = LoadObject<UGP_RegionEventData>(nullptr, EventPath);
-		TestNotNull(FString::Printf(TEXT("Production event loads: %s"), EventPath), EventData);
-		if (!IsValid(EventData))
-		{
-			continue;
-		}
-
-		for (const FGP_EnemySpawnEntry& SpawnEntry : EventData->EnemySpawns)
-		{
-			ValidateEnemyAnimationContract(
-				*this,
-				SpawnEntry.EnemyClass.Get(),
-				FString::Printf(TEXT("%s spawn %s"), EventPath, *GetNameSafe(SpawnEntry.EnemyClass.Get())));
-		}
-	}
+	// Production enemy classes are validated directly so animation coverage is independent of removed demo content.
 
 	TestWorld->DestroyWorld(false);
 	return !HasAnyErrors();

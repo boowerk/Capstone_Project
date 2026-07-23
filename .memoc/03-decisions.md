@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-21T22:24:01+09:00
+updated: 2026-07-24T01:57:40+09:00
 status: active
 tags:
   - memoc
@@ -14,6 +14,13 @@ tags:
 Durable project decisions live here. Keep entries short, dated, and useful to future agents.
 
 ## Decision Log
+
+### 2026-07-24
+- Supersede the 2026-07-14 corruption/exploration decisions: the product has no world-corruption value or ambient/random Region Event path. Do not restore their timers, weighted selection, random placement, enemy scaling, outcome deltas, or presentation.
+- Supersede the fixed-demo decisions dated 2026-07-21 and 2026-07-18 plus the remaining 2026-07-09 Region Event design: remove the seed-varied outer route, Red Rift/Defense/Shrine lifecycle, quorum/reward logic, gold objective marker, and automatic center boss/result path.
+- Keep `RegionState` as an independent authored biome-ID/PCG contract, and keep general Zone/Portal/FinishRun code available. Neither system may implicitly restart the removed demo.
+- Preserve the fixed three-player session and authored-anchor start expansion. Because protected `L_LandscapeMap` has no authored zones, its current post-lobby behavior is intentional free exploration until a separate gameplay-flow ticket is approved.
+- Keep empty `GP_RegionEventDirector` and `GP_RegionEventData` serialization shells only while protected `L_LandscapeMap`/`DA_RegionEventData` retain those class references. They expose no event configuration or callable runtime API.
 
 ### 2026-07-21
 - Lock enemy attack target identity at ability activation in the three-player game. Preparation and windup may sample that same actor's live position, but `AttackHit` locks direction and no target rescore may redirect the strike or projectile to a teammate.

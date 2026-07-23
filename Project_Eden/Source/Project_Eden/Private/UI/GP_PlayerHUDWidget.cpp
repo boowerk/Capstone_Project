@@ -23,8 +23,6 @@
 #include "Materials/MaterialInterface.h"
 #include "UObject/ConstructorHelpers.h"
 #include "UI/GP_MinimapSubsystem.h"
-#include "Game/Corruption/GP_WorldCorruptionComponent.h"
-#include "Game/Demo/GP_DemoRunDirector.h"
 #include "Game/GP_GameState.h"
 #include "UI/GP_SkillSlotHUDWidget.h"
 #include "Player/GP_PlayerState.h"
@@ -63,12 +61,6 @@ UGP_PlayerHUDWidget::UGP_PlayerHUDWidget(const FObjectInitializer& ObjectInitial
 	{
 		MinimapEnemyMarkerTexture = EnemyMarkerFinder.Object;
 	}
-	static ConstructorHelpers::FObjectFinder<UTexture2D> ObjectiveMarkerFinder(
-		TEXT("/Game/UI/HUD/Minimap/Textures/T_UI_Minimap_Point_Gold.T_UI_Minimap_Point_Gold"));
-	if (ObjectiveMarkerFinder.Succeeded())
-	{
-		MinimapObjectiveMarkerTexture = ObjectiveMarkerFinder.Object;
-	}
 
 	// Provide the generated static-map material by default so the minimap works even if the BP field is left empty.
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> MinimapMaterialFinder(
@@ -91,7 +83,6 @@ void UGP_PlayerHUDWidget::NativeConstruct()
 	RefreshPreview();
 	RefreshMinimapPlayerArrowRotation();
 	BindToMinimapSubsystem();
-	BindToWorldCorruption();
 	RefreshMinimapBackgroundFromSubsystem();
 	RefreshMinimapPresentation(0.0f);
 
@@ -121,17 +112,8 @@ void UGP_PlayerHUDWidget::NativeDestruct()
 	{
 		BoundMinimapSubsystem->OnRenderTargetChanged.RemoveDynamic(this, &ThisClass::HandleMinimapRenderTargetChanged);
 	}
-	if (BoundWorldCorruption.IsValid())
-	{
-		BoundWorldCorruption->OnWorldCorruptionChanged.RemoveDynamic(this, &ThisClass::HandleWorldCorruptionChanged);
-	}
-
 	BoundMinimapSubsystem.Reset();
-	BoundWorldCorruption.Reset();
 	EnemyMarkerPool.Reset();
-	DemoObjectiveMarker = nullptr;
-	CachedDemoRunDirector.Reset();
-	NextDemoDirectorResolveTimeSeconds = 0.0;
 	MinimapMarkerCanvas = nullptr;
 	MinimapMaterialInstance = nullptr;
 	Super::NativeDestruct();
@@ -202,74 +184,9 @@ void UGP_PlayerHUDWidget::EnsureMinimapMaterial(UTextureRenderTarget2D* InRender
 
 void UGP_PlayerHUDWidget::RefreshMinimapPresentation(float DeltaSeconds)
 {
-	BindToWorldCorruption();
 	RefreshMinimapPlayerArrowRotation();
 	RefreshMinimapMapUV();
 	RefreshEnemyMinimapMarkers(DeltaSeconds);
-	RefreshDemoObjectiveMinimapMarker();
-}
-
-FVector2D UGP_PlayerHUDWidget::CalculateClampedMarkerOffsetPixels(
-	const FVector2D& MapDeltaUV,
-	float Zoom,
-	const FVector2D& MarkerLayerSize,
-	float VisibleRadius,
-	float MarkerSize)
-{
-	if (MarkerLayerSize.X <= 0.0f || MarkerLayerSize.Y <= 0.0f)
-	{
-		return FVector2D::ZeroVector;
-	}
-
-	FVector2D PixelOffset(
-		MapDeltaUV.X * FMath::Max(0.0f, Zoom) * MarkerLayerSize.X,
-		MapDeltaUV.Y * FMath::Max(0.0f, Zoom) * MarkerLayerSize.Y);
-	const float SafeRadiusPixels = FMath::Max(
-		0.0f,
-		FMath::Min(MarkerLayerSize.X, MarkerLayerSize.Y) * FMath::Max(0.0f, VisibleRadius)
-			- FMath::Max(0.0f, MarkerSize) * 0.5f);
-	if (PixelOffset.Size() > SafeRadiusPixels)
-	{
-		PixelOffset = PixelOffset.GetSafeNormal() * SafeRadiusPixels;
-	}
-	return PixelOffset;
-}
-
-void UGP_PlayerHUDWidget::BindToWorldCorruption()
-{
-	UWorld* World = GetWorld();
-	AGP_GameState* GameState = World ? World->GetGameState<AGP_GameState>() : nullptr;
-	UGP_WorldCorruptionComponent* Corruption = IsValid(GameState) ? GameState->GetWorldCorruptionComponent() : nullptr;
-	if (!IsValid(Corruption) || BoundWorldCorruption.Get() == Corruption)
-	{
-		return;
-	}
-
-	if (BoundWorldCorruption.IsValid())
-	{
-		BoundWorldCorruption->OnWorldCorruptionChanged.RemoveDynamic(this, &ThisClass::HandleWorldCorruptionChanged);
-	}
-	BoundWorldCorruption = Corruption;
-	Corruption->OnWorldCorruptionChanged.AddUniqueDynamic(this, &ThisClass::HandleWorldCorruptionChanged);
-	ApplyMinimapCorruptionTint(Corruption->GetWorldCorruptionNormalized());
-}
-
-void UGP_PlayerHUDWidget::HandleWorldCorruptionChanged(float Corruption, float NormalizedCorruption)
-{
-	ApplyMinimapCorruptionTint(NormalizedCorruption);
-}
-
-void UGP_PlayerHUDWidget::ApplyMinimapCorruptionTint(float NormalizedCorruption)
-{
-	if (UImage* BackgroundImage = ResolveMinimapBackgroundImage())
-	{
-		// UImage tint multiplies the existing one-shot map material without changing its UV or capture resource.
-		const FLinearColor Tint = FLinearColor::LerpUsingHSV(
-			MinimapCleanTint,
-			MinimapCorruptedTint,
-			FMath::Clamp(NormalizedCorruption, 0.0f, 1.0f));
-		BackgroundImage->SetColorAndOpacity(Tint);
-	}
 }
 
 void UGP_PlayerHUDWidget::RefreshMinimapMapUV()
@@ -570,127 +487,6 @@ void UGP_PlayerHUDWidget::RefreshEnemyMinimapMarkers(float DeltaSeconds)
 		{
 			EnemyMarkerPool[Index]->SetVisibility(ESlateVisibility::Collapsed);
 		}
-	}
-}
-
-void UGP_PlayerHUDWidget::RefreshDemoObjectiveMinimapMarker()
-{
-	const auto HideObjectiveMarker = [this]()
-	{
-		if (IsValid(DemoObjectiveMarker))
-		{
-			DemoObjectiveMarker->SetVisibility(ESlateVisibility::Collapsed);
-		}
-	};
-
-	if (!BoundMinimapSubsystem.IsValid()
-		|| !BoundMinimapSubsystem->IsMinimapReady()
-		|| !IsValid(MinimapObjectiveMarkerTexture)
-		|| !EnsureMinimapMarkerLayer())
-	{
-		HideObjectiveMarker();
-		return;
-	}
-
-	if (!CachedDemoRunDirector.IsValid())
-	{
-		UWorld* World = GetWorld();
-		const double Now = IsValid(World) ? static_cast<double>(World->GetTimeSeconds()) : 0.0;
-		if (!IsValid(World) || Now < NextDemoDirectorResolveTimeSeconds)
-		{
-			HideObjectiveMarker();
-			return;
-		}
-		// HUDs on non-demo maps avoid scanning the actor list every frame while still finding late replication.
-		NextDemoDirectorResolveTimeSeconds = Now + 1.0;
-		for (TActorIterator<AGP_DemoRunDirector> It(World); It; ++It)
-		{
-			if (IsValid(*It))
-			{
-				CachedDemoRunDirector = *It;
-				break;
-			}
-		}
-	}
-
-	const AGP_DemoRunDirector* RunDirector = CachedDemoRunDirector.Get();
-	if (!IsValid(RunDirector)
-		|| RunDirector->GetObjectiveRegionId() == INDEX_NONE
-		|| RunDirector->GetCurrentStage() == EGPDemoRunStage::BossFight
-		|| RunDirector->GetCurrentStage() == EGPDemoRunStage::Completed)
-	{
-		HideObjectiveMarker();
-		return;
-	}
-
-	const APawn* OwningPawn = GetOwningPlayerPawn();
-	FVector2D PlayerMapUV;
-	FVector2D ObjectiveMapUV;
-	if (!IsValid(OwningPawn)
-		|| !BoundMinimapSubsystem->WorldToMapUV(OwningPawn->GetActorLocation(), PlayerMapUV)
-		|| !BoundMinimapSubsystem->WorldToMapUV(RunDirector->GetObjectiveLocation(), ObjectiveMapUV))
-	{
-		HideObjectiveMarker();
-		return;
-	}
-
-	FVector2D MarkerLayerSize = MinimapMarkerCanvas->GetCachedGeometry().GetLocalSize();
-	if (MarkerLayerSize.IsNearlyZero())
-	{
-		if (const UImage* BackgroundImage = ResolveMinimapBackgroundImage())
-		{
-			MarkerLayerSize = BackgroundImage->GetCachedGeometry().GetLocalSize();
-		}
-	}
-	if (MarkerLayerSize.IsNearlyZero())
-	{
-		HideObjectiveMarker();
-		return;
-	}
-
-	if (!IsValid(DemoObjectiveMarker))
-	{
-		DemoObjectiveMarker = Cast<UImage>(GetWidgetFromName(TEXT("RuntimeDemoObjectiveMinimapMarker")));
-	}
-	if (!IsValid(DemoObjectiveMarker))
-	{
-		if (!WidgetTree)
-		{
-			return;
-		}
-		DemoObjectiveMarker = WidgetTree->ConstructWidget<UImage>(
-			UImage::StaticClass(),
-			TEXT("RuntimeDemoObjectiveMinimapMarker"));
-		UCanvasPanelSlot* MarkerSlot = IsValid(DemoObjectiveMarker)
-			? MinimapMarkerCanvas->AddChildToCanvas(DemoObjectiveMarker)
-			: nullptr;
-		if (!MarkerSlot)
-		{
-			DemoObjectiveMarker = nullptr;
-			return;
-		}
-
-		// A gold point reads as the route objective while red points remain combat threats.
-		DemoObjectiveMarker->SetBrushFromTexture(MinimapObjectiveMarkerTexture, true);
-		DemoObjectiveMarker->SetVisibility(ESlateVisibility::HitTestInvisible);
-		MarkerSlot->SetAutoSize(false);
-		MarkerSlot->SetAlignment(FVector2D(0.5f, 0.5f));
-		MarkerSlot->SetZOrder(10);
-	}
-
-	// A clamped edge point remains a direction cue even when the next beat is several regions away.
-	const FVector2D PixelOffset = CalculateClampedMarkerOffsetPixels(
-		ObjectiveMapUV - PlayerMapUV,
-		MinimapZoom,
-		MarkerLayerSize,
-		MinimapMarkerVisibleRadius,
-		MinimapObjectiveMarkerSize);
-
-	DemoObjectiveMarker->SetVisibility(ESlateVisibility::HitTestInvisible);
-	if (UCanvasPanelSlot* MarkerSlot = Cast<UCanvasPanelSlot>(DemoObjectiveMarker->Slot))
-	{
-		MarkerSlot->SetPosition((MarkerLayerSize * 0.5f) + PixelOffset);
-		MarkerSlot->SetSize(FVector2D(MinimapObjectiveMarkerSize));
 	}
 }
 

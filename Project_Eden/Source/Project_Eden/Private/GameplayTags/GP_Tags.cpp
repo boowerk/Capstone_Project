@@ -159,16 +159,6 @@ namespace GPTags
         }
     }
 
-	// Corruption scaling data is supplied by the enemy-side infinite GameplayEffect.
-	namespace Corruption
-	{
-		namespace Data
-		{
-			UE_DEFINE_GAMEPLAY_TAG_COMMENT(DamageIncreaseRate, "GPTags.Corruption.Data.DamageIncreaseRate", "오염도 기반 적 피해 증가율");
-			UE_DEFINE_GAMEPLAY_TAG_COMMENT(ArmorBonus, "GPTags.Corruption.Data.ArmorBonus", "오염도 기반 적 방어력 보너스");
-		}
-	}
-
     // [3] State : 캐릭터 상태, 버프, 디버프
     namespace State
     {
