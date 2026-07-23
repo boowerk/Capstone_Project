@@ -13,7 +13,23 @@ class AGP_EnemySpawnMarker;
 class AGP_RegionEventActor;
 class AGP_RegionEventDirector;
 class AGP_VillageLayoutDirector;
+class APlayerState;
 enum class EGPRegionEventTrigger : uint8;
+enum class EGPZoneStage : uint8;
+
+struct FGPZoneRuntimeState
+{
+	TWeakObjectPtr<AGP_EnemySpawnVolume> Zone;
+	TSet<TWeakObjectPtr<APlayerState>> Participants;
+	TSet<TWeakObjectPtr<APlayerState>> PresentPlayers;
+	int32 MarkersTotal = 0;
+	int32 MarkersTriggered = 0;
+	int32 AliveEnemies = 0;
+	FVector LastEnemyDeathLocation = FVector::ZeroVector;
+	bool bHasLastEnemyDeathLocation = false;
+	bool bStarted = false;
+	bool bCompleted = false;
+};
 
 /**
  * Server-authoritative progression manager for the linear "city -> boss room -> next city" loop.
@@ -44,6 +60,7 @@ protected:
 	virtual void InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage) override;
 	virtual void InitGameState() override;
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "Run|Zone")
 	void OnZoneStarted(int32 ZoneIndex, AGP_EnemySpawnVolume* Zone);
@@ -70,7 +87,7 @@ protected:
 	// Region revival config. In the current RegionStateManager/PCG setup,
 	// state 0 is the healthy/alive vegetation state.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Region", meta = (ClampMin = "0"))
-	int32 RegionCount = 9;
+	int32 RegionCount = 15;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Region")
 	uint8 DeadRegionState = 3;
@@ -124,6 +141,28 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Village Layout")
 	bool bAutoSpawnVillageLayoutDirector = true;
 
+	// Active gameplay zones act as navigation invokers, keeping runtime NavMesh generation
+	// around unlocked villages instead of around every player or across the entire landscape.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Navigation")
+	bool bUseZoneNavigationInvokers = true;
+
+	// 180 m covers the corners of the current 230 m medium-village footprint.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Navigation",
+		meta = (EditCondition = "bUseZoneNavigationInvokers", ClampMin = "1000.0", Units = "cm"))
+	float ZoneNavigationGenerationRadius = 18000.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Navigation",
+		meta = (EditCondition = "bUseZoneNavigationInvokers", ClampMin = "1000.0", Units = "cm"))
+	float ZoneNavigationRemovalRadius = 22000.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Navigation",
+		meta = (EditCondition = "bUseZoneNavigationInvokers", ClampMin = "0.05", Units = "s"))
+	float ZoneNavigationRetryInterval = 0.25f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Navigation",
+		meta = (EditCondition = "bUseZoneNavigationInvokers", ClampMin = "1.0", Units = "s"))
+	float ZoneNavigationReadyTimeout = 10.0f;
+
 private:
 	int32 RunSeed = INDEX_NONE;
 
@@ -135,6 +174,14 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<AGP_VillageLayoutDirector> VillageLayoutDirector;
+
+	TMap<TWeakObjectPtr<AGP_EnemySpawnVolume>, FGPZoneRuntimeState> ZoneRuntimeStates;
+	TMap<TWeakObjectPtr<AGP_EnemyCharacter>, TWeakObjectPtr<AGP_EnemySpawnVolume>> EnemyOwningZones;
+	TMap<TWeakObjectPtr<AGP_EnemySpawnVolume>, int32> ZoneNavigationStartRetries;
+	TSet<EGPZoneStage> UnlockedStages;
+	TSet<TWeakObjectPtr<AGP_EnemySpawnVolume>> RegisteredNavigationInvokerZones;
+	bool bUseStagedZoneProgression = false;
+	bool bZoneProgressionInitialized = false;
 
 	int32 CurrentZoneIndex = INDEX_NONE;
 	int32 PendingZoneIndex = INDEX_NONE;
@@ -152,25 +199,61 @@ private:
 	FTimerHandle ReturnToLobbyTimerHandle;
 
 	void GatherZones();
+	void InitializeZoneProgression();
+	void BindZoneDelegates(AGP_EnemySpawnVolume* Zone);
 	void ResolveVillageLayoutDirector();
 	void ResolveRegionEventDirector();
 	void InitializeRegionStates();
 	void SpawnCorruptionPresentation();
+	void RegisterZoneNavigationInvoker(AGP_EnemySpawnVolume* Zone);
+	void UnregisterZoneNavigationInvoker(AGP_EnemySpawnVolume* Zone);
+	void UnregisterAllZoneNavigationInvokers();
 	void UnlockZone(int32 ZoneIndex);
 	void StartZone(int32 ZoneIndex);
 	void StartRegionEventForZone(AGP_EnemySpawnVolume* Zone, EGPRegionEventTrigger Trigger);
 	void SpawnZoneEnemies(AGP_EnemySpawnVolume* Zone);
 	void SpawnMarkerEnemies(AGP_EnemySpawnVolume* Zone, AGP_EnemySpawnMarker* Marker);
-	void RegisterZoneEnemy(AGP_EnemyCharacter* Enemy, int32 CorruptionRegionId = INDEX_NONE);
+	void RegisterZoneEnemy(
+		AGP_EnemyCharacter* Enemy,
+		AGP_EnemySpawnVolume* OwningZone,
+		int32 CorruptionRegionId = INDEX_NONE);
 	void MaybeCompleteZone();
 	void CompleteCurrentZone();
 	void AdvanceZone();
 	void SpawnPortalToZone(int32 FromZoneIndex, int32 ToZoneIndex);
 	void FinishRun(bool bVictory);
 	void ReturnToLobby();
+	void UnlockStage(EGPZoneStage Stage);
+	void StartStagedZone(AGP_EnemySpawnVolume* Zone);
+	void MaybeCompleteStagedZone(AGP_EnemySpawnVolume* Zone);
+	void CompleteStagedZone(AGP_EnemySpawnVolume* Zone);
+	void EvaluateStagedProgression();
+	bool AreAllZonesInStageCompleted(EGPZoneStage Stage) const;
+	bool HaveAllActivePlayersMiddleCredit() const;
+	bool AreAllActivePlayersPresent(const FGPZoneRuntimeState& State) const;
+	int32 GetTotalAliveZoneEnemies() const;
+	AGP_EnemySpawnVolume* FindActiveZoneForRegion(int32 RegionId) const;
+	AGP_EnemySpawnVolume* FindNearestZoneInStage(
+		const AGP_EnemySpawnVolume* FromZone,
+		EGPZoneStage Stage) const;
+	void SpawnPortalBetweenZones(
+		AGP_EnemySpawnVolume* FromZone,
+		AGP_EnemySpawnVolume* ToZone,
+		const FVector& PreferredSpawnLocation,
+		int32 RetryCount = 0);
+	void AssignPlayersToOuterVillageStarts();
 
 	UFUNCTION()
 	void HandlePlayerEnteredZone(AGP_EnemySpawnVolume* Zone);
+
+	UFUNCTION()
+	void HandlePlayerEnteredZoneDetailed(AGP_EnemySpawnVolume* Zone, APlayerState* PlayerState);
+
+	UFUNCTION()
+	void HandlePlayerExitedZoneDetailed(AGP_EnemySpawnVolume* Zone, APlayerState* PlayerState);
+
+	UFUNCTION()
+	void HandleVillageRuntimeLayoutReady();
 
 	UFUNCTION()
 	void HandleMarkerTriggered(AGP_EnemySpawnVolume* Zone, AGP_EnemySpawnMarker* Marker);

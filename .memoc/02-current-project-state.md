@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-23T14:09:49+09:00
+updated: 2026-07-23T20:25:00+09:00
 status: active
 tags:
   - memoc
@@ -11,13 +11,18 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-07-23T14:09:49+09:00
+Last synced: 2026-07-24T00:25:00+09:00
 
 ## Current Status
 
+- Stage-based village Zone progression is implemented but uncommitted. The Director configures streamed `AGP_EnemySpawnVolume` actors from each selected slot's `GroupId`, waits for sequential PCG completion, then signals GameMode. Outer zones can run concurrently; clearing a Middle zone grants every recorded participant replicated credit in GameState; Center/Colosseum wait for all active players to be simultaneously present. Players are deterministically teleported to PlayerStarts contained in selected Outer levels. Active/unlocked Zones now register as Navigation Invokers (180m generation, 220m removal), completed Zones unregister, Recast defaults to Dynamic, and spawn/portal logic waits up to 10s for asynchronous NavMesh readiness. Legacy linear zones remain the default. Editor build plus `ProjectEden.Game.ZoneProgression.Contracts` and `ProjectEden.Game.WorldLayout.VillageSelection` pass. User set Outer Required/Pick=3 and Middle Required/Pick=4. Pending authoring: one Zone and PlayerStart per village preset, unique slot RegionIds, and Center/Colosseum zones.
+- Village presets now use `/Game/WorldLayout/DA_VillagePresetCatalog`. `UGP_VillagePresetCatalog` owns content-authored additions, while the Director keeps Village_00 as the legacy primary and appends unique legacy inline entries for backward compatibility; catalog duplicates are authoritative. `FGP_VillagePresetDefinition::PresetSizeClass` now requires exact equality with the slot class, while the existing Footprint fit remains a safety check. Village_01/02 are Small; Village_00/03 are Medium. Village_03 uses `/Game/WorldLayout/L_Village_03`, offset `(0,0,-1500)`, half extent `(11500,11500,3000)`, and weight `1.0`. The Editor build and strengthened `ProjectEden.Game.WorldLayout.VillageSelection` test pass; PIE generation remains unchecked.
+- Village slot capacity support is implemented but uncommitted. `SlotSizeClass` exposes Small (130m) and Medium (230m); existing slots default to Medium. Preset assignment filters by each preset's actual offset+extent, so Medium accepts Village_00/01 while Small accepts only compact Village_01. Overlap selection still uses assigned actual Footprints. Slots show a separate orange capacity visualization and inner assigned Footprint; the runtime root remains non-editor-only. Full Editor build and `ProjectEden.Game.WorldLayout.VillageSelection` pass. A Development Game build is blocked before project compile by the unrelated installed `PCGExtendedToolkit` missing `PCGExCore.precompiled`. Pending authoring choice: which `Village_A..E` slots should be Small.
+- Village_01 Footprint centering is committed as `e4acdb19`; follow-up `35682b31` removes the accidental local `Y +2000cm` double correction from its five authored layout actors while keeping their relative layout and `PCGWorldActor0` at origin. `BP_CityAnchor` is now at level XY `(0,0)`. Native defaults and the placed `L_LandscapeMap` Director retain Footprint offset `(0,0,-1500)` and the 130m square extent. Rebuild Preview seed 186 in Top Orthographic shows exact XY center alignment.
+- Landscape Region GameMap2 now has an uncommitted world-space macro BaseColor variation pass. `M_StateMask` samples `T_RegionGround_MacroNoise_1024` once in world XY, varies only ground BaseColor before the slope/cliff overlay, and keeps the master switch default false. `MI_RegionLandscape_GameMap2` alone enables it at 180m scale and 0.16 strength; the noise texture is linear (`sRGB=false`). `ApplyRegionMacroVariation.py` is an idempotent editor automation script. UE commandlet verification passed with the material still Opaque and V2.2 still enabled; in-editor visual inspection remains pending because Computer Use was accidentally cancelled during startup shader compilation.
 - Village authoring now has a Director-owned transient editor preview. `Rebuild Preview` runs the deterministic selection with `PreviewSeed`, loads one non-saveable Level Instance per selected slot at the exact runtime transform, applies the same instance-unique Road/District tags and graph overrides, and optionally schedules PCG sequentially in Preview mode. `Clear Village Preview`, footprint refresh, and Director destruction unload/clean the preview. `bUsePreviewSeedInPIE` defaults on, so PIE village selection matches Rebuild Preview even when GameState generated another RunSeed; packaged games still use their real RunSeed. Runtime remains Generate On Demand. The slot Footprint is also a flat visualization-only XY box at local Z=0. Full `Project_EdenEditor` build and `ProjectEden.Game.WorldLayout.VillageSelection` pass. `L_LandscapeMap` now has five unique SlotIds `Village_A..E`; PreviewSeed 186 selects `Village_A=Village_01` and `Village_E=Village_00`, loads two transient Level Instances, and schedules two isolated PCG components.
 - Village footprint-aware selection is committed as `f32ef1a2`. Slots display yaw-aware XY OBB footprints, red means overlap, and deterministic feasibility selection excludes conflicting combinations while preserving required-group lookahead. The `/Game/WorldLayout/L_Village_00` primary now uses half extent `(11500,11500,3000)` cm (230x230m full XY) and offset `(0,0,-1500)` cm.
-- Mixed village presets are committed. The legacy level/footprint remains the canonical primary, while `/Game/WorldLayout/L_Village_01` now uses offset `(0,-2000,-1500)` cm and half extent `(6500,6500,3000)` cm (130x130m full XY). Source defaults, automation expectations, and the saved `L_LandscapeMap` Director overrides match these sizes. Full Editor build and `ProjectEden.Game.WorldLayout.VillageSelection` pass. Multiplayer client streaming and explicit cook registration remain follow-up work.
+- Mixed village presets are committed. The legacy level/footprint remains the canonical primary, while `/Game/WorldLayout/L_Village_01` now uses centered offset `(0,0,-1500)` cm and half extent `(6500,6500,3000)` cm (130x130m full XY). Source defaults, automation expectations, and the saved `L_LandscapeMap` Director overrides match these sizes. Full Editor build and `ProjectEden.Game.WorldLayout.VillageSelection` pass. Multiplayer client streaming and explicit cook registration remain follow-up work.
 - Landscape Region V2.2 is active only on `MI_RegionLandscape_GameMap2`. The approved final preset is Candidate J: deterministic per-pair PCHIP boundary displacement with non-uniform 36-260m spacing, 4-26m random amplitudes, 50% sign persistence, 16m cap, and fixed junction/perimeter cores. Its blend half-width now varies independently and smoothly per region-pair from 18-32px around a 24px base, with 80-240m anchors; each region influence samples its own nearest boundary-side pixel. Hard `RegionID`, StateRT, PCG, topology, packed visual IDs, and the runtime shader remain unchanged. Authoritative source is `Project_Eden/ArtSource/RegionVisualSlotsV22`; the external V2.2 mirror is byte-identical.
 - Final generation passes 61/61 twice deterministically. Observed blend half-width is 18.105-31.112px (mean 23.935px) with 81.045-237.979m actual anchor gaps; unassigned boundary pixels, same-slot support/guard overlap, active-ID mismatch, and ID-transition violations are zero, with at most four active regions. Weight PNG is `8209CBD4...11917`; IDs01/IDs23 remain `5FAD10BB...E0B7` / `7A0E2CBF...0913`. Computer Use reimported and saved Weight as regular non-VT BGRA8, Bilinear, NoMipmaps/one mip, Clamp X/Y, sRGB off, VectorDisplacementmap (717,075 bytes, `F91AB7E1...53CC6`). `MI_RegionLandscape_GameMap2` remains `841EE208...D740`; the user-owned map remains `E8CE0B5D...B728C` and was not saved. Transient random-state refresh visibly applied the new boundary weights; no related material/texture error followed the save.
 
@@ -286,6 +291,19 @@ Last synced: 2026-05-23T00:00:00
 ## Change Log
 
 See `.memoc/worklog/` and generated `.memoc/activity.md`.
+
+### 2026-07-23 Village slot capacities
+
+- `817189ac` separates slot capacity from preset footprint: Small is 130m,
+  Medium is 230m, preset assignment is fit-filtered, and overlap remains based
+  on the selected preset's real footprint.
+- `L_LandscapeMap` has seven slots. `GP_VillageSlot5` and
+  `GP_VillageSlot7` are Medium; the other five are Small.
+- Editor build and village-selection automation pass. Headless map save
+  verified `total=7 small=5 medium=2`.
+- Ten fixed seeds passed actual-map compatibility, conflict, and determinism
+  checks. Standalone seeds 0, 1, and 186 each completed city PCG for all 7
+  slots with nonzero managed ISM instances and no village-runtime failures.
 
 ### 2026-07-21 Village multi-instance PCG isolation
 

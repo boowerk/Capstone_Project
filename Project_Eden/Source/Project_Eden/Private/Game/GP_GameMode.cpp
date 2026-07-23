@@ -11,7 +11,11 @@
 #include "Game/RegionEvents/GP_RegionEventActor.h"
 #include "Game/RegionEvents/GP_RegionEventDirector.h"
 #include "Game/WorldLayout/GP_VillageLayoutDirector.h"
+#include "GameFramework/PlayerController.h"
+#include "GameFramework/PlayerStart.h"
+#include "GameFramework/PlayerState.h"
 #include "Kismet/GameplayStatics.h"
+#include "NavigationSystem.h"
 
 AGP_GameMode::AGP_GameMode()
 {
@@ -53,7 +57,6 @@ void AGP_GameMode::BeginPlay()
 	Super::BeginPlay();
 
 	ResolveVillageLayoutDirector();
-	GatherZones();
 	ResolveRegionEventDirector();
 	SpawnCorruptionPresentation();
 
@@ -64,14 +67,26 @@ void AGP_GameMode::BeginPlay()
 		World->GetTimerManager().SetTimerForNextTick(FTimerDelegate::CreateUObject(this, &AGP_GameMode::InitializeRegionStates));
 	}
 
-	// Subscribe to all volumes; unlock zone 0 so it fires when the first player steps in.
-	for (AGP_EnemySpawnVolume* Zone : OrderedZones)
+	if (VillageLayoutDirector)
 	{
-		Zone->OnPlayerEnteredZone.AddDynamic(this, &AGP_GameMode::HandlePlayerEnteredZone);
-		Zone->OnMarkerTriggered.AddDynamic(this, &AGP_GameMode::HandleMarkerTriggered);
+		VillageLayoutDirector->OnRuntimeLayoutReady.AddUniqueDynamic(
+			this,
+			&AGP_GameMode::HandleVillageRuntimeLayoutReady);
+		if (VillageLayoutDirector->IsRuntimeLayoutReady())
+		{
+			HandleVillageRuntimeLayoutReady();
+		}
 	}
+	else
+	{
+		InitializeZoneProgression();
+	}
+}
 
-	UnlockZone(0);
+void AGP_GameMode::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	UnregisterAllZoneNavigationInvokers();
+	Super::EndPlay(EndPlayReason);
 }
 
 void AGP_GameMode::ResolveVillageLayoutDirector()
@@ -155,8 +170,81 @@ void AGP_GameMode::GatherZones()
 
 	OrderedZones.Sort([](const AGP_EnemySpawnVolume& A, const AGP_EnemySpawnVolume& B)
 	{
-		return A.GetZoneOrder() < B.GetZoneOrder();
+		if (A.GetZoneOrder() != B.GetZoneOrder())
+		{
+			return A.GetZoneOrder() < B.GetZoneOrder();
+		}
+		return A.GetZoneId().LexicalLess(B.GetZoneId());
 	});
+}
+
+void AGP_GameMode::InitializeZoneProgression()
+{
+	if (bZoneProgressionInitialized)
+	{
+		return;
+	}
+
+	GatherZones();
+	bZoneProgressionInitialized = true;
+	bUseStagedZoneProgression = OrderedZones.ContainsByPredicate(
+		[](const AGP_EnemySpawnVolume* Zone)
+		{
+			return IsValid(Zone) && Zone->GetZoneStage() != EGPZoneStage::Legacy;
+		});
+
+	ZoneRuntimeStates.Reset();
+	for (AGP_EnemySpawnVolume* Zone : OrderedZones)
+	{
+		if (!IsValid(Zone))
+		{
+			continue;
+		}
+
+		BindZoneDelegates(Zone);
+		FGPZoneRuntimeState& State = ZoneRuntimeStates.FindOrAdd(Zone);
+		State.Zone = Zone;
+	}
+
+	if (OrderedZones.IsEmpty())
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[GP_GameMode] No AGP_EnemySpawnVolume zones found after village layout became ready."));
+		return;
+	}
+
+	if (bUseStagedZoneProgression)
+	{
+		UnlockStage(EGPZoneStage::Outer);
+		UE_LOG(LogTemp, Log,
+			TEXT("[GP_GameMode] Initialized staged zone progression with %d zones."),
+			OrderedZones.Num());
+		if (UWorld* World = GetWorld())
+		{
+			World->GetTimerManager().SetTimerForNextTick(
+				FTimerDelegate::CreateUObject(this, &AGP_GameMode::AssignPlayersToOuterVillageStarts));
+		}
+		return;
+	}
+
+	UnlockZone(0);
+}
+
+void AGP_GameMode::BindZoneDelegates(AGP_EnemySpawnVolume* Zone)
+{
+	if (!IsValid(Zone))
+	{
+		return;
+	}
+
+	Zone->OnPlayerEnteredZone.AddUniqueDynamic(this, &AGP_GameMode::HandlePlayerEnteredZone);
+	Zone->OnPlayerEnteredZoneDetailed.AddUniqueDynamic(
+		this,
+		&AGP_GameMode::HandlePlayerEnteredZoneDetailed);
+	Zone->OnPlayerExitedZoneDetailed.AddUniqueDynamic(
+		this,
+		&AGP_GameMode::HandlePlayerExitedZoneDetailed);
+	Zone->OnMarkerTriggered.AddUniqueDynamic(this, &AGP_GameMode::HandleMarkerTriggered);
 }
 
 void AGP_GameMode::ResolveRegionEventDirector()
@@ -203,6 +291,7 @@ void AGP_GameMode::UnlockZone(int32 ZoneIndex)
 	}
 
 	PendingZoneIndex = ZoneIndex;
+	RegisterZoneNavigationInvoker(OrderedZones[ZoneIndex]);
 	OrderedZones[ZoneIndex]->Unlock();
 
 	UE_LOG(LogTemp, Log, TEXT("[GP_GameMode] Zone %d unlocked — waiting for player to enter."), ZoneIndex);
@@ -215,6 +304,11 @@ void AGP_GameMode::HandlePlayerEnteredZone(AGP_EnemySpawnVolume* Zone)
 		return;
 	}
 
+	if (bUseStagedZoneProgression)
+	{
+		return;
+	}
+
 	const int32 ZoneIndex = OrderedZones.IndexOfByKey(Zone);
 	if (ZoneIndex != PendingZoneIndex)
 	{
@@ -222,6 +316,103 @@ void AGP_GameMode::HandlePlayerEnteredZone(AGP_EnemySpawnVolume* Zone)
 	}
 
 	StartZone(ZoneIndex);
+}
+
+void AGP_GameMode::HandlePlayerEnteredZoneDetailed(
+	AGP_EnemySpawnVolume* Zone,
+	APlayerState* PlayerState)
+{
+	if (bRunFinished || !bUseStagedZoneProgression || !IsValid(Zone) || !IsValid(PlayerState))
+	{
+		return;
+	}
+
+	FGPZoneRuntimeState* State = ZoneRuntimeStates.Find(Zone);
+	if (!State || State->bCompleted)
+	{
+		return;
+	}
+
+	State->Participants.Add(PlayerState);
+	State->PresentPlayers.Add(PlayerState);
+
+	if (!State->bStarted)
+	{
+		const bool bRequiresFullParty =
+			Zone->GetZoneStage() == EGPZoneStage::Center
+			|| Zone->GetZoneStage() == EGPZoneStage::Colosseum;
+		if (!bRequiresFullParty || AreAllActivePlayersPresent(*State))
+		{
+			StartStagedZone(Zone);
+		}
+	}
+}
+
+void AGP_GameMode::RegisterZoneNavigationInvoker(AGP_EnemySpawnVolume* Zone)
+{
+	if (!bUseZoneNavigationInvokers || !IsValid(Zone)
+		|| RegisteredNavigationInvokerZones.Contains(Zone))
+	{
+		return;
+	}
+
+	const float GenerationRadius = FMath::Max(1000.0f, ZoneNavigationGenerationRadius);
+	const float RemovalRadius = FMath::Max(GenerationRadius, ZoneNavigationRemovalRadius);
+	UNavigationSystemV1::RegisterNavigationInvoker(*Zone, GenerationRadius, RemovalRadius);
+	RegisteredNavigationInvokerZones.Add(Zone);
+
+	UE_LOG(LogTemp, Log,
+		TEXT("[GP_GameMode] Registered zone '%s' as navigation invoker (generation=%.0f cm, removal=%.0f cm)."),
+		*Zone->GetZoneId().ToString(),
+		GenerationRadius,
+		RemovalRadius);
+}
+
+void AGP_GameMode::UnregisterZoneNavigationInvoker(AGP_EnemySpawnVolume* Zone)
+{
+	ZoneNavigationStartRetries.Remove(Zone);
+	if (!IsValid(Zone) || !RegisteredNavigationInvokerZones.Remove(Zone))
+	{
+		return;
+	}
+
+	UNavigationSystemV1::UnregisterNavigationInvoker(*Zone);
+	UE_LOG(LogTemp, Log,
+		TEXT("[GP_GameMode] Unregistered completed zone '%s' navigation invoker."),
+		*Zone->GetZoneId().ToString());
+}
+
+void AGP_GameMode::UnregisterAllZoneNavigationInvokers()
+{
+	for (const TWeakObjectPtr<AGP_EnemySpawnVolume>& Zone : RegisteredNavigationInvokerZones)
+	{
+		if (Zone.IsValid())
+		{
+			UNavigationSystemV1::UnregisterNavigationInvoker(*Zone.Get());
+		}
+	}
+	RegisteredNavigationInvokerZones.Reset();
+	ZoneNavigationStartRetries.Reset();
+}
+
+void AGP_GameMode::HandlePlayerExitedZoneDetailed(
+	AGP_EnemySpawnVolume* Zone,
+	APlayerState* PlayerState)
+{
+	if (!bUseStagedZoneProgression || !IsValid(Zone) || !IsValid(PlayerState))
+	{
+		return;
+	}
+
+	if (FGPZoneRuntimeState* State = ZoneRuntimeStates.Find(Zone))
+	{
+		State->PresentPlayers.Remove(PlayerState);
+	}
+}
+
+void AGP_GameMode::HandleVillageRuntimeLayoutReady()
+{
+	InitializeZoneProgression();
 }
 
 void AGP_GameMode::StartRun()
@@ -236,6 +427,12 @@ void AGP_GameMode::StartRun()
 	{
 		UE_LOG(LogTemp, Warning, TEXT("[GP_GameMode] No AGP_EnemySpawnVolume zones found in the level; nothing to run."));
 		FinishRun(/*bVictory=*/true);
+		return;
+	}
+
+	if (bUseStagedZoneProgression)
+	{
+		UnlockStage(EGPZoneStage::Outer);
 		return;
 	}
 
@@ -294,7 +491,26 @@ void AGP_GameMode::StartZone(int32 ZoneIndex)
 
 void AGP_GameMode::HandleMarkerTriggered(AGP_EnemySpawnVolume* Zone, AGP_EnemySpawnMarker* Marker)
 {
-	if (bRunFinished || !IsValid(Zone) || !Marker || OrderedZones.IndexOfByKey(Zone) != CurrentZoneIndex)
+	if (bRunFinished || !IsValid(Zone) || !Marker)
+	{
+		return;
+	}
+
+	if (bUseStagedZoneProgression)
+	{
+		FGPZoneRuntimeState* State = ZoneRuntimeStates.Find(Zone);
+		if (!State || !State->bStarted || State->bCompleted)
+		{
+			return;
+		}
+
+		++State->MarkersTriggered;
+		SpawnMarkerEnemies(Zone, Marker);
+		MaybeCompleteStagedZone(Zone);
+		return;
+	}
+
+	if (OrderedZones.IndexOfByKey(Zone) != CurrentZoneIndex)
 	{
 		return;
 	}
@@ -343,7 +559,7 @@ void AGP_GameMode::SpawnMarkerEnemies(AGP_EnemySpawnVolume* Zone, AGP_EnemySpawn
 			}
 
 			SpawnedEnemy->SpawnDefaultController();
-			RegisterZoneEnemy(SpawnedEnemy, Zone->GetCorruptionRegionId());
+			RegisterZoneEnemy(SpawnedEnemy, Zone, Zone->GetCorruptionRegionId());
 		}
 	}
 }
@@ -420,12 +636,15 @@ void AGP_GameMode::SpawnZoneEnemies(AGP_EnemySpawnVolume* Zone)
 			}
 
 			SpawnedEnemy->SpawnDefaultController();
-			RegisterZoneEnemy(SpawnedEnemy, Zone->GetCorruptionRegionId());
+			RegisterZoneEnemy(SpawnedEnemy, Zone, Zone->GetCorruptionRegionId());
 		}
 	}
 }
 
-void AGP_GameMode::RegisterZoneEnemy(AGP_EnemyCharacter* Enemy, int32 CorruptionRegionId)
+void AGP_GameMode::RegisterZoneEnemy(
+	AGP_EnemyCharacter* Enemy,
+	AGP_EnemySpawnVolume* OwningZone,
+	int32 CorruptionRegionId)
 {
 	if (bRunFinished || !IsValid(Enemy))
 	{
@@ -441,16 +660,51 @@ void AGP_GameMode::RegisterZoneEnemy(AGP_EnemyCharacter* Enemy, int32 Corruption
 	Enemy->SetCorruptionRegionId(CorruptionRegionId != INDEX_NONE ? CorruptionRegionId : CurrentZoneIndex);
 
 	Enemy->OnEnemyDied.AddDynamic(this, &AGP_GameMode::HandleZoneEnemyDied);
-	++AliveZoneEnemies;
+	if (bUseStagedZoneProgression && IsValid(OwningZone))
+	{
+		FGPZoneRuntimeState& State = ZoneRuntimeStates.FindOrAdd(OwningZone);
+		State.Zone = OwningZone;
+		++State.AliveEnemies;
+		EnemyOwningZones.Add(Enemy, OwningZone);
+	}
+	else
+	{
+		++AliveZoneEnemies;
+	}
 
 	if (AGP_GameState* GPGameState = GetGPGameState())
 	{
-		GPGameState->SetEnemiesRemaining(AliveZoneEnemies);
+		GPGameState->SetEnemiesRemaining(
+			bUseStagedZoneProgression ? GetTotalAliveZoneEnemies() : AliveZoneEnemies);
 	}
 }
 
 void AGP_GameMode::HandleZoneEnemyDied(AGP_EnemyCharacter* DeadEnemy)
 {
+	if (bUseStagedZoneProgression)
+	{
+		TWeakObjectPtr<AGP_EnemySpawnVolume> OwningZone;
+		if (EnemyOwningZones.RemoveAndCopyValue(DeadEnemy, OwningZone))
+		{
+			if (FGPZoneRuntimeState* State = ZoneRuntimeStates.Find(OwningZone))
+			{
+				State->AliveEnemies = FMath::Max(0, State->AliveEnemies - 1);
+				if (IsValid(DeadEnemy))
+				{
+					State->LastEnemyDeathLocation = DeadEnemy->GetActorLocation();
+					State->bHasLastEnemyDeathLocation = true;
+				}
+			}
+
+			if (AGP_GameState* GPGameState = GetGPGameState())
+			{
+				GPGameState->SetEnemiesRemaining(GetTotalAliveZoneEnemies());
+			}
+			MaybeCompleteStagedZone(OwningZone.Get());
+		}
+		return;
+	}
+
 	AliveZoneEnemies = FMath::Max(0, AliveZoneEnemies - 1);
 
 	// Remember where this enemy fell so the advance portal can spawn on the kill spot.
@@ -471,7 +725,11 @@ void AGP_GameMode::HandleZoneEnemyDied(AGP_EnemyCharacter* DeadEnemy)
 void AGP_GameMode::HandleRegionEventEnemySpawned(AGP_RegionEventActor* EventActor, AGP_EnemyCharacter* Enemy)
 {
 	// Event-spawned enemies join the current zone budget so events cannot be ignored during a city clear.
-	RegisterZoneEnemy(Enemy, IsValid(EventActor) ? EventActor->GetRegionId() : INDEX_NONE);
+	const int32 RegionId = IsValid(EventActor) ? EventActor->GetRegionId() : INDEX_NONE;
+	RegisterZoneEnemy(
+		Enemy,
+		bUseStagedZoneProgression ? FindActiveZoneForRegion(RegionId) : nullptr,
+		RegionId);
 }
 
 void AGP_GameMode::CompleteCurrentZone()
@@ -502,6 +760,7 @@ void AGP_GameMode::CompleteCurrentZone()
 
 	OnZoneCompleted(CurrentZoneIndex, ClearedZone);
 	StartRegionEventForZone(ClearedZone, EGPRegionEventTrigger::ZoneCompleted);
+	UnregisterZoneNavigationInvoker(ClearedZone);
 	AdvanceZone();
 }
 
@@ -563,6 +822,547 @@ void AGP_GameMode::SpawnPortalToZone(int32 FromZoneIndex, int32 ToZoneIndex)
 	}
 }
 
+void AGP_GameMode::UnlockStage(EGPZoneStage Stage)
+{
+	if (UnlockedStages.Contains(Stage))
+	{
+		return;
+	}
+
+	int32 UnlockedCount = 0;
+	for (AGP_EnemySpawnVolume* Zone : OrderedZones)
+	{
+		if (IsValid(Zone) && Zone->GetZoneStage() == Stage)
+		{
+			RegisterZoneNavigationInvoker(Zone);
+			Zone->Unlock();
+			++UnlockedCount;
+		}
+	}
+
+	if (UnlockedCount > 0)
+	{
+		UnlockedStages.Add(Stage);
+		UE_LOG(LogTemp, Log,
+			TEXT("[GP_GameMode] Stage %d unlocked with %d zone(s)."),
+			static_cast<int32>(Stage),
+			UnlockedCount);
+	}
+}
+
+void AGP_GameMode::StartStagedZone(AGP_EnemySpawnVolume* Zone)
+{
+	FGPZoneRuntimeState* State = ZoneRuntimeStates.Find(Zone);
+	if (bRunFinished || !State || State->bStarted || State->bCompleted || !IsValid(Zone))
+	{
+		return;
+	}
+
+	const bool bRequiresFullParty =
+		Zone->GetZoneStage() == EGPZoneStage::Center
+		|| Zone->GetZoneStage() == EGPZoneStage::Colosseum;
+	if (bRequiresFullParty && !AreAllActivePlayersPresent(*State))
+	{
+		return;
+	}
+
+	if (bUseZoneNavigationInvokers)
+	{
+		bool bNavigationReady = false;
+		Zone->GetSpawnPoint(/*bRandomizeInVolume=*/false, bNavigationReady);
+		if (!bNavigationReady)
+		{
+			const float RetryInterval = FMath::Max(0.05f, ZoneNavigationRetryInterval);
+			const int32 MaxRetries = FMath::Max(
+				1,
+				FMath::CeilToInt(ZoneNavigationReadyTimeout / RetryInterval));
+			int32& RetryCount = ZoneNavigationStartRetries.FindOrAdd(Zone);
+			if (RetryCount >= MaxRetries)
+			{
+				UE_LOG(LogTemp, Error,
+					TEXT("[GP_GameMode] Zone '%s' could not start: navigation was not ready after %.1f seconds. Check NavMeshBoundsVolume coverage and RecastNavMesh Runtime Generation=Dynamic."),
+					*Zone->GetZoneId().ToString(),
+					ZoneNavigationReadyTimeout);
+				return;
+			}
+
+			++RetryCount;
+			if (UWorld* World = GetWorld())
+			{
+				const TWeakObjectPtr<AGP_EnemySpawnVolume> WeakZone = Zone;
+				FTimerHandle RetryTimer;
+				World->GetTimerManager().SetTimer(
+					RetryTimer,
+					FTimerDelegate::CreateWeakLambda(this, [this, WeakZone]()
+					{
+						if (WeakZone.IsValid())
+						{
+							StartStagedZone(WeakZone.Get());
+						}
+					}),
+					RetryInterval,
+					false);
+			}
+			return;
+		}
+	}
+
+	ZoneNavigationStartRetries.Remove(Zone);
+	State->bStarted = true;
+	State->MarkersTotal = Zone->GetMarkerCount();
+	State->MarkersTriggered = 0;
+	State->AliveEnemies = 0;
+	State->bHasLastEnemyDeathLocation = false;
+	bRunStarted = true;
+
+	if (AGP_GameState* GPGameState = GetGPGameState())
+	{
+		GPGameState->SetCurrentZoneIndex(Zone->GetZoneOrder());
+		GPGameState->SetMatchPhase(
+			Zone->GetZoneStage() == EGPZoneStage::Colosseum || Zone->IsBossZone()
+				? EGPMatchPhase::BossFight
+				: EGPMatchPhase::InCity);
+	}
+
+	StartRegionEventForZone(Zone, EGPRegionEventTrigger::ZoneStarted);
+	const int32 ZoneIndex = OrderedZones.IndexOfByKey(Zone);
+	OnZoneStarted(ZoneIndex, Zone);
+
+	if (State->MarkersTotal > 0)
+	{
+		Zone->ActivateMarkers();
+		return;
+	}
+
+	SpawnZoneEnemies(Zone);
+	MaybeCompleteStagedZone(Zone);
+}
+
+void AGP_GameMode::MaybeCompleteStagedZone(AGP_EnemySpawnVolume* Zone)
+{
+	FGPZoneRuntimeState* State = ZoneRuntimeStates.Find(Zone);
+	if (!State || !State->bStarted || State->bCompleted)
+	{
+		return;
+	}
+
+	const bool bAllMarkersDone =
+		State->MarkersTotal == 0 || State->MarkersTriggered >= State->MarkersTotal;
+	if (bAllMarkersDone && State->AliveEnemies == 0)
+	{
+		CompleteStagedZone(Zone);
+	}
+}
+
+void AGP_GameMode::CompleteStagedZone(AGP_EnemySpawnVolume* Zone)
+{
+	FGPZoneRuntimeState* State = ZoneRuntimeStates.Find(Zone);
+	if (bRunFinished || !State || State->bCompleted || !IsValid(Zone))
+	{
+		return;
+	}
+
+	State->bCompleted = true;
+	if (RegionEventDirector)
+	{
+		RegionEventDirector->CompleteEventsForZone(Zone);
+	}
+
+	if (AGP_GameState* GPGameState = GetGPGameState())
+	{
+		for (int32 RegionId : Zone->GetRegionsToRevive())
+		{
+			GPGameState->SetRegionState(RegionId, AliveRegionState);
+		}
+	}
+
+	if (Zone->GetZoneStage() == EGPZoneStage::Middle)
+	{
+		AGP_GameState* GPGameState = GetGPGameState();
+		for (const TWeakObjectPtr<APlayerState>& Participant : State->Participants)
+		{
+			if (Participant.IsValid() && GPGameState)
+			{
+				GPGameState->GrantMiddleClearCredit(Participant.Get());
+			}
+		}
+		UE_LOG(LogTemp, Log,
+			TEXT("[GP_GameMode] Middle zone '%s' completed; qualified players=%d."),
+			*Zone->GetZoneId().ToString(),
+			GPGameState ? GPGameState->GetMiddleClearCreditCount() : 0);
+	}
+
+	OnZoneCompleted(OrderedZones.IndexOfByKey(Zone), Zone);
+	StartRegionEventForZone(Zone, EGPRegionEventTrigger::ZoneCompleted);
+	UnregisterZoneNavigationInvoker(Zone);
+	EvaluateStagedProgression();
+}
+
+void AGP_GameMode::EvaluateStagedProgression()
+{
+	if (AreAllZonesInStageCompleted(EGPZoneStage::Outer)
+		&& !UnlockedStages.Contains(EGPZoneStage::Middle))
+	{
+		UnlockStage(EGPZoneStage::Middle);
+		for (AGP_EnemySpawnVolume* OuterZone : OrderedZones)
+		{
+			if (!IsValid(OuterZone) || OuterZone->GetZoneStage() != EGPZoneStage::Outer)
+			{
+				continue;
+			}
+
+			if (AGP_EnemySpawnVolume* MiddleZone =
+				FindNearestZoneInStage(OuterZone, EGPZoneStage::Middle))
+			{
+				const FGPZoneRuntimeState* OuterState = ZoneRuntimeStates.Find(OuterZone);
+				const FVector SpawnLocation =
+					OuterState && OuterState->bHasLastEnemyDeathLocation
+						? OuterState->LastEnemyDeathLocation
+						: OuterZone->GetActorLocation();
+				SpawnPortalBetweenZones(OuterZone, MiddleZone, SpawnLocation);
+			}
+		}
+	}
+
+	if (UnlockedStages.Contains(EGPZoneStage::Middle)
+		&& HaveAllActivePlayersMiddleCredit()
+		&& !UnlockedStages.Contains(EGPZoneStage::Center))
+	{
+		UnlockStage(EGPZoneStage::Center);
+		for (AGP_EnemySpawnVolume* MiddleZone : OrderedZones)
+		{
+			const FGPZoneRuntimeState* State = ZoneRuntimeStates.Find(MiddleZone);
+			if (!IsValid(MiddleZone)
+				|| MiddleZone->GetZoneStage() != EGPZoneStage::Middle
+				|| !State
+				|| !State->bCompleted)
+			{
+				continue;
+			}
+
+			if (AGP_EnemySpawnVolume* CenterZone =
+				FindNearestZoneInStage(MiddleZone, EGPZoneStage::Center))
+			{
+				const FVector SpawnLocation = State->bHasLastEnemyDeathLocation
+					? State->LastEnemyDeathLocation
+					: MiddleZone->GetActorLocation();
+				SpawnPortalBetweenZones(MiddleZone, CenterZone, SpawnLocation);
+			}
+		}
+	}
+
+	if (AreAllZonesInStageCompleted(EGPZoneStage::Center)
+		&& !UnlockedStages.Contains(EGPZoneStage::Colosseum))
+	{
+		UnlockStage(EGPZoneStage::Colosseum);
+		for (AGP_EnemySpawnVolume* CenterZone : OrderedZones)
+		{
+			const FGPZoneRuntimeState* State = ZoneRuntimeStates.Find(CenterZone);
+			if (!IsValid(CenterZone)
+				|| CenterZone->GetZoneStage() != EGPZoneStage::Center
+				|| !State
+				|| !State->bCompleted)
+			{
+				continue;
+			}
+
+			if (AGP_EnemySpawnVolume* BossZone =
+				FindNearestZoneInStage(CenterZone, EGPZoneStage::Colosseum))
+			{
+				const FVector SpawnLocation = State->bHasLastEnemyDeathLocation
+					? State->LastEnemyDeathLocation
+					: CenterZone->GetActorLocation();
+				SpawnPortalBetweenZones(CenterZone, BossZone, SpawnLocation);
+			}
+		}
+	}
+
+	if (AreAllZonesInStageCompleted(EGPZoneStage::Colosseum))
+	{
+		FinishRun(/*bVictory=*/true);
+	}
+}
+
+bool AGP_GameMode::AreAllZonesInStageCompleted(EGPZoneStage Stage) const
+{
+	bool bFoundZone = false;
+	for (const AGP_EnemySpawnVolume* Zone : OrderedZones)
+	{
+		if (!IsValid(Zone) || Zone->GetZoneStage() != Stage)
+		{
+			continue;
+		}
+
+		bFoundZone = true;
+		const FGPZoneRuntimeState* State = ZoneRuntimeStates.Find(Zone);
+		if (!State || !State->bCompleted)
+		{
+			return false;
+		}
+	}
+	return bFoundZone;
+}
+
+bool AGP_GameMode::HaveAllActivePlayersMiddleCredit() const
+{
+	const AGP_GameState* GPGameState = GetGPGameState();
+	if (!GPGameState)
+	{
+		return false;
+	}
+
+	int32 ActivePlayerCount = 0;
+	for (APlayerState* PlayerState : GPGameState->PlayerArray)
+	{
+		if (!IsValid(PlayerState) || PlayerState->IsOnlyASpectator())
+		{
+			continue;
+		}
+
+		++ActivePlayerCount;
+		if (!GPGameState->HasMiddleClearCredit(PlayerState))
+		{
+			return false;
+		}
+	}
+	return ActivePlayerCount > 0;
+}
+
+bool AGP_GameMode::AreAllActivePlayersPresent(const FGPZoneRuntimeState& State) const
+{
+	const AGP_GameState* GPGameState = GetGPGameState();
+	if (!GPGameState)
+	{
+		return false;
+	}
+
+	int32 ActivePlayerCount = 0;
+	for (APlayerState* PlayerState : GPGameState->PlayerArray)
+	{
+		if (!IsValid(PlayerState) || PlayerState->IsOnlyASpectator())
+		{
+			continue;
+		}
+
+		++ActivePlayerCount;
+		if (!State.PresentPlayers.Contains(PlayerState))
+		{
+			return false;
+		}
+	}
+	return ActivePlayerCount > 0;
+}
+
+int32 AGP_GameMode::GetTotalAliveZoneEnemies() const
+{
+	int32 Total = 0;
+	for (const TPair<TWeakObjectPtr<AGP_EnemySpawnVolume>, FGPZoneRuntimeState>& Pair : ZoneRuntimeStates)
+	{
+		if (!Pair.Value.bCompleted)
+		{
+			Total += Pair.Value.AliveEnemies;
+		}
+	}
+	return Total;
+}
+
+AGP_EnemySpawnVolume* AGP_GameMode::FindActiveZoneForRegion(int32 RegionId) const
+{
+	for (const TPair<TWeakObjectPtr<AGP_EnemySpawnVolume>, FGPZoneRuntimeState>& Pair : ZoneRuntimeStates)
+	{
+		AGP_EnemySpawnVolume* Zone = Pair.Key.Get();
+		if (IsValid(Zone)
+			&& Pair.Value.bStarted
+			&& !Pair.Value.bCompleted
+			&& Zone->GetCorruptionRegionId() == RegionId)
+		{
+			return Zone;
+		}
+	}
+	return nullptr;
+}
+
+AGP_EnemySpawnVolume* AGP_GameMode::FindNearestZoneInStage(
+	const AGP_EnemySpawnVolume* FromZone,
+	EGPZoneStage Stage) const
+{
+	AGP_EnemySpawnVolume* Nearest = nullptr;
+	double BestDistanceSquared = TNumericLimits<double>::Max();
+	for (AGP_EnemySpawnVolume* Zone : OrderedZones)
+	{
+		if (!IsValid(Zone) || Zone->GetZoneStage() != Stage)
+		{
+			continue;
+		}
+
+		const double DistanceSquared = FromZone
+			? FVector::DistSquared(FromZone->GetActorLocation(), Zone->GetActorLocation())
+			: 0.0;
+		if (DistanceSquared < BestDistanceSquared)
+		{
+			BestDistanceSquared = DistanceSquared;
+			Nearest = Zone;
+		}
+	}
+	return Nearest;
+}
+
+void AGP_GameMode::SpawnPortalBetweenZones(
+	AGP_EnemySpawnVolume* FromZone,
+	AGP_EnemySpawnVolume* ToZone,
+	const FVector& PreferredSpawnLocation,
+	int32 RetryCount)
+{
+	UWorld* World = GetWorld();
+	if (!World || !*PortalClass || !IsValid(FromZone) || !IsValid(ToZone))
+	{
+		return;
+	}
+
+	bool bTargetProjected = false;
+	const FVector TargetPosition =
+		ToZone->GetSpawnPoint(/*bRandomizeInVolume=*/false, bTargetProjected);
+	if (!bTargetProjected)
+	{
+		const float RetryInterval = FMath::Max(0.05f, ZoneNavigationRetryInterval);
+		const int32 MaxRetries = FMath::Max(
+			1,
+			FMath::CeilToInt(ZoneNavigationReadyTimeout / RetryInterval));
+		if (bUseZoneNavigationInvokers && RetryCount < MaxRetries)
+		{
+			const TWeakObjectPtr<AGP_EnemySpawnVolume> WeakFromZone = FromZone;
+			const TWeakObjectPtr<AGP_EnemySpawnVolume> WeakToZone = ToZone;
+			FTimerHandle RetryTimer;
+			World->GetTimerManager().SetTimer(
+				RetryTimer,
+				FTimerDelegate::CreateWeakLambda(
+					this,
+					[this, WeakFromZone, WeakToZone, PreferredSpawnLocation, RetryCount]()
+					{
+						if (WeakFromZone.IsValid() && WeakToZone.IsValid())
+						{
+							SpawnPortalBetweenZones(
+								WeakFromZone.Get(),
+								WeakToZone.Get(),
+								PreferredSpawnLocation,
+								RetryCount + 1);
+						}
+					}),
+				RetryInterval,
+				false);
+			return;
+		}
+
+		UE_LOG(LogTemp, Error,
+			TEXT("[GP_GameMode] Skipped staged portal to zone '%s': navigation was not ready after %.1f seconds."),
+			*ToZone->GetZoneId().ToString(),
+			ZoneNavigationReadyTimeout);
+		return;
+	}
+
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.SpawnCollisionHandlingOverride =
+		ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	if (AGP_RunPortal* Portal = World->SpawnActor<AGP_RunPortal>(
+		PortalClass,
+		PreferredSpawnLocation,
+		FRotator::ZeroRotator,
+		SpawnParameters))
+	{
+		Portal->SetTargetLocation(TargetPosition);
+	}
+}
+
+void AGP_GameMode::AssignPlayersToOuterVillageStarts()
+{
+	if (!bUseStagedZoneProgression || !GetWorld())
+	{
+		return;
+	}
+
+	TArray<AGP_EnemySpawnVolume*> OuterZones;
+	for (AGP_EnemySpawnVolume* Zone : OrderedZones)
+	{
+		if (IsValid(Zone) && Zone->GetZoneStage() == EGPZoneStage::Outer)
+		{
+			OuterZones.Add(Zone);
+		}
+	}
+	OuterZones.Sort([](const AGP_EnemySpawnVolume& A, const AGP_EnemySpawnVolume& B)
+	{
+		return A.GetZoneId().LexicalLess(B.GetZoneId());
+	});
+
+	TArray<AActor*> FoundStarts;
+	UGameplayStatics::GetAllActorsOfClass(this, APlayerStart::StaticClass(), FoundStarts);
+	TArray<APlayerStart*> OuterStarts;
+	for (AGP_EnemySpawnVolume* Zone : OuterZones)
+	{
+		APlayerStart* MatchingStart = nullptr;
+		for (AActor* Actor : FoundStarts)
+		{
+			APlayerStart* PlayerStart = Cast<APlayerStart>(Actor);
+			if (IsValid(PlayerStart) && PlayerStart->GetLevel() == Zone->GetLevel())
+			{
+				if (!MatchingStart
+					|| PlayerStart->GetFName().LexicalLess(MatchingStart->GetFName()))
+				{
+					MatchingStart = PlayerStart;
+				}
+			}
+		}
+		if (MatchingStart)
+		{
+			OuterStarts.Add(MatchingStart);
+		}
+	}
+
+	TArray<APlayerController*> Players;
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		if (APlayerController* PlayerController = It->Get())
+		{
+			Players.Add(PlayerController);
+		}
+	}
+	Players.Sort([](const APlayerController& A, const APlayerController& B)
+	{
+		const APlayerState* AState = A.GetPlayerState<APlayerState>();
+		const APlayerState* BState = B.GetPlayerState<APlayerState>();
+		return (AState ? AState->GetPlayerId() : MAX_int32)
+			< (BState ? BState->GetPlayerId() : MAX_int32);
+	});
+
+	const int32 AssignmentCount = FMath::Min(Players.Num(), OuterStarts.Num());
+	for (int32 Index = 0; Index < AssignmentCount; ++Index)
+	{
+		APawn* Pawn = Players[Index] ? Players[Index]->GetPawn() : nullptr;
+		APlayerStart* PlayerStart = OuterStarts[Index];
+		if (!IsValid(Pawn) || !IsValid(PlayerStart))
+		{
+			continue;
+		}
+
+		Pawn->TeleportTo(
+			PlayerStart->GetActorLocation(),
+			PlayerStart->GetActorRotation(),
+			false,
+			true);
+		UE_LOG(LogTemp, Log,
+			TEXT("[GP_GameMode] Assigned player %d to outer start '%s'."),
+			Index,
+			*PlayerStart->GetName());
+	}
+
+	if (AssignmentCount < Players.Num())
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[GP_GameMode] Found %d player(s) but only %d streamed outer PlayerStart(s)."),
+			Players.Num(),
+			OuterStarts.Num());
+	}
+}
+
 void AGP_GameMode::NotifyAllPlayersDead()
 {
 	FinishRun(/*bVictory=*/false);
@@ -576,6 +1376,7 @@ void AGP_GameMode::FinishRun(bool bVictory)
 	}
 
 	bRunFinished = true;
+	UnregisterAllZoneNavigationInvokers();
 
 	if (AGP_GameState* GPGameState = GetGPGameState())
 	{
