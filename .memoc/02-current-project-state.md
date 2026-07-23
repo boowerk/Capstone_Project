@@ -238,6 +238,7 @@ Last synced: 2026-05-23T00:00:00
 
 - Remove stale EarlyTransition notify states from the 22 referenced UEFN Run/Slide animations in the editor and resave them; the broken legacy notify package is intentionally absent, so load-all checks currently emit warning-only missing-package messages.
 - Manually demo-check the current three-player flow in PIE when requested; dedicated/live server execution is not required for the current implementation pass.
+- PIE-check the reimported Paladin and Daelithra meshes with the explicitly reapplied MaskMan runtime Retarget AnimBP; their old experimental target IK Rig/Retargeter assets are not runtime sources.
 - PIE-check boss target marker VFX in a multi-player/session setup: first target acquisition and target swaps should flash on the selected player's torso only.
 - PIE-check Crystal Seraph before/after target acquisition and after tactical teleports; `[Patrol] Fallback move location selected` must not spam and `[Leash] Return home finished` must remain reachable.
 - PIE-check Crystal Seraph's visible fall, grounded hit gate, and return-to-hover timing; tune `GroggyDuration` / `FinalPhaseGroggyDuration` on the boss Blueprint if needed.

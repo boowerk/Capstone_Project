@@ -13,6 +13,7 @@ class UCameraComponent;
 class UNavigationInvokerComponent;
 class AGP_WhiteVoidSetActor;
 class USkeletalMeshComponent;
+class USkeletalMesh;
 class UAnimInstance;
 class UAnimMontage;
 class UPDA_WeaponItemCollection;
@@ -51,6 +52,10 @@ public:
 	virtual UAttributeSet* GetAttributeSet() const override;
 	virtual void PossessedBy(AController* NewController) override;
 	virtual void OnRep_PlayerState() override;
+
+	// The game mode assigns the deterministic party spawn slot after possession.
+	// Slot 0 retains the default character; slots 1 and 2 use the Blueprint-configured party meshes.
+	void SetPartyVisualSlot(int32 NewPartyVisualSlot);
 
 	// =========================================================================
 	// 3. 이동 및 상태 제어 API (Movement & State Control)
@@ -172,6 +177,10 @@ protected:
 	void UpdateCameraMotion(float DeltaSeconds);
 	void RefreshCurrentMaxWalkSpeed();
 	void PushMovementSpeedScaleRatioToAnimInstances();
+	void ApplyPartyVisualSlot();
+
+	UFUNCTION()
+	void OnRep_PartyVisualSlot();
 
 	// =========================================================================
 	// 10. 컴뱃 & 록온 (Combat & LockOn Variables)
@@ -271,6 +280,24 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Animation|Retarget", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USkeletalMeshComponent> UEFNSourceMesh;
+
+	// Keep party appearances as Blueprint defaults so artists can replace either mesh without native path changes.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Network|Party Visuals", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<USkeletalMesh> SecondPlayerSkeletalMesh;
+
+	// Per-slot import correction. Keep this on the Blueprint so artists can adjust an
+	// imported character without changing the shared MaskMan animation scale profile.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Network|Party Visuals", meta = (AllowPrivateAccess = "true", ClampMin = "0.01"))
+	float SecondPlayerVisualScale = 1.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Network|Party Visuals", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<USkeletalMesh> ThirdPlayerSkeletalMesh;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Network|Party Visuals", meta = (AllowPrivateAccess = "true", ClampMin = "0.01"))
+	float ThirdPlayerVisualScale = 1.0f;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, ReplicatedUsing = OnRep_PartyVisualSlot, Category = "Network|Party Visuals", meta = (AllowPrivateAccess = "true"))
+	int32 PartyVisualSlot = 0;
 
 	// =========================================================================
 	// 14. 화이트 보이드 제어 상태 & 내부 함수 (White Void Internal State & Helpers)

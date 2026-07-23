@@ -51,6 +51,16 @@ AActor* AGP_GameMode::ChoosePlayerStart_Implementation(AController* Player)
 	return Super::ChoosePlayerStart_Implementation(Player);
 }
 
+void AGP_GameMode::RestartPlayer(AController* NewPlayer)
+{
+	Super::RestartPlayer(NewPlayer);
+
+	if (AGP_PlayerCharacter* PlayerCharacter = NewPlayer ? Cast<AGP_PlayerCharacter>(NewPlayer->GetPawn()) : nullptr)
+	{
+		PlayerCharacter->SetPartyVisualSlot(ResolvePartyStartSlot(NewPlayer));
+	}
+}
+
 void AGP_GameMode::Logout(AController* Exiting)
 {
 	// Release the deterministic slot immediately so a reconnect does not wait for garbage collection.
@@ -294,9 +304,13 @@ int32 AGP_GameMode::ResolvePartyStartSlot(AController* Player)
 		}
 	}
 
-	for (int32 SlotIndex = 0; SlotIndex < PartyPlayerStartSlots.Num(); ++SlotIndex)
+	// Visual slots must not depend on runtime PlayerStart creation. Maps without a valid
+	// authored start still use the engine spawn fallback, but 2P/3P must retain their
+	// deterministic appearances.
+	const int32 PartySlotCount = FMath::Clamp(RequiredPartyPlayerStartCount, 1, 3);
+	for (int32 SlotIndex = 0; SlotIndex < PartySlotCount; ++SlotIndex)
 	{
-		if (!UsedSlots.Contains(SlotIndex) && PartyPlayerStartSlots[SlotIndex].IsValid())
+		if (!UsedSlots.Contains(SlotIndex))
 		{
 			PartyStartSlotByController.Add(PlayerKey, SlotIndex);
 			return SlotIndex;
