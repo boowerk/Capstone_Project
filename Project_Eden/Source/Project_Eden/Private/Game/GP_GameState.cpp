@@ -1,13 +1,6 @@
 #include "Game/GP_GameState.h"
 
-#include "Game/Corruption/GP_WorldCorruptionComponent.h"
 #include "Net/UnrealNetwork.h"
-
-AGP_GameState::AGP_GameState()
-{
-	// A replicated default subobject keeps corruption available to every GameState client without a map actor dependency.
-	WorldCorruptionComponent = CreateDefaultSubobject<UGP_WorldCorruptionComponent>(TEXT("WorldCorruptionComponent"));
-}
 
 void AGP_GameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {

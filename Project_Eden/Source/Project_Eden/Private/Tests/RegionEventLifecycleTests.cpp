@@ -51,13 +51,7 @@ bool FRegionEventLifecycleDefaultsTest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("Region event DataAsset defaults exist"), EventDefaults);
 	if (EventDefaults)
 	{
-		// These neutral defaults are a regression guard for every event asset authored before discovery/corruption flow existed.
-		TestEqual(TEXT("Legacy events accept uncorrupted regions"), EventDefaults->MinimumCorruptionNormalized, 0.0f);
-		TestEqual(TEXT("Legacy events accept fully corrupted regions"), EventDefaults->MaximumCorruptionNormalized, 1.0f);
-		TestEqual(TEXT("Legacy success does not mutate corruption"), EventDefaults->CompletionCorruptionReduction, 0.0f);
-		TestEqual(TEXT("Legacy failure does not mutate corruption"), EventDefaults->ExpirationCorruptionIncrease, 0.0f);
-		TestEqual(TEXT("Legacy events add no cooldown"), EventDefaults->RegionCooldownSeconds, 0.0f);
-		TestFalse(TEXT("Legacy events do not block zone completion"), EventDefaults->bBlocksZoneCompletion);
+		// Guided encounter data keeps only proximity-discovery defaults shared by the fixed demo beats.
 		TestFalse(TEXT("Legacy events activate immediately"), EventDefaults->bActivateWhenPlayerApproaches);
 		TestEqual(TEXT("Discovery radius has a playable default"), EventDefaults->ApproachActivationRadius, 700.0f);
 		TestEqual(TEXT("Discovery waits indefinitely unless authored otherwise"), EventDefaults->DormantWaitTimeoutSeconds, -1.0f);
@@ -71,9 +65,8 @@ bool FRegionEventLifecycleDefaultsTest::RunTest(const FString& Parameters)
 		TestNotNull(TEXT("Native event has a ground decal"), ActorDefaults->FindComponentByClass<UDecalComponent>());
 		TestNotNull(TEXT("Native event has a marker light"), ActorDefaults->FindComponentByClass<UPointLightComponent>());
 		TestNotNull(TEXT("Native event has a text marker"), ActorDefaults->FindComponentByClass<UTextRenderComponent>());
-		TestFalse(TEXT("Uninitialized event does not block progression"), ActorDefaults->IsBlockingZoneCompletion());
 		TestEqual(TEXT("Uninitialized event tracks no enemies"), ActorDefaults->GetAliveSpawnedEnemyCount(), 0);
-		// Open-world objectives own their spawned combatants and must not leak AI after completion or expiration.
+		// Scripted objectives own their spawned combatants and must not leak AI after completion or expiration.
 		TestTrue(TEXT("Finished events retire their remaining enemies"), ActorDefaults->ShouldRetireSpawnedEnemiesOnEnd());
 	}
 

@@ -6,7 +6,6 @@
 #include "Components/PointLightComponent.h"
 #include "Components/SphereComponent.h"
 #include "Components/TextRenderComponent.h"
-#include "Game/Corruption/GP_WorldCorruptionComponent.h"
 #include "Game/GP_GameState.h"
 #include "Game/RegionEvents/GP_RegionEventData.h"
 #include "GameFramework/PlayerController.h"
@@ -177,14 +176,7 @@ void AGP_RegionEventActor::ConfigureApproachActivation(
 	}
 }
 
-void AGP_RegionEventActor::ConfigureExplorationActivation(float InActivationRadius, float InDormantTimeoutSeconds)
-{
-	// The director selects exploration events as a single mode, so it should not need to pass a redundant true flag.
-	RequiredApproachPlayerCount = 1;
-	ConfigureApproachActivation(/*bWaitForPlayerApproach=*/true, InActivationRadius, InDormantTimeoutSeconds);
-}
-
-void AGP_RegionEventActor::ConfigureGuidedExplorationActivation(
+void AGP_RegionEventActor::ConfigureGuidedActivation(
 	float InActivationRadius,
 	float InDormantTimeoutSeconds,
 	int32 InRequiredApproachPlayers)
@@ -250,8 +242,6 @@ void AGP_RegionEventActor::CompleteRegionEvent()
 	{
 		ApplyRegionState(EventData->CompletedRegionState);
 	}
-	ApplyCorruptionOutcome(/*bCompletedSuccessfully=*/true);
-
 	SetRuntimeState(EGPRegionEventRuntimeState::Completed);
 	RetireSpawnedEnemies();
 }
@@ -270,7 +260,6 @@ void AGP_RegionEventActor::ExpireRegionEvent()
 		World->GetTimerManager().ClearTimer(AutoExpireTimerHandle);
 	}
 	StopWaitingForPlayerApproach();
-	ApplyCorruptionOutcome(/*bCompletedSuccessfully=*/false);
 	SetRuntimeState(EGPRegionEventRuntimeState::Expired);
 	RetireSpawnedEnemies();
 }
@@ -286,13 +275,6 @@ int32 AGP_RegionEventActor::GetAliveSpawnedEnemyCount() const
 		}
 	}
 	return AliveEnemyCount;
-}
-
-bool AGP_RegionEventActor::IsBlockingZoneCompletion() const
-{
-	return IsValid(EventData) && EventData->bBlocksZoneCompletion
-		&& RuntimeState != EGPRegionEventRuntimeState::Completed
-		&& RuntimeState != EGPRegionEventRuntimeState::Expired;
 }
 
 void AGP_RegionEventActor::SetRuntimeState(EGPRegionEventRuntimeState NewState)
@@ -315,26 +297,6 @@ void AGP_RegionEventActor::ApplyRegionState(uint8 NewState) const
 	{
 		// Region visuals already replicate through AGP_GameState, so event actors only write on the server.
 		GPGameState->SetRegionState(RegionId, NewState);
-	}
-}
-
-void AGP_RegionEventActor::ApplyCorruptionOutcome(bool bCompletedSuccessfully) const
-{
-	const AGP_GameState* GPGameState = GetWorld() ? GetWorld()->GetGameState<AGP_GameState>() : nullptr;
-	UGP_WorldCorruptionComponent* Corruption = IsValid(GPGameState) ? GPGameState->GetWorldCorruptionComponent() : nullptr;
-	if (!IsValid(EventData) || !IsValid(Corruption) || RegionId == INDEX_NONE)
-	{
-		return;
-	}
-
-	// Keep outcome tuning in the DataAsset while the replicated GameState component remains the single source of truth.
-	if (bCompletedSuccessfully && EventData->CompletionCorruptionReduction > 0.0f)
-	{
-		Corruption->ReduceRegionCorruption(RegionId, EventData->CompletionCorruptionReduction);
-	}
-	else if (!bCompletedSuccessfully && EventData->ExpirationCorruptionIncrease > 0.0f)
-	{
-		Corruption->AddRegionCorruption(RegionId, EventData->ExpirationCorruptionIncrease);
 	}
 }
 
@@ -400,8 +362,6 @@ int32 AGP_RegionEventActor::SpawnConfiguredEnemies()
 				continue;
 			}
 
-			// Assign the region before BeginPlay so corruption scaling never samples the wrong region for one frame.
-			SpawnedEnemy->SetCorruptionRegionId(RegionId);
 			SpawnedEventEnemies.AddUnique(SpawnedEnemy);
 			// Terminal death covers both combat kills and scripted cleanup without coupling tracking to XP rewards.
 			SpawnedEnemy->OnEnemyDeathStarted.AddDynamic(this, &ThisClass::HandleSpawnedEventEnemyDied);
@@ -575,7 +535,7 @@ void AGP_RegionEventActor::HandleDormantWaitTimeout()
 {
 	if (HasAuthority() && bWaitingForPlayerApproach && RuntimeState == EGPRegionEventRuntimeState::Dormant)
 	{
-		// Timing out an ignored discovery is a normal event failure and applies the configured failure consequence.
+		// Timing out an ignored scripted objective closes it without mutating any global progression system.
 		ExpireRegionEvent();
 	}
 }

@@ -6,17 +6,14 @@
 #include "GP_GameMode.generated.h"
 
 class AGP_EnemyCharacter;
-class AGP_CorruptionPresentationActor;
 class AGP_DemoRunDirector;
 class AGP_EnemySpawnVolume;
 class AGP_GameState;
 class AGP_RunPortal;
 class AGP_EnemySpawnMarker;
-class AGP_RegionEventActor;
 class AGP_RegionEventDirector;
 class APawn;
 class APlayerStart;
-enum class EGPRegionEventTrigger : uint8;
 
 /**
  * Server-authoritative progression manager for the linear "city -> boss room -> next city" loop.
@@ -86,43 +83,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Region")
 	uint8 AliveRegionState = 0;
 
-	// Corruption progression is initialized together with the existing region state array.
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Corruption")
-	bool bEnableWorldCorruption = true;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Corruption", meta = (EditCondition = "bEnableWorldCorruption", ClampMin = "0.0"))
-	float InitialCorruption = 15.0f;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Corruption", meta = (EditCondition = "bEnableWorldCorruption", ClampMin = "1.0"))
-	float MaximumCorruption = 100.0f;
-
-	// The default adds two corruption points per real-time minute to every region.
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Corruption", meta = (EditCondition = "bEnableWorldCorruption", ClampMin = "0.0"))
-	float PassiveCorruptionIncreasePerMinute = 2.0f;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Corruption", meta = (EditCondition = "bEnableWorldCorruption", ClampMin = "0.1", Units = "s"))
-	float CorruptionUpdateInterval = 5.0f;
-
-	// The replicated native actor works out of the box; assign a BP child to customize skybox material presentation.
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Corruption|Presentation")
-	bool bAutoSpawnCorruptionPresentation = true;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Corruption|Presentation", meta = (EditCondition = "bAutoSpawnCorruptionPresentation"))
-	TSubclassOf<AGP_CorruptionPresentationActor> CorruptionPresentationClass;
-
-	// Optional regional event coordinator. Place one in the map for authored pools, or provide a class to auto-spawn.
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Region Events")
+	// The retained director resolves only explicit IDs requested by the fixed graduation-demo route.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Demo Flow")
 	TSubclassOf<AGP_RegionEventDirector> RegionEventDirectorClass;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Region Events")
-	bool bAutoSpawnRegionEventDirector = false;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Region Events")
-	bool bStartRegionEventsOnZoneStart = true;
-
-	// Completion events are meant for reward/cleanup presentation. Enemy-spawning completion events should stay disabled.
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Region Events")
-	bool bStartRegionEventsOnZoneCompleted = false;
 
 	// Only the production open landscape receives the layered graduation-demo golden path.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Demo Flow")
@@ -216,13 +179,11 @@ private:
 	void BeginGuidedDemoFlowStartup();
 	void TryStartGuidedDemoFlow();
 	void InitializeRegionStates();
-	void SpawnCorruptionPresentation();
 	void UnlockZone(int32 ZoneIndex);
 	void StartZone(int32 ZoneIndex);
-	void StartRegionEventForZone(AGP_EnemySpawnVolume* Zone, EGPRegionEventTrigger Trigger);
 	void SpawnZoneEnemies(AGP_EnemySpawnVolume* Zone);
 	void SpawnMarkerEnemies(AGP_EnemySpawnVolume* Zone, AGP_EnemySpawnMarker* Marker);
-	void RegisterZoneEnemy(AGP_EnemyCharacter* Enemy, int32 CorruptionRegionId = INDEX_NONE);
+	void RegisterZoneEnemy(AGP_EnemyCharacter* Enemy);
 	void MaybeCompleteZone();
 	void CompleteCurrentZone();
 	void AdvanceZone();
@@ -246,12 +207,6 @@ private:
 
 	UFUNCTION()
 	void HandleZoneEnemyDied(AGP_EnemyCharacter* DeadEnemy, AActor* DeathInstigator);
-
-	UFUNCTION()
-	void HandleRegionEventEnemySpawned(AGP_RegionEventActor* EventActor, AGP_EnemyCharacter* Enemy);
-
-	UFUNCTION()
-	void HandleRegionEventEnded(AGP_RegionEventDirector* Director, AGP_RegionEventActor* EventActor);
 
 	AGP_GameState* GetGPGameState() const;
 };

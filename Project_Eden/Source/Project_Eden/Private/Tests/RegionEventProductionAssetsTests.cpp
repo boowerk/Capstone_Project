@@ -1,6 +1,5 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
-#include "Game/RegionEvents/GP_CrystalCorruptionRegionEventActor.h"
 #include "Game/RegionEvents/GP_RedRiftRegionEventActor.h"
 #include "Game/RegionEvents/GP_RegionEventData.h"
 #include "Game/RegionEvents/GP_ShrineRuinsRegionEventActor.h"
@@ -27,10 +26,9 @@ bool FGPRegionEventProductionAssetsTest::RunTest(const FString& Parameters)
 	using namespace GPRegionEventProductionAssetTests;
 	const FExpectedProductionEvent ExpectedEvents[] =
 	{
+		// The guided graduation route owns exactly these three deterministic encounter definitions.
 		{ TEXT("/Game/RegionEvents/Runtime/DA_RE_World_RedRift.DA_RE_World_RedRift"),
 			TEXT("world_red_rift"), AGP_RedRiftRegionEventActor::StaticClass() },
-		{ TEXT("/Game/RegionEvents/Runtime/DA_RE_World_CrystalCorruption.DA_RE_World_CrystalCorruption"),
-			TEXT("world_crystal_corruption"), AGP_CrystalCorruptionRegionEventActor::StaticClass() },
 		{ TEXT("/Game/RegionEvents/Runtime/DA_RE_World_ShrineRuins.DA_RE_World_ShrineRuins"),
 			TEXT("world_shrine_ruins"), AGP_ShrineRuinsRegionEventActor::StaticClass() },
 		{ TEXT("/Game/RegionEvents/Runtime/DA_RE_World_StructureDefense.DA_RE_World_StructureDefense"),
@@ -51,9 +49,7 @@ bool FGPRegionEventProductionAssetsTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("Production event uses its native runtime class"), EventData->EventActorClass.Get(), Expected.NativeActorClass);
 		TestFalse(TEXT("Production label does not expose test content"),
 			EventData->DisplayName.ToString().Contains(TEXT("TEST"), ESearchCase::IgnoreCase));
-		TestTrue(TEXT("Production success cleanses corruption"), EventData->CompletionCorruptionReduction > 0.0f);
-		TestTrue(TEXT("Production failure has an authored consequence"), EventData->ExpirationCorruptionIncrease > 0.0f);
-		TestTrue(TEXT("Production events have a regional cooldown"), EventData->RegionCooldownSeconds >= 120.0f);
+		// Scripted encounters must remain visible before activation without mutating authored biome presentation.
 		TestTrue(TEXT("Production events are discoverable before activation"), EventData->bActivateWhenPlayerApproaches);
 		TestFalse(TEXT("Production events never overwrite authored biome states"), EventData->bApplyActiveRegionState);
 		TestFalse(TEXT("Production completion never overwrites authored biome states"), EventData->bApplyCompletedRegionState);

@@ -13,22 +13,15 @@ UENUM(BlueprintType)
 enum class EGPRegionEventType : uint8
 {
 	EnemyAmbush UMETA(DisplayName = "Enemy Ambush"),
+	// Legacy presentation label used by the fixed Red Rift asset; it no longer drives a world-corruption system.
 	CorruptionRift UMETA(DisplayName = "Corruption Rift"),
 	ShrineCache UMETA(DisplayName = "Shrine Cache"),
 	EnvironmentalHazard UMETA(DisplayName = "Environmental Hazard")
 };
 
-/** When the run flow is allowed to roll this event for a zone. */
-UENUM(BlueprintType)
-enum class EGPRegionEventTrigger : uint8
-{
-	ZoneStarted UMETA(DisplayName = "Zone Started"),
-	ZoneCompleted UMETA(DisplayName = "Zone Completed")
-};
-
 /**
- * Designer-authored definition for one possible event on a PCG/region slot.
- * Runtime actors read this data, while Blueprint children can replace art/VFX later.
+ * Designer-authored definition for one deterministic graduation-demo encounter.
+ * Runtime actors read this data by stable EventId; no weighted or ambient selection remains.
  */
 UCLASS(BlueprintType)
 class PROJECT_EDEN_API UGP_RegionEventData : public UDataAsset
@@ -48,38 +41,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Region Event")
 	EGPRegionEventType EventType = EGPRegionEventType::EnemyAmbush;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Region Event")
-	EGPRegionEventTrigger Trigger = EGPRegionEventTrigger::ZoneStarted;
-
 	// Optional per-event runtime class. Leave empty to use the director's default actor class.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Region Event")
 	TSubclassOf<AGP_RegionEventActor> EventActorClass;
-
-	// Weight is kept on the data asset so content designers can tune the pool without touching C++.
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Region Event", meta = (ClampMin = "0.0"))
-	float SelectionWeight = 1.0f;
-
-	// Corruption bounds let the director keep an event out of regions where its fiction would not make sense.
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Region Event|Corruption", meta = (ClampMin = "0.0", ClampMax = "1.0"))
-	float MinimumCorruptionNormalized = 0.0f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Region Event|Corruption", meta = (ClampMin = "0.0", ClampMax = "1.0"))
-	float MaximumCorruptionNormalized = 1.0f;
-
-	// Outcome deltas are raw corruption points, matching UGP_WorldCorruptionComponent's public API.
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Region Event|Corruption", meta = (ClampMin = "0.0"))
-	float CompletionCorruptionReduction = 0.0f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Region Event|Corruption", meta = (ClampMin = "0.0"))
-	float ExpirationCorruptionIncrease = 0.0f;
-
-	// Zero preserves the legacy behavior where this event may be selected again immediately.
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Region Event|Flow", meta = (ClampMin = "0.0"))
-	float RegionCooldownSeconds = 0.0f;
-
-	// Blocking is opt-in so existing event assets cannot unexpectedly prevent zone completion.
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Region Event|Flow")
-	bool bBlocksZoneCompletion = false;
 
 	// Proximity activation keeps an event discoverable in-world before committing the party to its gameplay.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Region Event|Discovery")

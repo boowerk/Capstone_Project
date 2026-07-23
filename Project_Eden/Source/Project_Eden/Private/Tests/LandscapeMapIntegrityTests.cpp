@@ -16,11 +16,6 @@ namespace
 	constexpr int32 ExpectedLandscapeRegionCount = 15;
 	constexpr float MinimumPlayablePlayerStartZ = 800.0f;
 	constexpr double MinimumNavigationXYCoverage = 0.9;
-	constexpr float MinimumProductionExplorationDelay = 20.0f;
-	constexpr float MinimumProductionExplorationInterval = 3.0f;
-	constexpr float MinimumProductionRegionDwell = 8.0f;
-	constexpr float MinimumProductionGlobalCooldown = 60.0f;
-	constexpr float MinimumProductionSpawnDistance = 1000.0f;
 
 	bool HasClassInHierarchy(const AActor& Actor, const FName RequiredClassName)
 	{
@@ -193,7 +188,7 @@ bool FGPLandscapeMapIntegrityTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Landscape exposes exactly 15 unique SeedIndex values"), AddressableRegionIndices.Num(), ExpectedLandscapeRegionCount);
 	for (int32 ExpectedRegionId = 0; ExpectedRegionId < ExpectedLandscapeRegionCount; ++ExpectedRegionId)
 	{
-		// A contiguous address space is required by the replicated region-state and corruption arrays.
+		// A contiguous address space is required by the replicated biome-state array.
 		TestTrue(
 			*FString::Printf(TEXT("Region SeedIndex %d is addressable"), ExpectedRegionId),
 			AddressableRegionIndices.Contains(ExpectedRegionId));
@@ -202,86 +197,55 @@ bool FGPLandscapeMapIntegrityTest::RunTest(const FString& Parameters)
 
 	if (IsValid(RegionEventDirectorActor))
 	{
-		// Guard the authored production cadence so temporary PIE acceleration cannot be saved into the shipping map.
-		const auto ReadFloat = [this, RegionEventDirectorActor](const FName PropertyName, float& OutValue)
+		const FBoolProperty* EnableScriptedEventsProperty =
+			FindFProperty<FBoolProperty>(RegionEventDirectorActor->GetClass(), TEXT("bEnableScriptedEvents"));
+		const FIntProperty* MaxActiveEventsProperty =
+			FindFProperty<FIntProperty>(RegionEventDirectorActor->GetClass(), TEXT("MaxActiveEvents"));
+		const FArrayProperty* GuidedEventPoolProperty =
+			FindFProperty<FArrayProperty>(RegionEventDirectorActor->GetClass(), TEXT("GuidedEventPool"));
+		TestNotNull(TEXT("Director exposes scripted-event enablement"), EnableScriptedEventsProperty);
+		TestNotNull(TEXT("Director exposes scripted-event concurrency"), MaxActiveEventsProperty);
+		TestNotNull(TEXT("Director exposes its guided event pool"), GuidedEventPoolProperty);
+		if (EnableScriptedEventsProperty && MaxActiveEventsProperty && GuidedEventPoolProperty)
 		{
-			const FFloatProperty* Property = FindFProperty<FFloatProperty>(RegionEventDirectorActor->GetClass(), PropertyName);
-			TestNotNull(*FString::Printf(TEXT("Director exposes %s"), *PropertyName.ToString()), Property);
-			if (!Property)
-			{
-				return false;
-			}
-
-			OutValue = Property->GetPropertyValue_InContainer(RegionEventDirectorActor);
-			return true;
-		};
-
-		float InitialDelay = 0.0f;
-		float EvaluationInterval = 0.0f;
-		float RegionDwell = 0.0f;
-		float BaseChance = 0.0f;
-		float FullCorruptionBonus = 0.0f;
-		float GlobalCooldown = 0.0f;
-		float MinimumSpawnDistance = 0.0f;
-		float MaximumSpawnDistance = 0.0f;
-		const bool bReadCadence =
-			ReadFloat(TEXT("InitialExplorationDelaySeconds"), InitialDelay)
-			&& ReadFloat(TEXT("ExplorationEvaluationIntervalSeconds"), EvaluationInterval)
-			&& ReadFloat(TEXT("RegionDwellSeconds"), RegionDwell)
-			&& ReadFloat(TEXT("BaseExplorationChance"), BaseChance)
-			&& ReadFloat(TEXT("FullCorruptionChanceBonus"), FullCorruptionBonus)
-			&& ReadFloat(TEXT("GlobalExplorationCooldownSeconds"), GlobalCooldown)
-			&& ReadFloat(TEXT("MinimumExplorationSpawnDistance"), MinimumSpawnDistance)
-			&& ReadFloat(TEXT("MaximumExplorationSpawnDistance"), MaximumSpawnDistance);
-
-		if (bReadCadence)
-		{
-			TestTrue(TEXT("Exploration waits before the first encounter"), InitialDelay >= MinimumProductionExplorationDelay);
-			TestTrue(TEXT("Exploration evaluation is not frame-like"), EvaluationInterval >= MinimumProductionExplorationInterval);
-			TestTrue(TEXT("Players must remain in a region before an encounter"), RegionDwell >= MinimumProductionRegionDwell);
-			TestTrue(TEXT("Base exploration chance stays restrained"), BaseChance > 0.0f && BaseChance <= 0.5f);
-			TestTrue(TEXT("Corruption chance bonus stays restrained"), FullCorruptionBonus >= 0.0f && FullCorruptionBonus <= 0.5f);
-			TestTrue(TEXT("Exploration encounters have a global cooldown"), GlobalCooldown >= MinimumProductionGlobalCooldown);
-			TestTrue(TEXT("Encounters spawn outside immediate combat range"), MinimumSpawnDistance >= MinimumProductionSpawnDistance);
-			TestTrue(TEXT("Exploration spawn distance range is valid"), MaximumSpawnDistance > MinimumSpawnDistance);
-		}
-
-		const FBoolProperty* EnableRegionEventsProperty =
-			FindFProperty<FBoolProperty>(RegionEventDirectorActor->GetClass(), TEXT("bEnableRegionEvents"));
-		const FBoolProperty* EnableExplorationEventsProperty =
-			FindFProperty<FBoolProperty>(RegionEventDirectorActor->GetClass(), TEXT("bEnableExplorationEvents"));
-		const FBoolProperty* DeterministicSeedProperty =
-			FindFProperty<FBoolProperty>(RegionEventDirectorActor->GetClass(), TEXT("bUseDeterministicRandomSeed"));
-		const FIntProperty* MaxActiveExplorationEventsProperty =
-			FindFProperty<FIntProperty>(RegionEventDirectorActor->GetClass(), TEXT("MaxActiveExplorationEvents"));
-		TestNotNull(TEXT("Director exposes region-event enablement"), EnableRegionEventsProperty);
-		TestNotNull(TEXT("Director exposes exploration-event enablement"), EnableExplorationEventsProperty);
-		TestNotNull(TEXT("Director exposes deterministic-seed mode"), DeterministicSeedProperty);
-		TestNotNull(TEXT("Director exposes exploration concurrency"), MaxActiveExplorationEventsProperty);
-		if (EnableRegionEventsProperty && EnableExplorationEventsProperty
-			&& DeterministicSeedProperty && MaxActiveExplorationEventsProperty)
-		{
-			// Production play keeps world events enabled, varied between runs, and limited to one readable objective.
-			TestTrue(TEXT("Region events are enabled in the production landscape"),
-				EnableRegionEventsProperty->GetPropertyValue_InContainer(RegionEventDirectorActor));
-			TestTrue(TEXT("Exploration events are enabled in the production landscape"),
-				EnableExplorationEventsProperty->GetPropertyValue_InContainer(RegionEventDirectorActor));
-			TestFalse(TEXT("Production exploration does not reuse a deterministic test sequence"),
-				DeterministicSeedProperty->GetPropertyValue_InContainer(RegionEventDirectorActor));
-			TestEqual(TEXT("Only one exploration objective can be active"),
-				MaxActiveExplorationEventsProperty->GetPropertyValue_InContainer(RegionEventDirectorActor),
+			// Production keeps one readable scripted objective active and resolves only the three guided beats.
+			TestTrue(TEXT("Scripted events are enabled in the production landscape"),
+				EnableScriptedEventsProperty->GetPropertyValue_InContainer(RegionEventDirectorActor));
+			TestEqual(TEXT("Only one scripted objective can be active"),
+				MaxActiveEventsProperty->GetPropertyValue_InContainer(RegionEventDirectorActor),
 				1);
+
+			FScriptArrayHelper GuidedEventPool(
+				GuidedEventPoolProperty,
+				GuidedEventPoolProperty->ContainerPtrToValuePtr<void>(RegionEventDirectorActor));
+			TestEqual(TEXT("Landscape director resolves three guided event definitions"), GuidedEventPool.Num(), 3);
 		}
 
-		const FArrayProperty* ExplorationPoolProperty =
-			FindFProperty<FArrayProperty>(RegionEventDirectorActor->GetClass(), TEXT("ExplorationEventPool"));
-		TestNotNull(TEXT("Director exposes its exploration event pool"), ExplorationPoolProperty);
-		if (ExplorationPoolProperty)
+		const FName RemovedRandomProperties[] =
 		{
-			FScriptArrayHelper ExplorationPool(
-				ExplorationPoolProperty,
-				ExplorationPoolProperty->ContainerPtrToValuePtr<void>(RegionEventDirectorActor));
-			TestEqual(TEXT("Landscape director resolves four production event definitions"), ExplorationPool.Num(), 4);
+			TEXT("RandomSeed"),
+			TEXT("EventPool"),
+			TEXT("bEnableRegionEvents"),
+			TEXT("bEnableExplorationEvents"),
+			TEXT("ExplorationEventPool"),
+			TEXT("InitialExplorationDelaySeconds"),
+			TEXT("ExplorationEvaluationIntervalSeconds"),
+			TEXT("RegionDwellSeconds"),
+			TEXT("BaseExplorationChance"),
+			TEXT("FullCorruptionChanceBonus"),
+			TEXT("GlobalExplorationCooldownSeconds"),
+			TEXT("MaxActiveExplorationEvents"),
+			TEXT("MinimumExplorationSpawnDistance"),
+			TEXT("MaximumExplorationSpawnDistance"),
+			TEXT("ExplorationNavProjectionExtent"),
+			TEXT("bUseDeterministicRandomSeed")
+		};
+		for (const FName RemovedPropertyName : RemovedRandomProperties)
+		{
+			// Removed ambient/weighted knobs must not silently return through a native or Blueprint parent.
+			TestNull(
+				*FString::Printf(TEXT("Director no longer exposes removed random property %s"), *RemovedPropertyName.ToString()),
+				FindFProperty<FProperty>(RegionEventDirectorActor->GetClass(), RemovedPropertyName));
 		}
 	}
 	return true;

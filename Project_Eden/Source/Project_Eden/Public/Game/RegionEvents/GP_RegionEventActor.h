@@ -63,13 +63,9 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Region Event|Discovery")
 	void ConfigureApproachActivation(bool bWaitForPlayerApproach, float InActivationRadius, float InDormantWaitTimeoutSeconds);
 
-	// Director-facing shorthand always enables proximity discovery with the supplied runtime tuning.
-	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Region Event|Discovery")
-	void ConfigureExplorationActivation(float InActivationRadius, float InDormantTimeoutSeconds);
-
 	// Guided objectives wait for a party quorum; the effective requirement clamps to currently possessed players.
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Region Event|Discovery")
-	void ConfigureGuidedExplorationActivation(
+	void ConfigureGuidedActivation(
 		float InActivationRadius,
 		float InDormantTimeoutSeconds,
 		int32 InRequiredApproachPlayers);
@@ -85,9 +81,6 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Region Event|Enemy")
 	bool ShouldRetireSpawnedEnemiesOnEnd() const { return bRetireSpawnedEnemiesOnEnd; }
-
-	UFUNCTION(BlueprintPure, Category = "Region Event|Flow")
-	bool IsBlockingZoneCompletion() const;
 
 	UPROPERTY(BlueprintAssignable, Category = "Region Event")
 	FGPOnRegionEventEnemySpawned OnRegionEventEnemySpawned;
@@ -140,7 +133,7 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Region Event|Presentation", meta = (ClampMin = "0.0"))
 	float MarkerLightIntensity = 2500.0f;
 
-	// Enables designer-authored exploration events that wait until the party reaches the spawned marker.
+	// Enables designer-authored scripted objectives that wait until the party reaches the spawned marker.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Region Event")
 	bool bActivateOnPlayerOverlap = false;
 
@@ -209,7 +202,6 @@ private:
 	void TryActivateFromCurrentOverlaps();
 	bool HasApproachPlayerQuorum(int32 OverlappingPlayerCount, int32 PossessedPlayerCount) const;
 	void HandleDormantWaitTimeout();
-	void ApplyCorruptionOutcome(bool bCompletedSuccessfully) const;
 	void RetireSpawnedEnemies();
 	bool ShouldWaitForPlayerApproach() const;
 	float GetConfiguredApproachRadius() const;

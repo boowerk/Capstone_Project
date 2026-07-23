@@ -2,8 +2,6 @@
 
 #include "Characters/GP_EnemyCharacter.h"
 #include "Characters/GP_PlayerCharacter.h"
-#include "Game/Corruption/GP_CorruptionPresentationActor.h"
-#include "Game/Corruption/GP_WorldCorruptionComponent.h"
 #include "Game/Demo/GP_DemoRunDirector.h"
 #include "Game/GP_EnemySpawnMarker.h"
 #include "Game/GP_EnemySpawnVolume.h"
@@ -11,7 +9,6 @@
 #include "Game/GP_RunPortal.h"
 #include "Game/GP_ThreePlayerGameSession.h"
 #include "Game/Regions/GP_RegionSpatialSubsystem.h"
-#include "Game/RegionEvents/GP_RegionEventActor.h"
 #include "Game/RegionEvents/GP_RegionEventDirector.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
@@ -31,7 +28,6 @@ AGP_GameMode::AGP_GameMode()
 {
 	GameStateClass = AGP_GameState::StaticClass();
 	RegionEventDirectorClass = AGP_RegionEventDirector::StaticClass();
-	CorruptionPresentationClass = AGP_CorruptionPresentationActor::StaticClass();
 	DemoRunDirectorClass = AGP_DemoRunDirector::StaticClass();
 	// Preserve the three-player admission cap if a client attempts to join
 	// directly after seamless travel reaches the gameplay map.
@@ -651,11 +647,10 @@ void AGP_GameMode::BeginPlay()
 	BeginThreePlayerGameplaySmokeProbe();
 #endif
 
-	// Resolve map-authored seeds before the director and corruption state consume RegionCount.
+	// Resolve map-authored seeds before fixed demo routing consumes RegionCount.
 	ResolveRuntimeRegionConfiguration();
 	GatherZones();
 	ResolveRegionEventDirector();
-	SpawnCorruptionPresentation();
 	BeginGuidedDemoFlowStartup();
 
 	// Let placed BP actors bind to GameState delegates in their BeginPlay before
@@ -817,17 +812,6 @@ void AGP_GameMode::InitializeRegionStates()
 			GPGameState->InitRegionStates(RegionCount, DeadRegionState);
 		}
 
-		if (UGP_WorldCorruptionComponent* Corruption = GPGameState->GetWorldCorruptionComponent())
-		{
-			// The authoritative timer lives with GameState so seamless clients receive one shared progression value.
-			Corruption->InitializeCorruption(
-				RegionCount,
-				bEnableWorldCorruption ? InitialCorruption : 0.0f,
-				MaximumCorruption,
-				PassiveCorruptionIncreasePerMinute,
-				CorruptionUpdateInterval,
-				bEnableWorldCorruption);
-		}
 	}
 }
 
@@ -867,31 +851,6 @@ void AGP_GameMode::ResolveRuntimeRegionConfiguration()
 		RuntimeInitialRegionStates.Num() == RegionCount ? TEXT("preserved") : TEXT("fallback"));
 }
 
-void AGP_GameMode::SpawnCorruptionPresentation()
-{
-	if (!bAutoSpawnCorruptionPresentation || !bEnableWorldCorruption || !*CorruptionPresentationClass)
-	{
-		return;
-	}
-
-	// Preserve an authored presentation actor or a seamless-travel carry-over instead of spawning a duplicate.
-	if (UGameplayStatics::GetActorOfClass(this, AGP_CorruptionPresentationActor::StaticClass()))
-	{
-		return;
-	}
-
-	if (UWorld* World = GetWorld())
-	{
-		FActorSpawnParameters SpawnParameters;
-		SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-		World->SpawnActor<AGP_CorruptionPresentationActor>(
-			CorruptionPresentationClass,
-			FVector::ZeroVector,
-			FRotator::ZeroRotator,
-			SpawnParameters);
-	}
-}
-
 void AGP_GameMode::GatherZones()
 {
 	TArray<AActor*> FoundZones;
@@ -926,7 +885,7 @@ void AGP_GameMode::ResolveRegionEventDirector()
 		}
 	}
 
-	if (!RegionEventDirector && bAutoSpawnRegionEventDirector && *RegionEventDirectorClass)
+	if (!RegionEventDirector && bAutoStartGuidedDemoFlow && *RegionEventDirectorClass)
 	{
 		if (UWorld* World = GetWorld())
 		{
@@ -942,11 +901,8 @@ void AGP_GameMode::ResolveRegionEventDirector()
 
 	if (RegionEventDirector)
 	{
-		// The director is server orchestration; spawned event actors replicate their own presentation state.
+		// This coordinator is retained only for deterministic demo IDs; it owns no ambient scheduler.
 		RegionEventDirector->InitializeRegionEventDirector(RegionCount);
-		RegionEventDirector->OnRegionEventEnemySpawned.AddDynamic(this, &ThisClass::HandleRegionEventEnemySpawned);
-		// A blocking objective re-evaluates zone completion as soon as it succeeds or expires.
-		RegionEventDirector->OnRegionEventEnded.AddDynamic(this, &ThisClass::HandleRegionEventEnded);
 	}
 }
 
@@ -1110,13 +1066,11 @@ void AGP_GameMode::StartZone(int32 ZoneIndex)
 	{
 		// Progressive mode: enemies spawn marker-by-marker as the player advances into the city.
 		Zone->ActivateMarkers();
-		StartRegionEventForZone(Zone, EGPRegionEventTrigger::ZoneStarted);
 		OnZoneStarted(ZoneIndex, Zone);
 		return;
 	}
 
 	// Box-fallback mode: spawn the whole composition at once.
-	StartRegionEventForZone(Zone, EGPRegionEventTrigger::ZoneStarted);
 	SpawnZoneEnemies(Zone);
 	OnZoneStarted(ZoneIndex, Zone);
 
@@ -1174,42 +1128,16 @@ void AGP_GameMode::SpawnMarkerEnemies(AGP_EnemySpawnVolume* Zone, AGP_EnemySpawn
 			}
 
 			SpawnedEnemy->SpawnDefaultController();
-			RegisterZoneEnemy(SpawnedEnemy, Zone->GetCorruptionRegionId());
+			RegisterZoneEnemy(SpawnedEnemy);
 		}
 	}
-}
-
-void AGP_GameMode::StartRegionEventForZone(AGP_EnemySpawnVolume* Zone, EGPRegionEventTrigger Trigger)
-{
-	if (!RegionEventDirector || !IsValid(Zone))
-	{
-		return;
-	}
-
-	if (Trigger == EGPRegionEventTrigger::ZoneStarted && !bStartRegionEventsOnZoneStart)
-	{
-		return;
-	}
-
-	if (Trigger == EGPRegionEventTrigger::ZoneCompleted && !bStartRegionEventsOnZoneCompleted)
-	{
-		return;
-	}
-
-	RegionEventDirector->TryStartRegionEventForZone(Zone, Trigger);
 }
 
 void AGP_GameMode::MaybeCompleteZone()
 {
 	// In marker mode the zone clears only once every marker has fired and nothing is left alive.
 	const bool bAllMarkersDone = (MarkersTotal == 0) || (MarkersTriggered >= MarkersTotal);
-	const AGP_EnemySpawnVolume* CurrentZone = OrderedZones.IsValidIndex(CurrentZoneIndex)
-		? OrderedZones[CurrentZoneIndex]
-		: nullptr;
-	const bool bWaitingForRegionObjective = RegionEventDirector
-		&& IsValid(CurrentZone)
-		&& RegionEventDirector->HasBlockingEventForZone(CurrentZone);
-	if (bAllMarkersDone && AliveZoneEnemies == 0 && !bWaitingForRegionObjective)
+	if (bAllMarkersDone && AliveZoneEnemies == 0)
 	{
 		CompleteCurrentZone();
 	}
@@ -1257,12 +1185,12 @@ void AGP_GameMode::SpawnZoneEnemies(AGP_EnemySpawnVolume* Zone)
 			}
 
 			SpawnedEnemy->SpawnDefaultController();
-			RegisterZoneEnemy(SpawnedEnemy, Zone->GetCorruptionRegionId());
+			RegisterZoneEnemy(SpawnedEnemy);
 		}
 	}
 }
 
-void AGP_GameMode::RegisterZoneEnemy(AGP_EnemyCharacter* Enemy, int32 CorruptionRegionId)
+void AGP_GameMode::RegisterZoneEnemy(AGP_EnemyCharacter* Enemy)
 {
 	if (bRunFinished || !IsValid(Enemy))
 	{
@@ -1273,9 +1201,6 @@ void AGP_GameMode::RegisterZoneEnemy(AGP_EnemyCharacter* Enemy, int32 Corruption
 	{
 		return;
 	}
-
-	// The explicit event/zone id lets enemies retain their regional strength even after progression advances.
-	Enemy->SetCorruptionRegionId(CorruptionRegionId != INDEX_NONE ? CorruptionRegionId : CurrentZoneIndex);
 
 	// The terminal death delegate also fires for scripted encounter cleanup, unlike the HP-zero reward delegate.
 	Enemy->OnEnemyDeathStarted.AddDynamic(this, &AGP_GameMode::HandleZoneEnemyDied);
@@ -1299,26 +1224,6 @@ void AGP_GameMode::HandleZoneEnemyDied(AGP_EnemyCharacter* DeadEnemy, AActor* De
 	MaybeCompleteZone();
 }
 
-void AGP_GameMode::HandleRegionEventEnemySpawned(AGP_RegionEventActor* EventActor, AGP_EnemyCharacter* Enemy)
-{
-	if (RegionEventDirector && RegionEventDirector->IsExplorationEvent(EventActor))
-	{
-		// Open-world encounters own and retire their enemies; they must not mutate an unrelated linear-zone budget.
-		return;
-	}
-
-	// Event-spawned enemies join the current zone budget so events cannot be ignored during a city clear.
-	RegisterZoneEnemy(Enemy, IsValid(EventActor) ? EventActor->GetRegionId() : INDEX_NONE);
-}
-
-void AGP_GameMode::HandleRegionEventEnded(AGP_RegionEventDirector* Director, AGP_RegionEventActor* EventActor)
-{
-	(void)Director;
-	(void)EventActor;
-	// Enemy deaths and objective completion may arrive in either order; this single gate handles both safely.
-	MaybeCompleteZone();
-}
-
 void AGP_GameMode::CompleteCurrentZone()
 {
 	if (bRunFinished || !OrderedZones.IsValidIndex(CurrentZoneIndex))
@@ -1327,12 +1232,6 @@ void AGP_GameMode::CompleteCurrentZone()
 	}
 
 	AGP_EnemySpawnVolume* ClearedZone = OrderedZones[CurrentZoneIndex];
-
-	if (RegionEventDirector)
-	{
-		// Finish any active region event before the zone writes its final revived state.
-		RegionEventDirector->CompleteEventsForZone(ClearedZone);
-	}
 
 	// Revive this zone's regions: the cleared city brings its surrounding nature
 	// regions back to life. Server writes the replicated state; clients apply the
@@ -1346,7 +1245,6 @@ void AGP_GameMode::CompleteCurrentZone()
 	}
 
 	OnZoneCompleted(CurrentZoneIndex, ClearedZone);
-	StartRegionEventForZone(ClearedZone, EGPRegionEventTrigger::ZoneCompleted);
 	AdvanceZone();
 }
 

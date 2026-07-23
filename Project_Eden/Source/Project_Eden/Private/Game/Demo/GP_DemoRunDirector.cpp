@@ -92,7 +92,7 @@ bool AGP_DemoRunDirector::InitializeDemoRun(
 	Route = InRoute;
 	RunSeed = InRunSeed;
 	bInitialized = true;
-	RegionEventDirector->SetAmbientExplorationSuppressed(true);
+	// The event coordinator resolves explicit demo IDs only; no ambient scheduler is active.
 	RegionEventDirector->OnRegionEventEnded.AddDynamic(this, &ThisClass::HandleGuidedEventEnded);
 
 	const FGPDemoRoutePoint* OpeningPoint = Route.FindPoint(EGPDemoRouteRole::OpeningObjective);
@@ -154,7 +154,6 @@ void AGP_DemoRunDirector::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	if (IsValid(RegionEventDirector))
 	{
 		RegionEventDirector->OnRegionEventEnded.RemoveDynamic(this, &ThisClass::HandleGuidedEventEnded);
-		RegionEventDirector->SetAmbientExplorationSuppressed(false);
 	}
 	if (IsValid(CurrentBoss))
 	{
@@ -240,13 +239,13 @@ void AGP_DemoRunDirector::EvaluateFlow()
 		{
 			if (Now - StageStartedAtSeconds >= GuidedEventWatchdogSeconds)
 			{
-				// Expiration applies the authored consequence, then the exact-event callback keeps the demo moving.
+				// Expiration closes a stalled scripted beat, then the exact-event callback keeps the demo moving.
 				CurrentEvent->ExpireRegionEvent();
 			}
 		}
 		else if (Now - StageStartedAtSeconds >= GuidedEventWatchdogSeconds)
 		{
-			// Temporary exploration-cap conflicts may clear themselves; only the stage watchdog may skip a beat.
+			// Temporary scripted-event conflicts may clear themselves; only the stage watchdog may skip a beat.
 			UE_LOG(LogTemp, Error, TEXT("[DemoFlow] Skipping stage %d after its spawn watchdog elapsed."), static_cast<int32>(CurrentStage));
 			AdvanceFromCurrentEventStage();
 		}
@@ -434,7 +433,6 @@ void AGP_DemoRunDirector::TryStartBossFight()
 		return;
 	}
 
-	CurrentBoss->SetCorruptionRegionId(ObjectiveRegionId);
 	CurrentBoss->OnEnemyDeathStarted.AddDynamic(this, &ThisClass::HandleBossDeathStarted);
 	if (!CurrentBoss->GetController())
 	{
