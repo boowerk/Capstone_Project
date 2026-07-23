@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-23T14:09:49+09:00
+updated: 2026-07-23T17:08:56+09:00
 status: active
 tags:
   - memoc
@@ -11,22 +11,24 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-07-23T14:09:49+09:00
+Last synced: 2026-07-23T17:08:56+09:00
 
 ## Village Multi-Preset Handoff
 
+- Uncommitted slot-capacity work adds `SlotSizeClass` Small (130m) / Medium (230m), with Medium as the backward-compatible default. Assignment rejects presets whose actual Footprint offset+extent exceeds capacity; overlap remains based on actual assigned Footprints. A separate orange editor-only `CapacityBounds` child avoids stripping the runtime root and cancels actor scale, while the inner Footprint stays unchanged. Undo and no-compatible debug paths are guarded. Full Editor build and `ProjectEden.Game.WorldLayout.VillageSelection` pass. Development Game verification is blocked by the unrelated installed `PCGExtendedToolkit` missing `PCGExCore.precompiled`. Choose which `Village_A..E` slots should be Small before saving map overrides.
+- Village_01 Footprint centering is committed as `e4acdb19`; follow-up `35682b31` removes its accidental local `Y +2000cm` double correction. The same five authored layout actors moved together by `Y -2000cm`, `BP_CityAnchor` is at level XY `(0,0)`, and `PCGWorldActor0` remains at origin. Native and placed-Director Footprint offset stays `(0,0,-1500)` with the 130m extent. Rebuild Preview seed 186 in Top Orthographic confirms exact XY center alignment.
 - Editor authoring follow-up: `AGP_VillageLayoutDirector` now exposes `Rebuild Preview` and `Clear Village Preview`. Rebuild uses `PreviewSeed`, loads transient non-saveable Level Instances at the exact runtime slot transforms, runs the existing instance tag/parameter setup, and optionally starts PCG sequentially in Preview editing mode. Runtime components remain Generate On Demand. Cleanup cancels PCG, unloads instances, destroys transient actors, and preserves the map's prior dirty state. Full Editor build and `ProjectEden.Game.WorldLayout.VillageSelection` pass.
 - `bUsePreviewSeedInPIE` is an enabled-by-default Director debug switch. PIE now builds village selection from `PreviewSeed` before requiring GameState RunSeed, while non-PIE and packaged runtime continue using GameState RunSeed. The log prints both values when the override is active. Full Editor build and `ProjectEden.Game.WorldLayout.VillageSelection` pass.
 - `L_LandscapeMap` has five unique SlotIds `Village_A..E`. The duplicated `GP_VillageSlot4/5` values were changed from `Village_C` to `Village_D/E` and the map was saved. Director `Rebuild Preview` at PreviewSeed 186 succeeded with `Village_A=Village_01` plus `Village_E=Village_00`; the log confirms two transient Level Instances and two sequential PCG components, with no duplicate-ID warnings.
 - `AGP_VillageSlot::FootprintBounds` is a visualization-only flat XY preview at slot-local Z=0 (1cm half-height). This prevents the preview child from being snapped independently while the Director later spawns from the unchanged slot actor location.
-- Mixed `L_Village_00`/`L_Village_01` selection is committed. The legacy fields define primary 00 with half extent `(11500,11500,3000)` cm (230x230m full XY); the additional preset pool contains compact 01 with offset `(0,-2000,-1500)` and half extent `(6500,6500,3000)` cm (130x130m full XY). The saved `L_LandscapeMap` Director overrides were updated to the same values. Duplicate IDs/paths are ignored and deterministic bounded assignment retries maximize the selected count before streaming.
+- Mixed `L_Village_00`/`L_Village_01` selection is committed. The legacy fields define primary 00 with half extent `(11500,11500,3000)` cm (230x230m full XY); the additional preset pool contains compact 01 with centered offset `(0,0,-1500)` and half extent `(6500,6500,3000)` cm (130x130m full XY). The saved `L_LandscapeMap` Director overrides were updated to the same values. Duplicate IDs/paths are ignored and deterministic bounded assignment retries maximize the selected count before streaming.
 - Final PIE: Seed `1372115260`, attempt 0, `Village_B=Village_01` and `Village_C=Village_00`; 01 isolated Road 3/District 1, 00 isolated Road 5/District 2, and sequential PCG completed `(2/2)`. Full Editor build and `ProjectEden.Game.WorldLayout.VillageSelection` automation pass.
 - `Project_Eden/Content/WorldLayout/L_Village_01.umap` is tracked in the same commit as the source/tests. The editor is open on `L_LandscapeMap` with PIE stopped; the task did not save the already user-modified map or unrelated region/material/memoc changes.
 
 ## Village Footprint Handoff
 
 - Source-only footprint work is complete. `AGP_VillageLayoutDirector` owns the current preset footprint; slots render it, red means overlap, and candidate conflict IDs feed deterministic non-overlap selection with required-group lookahead.
-- Default half extent is `11500,11500,3000` cm and offset is `0,0,-1500` cm, so Village_00's visible XY footprint is 230m x 230m. Village_01 uses `6500,6500,3000` cm with offset `0,-2000,-1500`, so its visible XY footprint is 130m x 130m. Use `Refresh Footprint Preview` or `Rebuild Preview` after reopening the map.
+- Default half extent is `11500,11500,3000` cm and offset is `0,0,-1500` cm, so Village_00's visible XY footprint is 230m x 230m. Village_01 uses `6500,6500,3000` cm with centered offset `0,0,-1500`, so its visible XY footprint is 130m x 130m. Use `Refresh Footprint Preview` or `Rebuild Preview` after reopening the map.
 - Full `Project_EdenEditor Win64 Development` build and `ProjectEden.Game.WorldLayout.VillageSelection` automation pass. Multi-preset support now uses each assigned preset's own footprint as described above.
 
 ## Village Layout Runtime V1 Handoff
@@ -46,6 +48,7 @@ Last synced: 2026-07-23T14:09:49+09:00
 
 ## Landscape Region Boundary Blend Handoff
 
+- Uncommitted macro-variation first pass: `M_StateMask` now inserts a default-false `UseRegionMacroVariation` branch immediately after `UseRegionVisualBlendV22` and before the optional slope/cliff overlay. It uses one shared world-XY sample from `T_RegionGround_MacroNoise_1024`, multiplies only BaseColor, and reconstructs/passes through the remaining fixed Material Attributes. `MI_RegionLandscape_GameMap2` alone overrides the switch true with `RegionMacroSizeMeters=180`, `RegionMacroStrength=0.16`, and the macro texture. The texture is saved linear (`sRGB=false`, Linear Color sampler). `Project_Eden/Scripts/Editor/ApplyRegionMacroVariation.py` safely reapplies/verifies this setup. Final commandlet returned exit 0 and logged `CODEX_REGION_MACRO_VERIFIED`; no SM6/material compile errors were found. Visual map inspection is the remaining step because Computer Use was accidentally cancelled while UE startup shaders were compiling.
 - Candidate J plus variable blend width is approved and applied. Geometry uses 36-260m non-uniform PCHIP spacing, 4-26m random amplitudes, 50% sign persistence, 16m cap, and fixed junction/perimeter cores. Blend half-width varies independently per region-pair from 18-32px around 24px using 80-240m anchors; each region influence samples its own nearest boundary-side pixel. The runtime shader, hard RegionID, PCG, StateRT, and packed visual IDs are unchanged.
 - Production validation passes 61/61 on two deterministic full runs. Observed width is 18.105-31.112px (mean 23.935px), actual gaps 81.045-237.979m, and unassigned boundary pixels, same-slot support/guard overlap, active-ID mismatch, ID-transition violations, topology changes, and protected-junction changes are zero. Weight PNG is `8209CBD4...11917`; IDs01/IDs23 remain `5FAD10BB...E0B7` / `7A0E2CBF...0913`. The prior Candidate J files are backed up under `Saved/CodexScratch/RegionVisualSlotsV22/candidate_j_before_random_width`; the external V2.2 mirror is updated byte-for-byte.
 - V2.2 is the current GameMap2 Landscape path. `M_StateMask.UseRegionVisualBlendV22` defaults false; only `MI_RegionLandscape_GameMap2` saves true. Disable it for exact V2.1, then disable `UseRegionTransitionV21` for V2. PCG and the other five material instances remain unchanged/default false.
@@ -319,6 +322,10 @@ _None yet._
 
 ## Resume Notes
 
+- 2026-07-24 Stage Zone work is code-complete but awaits content. User already set `Outer` Required/Pick=3 and `Middle` Required/Pick=4 on `L_LandscapeMap`. Reopen after the successful Editor build, add exactly one `AGP_EnemySpawnVolume` and one `APlayerStart` to every `L_Village_00..03`, keep streamed Zone Stage as Legacy because Director overrides it, and author each placed slot's landscape `RegionId`. Add persistent Center/Colosseum zones with explicit stages. Do not PIE-test until those actors exist; otherwise GameMode correctly logs that no zones were found.
+- 2026-07-24 Zone-only navigation is implemented in GameMode. Unlocked stage Zones are invokers; completed/end-play Zones unregister. Defaults are generation `18000cm`, removal `22000cm`, retry `0.25s`, timeout `10s`. `DefaultEngine.ini` enables invoker-only generation and Dynamic Recast. The main map binary contains NavMeshBoundsVolume/RecastNavMesh. PIE still needs `P` visualization and runtime log validation after village Zone actors are authored.
+- 2026-07-24 Outer→Middle travel-map foundation is implemented and uncommitted. Outer clear now spawns one persistent selection portal per Outer; overlap opens a client-only `UGP_MiddleTravelMapWidget` populated with current uncleared Middle zones. Marker selection RPC is server-validated by stage, ZoneId, incomplete state, and 600cm portal proximity, then teleports only that player to a same-LevelInstance actor tagged `MiddleArrivalAnchor` (Zone NavMesh fallback). Existing fixed Middle→Center→Colosseum portals remain unchanged. Editor build, Zone contracts, and minimap stability pass. Pending editor work: create `WBP_MiddleTravelMap`, assign it on `/Game/GAS_Pattern/Player/BP_GP_PlayerController`, and add `VillagePortalAnchor` plus `MiddleArrivalAnchor` TargetPoints to village presets.
+
 - `ABP_UEFNSource_Player` EventGraph already does `Try Get Pawn Owner -> Cast BP_GP_PlayerCharacter -> Get CharacterTrajectory -> Set Character Trajectory`.
 - `GP_CharacterAnimInstance` now reflects `CharacterTrajectory` off the owning character class instead of requiring a fragile nested property-access node in the AnimGraph.
 - `Blend Poses by Enum` node added through tooling could not set protected `BoundEnum`; user rebuilt enum blend manually in editor.
@@ -328,6 +335,15 @@ _None yet._
 ## Suggested Reads
 
 Search first, then open only files named above.
+
+### 2026-07-23 Village capacity handoff
+
+- Capacity implementation and map assignment are committed as `817189ac`.
+- Ten fixed seeds passed Small/Medium compatibility, conflict, and
+  determinism checks. Standalone seeds 0/1/186 completed 7/7 PCG with
+  nonzero managed ISM instances.
+- Next, author a second Small preset (`L_Village_02`), then another Medium
+  preset. Biome/region restrictions and Large capacity remain optional.
 
 ### 2026-07-22 Village streaming handoff
 

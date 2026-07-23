@@ -18,12 +18,14 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Abilities/GameplayAbilityTypes.h"
 #include "GameplayTags/GP_Tags.h"
+#include "Game/GP_GameMode.h"
 #include "InputCoreTypes.h"
 #include "Kismet/GameplayStatics.h"
 #include "Logging/LogMacros.h"
 #include "Player/GP_PlayerState.h"
 #include "UI/GP_AugmentSelectWidget.h"
 #include "UI/GP_CharacterStatsMenuWidget.h"
+#include "UI/GP_MiddleTravelMapWidget.h"
 #include "UI/GP_SkillSelectWidget.h"
 #include "UI/GP_PlayerHUDWidget.h"
 
@@ -122,6 +124,95 @@ void AGP_PlayerController::ClientOpenRegionEventAugmentSelect_Implementation()
 {
 	// Region shrine rewards are chosen locally so each client sees the regular augment picker flow.
 	RequestOpenAugmentSelect();
+}
+
+void AGP_PlayerController::ClientOpenMiddleTravelMap_Implementation(
+	const TArray<FGPMiddleTravelDestination>& Destinations)
+{
+	if (!IsLocalController() || Destinations.IsEmpty() || !EnsureMiddleTravelMapWidget())
+	{
+		return;
+	}
+
+	MiddleTravelMapWidget->SetDestinations(Destinations);
+	if (!MiddleTravelMapWidget->IsInViewport())
+	{
+		MiddleTravelMapWidget->AddToViewport(100);
+	}
+	MiddleTravelMapWidget->SetVisibility(ESlateVisibility::Visible);
+	ApplyMiddleTravelInputMode(true);
+}
+
+void AGP_PlayerController::ClientConfirmMiddleTravel_Implementation()
+{
+	CloseMiddleTravelMap();
+}
+
+void AGP_PlayerController::RequestMiddleTravel(FName DestinationZoneId)
+{
+	if (!IsLocalController() || DestinationZoneId.IsNone())
+	{
+		return;
+	}
+
+	Server_RequestMiddleTravel(DestinationZoneId);
+}
+
+void AGP_PlayerController::CloseMiddleTravelMap()
+{
+	if (IsValid(MiddleTravelMapWidget) && MiddleTravelMapWidget->IsInViewport())
+	{
+		MiddleTravelMapWidget->RemoveFromParent();
+	}
+	ApplyMiddleTravelInputMode(false);
+}
+
+bool AGP_PlayerController::EnsureMiddleTravelMapWidget()
+{
+	if (IsValid(MiddleTravelMapWidget))
+	{
+		return true;
+	}
+
+	if (!MiddleTravelMapWidgetClass)
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("MiddleTravelMapWidgetClass is not set on %s. Assign a Widget Blueprint based on GP_MiddleTravelMapWidget."),
+			*GetName());
+		return false;
+	}
+
+	MiddleTravelMapWidget =
+		CreateWidget<UGP_MiddleTravelMapWidget>(this, MiddleTravelMapWidgetClass);
+	return IsValid(MiddleTravelMapWidget);
+}
+
+void AGP_PlayerController::ApplyMiddleTravelInputMode(bool bMenuOpen)
+{
+	bShowMouseCursor = bMenuOpen;
+	if (bMenuOpen)
+	{
+		FInputModeGameAndUI InputMode;
+		if (MiddleTravelMapWidget)
+		{
+			InputMode.SetWidgetToFocus(MiddleTravelMapWidget->TakeWidget());
+		}
+		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+		InputMode.SetHideCursorDuringCapture(false);
+		SetInputMode(InputMode);
+		return;
+	}
+
+	SetInputMode(FInputModeGameOnly());
+}
+
+void AGP_PlayerController::Server_RequestMiddleTravel_Implementation(
+	FName DestinationZoneId)
+{
+	if (AGP_GameMode* GameMode = GetWorld() ? GetWorld()->GetAuthGameMode<AGP_GameMode>() : nullptr)
+	{
+		GameMode->RequestMiddleTravel(this, DestinationZoneId);
+	}
 }
 
 bool AGP_PlayerController::RequestEquipSkill(UGP_SkillData* SkillData, FGameplayTag SlotTag)

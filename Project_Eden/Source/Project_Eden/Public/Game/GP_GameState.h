@@ -5,6 +5,7 @@
 #include "GP_GameState.generated.h"
 
 class UGP_WorldCorruptionComponent;
+class APlayerState;
 
 // Replicated phase of the linear city-progression run. Drives HUD and client-side presentation.
 UENUM(BlueprintType)
@@ -57,6 +58,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Run")
 	int32 GetRunSeed() const { return RunSeed; }
 
+	UFUNCTION(BlueprintPure, Category = "Run|Progression")
+	bool HasMiddleClearCredit(const APlayerState* PlayerState) const;
+
+	UFUNCTION(BlueprintPure, Category = "Run|Progression")
+	int32 GetMiddleClearCreditCount() const { return MiddleQualifiedPlayers.Num(); }
+
 	UFUNCTION(BlueprintPure, Category = "Run|Region")
 	uint8 GetRegionState(int32 RegionId) const;
 
@@ -68,6 +75,7 @@ public:
 	void SetCurrentZoneIndex(int32 NewZoneIndex);
 	void SetEnemiesRemaining(int32 NewEnemiesRemaining);
 	void SetRunSeed(int32 NewRunSeed);
+	void GrantMiddleClearCredit(APlayerState* PlayerState);
 
 	// Server-only. Resizes RegionStates to Count and fills it with InitialState
 	// (e.g. all regions dead at run start). Broadcasts a reset (-1).
@@ -105,6 +113,9 @@ protected:
 
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Run", meta = (AllowPrivateAccess = "true"))
 	int32 RunSeed = INDEX_NONE;
+
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Run|Progression", meta = (AllowPrivateAccess = "true"))
+	TArray<TObjectPtr<APlayerState>> MiddleQualifiedPlayers;
 
 	// Per-region state value (index = region id). Replicated; clients apply it
 	// to the landscape/vegetation via OnRegionStateChanged.

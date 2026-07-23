@@ -33,3 +33,7 @@ _None yet. Use `memoc ingest` or `memoc note "<title>"` to create source-backed 
 - [Agent Index](../00-agent-index.md)
 - [Project Brief](../00-project-brief.md)
 - [Current Project State](../02-current-project-state.md)
+
+## Knowledge Pages
+
+- [Village slot capacity and preset footprint](knowledge/topics/village-slot-capacity-and-preset-footprint.md) — saved query/topic note.

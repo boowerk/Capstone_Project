@@ -9,6 +9,7 @@
 #include "Engine/LevelStreamingDynamic.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "Game/GP_EnemySpawnVolume.h"
 #include "Game/GP_GameState.h"
 #include "Game/WorldLayout/GP_VillagePresetCatalog.h"
 #include "Game/WorldLayout/GP_VillageSelectionPolicy.h"
@@ -89,6 +90,51 @@ namespace
 			? FName(*Preset.VillageLevel.ToSoftObjectPath().GetAssetName())
 			: Preset.PresetId;
 	}
+
+	EGPZoneStage ResolveZoneStage(FName GroupId, FName SlotId)
+	{
+		const FString Group = GroupId.ToString();
+		const FString Slot = SlotId.ToString();
+		if (Group.Equals(TEXT("Outer"), ESearchCase::IgnoreCase)
+			|| Slot.StartsWith(TEXT("Outer_"), ESearchCase::IgnoreCase))
+		{
+			return EGPZoneStage::Outer;
+		}
+		if (Group.Equals(TEXT("Middle"), ESearchCase::IgnoreCase)
+			|| Slot.StartsWith(TEXT("Middle_"), ESearchCase::IgnoreCase))
+		{
+			return EGPZoneStage::Middle;
+		}
+		if (Group.Equals(TEXT("Center"), ESearchCase::IgnoreCase)
+			|| Slot.StartsWith(TEXT("Center_"), ESearchCase::IgnoreCase))
+		{
+			return EGPZoneStage::Center;
+		}
+		if (Group.Equals(TEXT("Colosseum"), ESearchCase::IgnoreCase)
+			|| Slot.StartsWith(TEXT("Colosseum_"), ESearchCase::IgnoreCase))
+		{
+			return EGPZoneStage::Colosseum;
+		}
+		return EGPZoneStage::Legacy;
+	}
+
+	int32 GetZoneStageOrder(EGPZoneStage Stage)
+	{
+		switch (Stage)
+		{
+		case EGPZoneStage::Outer:
+			return 0;
+		case EGPZoneStage::Middle:
+			return 1;
+		case EGPZoneStage::Center:
+			return 2;
+		case EGPZoneStage::Colosseum:
+			return 3;
+		case EGPZoneStage::Legacy:
+		default:
+			return 0;
+		}
+	}
 }
 
 int32 AGP_VillageLayoutDirector::SelectVillagePresetIndex(
@@ -121,6 +167,7 @@ int32 AGP_VillageLayoutDirector::SelectVillagePresetIndex(
 			&& Preset.SelectionWeight > 0.0f
 			&& PresetIdCounts.FindRef(PresetId) == 1
 			&& LevelPathCounts.FindRef(LevelPath) == 1
+			&& Preset.PresetSizeClass == SlotSizeClass
 			&& DoesVillageFootprintFitSlot(Preset.Footprint, SlotSizeClass))
 		{
 			ValidPresetIndices.Add(PresetIndex);
@@ -295,6 +342,7 @@ TArray<FGP_VillagePresetDefinition> AGP_VillageLayoutDirector::BuildEffectiveVil
 		FGP_VillagePresetDefinition PrimaryPreset;
 		PrimaryPreset.PresetId = TEXT("Village_00");
 		PrimaryPreset.VillageLevel = VillageLevelPreset;
+		PrimaryPreset.PresetSizeClass = EGP_VillageSlotSizeClass::Medium;
 		PrimaryPreset.Footprint = VillagePresetFootprint;
 		PrimaryPresets.Add(PrimaryPreset);
 	}
@@ -371,6 +419,7 @@ bool AGP_VillageLayoutDirector::BuildSelectionForSeed(int32 InRunSeed)
 		return false;
 	}
 
+	bRuntimeLayoutReady = false;
 	CollectSlots();
 	TArray<AGP_VillageSlot*> CandidateSlots;
 	for (AGP_VillageSlot* Slot : CachedSlots)
@@ -483,6 +532,11 @@ bool AGP_VillageLayoutDirector::BuildSelectionForSeed(int32 InRunSeed)
 	if (bDrawDebug)
 	{
 		DrawSelectionDebug();
+	}
+
+	if (bIsGameWorld && (!bShouldStreamVillageLevel || SelectedSet.IsEmpty()))
+	{
+		MarkRuntimeLayoutReady();
 	}
 
 	return Result.bSucceeded && bDataLayersApplied && bVillageLevelScheduled;
@@ -1240,6 +1294,7 @@ bool AGP_VillageLayoutDirector::StreamSelectedVillageLevels(const TSet<FName>& I
 
 	if (InSelectedSlotIds.IsEmpty())
 	{
+		MarkRuntimeLayoutReady();
 		return true;
 	}
 
@@ -1391,6 +1446,71 @@ void AGP_VillageLayoutDirector::UnloadActiveVillageLevels()
 	GeneratedVillageLevelIds.Reset();
 	PendingVillagePCGComponents.Reset();
 	ExpectedVillageLevelCount = 0;
+	bRuntimeLayoutReady = false;
+}
+
+void AGP_VillageLayoutDirector::ConfigureVillageGameplayActors(
+	ULevelStreamingDynamic* StreamingLevel,
+	FName SlotId) const
+{
+	ULevel* LoadedLevel = StreamingLevel ? StreamingLevel->GetLoadedLevel() : nullptr;
+	if (!LoadedLevel)
+	{
+		return;
+	}
+
+	const AGP_VillageSlot* Slot = nullptr;
+	for (const AGP_VillageSlot* Candidate : CachedSlots)
+	{
+		if (IsValid(Candidate) && Candidate->GetSlotId() == SlotId)
+		{
+			Slot = Candidate;
+			break;
+		}
+	}
+	if (!Slot)
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[VillageLayout] Cannot configure gameplay actors for unknown slot '%s'."),
+			*SlotId.ToString());
+		return;
+	}
+
+	const EGPZoneStage Stage = ResolveZoneStage(Slot->GetGroupId(), SlotId);
+	int32 ZoneCount = 0;
+	for (AActor* Actor : LoadedLevel->Actors)
+	{
+		AGP_EnemySpawnVolume* Zone = Cast<AGP_EnemySpawnVolume>(Actor);
+		if (!IsValid(Zone))
+		{
+			continue;
+		}
+
+		++ZoneCount;
+		const FName RuntimeZoneId = ZoneCount == 1
+			? SlotId
+			: FName(*FString::Printf(TEXT("%s_%02d"), *SlotId.ToString(), ZoneCount));
+		Zone->ConfigureRuntimeZone(
+			RuntimeZoneId,
+			Stage,
+			GetZoneStageOrder(Stage),
+			Slot->GetRegionId());
+	}
+
+	if (ZoneCount == 0)
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[VillageLayout] Slot '%s' preset has no AGP_EnemySpawnVolume yet."),
+			*SlotId.ToString());
+		return;
+	}
+
+	UE_LOG(LogTemp, Log,
+		TEXT("[VillageLayout] Configured %d gameplay zone(s) for slot '%s' Stage=%d RegionId=%d."),
+		ZoneCount,
+		*SlotId.ToString(),
+		static_cast<int32>(Stage),
+		Slot->GetRegionId());
 }
 
 bool AGP_VillageLayoutDirector::ConfigureVillagePCG(
@@ -1818,6 +1938,7 @@ void AGP_VillageLayoutDirector::HandleVillageLevelLoaded()
 		int32 PCGComponentCount = 0;
 		int32 RoadActorCount = 0;
 		int32 DistrictActorCount = 0;
+		ConfigureVillageGameplayActors(Pair.Value, Pair.Key);
 		if (!ConfigureVillagePCG(
 			Pair.Value,
 			Pair.Key,
@@ -1916,6 +2037,7 @@ void AGP_VillageLayoutDirector::HandleVillagePCGGenerated(UPCGComponent* PCGComp
 		&& GeneratedVillageLevelIds.Num() == ExpectedVillageLevelCount)
 	{
 		ClearVillageStreamingTimeout();
+		MarkRuntimeLayoutReady();
 		return;
 	}
 
@@ -1986,6 +2108,21 @@ void AGP_VillageLayoutDirector::ClearVillageStreamingTimeout()
 	{
 		VillageStreamingTimeoutHandle.Invalidate();
 	}
+}
+
+void AGP_VillageLayoutDirector::MarkRuntimeLayoutReady()
+{
+	if (bRuntimeLayoutReady || !GetWorld() || !GetWorld()->IsGameWorld())
+	{
+		return;
+	}
+
+	bRuntimeLayoutReady = true;
+	UE_LOG(LogTemp, Log,
+		TEXT("[VillageLayout] Runtime layout ready. Selected=%d Generated=%d."),
+		SelectedSlotIds.Num(),
+		GeneratedVillageLevelIds.Num());
+	OnRuntimeLayoutReady.Broadcast();
 }
 
 void AGP_VillageLayoutDirector::DrawSelectionDebug() const

@@ -14,6 +14,8 @@ class USceneComponent;
 class ULevelStreamingDynamic;
 class UWorld;
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FGPOnVillageRuntimeLayoutReady);
+
 UCLASS(Blueprintable)
 class PROJECT_EDEN_API AGP_VillageLayoutDirector : public AActor
 {
@@ -40,6 +42,12 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Village|Debug")
 	FString GetLastSelectionSummary() const { return LastSelectionSummary; }
+
+	UFUNCTION(BlueprintPure, Category = "Village|Runtime")
+	bool IsRuntimeLayoutReady() const { return bRuntimeLayoutReady; }
+
+	UPROPERTY(BlueprintAssignable, Category = "Village|Runtime")
+	FGPOnVillageRuntimeLayoutReady OnRuntimeLayoutReady;
 
 	UFUNCTION(BlueprintPure, Category = "Village|Level Instance")
 	TSoftObjectPtr<UWorld> GetVillageLevelPreset() const { return VillageLevelPreset; }
@@ -167,6 +175,7 @@ private:
 	int32 ExpectedVillageLevelCount = 0;
 	bool bVillageLevelBatchFailed = false;
 	bool bSchedulingVillagePCG = false;
+	bool bRuntimeLayoutReady = false;
 
 	int32 LastRunSeed = INDEX_NONE;
 	int32 LastPresetAssignmentAttempt = 0;
@@ -195,6 +204,9 @@ private:
 		int32& OutPCGComponentCount,
 		int32& OutRoadActorCount,
 		int32& OutDistrictActorCount) const;
+	void ConfigureVillageGameplayActors(
+		ULevelStreamingDynamic* StreamingLevel,
+		FName SlotId) const;
 	bool GenerateVillagePCG(
 		ULevelStreamingDynamic* StreamingLevel,
 		FName SlotId,
@@ -212,6 +224,7 @@ private:
 	void HandleVillagePCGCancelled(UPCGComponent* PCGComponent);
 	void HandleVillageStreamingTimeout();
 	void ClearVillageStreamingTimeout();
+	void MarkRuntimeLayoutReady();
 	void DrawSelectionDebug() const;
 
 	UFUNCTION()

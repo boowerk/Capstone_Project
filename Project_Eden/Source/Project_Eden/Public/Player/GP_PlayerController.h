@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
+#include "Game/GP_MiddleTravelTypes.h"
 #include "GameplayTagContainer.h"
 #include "GP_PlayerController.generated.h"
 
@@ -17,6 +18,7 @@ class UGP_SkillPoolData;
 class UGP_SkillSelectWidget;
 class UGP_TestSkillSet;
 class UGP_PlayerHUDWidget;
+class UGP_MiddleTravelMapWidget;
 class UInputAction;
 class UInputMappingContext;
 class UUserWidget;
@@ -52,6 +54,19 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "UI|Skill")
 	UGP_SkillPoolData* GetSkillPoolData() const { return SkillPoolData; }
+
+	UFUNCTION(Client, Reliable, Category = "UI|Middle Travel")
+	void ClientOpenMiddleTravelMap(
+		const TArray<FGPMiddleTravelDestination>& Destinations);
+
+	UFUNCTION(Client, Reliable, Category = "UI|Middle Travel")
+	void ClientConfirmMiddleTravel();
+
+	UFUNCTION(BlueprintCallable, Category = "UI|Middle Travel")
+	void RequestMiddleTravel(FName DestinationZoneId);
+
+	UFUNCTION(BlueprintCallable, Category = "UI|Middle Travel")
+	void CloseMiddleTravelMap();
 
 protected:
 	virtual void BeginPlay() override;
@@ -129,6 +144,12 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UGP_PlayerHUDWidget> HUDWidget;
+
+	UPROPERTY(EditDefaultsOnly, Category = "UI|Middle Travel")
+	TSubclassOf<UGP_MiddleTravelMapWidget> MiddleTravelMapWidgetClass;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UGP_MiddleTravelMapWidget> MiddleTravelMapWidget;
 
 	UPROPERTY(EditDefaultsOnly, Category = "UI|Character Menu")
 	TSubclassOf<UGP_CharacterStatsMenuWidget> CharacterStatsMenuWidgetClass;
@@ -225,6 +246,9 @@ private:
 	UFUNCTION(Server, Reliable)
 	void Server_EquipSkill(UGP_SkillData* SkillData, FGameplayTag SlotTag);
 
+	UFUNCTION(Server, Reliable)
+	void Server_RequestMiddleTravel(FName DestinationZoneId);
+
 	bool CanEquipSkill(UGP_SkillData* SkillData, FGameplayTag SlotTag) const;
 	bool ActivateAbilityByTag(const FGameplayTag& AbilityTag) const;
 	bool IsSkillSelectionActive() const;
@@ -247,6 +271,8 @@ private:
 	void OpenSkillSelect();
 	void CloseSkillSelect();
 	void ApplySkillSelectInputMode(bool bMenuOpen);
+	bool EnsureMiddleTravelMapWidget();
+	void ApplyMiddleTravelInputMode(bool bMenuOpen);
 	FVector2D ResolveEffectiveMoveInput(const AGP_PlayerCharacter* PlayerCharacter) const;
 	void UpdateMovementSpeed(float DeltaSeconds);
 	void UpdateCharacterRotation(float DeltaSeconds);

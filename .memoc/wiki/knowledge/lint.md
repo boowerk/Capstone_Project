@@ -2,30 +2,32 @@
 memoc: true
 type: wiki
 scope: project-memory
-created: 2026-05-21T07:03:24
-updated: 2026-05-21T07:03:24
+created: 2026-07-23T07:19:44
+updated: 2026-07-23T07:19:44
 status: generated
 confidence: medium
 tags:
   - memoc
   - memoc/wiki
-  - memoc/lint
   - memoc/knowledge-wiki
+  - memoc/lint
 ---
 # Wiki Lint
 
-Last checked: 2026-05-21T07:03:24
+Last checked: 2026-07-23T07:19:44
 
 ## Graph Checks
 
 - Every wiki page is listed from [Wiki Index](../index.md) or a directory README.
-- Every wiki page links back to an index, hub, source, topic, or related page.
+- Every wiki page links back to an index, project hub, knowledge hub, source, topic, or related page.
 - Important concepts mentioned in two or more places have their own linked page.
 - Source records link to the pages they update, and those pages link back to sources when provenance matters.
 
 ## Issues
 
-_No issues found._
+- .memoc/wiki/knowledge/sources/README.md: broken link ../index.md
+- .memoc/wiki/knowledge/topics/README.md: broken link ../index.md
+- .memoc/wiki/knowledge/topics/README.md: broken link ../index.md
 
 ## Warnings
 

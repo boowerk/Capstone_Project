@@ -6,10 +6,29 @@
 
 class AGP_EnemyCharacter;
 class AGP_EnemySpawnMarker;
+class APlayerState;
 class UBoxComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FGPOnPlayerEnteredZone, AGP_EnemySpawnVolume*, Zone);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
+	FGPOnPlayerEnteredZoneDetailed,
+	AGP_EnemySpawnVolume*, Zone,
+	APlayerState*, PlayerState);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
+	FGPOnPlayerExitedZoneDetailed,
+	AGP_EnemySpawnVolume*, Zone,
+	APlayerState*, PlayerState);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FGPOnMarkerTriggered, AGP_EnemySpawnVolume*, Zone, AGP_EnemySpawnMarker*, Marker);
+
+UENUM(BlueprintType)
+enum class EGPZoneStage : uint8
+{
+	Legacy UMETA(DisplayName = "Legacy Linear"),
+	Outer UMETA(DisplayName = "Outer"),
+	Middle UMETA(DisplayName = "Middle"),
+	Center UMETA(DisplayName = "Center"),
+	Colosseum UMETA(DisplayName = "Colosseum")
+};
 
 /** One enemy type and how many of it spawn. */
 USTRUCT(BlueprintType)
@@ -43,6 +62,8 @@ public:
 	AGP_EnemySpawnVolume();
 
 	int32 GetZoneOrder() const { return ZoneOrder; }
+	FName GetZoneId() const { return ZoneId; }
+	EGPZoneStage GetZoneStage() const { return ZoneStage; }
 	bool IsBossZone() const { return bIsBossZone; }
 	FText GetDisplayName() const { return DisplayName; }
 	const TArray<int32>& GetRegionsToRevive() const { return RegionsToRevive; }
@@ -53,6 +74,11 @@ public:
 
 	void Unlock();
 	void ActivateMarkers();
+	void ConfigureRuntimeZone(
+		FName InZoneId,
+		EGPZoneStage InZoneStage,
+		int32 InZoneOrder,
+		int32 InRegionId);
 
 	// Called by AGP_EnemySpawnMarker when a player enters its radius.
 	void NotifyMarkerTriggered(AGP_EnemySpawnMarker* Marker);
@@ -62,6 +88,12 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category = "Zone")
 	FGPOnPlayerEnteredZone OnPlayerEnteredZone;
+
+	UPROPERTY(BlueprintAssignable, Category = "Zone")
+	FGPOnPlayerEnteredZoneDetailed OnPlayerEnteredZoneDetailed;
+
+	UPROPERTY(BlueprintAssignable, Category = "Zone")
+	FGPOnPlayerExitedZoneDetailed OnPlayerExitedZoneDetailed;
 
 	UPROPERTY(BlueprintAssignable, Category = "Zone")
 	FGPOnMarkerTriggered OnMarkerTriggered;
@@ -74,6 +106,12 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Zone")
 	int32 ZoneOrder = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Zone")
+	FName ZoneId = NAME_None;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Zone")
+	EGPZoneStage ZoneStage = EGPZoneStage::Legacy;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Zone")
 	FText DisplayName;
@@ -109,4 +147,11 @@ private:
 	UFUNCTION()
 	void HandleBoxOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
 		UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+
+	UFUNCTION()
+	void HandleBoxEndOverlap(
+		UPrimitiveComponent* OverlappedComp,
+		AActor* OtherActor,
+		UPrimitiveComponent* OtherComp,
+		int32 OtherBodyIndex);
 };

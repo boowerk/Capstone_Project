@@ -20,9 +20,13 @@ class PROJECT_EDEN_API AGP_RunPortal : public AActor
 
 public:
 	AGP_RunPortal();
+	virtual void GetLifetimeReplicatedProps(
+		TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	// Set by GameMode at spawn: where players are sent when they enter this portal.
 	void SetTargetLocation(const FVector& InTargetLocation) { TargetLocation = InTargetLocation; }
+	void SetMiddleDestinationSelection(bool bEnabled) { bMiddleDestinationSelection = bEnabled; }
+	bool IsMiddleDestinationSelection() const { return bMiddleDestinationSelection; }
 
 protected:
 	virtual void BeginPlay() override;
@@ -35,11 +39,18 @@ protected:
 	UFUNCTION(BlueprintImplementableEvent, Category = "Portal")
 	void OnPlayerPassedThrough(AGP_PlayerCharacter* Player);
 
+	// Fired for the owning player when this portal opens the Middle destination map.
+	UFUNCTION(BlueprintImplementableEvent, Category = "Portal")
+	void OnMiddleDestinationSelectionOpened(AGP_PlayerCharacter* Player);
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Portal")
 	TObjectPtr<USphereComponent> Trigger;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Portal")
 	FVector TargetLocation = FVector::ZeroVector;
+
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category = "Portal")
+	bool bMiddleDestinationSelection = false;
 
 private:
 	// Tracks which players have already passed through to prevent double-teleport.

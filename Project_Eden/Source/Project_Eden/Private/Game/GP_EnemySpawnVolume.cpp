@@ -3,6 +3,8 @@
 #include "Characters/GP_PlayerCharacter.h"
 #include "Components/BoxComponent.h"
 #include "Game/GP_EnemySpawnMarker.h"
+#include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerState.h"
 #include "Kismet/GameplayStatics.h"
 #include "NavigationSystem.h"
 
@@ -46,6 +48,7 @@ void AGP_EnemySpawnVolume::BeginPlay()
 	if (HasAuthority())
 	{
 		SpawnBox->OnComponentBeginOverlap.AddDynamic(this, &AGP_EnemySpawnVolume::HandleBoxOverlap);
+		SpawnBox->OnComponentEndOverlap.AddDynamic(this, &AGP_EnemySpawnVolume::HandleBoxEndOverlap);
 	}
 
 	// Collect AGP_EnemySpawnMarker actors whose centers fall inside this box.
@@ -55,6 +58,11 @@ void AGP_EnemySpawnVolume::BeginPlay()
 	{
 		if (AGP_EnemySpawnMarker* Marker = Cast<AGP_EnemySpawnMarker>(Actor))
 		{
+			if (Marker->GetLevel() != GetLevel())
+			{
+				continue;
+			}
+
 			// Use point-in-box check instead of overlap (overlap not ready at BeginPlay).
 			const FVector Local = SpawnBox->GetComponentTransform().InverseTransformPosition(Marker->GetActorLocation());
 			const FVector Extent = SpawnBox->GetScaledBoxExtent();
@@ -71,6 +79,25 @@ void AGP_EnemySpawnVolume::BeginPlay()
 void AGP_EnemySpawnVolume::Unlock()
 {
 	bUnlocked = true;
+}
+
+void AGP_EnemySpawnVolume::ConfigureRuntimeZone(
+	FName InZoneId,
+	EGPZoneStage InZoneStage,
+	int32 InZoneOrder,
+	int32 InRegionId)
+{
+	ZoneId = InZoneId;
+	ZoneStage = InZoneStage;
+	ZoneOrder = InZoneOrder;
+	if (InRegionId != INDEX_NONE)
+	{
+		CorruptionRegionId = InRegionId;
+		if (RegionsToRevive.IsEmpty())
+		{
+			RegionsToRevive.Add(InRegionId);
+		}
+	}
 }
 
 void AGP_EnemySpawnVolume::ActivateMarkers()
@@ -92,13 +119,37 @@ void AGP_EnemySpawnVolume::NotifyMarkerTriggered(AGP_EnemySpawnMarker* Marker)
 void AGP_EnemySpawnVolume::HandleBoxOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
 	UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
-	if (bEntered || !bUnlocked || !Cast<AGP_PlayerCharacter>(OtherActor))
+	if (!bUnlocked || !Cast<AGP_PlayerCharacter>(OtherActor))
 	{
 		return;
 	}
 
-	bEntered = true;
-	OnPlayerEnteredZone.Broadcast(this);
+	const APawn* PlayerPawn = Cast<APawn>(OtherActor);
+	APlayerState* PlayerState = PlayerPawn ? PlayerPawn->GetPlayerState() : nullptr;
+	if (PlayerState)
+	{
+		OnPlayerEnteredZoneDetailed.Broadcast(this, PlayerState);
+	}
+
+	if (!bEntered)
+	{
+		bEntered = true;
+		OnPlayerEnteredZone.Broadcast(this);
+	}
+}
+
+void AGP_EnemySpawnVolume::HandleBoxEndOverlap(
+	UPrimitiveComponent* OverlappedComp,
+	AActor* OtherActor,
+	UPrimitiveComponent* OtherComp,
+	int32 OtherBodyIndex)
+{
+	const APawn* PlayerPawn = Cast<APawn>(OtherActor);
+	APlayerState* PlayerState = PlayerPawn ? PlayerPawn->GetPlayerState() : nullptr;
+	if (PlayerState)
+	{
+		OnPlayerExitedZoneDetailed.Broadcast(this, PlayerState);
+	}
 }
 
 FVector AGP_EnemySpawnVolume::ProjectToNavmesh(const FVector& DesiredLocation, bool& bOutProjected) const

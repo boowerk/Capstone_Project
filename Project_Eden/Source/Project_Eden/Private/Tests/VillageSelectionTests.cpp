@@ -552,6 +552,8 @@ bool FVillageSelectionPolicyTest::RunTest(const FString& Parameters)
 		AGP_VillageLayoutDirector::StaticClass()->FindPropertyByName(TEXT("VillagePresetPool")));
 	TestNotNull(TEXT("VillageLayoutDirector exposes a village preset catalog"),
 		AGP_VillageLayoutDirector::StaticClass()->FindPropertyByName(TEXT("VillagePresetCatalog")));
+	TestNotNull(TEXT("Village presets expose an explicit size class"),
+		FGP_VillagePresetDefinition::StaticStruct()->FindPropertyByName(TEXT("PresetSizeClass")));
 	TestNotNull(TEXT("VillageSlot exposes a size-class capacity"),
 		AGP_VillageSlot::StaticClass()->FindPropertyByName(TEXT("SlotSizeClass")));
 	TestNotNull(TEXT("Village candidates expose footprint conflicts"),
@@ -655,15 +657,22 @@ bool FVillageSelectionPolicyTest::RunTest(const FString& Parameters)
 		{
 			return Preset.PresetId == FName(TEXT("Village_02"));
 		});
+	const FGP_VillagePresetDefinition* Village03Preset = DefaultPresetPool.FindByPredicate(
+		[](const FGP_VillagePresetDefinition& Preset)
+		{
+			return Preset.PresetId == FName(TEXT("Village_03"));
+		});
 	TestNotNull(TEXT("Village_00 preset is available"), Village00Preset);
 	TestNotNull(TEXT("Village_01 preset is available"), Village01Preset);
 	TestNotNull(TEXT("Village_02 preset is available"), Village02Preset);
-	if (Village00Preset && Village01Preset && Village02Preset)
+	TestNotNull(TEXT("Village_03 preset is available"), Village03Preset);
+	if (Village00Preset && Village01Preset && Village02Preset && Village03Preset)
 	{
 		const TArray<FGP_VillagePresetDefinition> BaselinePresetPool = {
 			*Village00Preset,
 			*Village01Preset,
-			*Village02Preset
+			*Village02Preset,
+			*Village03Preset
 		};
 		TestEqual(TEXT("Village_00 preset keeps the legacy level"),
 			Village00Preset->VillageLevel.ToSoftObjectPath(),
@@ -674,12 +683,26 @@ bool FVillageSelectionPolicyTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("Village_01 uses a 130 m square compact footprint"),
 			Village01Preset->Footprint.FootprintExtent,
 			FVector(6500.0f, 6500.0f, 3000.0f));
+		TestTrue(TEXT("Village_01 is explicitly Small"),
+			Village01Preset->PresetSizeClass == EGP_VillageSlotSizeClass::Small);
 		TestEqual(TEXT("Village_02 preset uses the second compact level"),
 			Village02Preset->VillageLevel.ToSoftObjectPath(),
 			FSoftObjectPath(TEXT("/Game/WorldLayout/L_Village_02.L_Village_02")));
 		TestEqual(TEXT("Village_02 uses a 130 m square compact footprint"),
 			Village02Preset->Footprint.FootprintExtent,
 			FVector(6500.0f, 6500.0f, 3000.0f));
+		TestTrue(TEXT("Village_02 is explicitly Small"),
+			Village02Preset->PresetSizeClass == EGP_VillageSlotSizeClass::Small);
+		TestEqual(TEXT("Village_03 preset uses the second Medium level"),
+			Village03Preset->VillageLevel.ToSoftObjectPath(),
+			FSoftObjectPath(TEXT("/Game/WorldLayout/L_Village_03.L_Village_03")));
+		TestEqual(TEXT("Village_03 uses a 230 m square Medium footprint"),
+			Village03Preset->Footprint.FootprintExtent,
+			FVector(11500.0f, 11500.0f, 3000.0f));
+		TestTrue(TEXT("Village_03 is explicitly Medium"),
+			Village03Preset->PresetSizeClass == EGP_VillageSlotSizeClass::Medium);
+		TestTrue(TEXT("Village_00 is explicitly Medium"),
+			Village00Preset->PresetSizeClass == EGP_VillageSlotSizeClass::Medium);
 		TestEqual(TEXT("Village_00 footprint is centered on its level origin"),
 			FVector2D(
 				Village00Preset->Footprint.FootprintOffset.X,
@@ -794,9 +817,9 @@ bool FVillageSelectionPolicyTest::RunTest(const FString& Parameters)
 			}
 		}
 
-		bool bSawVillage00 = false;
-		bool bSawVillage01 = false;
-		bool bSawVillage02 = false;
+		bool bMediumSlotSawVillage00 = false;
+		bool bMediumSlotSawVillage03 = false;
+		bool bMediumSlotSelectedOnlyMediumPresets = true;
 		for (int32 Seed = 0; Seed < 128; ++Seed)
 		{
 			const int32 PresetIndex = AGP_VillageLayoutDirector::SelectVillagePresetIndex(
@@ -805,14 +828,19 @@ bool FVillageSelectionPolicyTest::RunTest(const FString& Parameters)
 				BaselinePresetPool);
 			if (BaselinePresetPool.IsValidIndex(PresetIndex))
 			{
-				bSawVillage00 |= BaselinePresetPool[PresetIndex].PresetId == FName(TEXT("Village_00"));
-				bSawVillage01 |= BaselinePresetPool[PresetIndex].PresetId == FName(TEXT("Village_01"));
-				bSawVillage02 |= BaselinePresetPool[PresetIndex].PresetId == FName(TEXT("Village_02"));
+				bMediumSlotSawVillage00 |=
+					BaselinePresetPool[PresetIndex].PresetId == FName(TEXT("Village_00"));
+				bMediumSlotSawVillage03 |=
+					BaselinePresetPool[PresetIndex].PresetId == FName(TEXT("Village_03"));
+				bMediumSlotSelectedOnlyMediumPresets &=
+					BaselinePresetPool[PresetIndex].PresetSizeClass
+						== EGP_VillageSlotSizeClass::Medium;
 			}
 		}
-		TestTrue(TEXT("Run seeds can select Village_00"), bSawVillage00);
-		TestTrue(TEXT("Run seeds can select Village_01"), bSawVillage01);
-		TestTrue(TEXT("Run seeds can select Village_02"), bSawVillage02);
+		TestTrue(TEXT("Medium slots can select Village_00"), bMediumSlotSawVillage00);
+		TestTrue(TEXT("Medium slots can select Village_03"), bMediumSlotSawVillage03);
+		TestTrue(TEXT("Medium slots reject Small presets for every seed"),
+			bMediumSlotSelectedOnlyMediumPresets);
 
 		bool bSmallSlotSelectedOnlyCompatiblePresets = true;
 		bool bSmallSlotSawVillage01 = false;
@@ -833,7 +861,9 @@ bool FVillageSelectionPolicyTest::RunTest(const FString& Parameters)
 
 			const FName SelectedPresetId = BaselinePresetPool[PresetIndex].PresetId;
 			bSmallSlotSelectedOnlyCompatiblePresets &=
-				AGP_VillageLayoutDirector::DoesVillageFootprintFitSlot(
+				BaselinePresetPool[PresetIndex].PresetSizeClass
+					== EGP_VillageSlotSizeClass::Small
+				&& AGP_VillageLayoutDirector::DoesVillageFootprintFitSlot(
 					BaselinePresetPool[PresetIndex].Footprint,
 					EGP_VillageSlotSizeClass::Small);
 			bSmallSlotSawVillage01 |= SelectedPresetId == FName(TEXT("Village_01"));
@@ -847,9 +877,7 @@ bool FVillageSelectionPolicyTest::RunTest(const FString& Parameters)
 		TArray<FGP_VillagePresetDefinition> MediumOnlyPool = DefaultPresetPool;
 		for (FGP_VillagePresetDefinition& Preset : MediumOnlyPool)
 		{
-			if (AGP_VillageLayoutDirector::DoesVillageFootprintFitSlot(
-					Preset.Footprint,
-					EGP_VillageSlotSizeClass::Small))
+			if (Preset.PresetSizeClass == EGP_VillageSlotSizeClass::Small)
 			{
 				Preset.SelectionWeight = 0.0f;
 			}
@@ -874,7 +902,9 @@ bool FVillageSelectionPolicyTest::RunTest(const FString& Parameters)
 		const int32 Village01OnlyIndex = AGP_VillageLayoutDirector::SelectVillagePresetIndex(
 			1337,
 			FName(TEXT("Village_A")),
-			Village01OnlyPool);
+			Village01OnlyPool,
+			0,
+			EGP_VillageSlotSizeClass::Small);
 		TestTrue(TEXT("Zero-weight presets are excluded"),
 			Village01OnlyPool.IsValidIndex(Village01OnlyIndex)
 				&& Village01OnlyPool[Village01OnlyIndex].PresetId == FName(TEXT("Village_01")));
@@ -883,14 +913,17 @@ bool FVillageSelectionPolicyTest::RunTest(const FString& Parameters)
 		const int32 BaselineStableIndex = AGP_VillageLayoutDirector::SelectVillagePresetIndex(
 			1337,
 			FName(TEXT("Village_A")),
-			BaselinePresetPool);
+			BaselinePresetPool,
+			0,
+			EGP_VillageSlotSizeClass::Small);
 		for (int32 Attempt = 1; Attempt < 32; ++Attempt)
 		{
 			const int32 AttemptIndex = AGP_VillageLayoutDirector::SelectVillagePresetIndex(
 				1337,
 				FName(TEXT("Village_A")),
 				BaselinePresetPool,
-				Attempt);
+				Attempt,
+				EGP_VillageSlotSizeClass::Small);
 			bSawAlternateAttemptPreset |= BaselinePresetPool.IsValidIndex(AttemptIndex)
 				&& BaselinePresetPool.IsValidIndex(BaselineStableIndex)
 				&& BaselinePresetPool[AttemptIndex].PresetId

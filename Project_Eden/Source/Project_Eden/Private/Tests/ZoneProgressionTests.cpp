@@ -5,7 +5,10 @@
 #include "Game/GP_EnemySpawnVolume.h"
 #include "Game/GP_GameMode.h"
 #include "Game/GP_GameState.h"
+#include "Game/GP_RunPortal.h"
 #include "Game/WorldLayout/GP_VillageLayoutDirector.h"
+#include "Player/GP_PlayerController.h"
+#include "UI/GP_MiddleTravelMapWidget.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FGPZoneProgressionContractTest,
@@ -54,6 +57,25 @@ bool FGPZoneProgressionContractTest::RunTest(const FString& Parameters)
 		TEXT("GameMode exposes the zone navigation removal radius"),
 		AGP_GameMode::StaticClass()->FindPropertyByName(
 			TEXT("ZoneNavigationRemovalRadius")));
+	TestNotNull(
+		TEXT("GameMode exposes the authored village portal anchor tag"),
+		AGP_GameMode::StaticClass()->FindPropertyByName(
+			TEXT("VillagePortalAnchorTag")));
+	TestNotNull(
+		TEXT("GameMode exposes the authored Middle arrival anchor tag"),
+		AGP_GameMode::StaticClass()->FindPropertyByName(
+			TEXT("MiddleArrivalAnchorTag")));
+	TestNotNull(
+		TEXT("PlayerController exposes a Middle travel map widget class"),
+		AGP_PlayerController::StaticClass()->FindPropertyByName(
+			TEXT("MiddleTravelMapWidgetClass")));
+	TestNotNull(
+		TEXT("Middle travel portal mode replicates to clients"),
+		AGP_RunPortal::StaticClass()->FindPropertyByName(
+			TEXT("bMiddleDestinationSelection")));
+	TestNotNull(
+		TEXT("Middle travel map has a native Widget Blueprint base"),
+		UGP_MiddleTravelMapWidget::StaticClass());
 
 	const FGPZoneRuntimeState RuntimeDefaults;
 	TestEqual(TEXT("Zone runtime begins with no enemies"), RuntimeDefaults.AliveEnemies, 0);

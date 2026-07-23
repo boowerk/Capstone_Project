@@ -31,6 +31,7 @@ public:
 
 	FName GetSlotId() const { return SlotId; }
 	FName GetGroupId() const { return GroupId; }
+	int32 GetRegionId() const { return RegionId; }
 	EGP_VillageSlotSizeClass GetSlotSizeClass() const { return SlotSizeClass; }
 	bool IsCandidateEnabled() const { return bEnabled; }
 	bool IsSelectedForRun() const { return bSelectedForRun; }

@@ -5,7 +5,12 @@ scope: project-memory
 created: 2026-07-23T16:08:07+09:00
 updated: 2026-07-23T16:08:07+09:00
 status: complete
-tags: [memoc, worklog, world-layout, village]
+tags:
+  - memoc
+  - worklog
+  - world-layout
+  - village
+  - memoc/worklog
 ---
 # Center Village_01 on its level origin
 

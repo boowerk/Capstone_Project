@@ -13,6 +13,7 @@ class AGP_EnemySpawnMarker;
 class AGP_RegionEventActor;
 class AGP_RegionEventDirector;
 class AGP_VillageLayoutDirector;
+class AGP_PlayerController;
 class APlayerState;
 enum class EGPRegionEventTrigger : uint8;
 enum class EGPZoneStage : uint8;
@@ -55,6 +56,12 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Run")
 	void NotifyAllPlayersDead();
+
+	// Called by a Middle-selection portal on the server.
+	void OpenMiddleTravelSelection(AGP_PlayerController* PlayerController);
+	bool RequestMiddleTravel(
+		AGP_PlayerController* PlayerController,
+		FName DestinationZoneId);
 
 protected:
 	virtual void InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage) override;
@@ -146,14 +153,14 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Navigation")
 	bool bUseZoneNavigationInvokers = true;
 
-	// 180 m covers the corners of the current 230 m medium-village footprint.
+	// Navigation only needs the authored combat area, not the full 230 m village footprint.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Navigation",
 		meta = (EditCondition = "bUseZoneNavigationInvokers", ClampMin = "1000.0", Units = "cm"))
-	float ZoneNavigationGenerationRadius = 18000.0f;
+	float ZoneNavigationGenerationRadius = 12000.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Navigation",
 		meta = (EditCondition = "bUseZoneNavigationInvokers", ClampMin = "1000.0", Units = "cm"))
-	float ZoneNavigationRemovalRadius = 22000.0f;
+	float ZoneNavigationRemovalRadius = 15000.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Navigation",
 		meta = (EditCondition = "bUseZoneNavigationInvokers", ClampMin = "0.05", Units = "s"))
@@ -162,6 +169,16 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Navigation",
 		meta = (EditCondition = "bUseZoneNavigationInvokers", ClampMin = "1.0", Units = "s"))
 	float ZoneNavigationReadyTimeout = 10.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Middle Travel")
+	FName VillagePortalAnchorTag = TEXT("VillagePortalAnchor");
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Middle Travel")
+	FName MiddleArrivalAnchorTag = TEXT("MiddleArrivalAnchor");
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Middle Travel",
+		meta = (ClampMin = "100.0", Units = "cm"))
+	float MiddleTravelPortalUseRadius = 600.0f;
 
 private:
 	int32 RunSeed = INDEX_NONE;
@@ -241,6 +258,14 @@ private:
 		AGP_EnemySpawnVolume* ToZone,
 		const FVector& PreferredSpawnLocation,
 		int32 RetryCount = 0);
+	void SpawnMiddleSelectionPortal(
+		AGP_EnemySpawnVolume* FromZone,
+		const FVector& PreferredSpawnLocation);
+	AActor* FindTaggedActorInZoneLevel(
+		const AGP_EnemySpawnVolume* Zone,
+		FName ActorTag) const;
+	bool IsPlayerNearMiddleSelectionPortal(
+		const AGP_PlayerController* PlayerController) const;
 	void AssignPlayersToOuterVillageStarts();
 
 	UFUNCTION()

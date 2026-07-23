@@ -2,7 +2,10 @@
 
 #include "Characters/GP_PlayerCharacter.h"
 #include "Components/SphereComponent.h"
+#include "Game/GP_GameMode.h"
 #include "Kismet/GameplayStatics.h"
+#include "Net/UnrealNetwork.h"
+#include "Player/GP_PlayerController.h"
 
 AGP_RunPortal::AGP_RunPortal()
 {
@@ -30,6 +33,13 @@ void AGP_RunPortal::BeginPlay()
 	}
 }
 
+void AGP_RunPortal::GetLifetimeReplicatedProps(
+	TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(AGP_RunPortal, bMiddleDestinationSelection);
+}
+
 void AGP_RunPortal::HandleOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
 	UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
@@ -39,6 +49,21 @@ void AGP_RunPortal::HandleOverlapBegin(UPrimitiveComponent* OverlappedComp, AAct
 	AGP_PlayerCharacter* Player = Cast<AGP_PlayerCharacter>(OtherActor);
 	if (!Player || PlayersEntered.Contains(Player))
 	{
+		return;
+	}
+
+	if (bMiddleDestinationSelection)
+	{
+		if (AGP_PlayerController* PlayerController =
+			Cast<AGP_PlayerController>(Player->GetController()))
+		{
+			if (AGP_GameMode* GameMode =
+				GetWorld() ? GetWorld()->GetAuthGameMode<AGP_GameMode>() : nullptr)
+			{
+				GameMode->OpenMiddleTravelSelection(PlayerController);
+				OnMiddleDestinationSelectionOpened(Player);
+			}
+		}
 		return;
 	}
 

@@ -32,3 +32,7 @@ Synthesized topic pages that compound knowledge across sessions.
 - [Sources](../sources.md)
 - [Glossary](../glossary.md)
 - [Wiki Lint](../lint.md)
+
+## Topic Pages
+
+- [Village slot capacity and preset footprint](village-slot-capacity-and-preset-footprint.md) — topic note.

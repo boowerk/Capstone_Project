@@ -5,7 +5,11 @@ scope: project-memory
 created: 2026-07-23T14:09:49+09:00
 updated: 2026-07-23T14:09:49+09:00
 status: complete
-tags: [memoc, memoc/worklog, village, world-layout]
+tags:
+  - memoc
+  - memoc/worklog
+  - village
+  - world-layout
 ---
 # Resize village footprints
 

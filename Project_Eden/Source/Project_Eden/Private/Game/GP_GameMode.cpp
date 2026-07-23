@@ -11,11 +11,14 @@
 #include "Game/RegionEvents/GP_RegionEventActor.h"
 #include "Game/RegionEvents/GP_RegionEventDirector.h"
 #include "Game/WorldLayout/GP_VillageLayoutDirector.h"
+#include "EngineUtils.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerStart.h"
 #include "GameFramework/PlayerState.h"
 #include "Kismet/GameplayStatics.h"
 #include "NavigationSystem.h"
+#include "Player/GP_PlayerController.h"
+#include "UI/GP_MinimapSubsystem.h"
 
 AGP_GameMode::AGP_GameMode()
 {
@@ -413,6 +416,18 @@ void AGP_GameMode::HandlePlayerExitedZoneDetailed(
 void AGP_GameMode::HandleVillageRuntimeLayoutReady()
 {
 	InitializeZoneProgression();
+
+	// Village Level Instances finish loading and their City PCG graphs finish generating
+	// before the director broadcasts this signal. Request the final minimap capture here
+	// so the static map includes the run's selected villages rather than an earlier
+	// global-PCG-only layout.
+	if (UWorld* World = GetWorld())
+	{
+		if (UGP_MinimapSubsystem* MinimapSubsystem = World->GetSubsystem<UGP_MinimapSubsystem>())
+		{
+			MinimapSubsystem->NotifyPcgLayoutReady(0.25f);
+		}
+	}
 }
 
 void AGP_GameMode::StartRun()
@@ -1019,7 +1034,7 @@ void AGP_GameMode::EvaluateStagedProgression()
 					OuterState && OuterState->bHasLastEnemyDeathLocation
 						? OuterState->LastEnemyDeathLocation
 						: OuterZone->GetActorLocation();
-				SpawnPortalBetweenZones(OuterZone, MiddleZone, SpawnLocation);
+				SpawnMiddleSelectionPortal(OuterZone, SpawnLocation);
 			}
 		}
 	}
@@ -1205,6 +1220,210 @@ AGP_EnemySpawnVolume* AGP_GameMode::FindNearestZoneInStage(
 		}
 	}
 	return Nearest;
+}
+
+void AGP_GameMode::OpenMiddleTravelSelection(
+	AGP_PlayerController* PlayerController)
+{
+	if (!HasAuthority() || bRunFinished || !IsValid(PlayerController)
+		|| !UnlockedStages.Contains(EGPZoneStage::Middle))
+	{
+		return;
+	}
+
+	TArray<FGPMiddleTravelDestination> Destinations;
+	for (AGP_EnemySpawnVolume* Zone : OrderedZones)
+	{
+		const FGPZoneRuntimeState* State = ZoneRuntimeStates.Find(Zone);
+		if (!IsValid(Zone)
+			|| Zone->GetZoneStage() != EGPZoneStage::Middle
+			|| (State && State->bCompleted))
+		{
+			continue;
+		}
+
+		FGPMiddleTravelDestination& Destination = Destinations.AddDefaulted_GetRef();
+		Destination.ZoneId = Zone->GetZoneId();
+		Destination.ZoneOrder = Zone->GetZoneOrder();
+		Destination.WorldLocation = Zone->GetActorLocation();
+	}
+
+	if (Destinations.IsEmpty())
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[GP_GameMode] Middle travel map was not opened: no uncleared Middle destinations remain."));
+		return;
+	}
+
+	PlayerController->ClientOpenMiddleTravelMap(Destinations);
+}
+
+bool AGP_GameMode::RequestMiddleTravel(
+	AGP_PlayerController* PlayerController,
+	FName DestinationZoneId)
+{
+	if (!HasAuthority() || bRunFinished || !IsValid(PlayerController)
+		|| DestinationZoneId.IsNone()
+		|| !UnlockedStages.Contains(EGPZoneStage::Middle)
+		|| !IsPlayerNearMiddleSelectionPortal(PlayerController))
+	{
+		return false;
+	}
+
+	AGP_EnemySpawnVolume* DestinationZone = nullptr;
+	for (AGP_EnemySpawnVolume* Zone : OrderedZones)
+	{
+		const FGPZoneRuntimeState* State = ZoneRuntimeStates.Find(Zone);
+		if (IsValid(Zone)
+			&& Zone->GetZoneStage() == EGPZoneStage::Middle
+			&& Zone->GetZoneId() == DestinationZoneId
+			&& (!State || !State->bCompleted))
+		{
+			DestinationZone = Zone;
+			break;
+		}
+	}
+
+	APawn* PlayerPawn = PlayerController->GetPawn();
+	if (!IsValid(DestinationZone) || !IsValid(PlayerPawn))
+	{
+		return false;
+	}
+
+	bool bProjected = false;
+	FVector ArrivalLocation = FVector::ZeroVector;
+	if (AActor* ArrivalAnchor =
+		FindTaggedActorInZoneLevel(DestinationZone, MiddleArrivalAnchorTag))
+	{
+		ArrivalLocation = ArrivalAnchor->GetActorLocation();
+		if (const UNavigationSystemV1* NavigationSystem =
+			UNavigationSystemV1::GetCurrent(GetWorld()))
+		{
+			FNavLocation ProjectedLocation;
+			bProjected = NavigationSystem->ProjectPointToNavigation(
+				ArrivalLocation,
+				ProjectedLocation,
+				FVector(300.0f, 300.0f, 1500.0f));
+			if (bProjected)
+			{
+				ArrivalLocation = ProjectedLocation.Location;
+			}
+		}
+	}
+
+	if (!bProjected)
+	{
+		ArrivalLocation =
+			DestinationZone->GetSpawnPoint(/*bRandomizeInVolume=*/false, bProjected);
+	}
+
+	if (!bProjected)
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[GP_GameMode] Rejected Middle travel to '%s': no NavMesh at its ArrivalAnchor or Zone."),
+			*DestinationZoneId.ToString());
+		return false;
+	}
+
+	const float HalfHeight = PlayerPawn->GetSimpleCollisionHalfHeight();
+	const FVector SafeArrival =
+		ArrivalLocation + FVector(0.0f, 0.0f, HalfHeight + 10.0f);
+	if (!PlayerPawn->TeleportTo(
+		SafeArrival,
+		PlayerPawn->GetActorRotation(),
+		false,
+		true))
+	{
+		return false;
+	}
+
+	PlayerController->ClientConfirmMiddleTravel();
+	UE_LOG(LogTemp, Log,
+		TEXT("[GP_GameMode] Player '%s' traveled to Middle zone '%s'."),
+		*GetNameSafe(PlayerController->GetPlayerState<APlayerState>()),
+		*DestinationZoneId.ToString());
+	return true;
+}
+
+void AGP_GameMode::SpawnMiddleSelectionPortal(
+	AGP_EnemySpawnVolume* FromZone,
+	const FVector& PreferredSpawnLocation)
+{
+	UWorld* World = GetWorld();
+	if (!World || !*PortalClass || !IsValid(FromZone))
+	{
+		return;
+	}
+
+	const AActor* PortalAnchor =
+		FindTaggedActorInZoneLevel(FromZone, VillagePortalAnchorTag);
+	const FVector SpawnLocation =
+		PortalAnchor ? PortalAnchor->GetActorLocation() : PreferredSpawnLocation;
+
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.SpawnCollisionHandlingOverride =
+		ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	if (AGP_RunPortal* Portal = World->SpawnActor<AGP_RunPortal>(
+		PortalClass,
+		SpawnLocation,
+		PortalAnchor ? PortalAnchor->GetActorRotation() : FRotator::ZeroRotator,
+		SpawnParameters))
+	{
+		Portal->SetMiddleDestinationSelection(true);
+	}
+}
+
+AActor* AGP_GameMode::FindTaggedActorInZoneLevel(
+	const AGP_EnemySpawnVolume* Zone,
+	FName ActorTag) const
+{
+	UWorld* World = GetWorld();
+	if (!World || !IsValid(Zone) || ActorTag.IsNone())
+	{
+		return nullptr;
+	}
+
+	for (TActorIterator<AActor> It(World); It; ++It)
+	{
+		AActor* Actor = *It;
+		if (IsValid(Actor)
+			&& Actor != Zone
+			&& Actor->GetLevel() == Zone->GetLevel()
+			&& Actor->ActorHasTag(ActorTag))
+		{
+			return Actor;
+		}
+	}
+	return nullptr;
+}
+
+bool AGP_GameMode::IsPlayerNearMiddleSelectionPortal(
+	const AGP_PlayerController* PlayerController) const
+{
+	const APawn* PlayerPawn = IsValid(PlayerController)
+		? PlayerController->GetPawn()
+		: nullptr;
+	UWorld* World = GetWorld();
+	if (!World || !IsValid(PlayerPawn))
+	{
+		return false;
+	}
+
+	const float UseRadiusSquared = FMath::Square(
+		FMath::Max(100.0f, MiddleTravelPortalUseRadius));
+	for (TActorIterator<AGP_RunPortal> It(World); It; ++It)
+	{
+		const AGP_RunPortal* Portal = *It;
+		if (IsValid(Portal)
+			&& Portal->IsMiddleDestinationSelection()
+			&& FVector::DistSquared(
+				Portal->GetActorLocation(),
+				PlayerPawn->GetActorLocation()) <= UseRadiusSquared)
+		{
+			return true;
+		}
+	}
+	return false;
 }
 
 void AGP_GameMode::SpawnPortalBetweenZones(

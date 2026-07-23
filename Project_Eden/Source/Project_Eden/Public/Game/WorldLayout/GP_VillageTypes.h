@@ -49,6 +49,11 @@ struct FGP_VillagePresetDefinition
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Village|Preset")
 	TSoftObjectPtr<UWorld> VillageLevel;
 
+	// A preset is eligible only for slots with the same size class. Footprint
+	// capacity is still validated separately to catch incorrect authored bounds.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Village|Preset")
+	EGP_VillageSlotSizeClass PresetSizeClass = EGP_VillageSlotSizeClass::Medium;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Village|Preset", meta = (ShowOnlyInnerProperties))
 	FGP_VillageFootprint Footprint;
 

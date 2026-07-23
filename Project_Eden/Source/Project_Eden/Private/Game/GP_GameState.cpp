@@ -1,6 +1,7 @@
 #include "Game/GP_GameState.h"
 
 #include "Game/Corruption/GP_WorldCorruptionComponent.h"
+#include "GameFramework/PlayerState.h"
 #include "Net/UnrealNetwork.h"
 
 AGP_GameState::AGP_GameState()
@@ -17,7 +18,23 @@ void AGP_GameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 	DOREPLIFETIME(AGP_GameState, CurrentZoneIndex);
 	DOREPLIFETIME(AGP_GameState, EnemiesRemaining);
 	DOREPLIFETIME(AGP_GameState, RunSeed);
+	DOREPLIFETIME(AGP_GameState, MiddleQualifiedPlayers);
 	DOREPLIFETIME(AGP_GameState, RegionStates);
+}
+
+bool AGP_GameState::HasMiddleClearCredit(const APlayerState* PlayerState) const
+{
+	return IsValid(PlayerState) && MiddleQualifiedPlayers.Contains(PlayerState);
+}
+
+void AGP_GameState::GrantMiddleClearCredit(APlayerState* PlayerState)
+{
+	if (!HasAuthority() || !IsValid(PlayerState))
+	{
+		return;
+	}
+
+	MiddleQualifiedPlayers.AddUnique(PlayerState);
 }
 
 void AGP_GameState::SetRunSeed(int32 NewRunSeed)
