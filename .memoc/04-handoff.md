@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-24T05:11:23+09:00
+updated: 2026-07-24T06:02:46+09:00
 status: active
 tags:
   - memoc
@@ -11,15 +11,16 @@ tags:
 ---
 # Agent Handoff
 
-Last synced: 2026-07-24T05:11:23+09:00
+Last synced: 2026-07-24T06:02:46+09:00
 
 ## Regular Enemy Death Absorption Handoff
 
-- Commits `34c84570` and `3633f215` add `/Game/Niagara/Dissolve_SK/NS_EnemyDeath_Absorb` plus `UGP_EnemyDeathAbsorptionComponent`, automatic regular-enemy death hookup, and policy/asset tests. Bosses remain on `UGP_BossDeathPresentationComponent`.
-- Niagara uses `User.SourceMesh` for the actual corpse and Point Attraction toward `User.AbsorbTargetPosition`; the existing normalized-age Lerp keeps the early mesh silhouette and increasingly preserves the attracted solver position. Runtime follows the latched player's `spine_03`, updates fixed bounds over the source-target corridor, hides the source only after successful activation, and finishes before the default two-second despawn.
+- Commits `34c84570` and `3633f215` add `/Game/Niagara/Dissolve_SK/NS_EnemyDeath_Absorb` plus `UGP_EnemyDeathAbsorptionComponent`; `9796240f` and `c971a3c2` add the falling phase and slower staggered absorption. Bosses remain on `UGP_BossDeathPresentationComponent`.
+- Niagara uses `User.SourceMesh` for the actual corpse and keeps `User.SpriteSize=(10,10)`. Gravity runs before Point Attraction and Drag; falloff exponent `0` makes attraction constant instead of distance-scaled, so grains fall first and arrive at different times. Runtime follows the latched player's `spine_03`, updates fixed bounds over the source-target corridor, hides the source only after successful activation, and finishes before the default two-second despawn.
+- Current timing/force defaults: full gravity through `0.28s`, fade to zero by `0.60s`, attraction delay `0.38s`, ramp `0.80s`, playback `2.6x`, strength `800`, gravity Z `-160`, drag `1.4`, kill radius `45cm`, and hard stop `1.90s`.
 - Three-player policy is authority-only killer selection with nearest living connected-player fallback, then reliable multicast of that one actor. Dedicated servers skip local VFX; no client performs its own target selection.
-- Verified after the final three-frame emission guard: `Project_EdenEditor Win64 Development` build passed; `ProjectEden.VFX.EnemyDeathAbsorption.Policy`, `.ProductionAssetContract`, and `ProjectEden.Combat.EnemyDeath.Lifecycle` passed. Compiled Niagara bindings/order and inactive-response behavior were independently inspected; relevant Niagara warnings/errors were zero. No live server/PIE run by request.
-- Manual gate: kill several FurnaceWalker/Cyclops enemies while the killer runs away and visually tune playback rate, strength, scatter delay, sprite size, or chest offset if needed. Keep the default enemy `DeathDespawnDelay` at least two seconds; lowering it can cut the attached effect short.
+- Verified after the falling-phase tuning: `Project_EdenEditor Win64 Development` build passed; `ProjectEden.VFX.EnemyDeathAbsorption.Policy`, `.ProductionAssetContract`, and `ProjectEden.Combat.EnemyDeath.Lifecycle` passed. Compiled module order is `Gravity -> Point Attraction -> Drag -> Solve`; relevant Niagara warnings/errors and NaN scans were zero. No live server/PIE run by request.
+- Manual gate: kill several FurnaceWalker/Cyclops enemies at short and long range while the killer moves. If still too fast, try strength `600`; if distant grains fail to arrive, lower drag toward `1.1` before raising strength. Keep `DeathDespawnDelay` at least two seconds; lowering it can cut the attached effect short.
 
 ## Enemy Live-Target Combat Handoff
 

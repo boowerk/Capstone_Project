@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-24T05:11:23+09:00
+updated: 2026-07-24T06:02:46+09:00
 status: active
 tags:
   - memoc
@@ -16,9 +16,12 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 ## Decision Log
 
 ### 2026-07-24
+- Keep the regular-enemy death grains at the designer-approved `User.SpriteSize=(10,10)`. Stage the motion as a readable fall followed by absorption: full gravity through `0.28s`, gravity fade to `0.60s`, attraction from `0.38s`, and a `0.80s` strength ramp.
+- Use Niagara Point Attraction with falloff enabled and exponent `0` for constant acceleration, followed by Drag. This supersedes the original distance-scaled spring behavior, which synchronized distant grains and made them snap to the chest together.
+- Revise the corpse-window tuning to `2.6x` playback, attraction strength `800`, drag `1.4`, kill radius `45cm`, and hard stop `1.90s`. Keep the existing two-second enemy despawn boundary and three-player target-latch policy.
 - For regular-enemy death absorption, use the dead enemy as `User.SourceMesh` and a moving player chest `Position` as the destination instead of matching particles to a target skeletal mesh. Different enemy/player topology makes vertex correspondence brittle; one converging point reads more clearly and is cheaper.
 - In the fixed three-player game, authority latches the valid killer once and otherwise chooses the nearest living connected player. Multicast that actor reliably; clients update only its live chest position and never rescore locally.
-- Keep the absorption cosmetic within the default two-second corpse lifetime: compress the original five-second dissolve curves to 3x playback, stop the high-rate emission after a short window and at least three update frames, and hard-stop at 1.75 seconds. Boss death presentation remains separate.
+- Keep the absorption cosmetic within the default two-second corpse lifetime, stop the high-rate emission after a short window and at least three update frames, and use the latest timing values recorded above. Boss death presentation remains separate.
 - Supersede the 2026-07-14 corruption/exploration decisions: the product has no world-corruption value or ambient/random Region Event path. Do not restore their timers, weighted selection, random placement, enemy scaling, outcome deltas, or presentation.
 - Supersede the fixed-demo decisions dated 2026-07-21 and 2026-07-18 plus the remaining 2026-07-09 Region Event design: remove the seed-varied outer route, Red Rift/Defense/Shrine lifecycle, quorum/reward logic, gold objective marker, and automatic center boss/result path.
 - Keep `RegionState` as an independent authored biome-ID/PCG contract, and keep general Zone/Portal/FinishRun code available. Neither system may implicitly restart the removed demo.
