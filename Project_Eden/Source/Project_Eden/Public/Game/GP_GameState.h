@@ -6,9 +6,12 @@
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 class UGP_WorldCorruptionComponent;
 class APlayerState;
 
+=======
+>>>>>>> origin/main
 =======
 >>>>>>> origin/main
 =======

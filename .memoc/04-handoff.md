@@ -5,7 +5,11 @@ scope: project-memory
 created: 2026-05-21T07:03:24
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 updated: 2026-07-23T17:08:56+09:00
+=======
+updated: 2026-07-24T07:01:06+09:00
+>>>>>>> origin/main
 =======
 updated: 2026-07-24T07:01:06+09:00
 >>>>>>> origin/main
@@ -19,6 +23,7 @@ tags:
 ---
 # Agent Handoff
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
 Last synced: 2026-07-23T17:08:56+09:00
@@ -87,6 +92,12 @@ Last synced: 2026-07-24T07:01:06+09:00
 
 ## Regular Enemy Death Absorption Handoff
 
+=======
+Last synced: 2026-07-24T07:01:06+09:00
+
+## Regular Enemy Death Absorption Handoff
+
+>>>>>>> origin/main
 =======
 Last synced: 2026-07-24T07:01:06+09:00
 

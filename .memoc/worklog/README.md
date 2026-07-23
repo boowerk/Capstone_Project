@@ -4,8 +4,13 @@ type: worklog
 scope: project-memory
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 created: 2026-07-01T05:22:45
 updated: 2026-07-01T05:22:45
+=======
+created: 2026-07-23T17:46:03
+updated: 2026-07-23T17:46:03
+>>>>>>> origin/main
 =======
 created: 2026-07-23T17:46:03
 updated: 2026-07-23T17:46:03
@@ -25,7 +30,11 @@ Generated index of conflict-light per-actor work records.
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 Last generated: 2026-07-01T05:22:45
+=======
+Last generated: 2026-07-23T17:46:03
+>>>>>>> origin/main
 =======
 Last generated: 2026-07-23T17:46:03
 >>>>>>> origin/main
@@ -48,7 +57,10 @@ worklog/<actor>/YYYY-MM/YYYYMMDDTHHMM-title.md
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
+=======
+>>>>>>> origin/main
 =======
 >>>>>>> origin/main
 - [Configure 2P/3P party character meshes](lim/2026-07/20260723T1745-configure-2p-3p-party-character-meshes.md) — lim active.
@@ -68,6 +80,9 @@ worklog/<actor>/YYYY-MM/YYYYMMDDTHHMM-title.md
 - [Stop passive target-facing turn](lim/2026-07/20260720T1743-stop-passive-target-facing-turn.md) — lim active.
 - [FurnaceWalker recovery-gated root-motion attack](lim/2026-07/20260717T0603-furnacewalker-recovery-gated-root-motion-attack.md) — lim active.
 <<<<<<< HEAD
+<<<<<<< HEAD
+>>>>>>> origin/main
+=======
 >>>>>>> origin/main
 =======
 >>>>>>> origin/main
@@ -75,6 +90,7 @@ worklog/<actor>/YYYY-MM/YYYYMMDDTHHMM-title.md
 - [Create FurnaceWalker melee enemy foundation](lim/2026-06/20260620T0450-create-furnacewalker-melee-enemy-foundation.md) — lim active.
 - [fix: resolve const correctness compile error C2662 in GP_PlayerController](lim/2026-06/20260601T1010-fix-resolve-const-correctness-compile-error-c2662-in-gp-playercontroller.md) — lim active.
 - [fix memoc wrapper timeout](lim/2026-06/20260601T0521-fix-memoc-wrapper-timeout.md) — lim active.
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
 - [refactor: move temporary and diagnostic python utility scripts from project root to agent scratch space](lim/2026-06/20260601T0508-refactor-move-temporary-and-diagnostic-python-utility-scripts-from-project-root-.md) — lim active.
@@ -93,6 +109,8 @@ worklog/<actor>/YYYY-MM/YYYYMMDDTHHMM-title.md
 - [Implemented White Void transition setup](lim/2026-05/20260526T1700-implemented-white-void-transition-setup.md) — lim active.
 - [Bridge fallback dash ActionEnd notify timing](lim/2026-05/20260526T1112-bridge-fallback-dash-actionend-notify-timing.md) — lim active.
 - [Restore movement scale on fallback root motion montage](lim/2026-05/20260526T1101-restore-movement-scale-on-fallback-root-motion-montage.md) — lim active.
+=======
+>>>>>>> origin/main
 =======
 >>>>>>> origin/main
 =======

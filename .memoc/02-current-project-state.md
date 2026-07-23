@@ -6,7 +6,11 @@ created: 2026-05-21T07:03:24
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 updated: 2026-07-24T06:22:00+09:00
+=======
+updated: 2026-07-24T07:01:06+09:00
+>>>>>>> origin/main
 =======
 updated: 2026-07-24T07:01:06+09:00
 >>>>>>> origin/main
@@ -20,6 +24,7 @@ tags:
 ---
 # Current Project State
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
 Last synced: 2026-07-24T06:22:00+09:00
@@ -49,6 +54,16 @@ Last synced: 2026-07-24T07:01:06+09:00
 
 - Crystal Seraph projectile/reflection VFX is current: `AGP_CrystalShardProjectile` uses `/Game/Meshes/FX_Meshes/ICE/SM_IceShard_03` instead of the prototype cone. `AGP_SeraphLaserActor` has no prototype mesh or runtime Niagara asset paths; `BP_SeraphLaser` owns Telegraph/Active/Reflection Impact/Reflection Beam Niagara defaults, and `BP_Crystal_Seraph` selects it as `SeraphLaserActorClass`. Active VFX now attaches to `SceneRoot` (firing origin), not the collision box centered along the beam. For visible-pipeline validation, `ActiveVFX` and `ReflectionBeamVFX` use `NS_Free_Magic_Attack2`; it was originally assigned only to reflection, which does not play until prism contact. Restart PIE before testing so newly spawned laser actors read updated defaults. All native pattern VFX and death shards/burst use shared `#59ADFF` (`GPCrystalSeraphVFXDefaults`) tint; material assets remain untouched. Rider-equivalent `Build.bat Project_EdenEditor Win64 Development ... -WaitMutex -FromMsBuild -architecture=x64` passed. PIE visual check remains: no rectangular mesh, all four cues visible, shard silhouette, reflection-point brightness.
 
+=======
+Last synced: 2026-07-24T07:01:06+09:00
+
+## Current Status
+
+- Regular enemy death absorption is current through `9796240f` and `c971a3c2`. `/Game/Niagara/Dissolve_SK/NS_EnemyDeath_Absorb` samples the actual dead enemy through `User.SourceMesh`, keeps the designer-tuned `10x10` grain size, falls under gravity first, then curves toward the server-selected killer's live chest with constant attraction and drag instead of a synchronized distance-scaled spring. Attraction starts at `0.38s`, gravity fades from `0.28s` to `0.60s`, strength ramps to `800` over `0.80s`, playback is `2.6x`, and the effect stops at `1.90s` within the two-second corpse window. If the killer is unusable, authority selects the nearest living connected player once; a reliable multicast gives all three clients the same target. Bosses keep their bespoke death effects. Editor build and the policy, production-asset contract, and enemy-death lifecycle tests pass; relevant Niagara warning/error and NaN scans are clean. PIE visual tuning remains.
+
+- Crystal Seraph projectile/reflection VFX is current: `AGP_CrystalShardProjectile` uses `/Game/Meshes/FX_Meshes/ICE/SM_IceShard_03` instead of the prototype cone. `AGP_SeraphLaserActor` has no prototype mesh or runtime Niagara asset paths; `BP_SeraphLaser` owns Telegraph/Active/Reflection Impact/Reflection Beam Niagara defaults, and `BP_Crystal_Seraph` selects it as `SeraphLaserActorClass`. Active VFX now attaches to `SceneRoot` (firing origin), not the collision box centered along the beam. For visible-pipeline validation, `ActiveVFX` and `ReflectionBeamVFX` use `NS_Free_Magic_Attack2`; it was originally assigned only to reflection, which does not play until prism contact. Restart PIE before testing so newly spawned laser actors read updated defaults. All native pattern VFX and death shards/burst use shared `#59ADFF` (`GPCrystalSeraphVFXDefaults`) tint; material assets remain untouched. Rider-equivalent `Build.bat Project_EdenEditor Win64 Development ... -WaitMutex -FromMsBuild -architecture=x64` passed. PIE visual check remains: no rectangular mesh, all four cues visible, shard silhouette, reflection-point brightness.
+
+>>>>>>> origin/main
 =======
 Last synced: 2026-07-24T07:01:06+09:00
 

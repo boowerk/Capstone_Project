@@ -5,7 +5,11 @@ scope: project-memory
 created: 2026-05-21T07:03:24
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 updated: 2026-07-23T19:03:00+09:00
+=======
+updated: 2026-07-24T07:01:06+09:00
+>>>>>>> origin/main
 =======
 updated: 2026-07-24T07:01:06+09:00
 >>>>>>> origin/main
@@ -23,6 +27,7 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 
 ## Decision Log
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
 ### 2026-07-23
@@ -68,6 +73,8 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 =======
 =======
 >>>>>>> origin/main
+=======
+>>>>>>> origin/main
 ### 2026-07-24
 - Give Sans Ground Hands a dedicated deferred-decal material with a centered radial opacity mask, pure-red material parameter, and equal footprint axes. Do not reuse or parameter-hack the Sans Sweep fan material; the two warning silhouettes have separate production contracts.
 - Keep the regular-enemy death grains at the designer-approved `User.SpriteSize=(10,10)`. Stage the motion as a readable fall followed by absorption: full gravity through `0.28s`, gravity fade to `0.60s`, attraction from `0.38s`, and a `0.80s` strength ramp.
@@ -105,6 +112,9 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 - Build the graduation golden path around Lobby ready travel into `L_LandscapeMap`, then one discoverable corruption objective, cleanse feedback, augment, boss, and result. Expand breadth only after this 15–20 minute path is reliable.
 - Treat dynamically named ServerTravel destinations as explicit Cook inputs. Editor package loading is not release proof; keep release status conditional until Cooked server/client travel passes.
 <<<<<<< HEAD
+<<<<<<< HEAD
+>>>>>>> origin/main
+=======
 >>>>>>> origin/main
 =======
 >>>>>>> origin/main
@@ -175,6 +185,7 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 ### 2026-07-21
 
 - Isolate streamed village PCG with per-slot Actor Tags plus component-local `UPCGGraphInstance` `RoadTag`/`DistrictTag` overrides. Remove template tags after retagging so legacy/global searches cannot mix simultaneous villages; do not mutate the shared base graph.
@@ -192,11 +203,16 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 =======
 =======
 >>>>>>> origin/main
+=======
+>>>>>>> origin/main
 ### 2026-07-14
 - Open-world exploration events are separate from the legacy linear-zone enemy budget. The event actor owns its spawned combatants and retires survivors through `RequestDeath`; zone/event tracking listens to the terminal `OnEnemyDeathStarted` delegate so scripted and combat deaths share one accounting path without granting cleanup XP.
 - Preserve authored region seed biome values. Corruption affects event eligibility, probability, enemy GAS scaling, and outcome deltas; it does not flatten seed `State` values or write generic active/completed biome states.
 - Production exploration pacing belongs to the placed `L_LandscapeMap` director: delayed/dwell-based evaluation, one active objective, global and per-region cooldowns, party-wide safe spawn distance, and non-deterministic event choice. Temporary PIE acceleration must remain unsaved and is guarded by map automation.
 <<<<<<< HEAD
+<<<<<<< HEAD
+>>>>>>> origin/main
+=======
 >>>>>>> origin/main
 =======
 >>>>>>> origin/main
