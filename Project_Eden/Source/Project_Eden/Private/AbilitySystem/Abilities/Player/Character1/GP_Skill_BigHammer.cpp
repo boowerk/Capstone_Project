@@ -9,6 +9,8 @@ UGP_Skill_BigHammer::UGP_Skill_BigHammer()
 	SelectionMode = EGP_SkillSelectionMode::GroundPosition;
 	bAllowSecondaryConfirm = false;
 	bRequireBlockingHit = true;
+	bUseProductionTargetPreview = true;
+	PreviewVisualStyle = EGP_SkillTargetPreviewStyle::HeavyImpact;
 	HitEventTag = GPTags::Event::Enemy::HitReact;
 }
 

@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "AbilitySystem/Abilities/GP_SkillBase.h"
+#include "Actors/GP_SkillTargetPreviewActor.h"
 #include "Engine/EngineTypes.h"
 #include "GP_TargetedSkillBase.generated.h"
 
@@ -125,6 +126,17 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS|Skill|Preview")
 	TSubclassOf<AActor> PreviewActorClass;
 
+	// Uses the project production preview actor while leaving PreviewActorClass
+	// available as an opt-in legacy/custom presentation path.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS|Skill|Preview")
+	bool bUseProductionTargetPreview = false;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS|Skill|Preview")
+	EGP_SkillTargetPreviewStyle PreviewVisualStyle =
+		EGP_SkillTargetPreviewStyle::Generic;
+
+	// Selection debug shapes require this flag, the ability debug flag, and
+	// the global g.DrawSkillDebug switch.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS|Skill|Preview")
 	bool bDrawSelectionDebug = false;
 
