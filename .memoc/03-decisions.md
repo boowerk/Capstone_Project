@@ -4,7 +4,11 @@ type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
 <<<<<<< HEAD
+<<<<<<< HEAD
 updated: 2026-07-23T19:03:00+09:00
+=======
+updated: 2026-07-24T07:01:06+09:00
+>>>>>>> origin/main
 =======
 updated: 2026-07-24T07:01:06+09:00
 >>>>>>> origin/main
@@ -19,6 +23,7 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 
 ## Decision Log
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 ### 2026-07-23
 - Keep player attribute values live and reusable: Health/Mana/Stamina share one grayscale fill mask and one track brush, with color supplied by each ProgressBar tint. Preserve the existing `GP_AttributeWidget`, inner `HealthBar`, and parent HUD instance names. Apply the soft top-left backplate through the existing `TopLeftFrame` Border instead of rebuilding the UMG hierarchy; leave the optional accent unplaced unless later visual review asks for it.
@@ -61,6 +66,8 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 - Keep the PCG Landscape Cache at `SerializeOnlyAtCook`: it works in PIE, serializes automatically while cooking, and avoids permanently embedding the cache in the editor map. `NeverSerialize` is invalid for Landscape-backed runtime PCG.
 - Each map's placed `BP_VegetationSpawner` must have a Box that covers its Landscape. `L_LandscapeMap` uses `64000,64000,8000`, aligned horizontally to both 32m grass and 128m default grids while covering its 1.071km Landscape.
 =======
+=======
+>>>>>>> origin/main
 ### 2026-07-24
 - Give Sans Ground Hands a dedicated deferred-decal material with a centered radial opacity mask, pure-red material parameter, and equal footprint axes. Do not reuse or parameter-hack the Sans Sweep fan material; the two warning silhouettes have separate production contracts.
 - Keep the regular-enemy death grains at the designer-approved `User.SpriteSize=(10,10)`. Stage the motion as a readable fall followed by absorption: full gravity through `0.28s`, gravity fade to `0.60s`, attraction from `0.38s`, and a `0.80s` strength ramp.
@@ -97,6 +104,9 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 - Keep AI/GAS/network architecture and bulk-log specialists temporary rather than permanent, selecting a model and reasoning level from the bounded ticket risk.
 - Build the graduation golden path around Lobby ready travel into `L_LandscapeMap`, then one discoverable corruption objective, cleanse feedback, augment, boss, and result. Expand breadth only after this 15–20 minute path is reliable.
 - Treat dynamically named ServerTravel destinations as explicit Cook inputs. Editor package loading is not release proof; keep release status conditional until Cooked server/client travel passes.
+<<<<<<< HEAD
+>>>>>>> origin/main
+=======
 >>>>>>> origin/main
 
 ### 2026-07-09
@@ -164,6 +174,7 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 - The minimap map texture should be clipped by the UI material, not only hidden under ring art. Player cursor heading should default to controller/view yaw so camera-facing a target matches the visible minimap direction.
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 ### 2026-07-21
 
 - Isolate streamed village PCG with per-slot Actor Tags plus component-local `UPCGGraphInstance` `RoadTag`/`DistrictTag` overrides. Remove template tags after retagging so legacy/global searches cannot mix simultaneous villages; do not mutate the shared base graph.
@@ -179,8 +190,13 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 - Keep K as a toggle. While the menu is open, block only the local player's movement, look, and skill input through UI-only focus; never pause the multiplayer world.
 - Preserve the legacy Widget Blueprints and construct the approved radial presentation as a defensive runtime fallback until an authored wheel hierarchy replaces it.
 =======
+=======
+>>>>>>> origin/main
 ### 2026-07-14
 - Open-world exploration events are separate from the legacy linear-zone enemy budget. The event actor owns its spawned combatants and retires survivors through `RequestDeath`; zone/event tracking listens to the terminal `OnEnemyDeathStarted` delegate so scripted and combat deaths share one accounting path without granting cleanup XP.
 - Preserve authored region seed biome values. Corruption affects event eligibility, probability, enemy GAS scaling, and outcome deltas; it does not flatten seed `State` values or write generic active/completed biome states.
 - Production exploration pacing belongs to the placed `L_LandscapeMap` director: delayed/dwell-based evaluation, one active objective, global and per-region cooldowns, party-wide safe spawn distance, and non-deterministic event choice. Temporary PIE acceleration must remain unsaved and is guarded by map automation.
+<<<<<<< HEAD
+>>>>>>> origin/main
+=======
 >>>>>>> origin/main

@@ -4,7 +4,11 @@ type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
 <<<<<<< HEAD
+<<<<<<< HEAD
 updated: 2026-07-23T17:08:56+09:00
+=======
+updated: 2026-07-24T07:01:06+09:00
+>>>>>>> origin/main
 =======
 updated: 2026-07-24T07:01:06+09:00
 >>>>>>> origin/main
@@ -15,6 +19,7 @@ tags:
 ---
 # Agent Handoff
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 Last synced: 2026-07-23T17:08:56+09:00
 
@@ -82,6 +87,12 @@ Last synced: 2026-07-24T07:01:06+09:00
 
 ## Regular Enemy Death Absorption Handoff
 
+=======
+Last synced: 2026-07-24T07:01:06+09:00
+
+## Regular Enemy Death Absorption Handoff
+
+>>>>>>> origin/main
 - Commits `34c84570` and `3633f215` add `/Game/Niagara/Dissolve_SK/NS_EnemyDeath_Absorb` plus `UGP_EnemyDeathAbsorptionComponent`; `9796240f` and `c971a3c2` add the falling phase and slower staggered absorption. Bosses remain on `UGP_BossDeathPresentationComponent`.
 - Niagara uses `User.SourceMesh` for the actual corpse and keeps `User.SpriteSize=(10,10)`. Gravity runs before Point Attraction and Drag; falloff exponent `0` makes attraction constant instead of distance-scaled, so grains fall first and arrive at different times. Runtime follows the latched player's `spine_03`, updates fixed bounds over the source-target corridor, hides the source only after successful activation, and finishes before the default two-second despawn.
 - Current timing/force defaults: full gravity through `0.28s`, fade to zero by `0.60s`, attraction delay `0.38s`, ramp `0.80s`, playback `2.6x`, strength `800`, gravity Z `-160`, drag `1.4`, kill radius `45cm`, and hard stop `1.90s`.

@@ -8,6 +8,7 @@
 #include "Game/GP_RunSeed.h"
 #include "Game/GP_RunPortal.h"
 <<<<<<< HEAD
+<<<<<<< HEAD
 #include "Game/RegionEvents/GP_RegionEventActor.h"
 #include "Game/RegionEvents/GP_RegionEventDirector.h"
 #include "Game/WorldLayout/GP_VillageLayoutDirector.h"
@@ -30,20 +31,41 @@
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerStart.h"
 #include "Kismet/GameplayStatics.h"
+=======
+#include "Game/GP_ThreePlayerGameSession.h"
+#include "Game/Regions/GP_RegionSpatialSubsystem.h"
+#include "EngineUtils.h"
+#include "Engine/World.h"
+#include "GameFramework/Character.h"
+#include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/PlayerController.h"
+#include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerStart.h"
+#include "Kismet/GameplayStatics.h"
+>>>>>>> origin/main
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "Player/GP_PlayerController.h"
 #include "Player/GP_PlayerState.h"
 #include "TimerManager.h"
+<<<<<<< HEAD
+>>>>>>> origin/main
+=======
 >>>>>>> origin/main
 
 AGP_GameMode::AGP_GameMode()
 {
 	GameStateClass = AGP_GameState::StaticClass();
 <<<<<<< HEAD
+<<<<<<< HEAD
 	RegionEventDirectorClass = AGP_RegionEventDirector::StaticClass();
 	CorruptionPresentationClass = AGP_CorruptionPresentationActor::StaticClass();
 	VillageLayoutDirectorClass = AGP_VillageLayoutDirector::StaticClass();
+=======
+	// Preserve the three-player admission cap if a client attempts to join
+	// directly after seamless travel reaches the gameplay map.
+	GameSessionClass = AGP_ThreePlayerGameSession::StaticClass();
+>>>>>>> origin/main
 =======
 	// Preserve the three-player admission cap if a client attempts to join
 	// directly after seamless travel reaches the gameplay map.
@@ -55,6 +77,7 @@ AGP_GameMode::AGP_GameMode()
 	bUseSeamlessTravel = true;
 }
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 void AGP_GameMode::InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage)
 {
@@ -80,6 +103,8 @@ void AGP_GameMode::InitGameState()
 }
 
 =======
+=======
+>>>>>>> origin/main
 AActor* AGP_GameMode::ChoosePlayerStart_Implementation(AController* Player)
 {
 	EnsurePartyPlayerStarts(Player);
@@ -365,16 +390,22 @@ int32 AGP_GameMode::ResolvePartyStartSlot(AController* Player)
 	return INDEX_NONE;
 }
 
+<<<<<<< HEAD
+>>>>>>> origin/main
+=======
 >>>>>>> origin/main
 void AGP_GameMode::BeginPlay()
 {
 	Super::BeginPlay();
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 	ResolveVillageLayoutDirector();
 	ResolveRegionEventDirector();
 	SpawnCorruptionPresentation();
 =======
+=======
+>>>>>>> origin/main
 #if !UE_BUILD_SHIPPING
 	BeginThreePlayerGameplaySmokeProbe();
 #endif
@@ -382,6 +413,9 @@ void AGP_GameMode::BeginPlay()
 	// Resolve map-authored seeds before the ordinary zone progression initializes region state.
 	ResolveRuntimeRegionConfiguration();
 	GatherZones();
+<<<<<<< HEAD
+>>>>>>> origin/main
+=======
 >>>>>>> origin/main
 
 	// Let placed BP actors bind to GameState delegates in their BeginPlay before
@@ -453,6 +487,29 @@ void AGP_GameMode::BeginThreePlayerGameplaySmokeProbe()
 		false);
 }
 
+<<<<<<< HEAD
+=======
+#if !UE_BUILD_SHIPPING
+void AGP_GameMode::BeginThreePlayerGameplaySmokeProbe()
+{
+	UWorld* World = GetWorld();
+	if (!IsValid(World)
+		|| !World->GetMapName().Contains(TEXT("L_LandscapeMap"))
+		|| !FParse::Param(FCommandLine::Get(), TEXT("LobbySmokeAutoReady")))
+	{
+		return;
+	}
+
+	ThreePlayerGameplaySmokeAttempts = 0;
+	World->GetTimerManager().SetTimer(
+		ThreePlayerGameplaySmokeTimerHandle,
+		this,
+		&ThisClass::TryThreePlayerGameplaySmokeProbe,
+		0.25f,
+		false);
+}
+
+>>>>>>> origin/main
 void AGP_GameMode::TryThreePlayerGameplaySmokeProbe()
 {
 	++ThreePlayerGameplaySmokeAttempts;
@@ -639,6 +696,7 @@ void AGP_GameMode::GatherZones()
 }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 void AGP_GameMode::InitializeZoneProgression()
 {
 	if (bZoneProgressionInitialized)
@@ -744,6 +802,8 @@ void AGP_GameMode::ResolveRegionEventDirector()
 	}
 }
 
+=======
+>>>>>>> origin/main
 =======
 >>>>>>> origin/main
 void AGP_GameMode::UnlockZone(int32 ZoneIndex)
@@ -1031,7 +1091,11 @@ void AGP_GameMode::SpawnMarkerEnemies(AGP_EnemySpawnVolume* Zone, AGP_EnemySpawn
 
 			SpawnedEnemy->SpawnDefaultController();
 <<<<<<< HEAD
+<<<<<<< HEAD
 			RegisterZoneEnemy(SpawnedEnemy, Zone, Zone->GetCorruptionRegionId());
+=======
+			RegisterZoneEnemy(SpawnedEnemy);
+>>>>>>> origin/main
 =======
 			RegisterZoneEnemy(SpawnedEnemy);
 >>>>>>> origin/main
@@ -1106,7 +1170,11 @@ void AGP_GameMode::SpawnZoneEnemies(AGP_EnemySpawnVolume* Zone)
 
 			SpawnedEnemy->SpawnDefaultController();
 <<<<<<< HEAD
+<<<<<<< HEAD
 			RegisterZoneEnemy(SpawnedEnemy, Zone, Zone->GetCorruptionRegionId());
+=======
+			RegisterZoneEnemy(SpawnedEnemy);
+>>>>>>> origin/main
 =======
 			RegisterZoneEnemy(SpawnedEnemy);
 >>>>>>> origin/main
@@ -1114,6 +1182,7 @@ void AGP_GameMode::SpawnZoneEnemies(AGP_EnemySpawnVolume* Zone)
 	}
 }
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 int32 AGP_GameMode::SpawnZoneBossEnemies(AGP_EnemySpawnVolume* Zone)
 {
@@ -1173,6 +1242,9 @@ void AGP_GameMode::RegisterZoneEnemy(
 =======
 void AGP_GameMode::RegisterZoneEnemy(AGP_EnemyCharacter* Enemy)
 >>>>>>> origin/main
+=======
+void AGP_GameMode::RegisterZoneEnemy(AGP_EnemyCharacter* Enemy)
+>>>>>>> origin/main
 {
 	if (bRunFinished || !IsValid(Enemy))
 	{
@@ -1184,6 +1256,7 @@ void AGP_GameMode::RegisterZoneEnemy(AGP_EnemyCharacter* Enemy)
 		return;
 	}
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 	// The explicit event/zone id lets enemies retain their regional strength even after progression advances.
 	Enemy->SetCorruptionRegionId(CorruptionRegionId != INDEX_NONE ? CorruptionRegionId : CurrentZoneIndex);
@@ -1201,6 +1274,8 @@ void AGP_GameMode::RegisterZoneEnemy(AGP_EnemyCharacter* Enemy)
 		++AliveZoneEnemies;
 	}
 =======
+=======
+>>>>>>> origin/main
 	// The terminal death delegate also fires for scripted encounter cleanup, unlike the HP-zero reward delegate.
 	Enemy->OnEnemyDeathStarted.AddDynamic(this, &AGP_GameMode::HandleZoneEnemyDied);
 	++AliveZoneEnemies;
@@ -1257,6 +1332,7 @@ void AGP_GameMode::HandleZoneEnemyDied(AGP_EnemyCharacter* DeadEnemy, AActor* De
 }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 void AGP_GameMode::HandleRegionEventEnemySpawned(AGP_RegionEventActor* EventActor, AGP_EnemyCharacter* Enemy)
 {
 	// Event-spawned enemies join the current zone budget so events cannot be ignored during a city clear.
@@ -1267,6 +1343,8 @@ void AGP_GameMode::HandleRegionEventEnemySpawned(AGP_RegionEventActor* EventActo
 		RegionId);
 }
 
+=======
+>>>>>>> origin/main
 =======
 >>>>>>> origin/main
 void AGP_GameMode::CompleteCurrentZone()
@@ -1291,8 +1369,11 @@ void AGP_GameMode::CompleteCurrentZone()
 
 	OnZoneCompleted(CurrentZoneIndex, ClearedZone);
 <<<<<<< HEAD
+<<<<<<< HEAD
 	StartRegionEventForZone(ClearedZone, EGPRegionEventTrigger::ZoneCompleted);
 	UnregisterZoneNavigationInvoker(ClearedZone);
+=======
+>>>>>>> origin/main
 =======
 >>>>>>> origin/main
 	AdvanceZone();

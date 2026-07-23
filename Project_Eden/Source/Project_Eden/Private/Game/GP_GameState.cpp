@@ -1,8 +1,11 @@
 #include "Game/GP_GameState.h"
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 #include "Game/Corruption/GP_WorldCorruptionComponent.h"
 #include "GameFramework/PlayerState.h"
+=======
+>>>>>>> origin/main
 =======
 >>>>>>> origin/main
 #include "Net/UnrealNetwork.h"

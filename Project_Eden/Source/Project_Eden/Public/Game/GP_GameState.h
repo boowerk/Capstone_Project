@@ -5,9 +5,12 @@
 #include "GP_GameState.generated.h"
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 class UGP_WorldCorruptionComponent;
 class APlayerState;
 
+=======
+>>>>>>> origin/main
 =======
 >>>>>>> origin/main
 // Replicated phase of the linear city-progression run. Drives HUD and client-side presentation.

@@ -10,6 +10,7 @@ class AGP_GameState;
 class AGP_RunPortal;
 class AGP_EnemySpawnMarker;
 <<<<<<< HEAD
+<<<<<<< HEAD
 class AGP_RegionEventActor;
 class AGP_RegionEventDirector;
 class AGP_VillageLayoutDirector;
@@ -32,6 +33,10 @@ struct FGPZoneRuntimeState
 	bool bStarted = false;
 	bool bCompleted = false;
 };
+=======
+class APawn;
+class APlayerStart;
+>>>>>>> origin/main
 =======
 class APawn;
 class APlayerStart;
@@ -63,11 +68,15 @@ public:
 	void NotifyAllPlayersDead();
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 	// Called by a Middle-selection portal on the server.
 	void OpenMiddleTravelSelection(AGP_PlayerController* PlayerController);
 	bool RequestMiddleTravel(
 		AGP_PlayerController* PlayerController,
 		FName DestinationZoneId);
+=======
+	virtual void RestartPlayer(AController* NewPlayer) override;
+>>>>>>> origin/main
 =======
 	virtual void RestartPlayer(AController* NewPlayer) override;
 >>>>>>> origin/main
@@ -77,7 +86,12 @@ protected:
 	virtual void InitGameState() override;
 	virtual void BeginPlay() override;
 <<<<<<< HEAD
+<<<<<<< HEAD
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+=======
+	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
+	virtual void Logout(AController* Exiting) override;
+>>>>>>> origin/main
 =======
 	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
 	virtual void Logout(AController* Exiting) override;
@@ -123,6 +137,7 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Network|Spawn", meta = (ClampMin = "150.0", Units = "cm"))
 	float PartyPlayerStartSpacing = 260.0f;
+<<<<<<< HEAD
 
 	// Optional run-layout coordinator. The native default only selects VillageSlot candidates;
 	// it does not spawn cities or change gameplay zones.
@@ -163,6 +178,8 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Middle Travel",
 		meta = (ClampMin = "100.0", Units = "cm"))
 	float MiddleTravelPortalUseRadius = 600.0f;
+=======
+>>>>>>> origin/main
 
 private:
 	int32 RunSeed = INDEX_NONE;
@@ -179,6 +196,7 @@ private:
 
 	// Populated from placed BP_RegionSeed actors when a map authors distinct biome states.
 	TArray<uint8> RuntimeInitialRegionStates;
+<<<<<<< HEAD
 
 	UPROPERTY(Transient)
 	TObjectPtr<AGP_VillageLayoutDirector> VillageLayoutDirector;
@@ -190,6 +208,8 @@ private:
 	TSet<TWeakObjectPtr<AGP_EnemySpawnVolume>> RegisteredNavigationInvokerZones;
 	bool bUseStagedZoneProgression = false;
 	bool bZoneProgressionInitialized = false;
+=======
+>>>>>>> origin/main
 
 	int32 CurrentZoneIndex = INDEX_NONE;
 	int32 PendingZoneIndex = INDEX_NONE;
@@ -217,6 +237,7 @@ private:
 	int32 ResolvePartyStartSlot(AController* Player);
 	void GatherZones();
 <<<<<<< HEAD
+<<<<<<< HEAD
 	void InitializeZoneProgression();
 	void BindZoneDelegates(AGP_EnemySpawnVolume* Zone);
 	void ResolveVillageLayoutDirector();
@@ -230,16 +251,24 @@ private:
 	void ResolveRuntimeRegionConfiguration();
 	void InitializeRegionStates();
 >>>>>>> origin/main
+=======
+	void ResolveRuntimeRegionConfiguration();
+	void InitializeRegionStates();
+>>>>>>> origin/main
 	void UnlockZone(int32 ZoneIndex);
 	void StartZone(int32 ZoneIndex);
 	void SpawnZoneEnemies(AGP_EnemySpawnVolume* Zone);
 	int32 SpawnZoneBossEnemies(AGP_EnemySpawnVolume* Zone);
 	void SpawnMarkerEnemies(AGP_EnemySpawnVolume* Zone, AGP_EnemySpawnMarker* Marker);
 <<<<<<< HEAD
+<<<<<<< HEAD
 	void RegisterZoneEnemy(
 		AGP_EnemyCharacter* Enemy,
 		AGP_EnemySpawnVolume* OwningZone,
 		int32 CorruptionRegionId = INDEX_NONE);
+=======
+	void RegisterZoneEnemy(AGP_EnemyCharacter* Enemy);
+>>>>>>> origin/main
 =======
 	void RegisterZoneEnemy(AGP_EnemyCharacter* Enemy);
 >>>>>>> origin/main
@@ -276,6 +305,14 @@ private:
 	bool IsPlayerNearMiddleSelectionPortal(
 		const AGP_PlayerController* PlayerController) const;
 	void AssignPlayersToOuterVillageStarts();
+
+#if !UE_BUILD_SHIPPING
+	// End-to-end QA continues past seamless travel until the authoritative three-player gameplay state is usable.
+	void BeginThreePlayerGameplaySmokeProbe();
+	void TryThreePlayerGameplaySmokeProbe();
+	FTimerHandle ThreePlayerGameplaySmokeTimerHandle;
+	int32 ThreePlayerGameplaySmokeAttempts = 0;
+#endif
 
 #if !UE_BUILD_SHIPPING
 	// End-to-end QA continues past seamless travel until the authoritative three-player gameplay state is usable.

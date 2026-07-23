@@ -38,12 +38,18 @@ echo Output: %ARCHIVE_DIR%
 echo This script uses the already-built Project_EdenServer.exe.
 echo If server code changed, run BuildDevServer.bat before this script.
 <<<<<<< HEAD
+<<<<<<< HEAD
 call "%RUN_UAT%" BuildCookRun -project="%UPROJECT%" -noP4 -server -noclient -serverplatform=Win64 -serverconfig=Development -nocompile -nocompileeditor -cook -stage -package -pak -archive -archivedirectory="%ARCHIVE_DIR%" -map=/Game/Maps/MainMap/LobbyMap+/Game/Maps/MainMap/L_LandscapeMap+/Game/Maps/DemoMap/ServerTest+/Game/Maps/DemoMap/ServerEmptyTest -utf8output %*
 =======
+=======
+>>>>>>> origin/main
 rem 로비가 동적으로 Landscape로 ServerTravel하므로 쿠커가 찾을 수 있도록 목적지 맵을 명시합니다.
 set "COOK_MAPS=/Game/Maps/MainMap/LobbyMap+/Game/Maps/MainMap/L_LandscapeMap+/Game/Maps/DemoMap/ServerTest+/Game/Maps/DemoMap/ServerEmptyTest"
 echo Cook maps: %COOK_MAPS%
 call "%RUN_UAT%" BuildCookRun -project="%UPROJECT%" -noP4 -server -noclient -serverplatform=Win64 -serverconfig=Development -nocompile -nocompileeditor -cook -stage -package -pak -archive -archivedirectory="%ARCHIVE_DIR%" -map=%COOK_MAPS% -utf8output %*
+<<<<<<< HEAD
+>>>>>>> origin/main
+=======
 >>>>>>> origin/main
 pause
 exit /b %ERRORLEVEL%
