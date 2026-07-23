@@ -16,6 +16,7 @@ class UEnemyAIRangeVisualizationComponent;
 class UEnemyArchetypeData;
 class UGP_BossDeathPresentationComponent;
 class UGP_BossTargetMarkerVFXComponent;
+class UGP_EnemyDeathAbsorptionComponent;
 class UGP_EnemyDeathAbility;
 class UGP_WidgetComponent;
 class UPDA_EnemyAnimationSet;
@@ -111,6 +112,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Boss|Death Presentation")
 	UGP_BossDeathPresentationComponent* GetBossDeathPresentationComponent() const { return BossDeathPresentationComponent; }
+
+	UFUNCTION(BlueprintPure, Category = "Enemy|Death Absorption")
+	UGP_EnemyDeathAbsorptionComponent* GetEnemyDeathAbsorptionComponent() const { return EnemyDeathAbsorptionComponent; }
 
 	// AIController calls this only when TargetActor is first acquired or changes to another valid player.
 	void NotifyBossTargetSelected(AActor* TargetActor);
@@ -411,6 +415,9 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Death Presentation", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UGP_BossDeathPresentationComponent> BossDeathPresentationComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Enemy|Death Absorption", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UGP_EnemyDeathAbsorptionComponent> EnemyDeathAbsorptionComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Enemy|UI", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UGP_WidgetComponent> WorldHealthBarComponent;

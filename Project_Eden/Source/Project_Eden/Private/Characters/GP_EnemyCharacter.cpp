@@ -39,6 +39,7 @@
 #include "UObject/UnrealType.h"
 #include "VFX/GP_BossDeathPresentationComponent.h"
 #include "VFX/GP_BossTargetMarkerVFXComponent.h"
+#include "VFX/GP_EnemyDeathAbsorptionComponent.h"
 
 AGP_EnemyCharacter::AGP_EnemyCharacter()
 {
@@ -71,6 +72,9 @@ AGP_EnemyCharacter::AGP_EnemyCharacter()
 	// Bosses use this dormant component to convert the shared GAS death state into a boss-specific clear effect.
 	BossDeathPresentationComponent = CreateDefaultSubobject<UGP_BossDeathPresentationComponent>(TEXT("BossDeathPresentationComponent"));
 	BossDeathPresentationComponent->SetupAttachment(GetRootComponent());
+
+	// Regular enemies use a replicated cosmetic bridge; bosses keep their existing bespoke death presentation.
+	EnemyDeathAbsorptionComponent = CreateDefaultSubobject<UGP_EnemyDeathAbsorptionComponent>(TEXT("EnemyDeathAbsorptionComponent"));
 
 	WorldHealthBarComponent = CreateDefaultSubobject<UGP_WidgetComponent>(TEXT("WorldHealthBarComponent"));
 	WorldHealthBarComponent->SetupAttachment(GetRootComponent());
@@ -1082,6 +1086,11 @@ void AGP_EnemyCharacter::ApplyDeathState()
 	{
 		// Presentation is local-only and no-ops for regular enemies, keeping the GAS death invariant centralised here.
 		BossDeathPresentationComponent->PlayDeathPresentation(DeathInstigatorActor);
+	}
+	if (HasAuthority() && !bIsBossEnemy && IsValid(EnemyDeathAbsorptionComponent))
+	{
+		// Authority selects one absorption recipient, then the component multicasts that stable actor to every client.
+		EnemyDeathAbsorptionComponent->PlayDeathAbsorption(DeathInstigatorActor);
 	}
 
 	RefreshWorldHealthBarVisibility();
