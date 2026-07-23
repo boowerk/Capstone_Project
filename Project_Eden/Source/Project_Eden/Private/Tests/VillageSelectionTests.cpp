@@ -597,6 +597,16 @@ bool FVillageSelectionPolicyTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("Village_01 uses a 130 m square compact footprint"),
 			Village01Preset->Footprint.FootprintExtent,
 			FVector(6500.0f, 6500.0f, 3000.0f));
+		TestEqual(TEXT("Village_00 footprint is centered on its level origin"),
+			FVector2D(
+				Village00Preset->Footprint.FootprintOffset.X,
+				Village00Preset->Footprint.FootprintOffset.Y),
+			FVector2D::ZeroVector);
+		TestEqual(TEXT("Village_01 footprint is centered on its level origin"),
+			FVector2D(
+				Village01Preset->Footprint.FootprintOffset.X,
+				Village01Preset->Footprint.FootprintOffset.Y),
+			FVector2D::ZeroVector);
 
 		const int32 StableIndex = AGP_VillageLayoutDirector::SelectVillagePresetIndex(
 			1337,
