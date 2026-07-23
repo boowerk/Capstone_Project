@@ -20,6 +20,7 @@
 #include "AbilitySystem/GP_AbilitySystemComponent.h"
 #include "AbilitySystem/GP_AttributeSet.h"
 #include "Animation/AnimInstance.h"
+#include "Animation/AnimMontage.h"
 #include "Animation/AnimSequence.h"
 #include "Animation/PDA_EnemyAnimationSet.h"
 #include "BehaviorTree/BlackboardComponent.h"
@@ -112,6 +113,7 @@ void AGP_EnemyCharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	UpdateTurnInPlace(DeltaSeconds);
+	UpdateBasicEnemyCombatHoldFacing(DeltaSeconds);
 }
 
 UAttributeSet* AGP_EnemyCharacter::GetAttributeSet() const
@@ -155,6 +157,40 @@ FVector AGP_EnemyCharacter::GetBehaviorAnchorLocation() const
 {
 	// AI possession can ask for the anchor before BeginPlay, so compute the editor-authored point on demand.
 	return bHasBehaviorAnchorLocation ? BehaviorAnchorLocation : GetActorTransform().TransformPosition(BehaviorAnchorOffset);
+}
+
+float AGP_EnemyCharacter::GetBasicMeleeAttackStartRange() const
+{
+	const float ForwardStepRange = FMath::Max(0.0f, BasicMeleeAttackStartRange);
+	const float StationaryRange = FMath::Min(
+		ForwardStepRange,
+		FMath::Max(0.0f, BasicMeleeStationaryAttackStartRange));
+	// Furnace-style lunges can use the wider edge; in-place melee such as production Cyclops stays inside overlap reach.
+	return IsValid(EnemyAnimationSet) && EnemyAnimationSet->bUseAbilityForwardStep
+		? ForwardStepRange
+		: StationaryRange;
+}
+
+void AGP_EnemyCharacter::BeginBasicEnemyCombatHoldFacing(AActor* TargetActor, float TurnRateDegreesPerSecond)
+{
+	if (!HasAuthority() || bIsDead || !IsValid(TargetActor))
+	{
+		ClearBasicEnemyCombatHoldFacing();
+		return;
+	}
+
+	BasicEnemyCombatHoldFacingTarget = TargetActor;
+	BasicEnemyCombatHoldFacingTurnRateDegreesPerSecond = FMath::Max(0.0f, TurnRateDegreesPerSecond);
+	// Tick is normally dormant for regular enemies; the explicit close-hold state temporarily enables per-frame facing.
+	SetActorTickEnabled(true);
+}
+
+void AGP_EnemyCharacter::ClearBasicEnemyCombatHoldFacing()
+{
+	BasicEnemyCombatHoldFacingTarget.Reset();
+	BasicEnemyCombatHoldFacingTurnRateDegreesPerSecond = 0.0f;
+	// Preserve opt-in turn-in-place or derived persistent Tick after the temporary combat hold ends.
+	SetActorTickEnabled(bEnableTurnInPlace || PrimaryActorTick.bStartWithTickEnabled);
 }
 
 void AGP_EnemyCharacter::OnConstruction(const FTransform& Transform)
@@ -297,7 +333,11 @@ void AGP_EnemyCharacter::ApplyRuntimeMovementPolicy()
 
 void AGP_EnemyCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	// Release the transient target reference before this replicated pawn leaves the world.
+	ClearBasicEnemyCombatHoldFacing();
 	StopTurnInPlace(false);
+	StopActiveCombatTransitionMontage();
+	CombatTransitionPhase = EGPEnemyCombatTransitionPhase::None;
 	UnbindMoveSpeedAttribute();
 	if (IsValid(BossTargetMarkerVFXComponent))
 	{
@@ -338,6 +378,38 @@ void AGP_EnemyCharacter::UpdateTurnInPlace(float DeltaSeconds)
 	// stationary state, so that inference makes idle, recovery, and tactical waits
 	// continuously face the player.  A dedicated AI task must call
 	// StartTurnInPlaceForTarget when a turn is actually part of its state transition.
+}
+
+void AGP_EnemyCharacter::UpdateBasicEnemyCombatHoldFacing(float DeltaSeconds)
+{
+	AActor* TargetActor = BasicEnemyCombatHoldFacingTarget.Get();
+	if (!HasAuthority() || bIsDead || bBasicEnemyAttackInProgress || !IsValid(TargetActor))
+	{
+		ClearBasicEnemyCombatHoldFacing();
+		return;
+	}
+
+	const UCharacterMovementComponent* MovementComponent = GetCharacterMovement();
+	if (bTurnInPlaceActive || (IsValid(MovementComponent) && MovementComponent->Velocity.Size2D() > 5.0f))
+	{
+		return;
+	}
+
+	FVector LookDirection = TargetActor->GetActorLocation() - GetActorLocation();
+	LookDirection.Z = 0.0f;
+	if (LookDirection.IsNearlyZero())
+	{
+		return;
+	}
+
+	FRotator NewRotation = GetActorRotation();
+	NewRotation.Yaw = EnemyAttackTransitionPolicy::StepFacingYaw(
+		NewRotation.Yaw,
+		LookDirection.Rotation().Yaw,
+		BasicEnemyCombatHoldFacingTurnRateDegreesPerSecond,
+		DeltaSeconds);
+	// Server movement replication distributes this smooth close-hold yaw to all three connected players.
+	SetActorRotation(NewRotation);
 }
 
 void AGP_EnemyCharacter::StartTurnInPlaceForTarget(const AActor* TargetActor)
@@ -464,6 +536,139 @@ void AGP_EnemyCharacter::StopTurnInPlace(bool bStopAnimation)
 	SetTurnInPlaceAnimGraphFlag(false);
 }
 
+float AGP_EnemyCharacter::BeginCombatTransitionAnimation(EGPEnemyCombatTransitionPhase TransitionPhase)
+{
+	if (!HasAuthority() || bIsDead || TransitionPhase == EGPEnemyCombatTransitionPhase::None)
+	{
+		return 0.0f;
+	}
+
+	const float TransitionDurationSeconds = GetCombatTransitionDurationSeconds(TransitionPhase);
+	if (TransitionDurationSeconds <= KINDA_SMALL_NUMBER
+		|| !IsValid(ResolveCombatTransitionAnimation(TransitionPhase)))
+	{
+		return 0.0f;
+	}
+
+	// Replicate only the semantic phase; every machine resolves the sequence from
+	// the same enemy DataAsset and creates its cosmetic dynamic montage locally.
+	CombatTransitionPhase = TransitionPhase;
+	ApplyCombatTransitionAnimation();
+	ForceNetUpdate();
+	return TransitionDurationSeconds;
+}
+
+void AGP_EnemyCharacter::EndCombatTransitionAnimation()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	CombatTransitionPhase = EGPEnemyCombatTransitionPhase::None;
+	ApplyCombatTransitionAnimation();
+	ForceNetUpdate();
+}
+
+float AGP_EnemyCharacter::GetCombatTransitionDurationSeconds(EGPEnemyCombatTransitionPhase TransitionPhase) const
+{
+	if (!IsValid(EnemyAnimationSet) || !IsValid(ResolveCombatTransitionAnimation(TransitionPhase)))
+	{
+		return 0.0f;
+	}
+
+	switch (TransitionPhase)
+	{
+	case EGPEnemyCombatTransitionPhase::AttackPrepare:
+		return FMath::Max(0.0f, EnemyAnimationSet->AttackPrepareDurationSeconds);
+	case EGPEnemyCombatTransitionPhase::ChaseResume:
+		return FMath::Max(0.0f, EnemyAnimationSet->ChaseResumeDurationSeconds);
+	default:
+		return 0.0f;
+	}
+}
+
+UAnimSequence* AGP_EnemyCharacter::ResolveCombatTransitionAnimation(EGPEnemyCombatTransitionPhase TransitionPhase) const
+{
+	if (!IsValid(EnemyAnimationSet))
+	{
+		return nullptr;
+	}
+
+	switch (TransitionPhase)
+	{
+	case EGPEnemyCombatTransitionPhase::AttackPrepare:
+		return EnemyAnimationSet->ResolveAttackPrepareAnimation();
+	case EGPEnemyCombatTransitionPhase::ChaseResume:
+		return EnemyAnimationSet->ResolveChaseResumeAnimation();
+	default:
+		return nullptr;
+	}
+}
+
+void AGP_EnemyCharacter::ApplyCombatTransitionAnimation()
+{
+	StopActiveCombatTransitionMontage();
+	if (bIsDead || CombatTransitionPhase == EGPEnemyCombatTransitionPhase::None)
+	{
+		return;
+	}
+
+	UAnimSequence* TransitionSequence = ResolveCombatTransitionAnimation(CombatTransitionPhase);
+	UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
+	if (!IsValid(TransitionSequence) || !IsValid(AnimInstance) || !IsValid(EnemyAnimationSet))
+	{
+		return;
+	}
+
+	if (const UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+		IsValid(ASC) && IsValid(ASC->GetCurrentMontage()))
+	{
+		// A late phase replication must never replace the GAS-owned attack montage.
+		return;
+	}
+
+	ActiveCombatTransitionMontage = AnimInstance->PlaySlotAnimationAsDynamicMontage(
+		TransitionSequence,
+		EnemyAnimationSet->CombatTransitionSlotName,
+		FMath::Max(0.0f, EnemyAnimationSet->CombatTransitionBlendInSeconds),
+		FMath::Max(0.0f, EnemyAnimationSet->CombatTransitionBlendOutSeconds),
+		1.0f,
+		1,
+		-1.0f,
+		0.0f);
+
+	UE_LOG(
+		LogEnemyAI,
+		Log,
+		TEXT("[CombatTransition] Phase=%d Pawn=%s Animation=%s Duration=%.2f"),
+		static_cast<int32>(CombatTransitionPhase),
+		*GetNameSafe(this),
+		*GetNameSafe(TransitionSequence),
+		GetCombatTransitionDurationSeconds(CombatTransitionPhase));
+}
+
+void AGP_EnemyCharacter::StopActiveCombatTransitionMontage()
+{
+	UAnimMontage* TransitionMontage = ActiveCombatTransitionMontage.Get();
+	UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
+	if (IsValid(TransitionMontage) && IsValid(AnimInstance))
+	{
+		const float BlendOutSeconds = IsValid(EnemyAnimationSet)
+			? FMath::Max(0.0f, EnemyAnimationSet->CombatTransitionBlendOutSeconds)
+			: 0.12f;
+		// Stop only the montage created for this bridge; never stop the slot broadly,
+		// because a replicated GAS attack may already own DefaultSlot.
+		AnimInstance->Montage_Stop(BlendOutSeconds, TransitionMontage);
+	}
+	ActiveCombatTransitionMontage = nullptr;
+}
+
+void AGP_EnemyCharacter::OnRep_CombatTransitionPhase()
+{
+	ApplyCombatTransitionAnimation();
+}
+
 UAnimSequence* AGP_EnemyCharacter::SelectTurnInPlaceAnimation(float SignedYawDeltaDegrees) const
 {
 	const bool bTurnLeft = SignedYawDeltaDegrees < 0.0f;
@@ -509,6 +714,7 @@ bool AGP_EnemyCharacter::IsBasicEnemyAttackReady() const
 	return IsValid(World)
 		&& !bBasicEnemyAttackInProgress
 		&& !bTurnInPlaceActive
+		&& CombatTransitionPhase == EGPEnemyCombatTransitionPhase::None
 		&& EnemyAttackCadencePolicy::IsReady(World->GetTimeSeconds(), BasicEnemyAttackReadyTimeSeconds);
 }
 
@@ -732,7 +938,20 @@ void AGP_EnemyCharacter::GiveDefaultEnemyAttackAbility()
 		return;
 	}
 
-	// Blueprint StartupAbilities can override this; the default grant only fills an otherwise missing basic attack.
+	if (DefaultAttackAbilityTag.IsValid())
+	{
+		for (const FGameplayAbilitySpec& AbilitySpec : ASC->GetActivatableAbilities())
+		{
+			if (IsValid(AbilitySpec.Ability)
+				&& AbilitySpec.Ability->GetAssetTags().HasTagExact(DefaultAttackAbilityTag))
+			{
+				// A tag-compatible StartupAbility replaces the native fallback, preventing two specs from answering one BT attack.
+				return;
+			}
+		}
+	}
+
+	// Class identity remains the fallback contract when an older enemy has no valid attack tag configured.
 	if (ASC->FindAbilitySpecFromClass(DefaultEnemyAttackAbilityClass) == nullptr)
 	{
 		ASC->GiveAbility(FGameplayAbilitySpec(DefaultEnemyAttackAbilityClass));
@@ -745,6 +964,7 @@ void AGP_EnemyCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 
 	DOREPLIFETIME(AGP_EnemyCharacter, bIsDead);
 	DOREPLIFETIME(AGP_EnemyCharacter, DeathInstigatorActor);
+	DOREPLIFETIME(AGP_EnemyCharacter, CombatTransitionPhase);
 }
 
 void AGP_EnemyCharacter::GiveDefaultEnemyDeathAbility()
@@ -850,6 +1070,16 @@ void AGP_EnemyCharacter::ApplyDeathState()
 	}
 
 	bDeathStateApplied = true;
+	if (HasAuthority())
+	{
+		EndCombatTransitionAnimation();
+	}
+	else
+	{
+		// OnRep_IsDead may arrive before the replicated phase reset.
+		CombatTransitionPhase = EGPEnemyCombatTransitionPhase::None;
+		ApplyCombatTransitionAnimation();
+	}
 	// 사망은 모든 행동 커밋보다 우선하며 지연된 BT 재평가가 타깃을 다시 잡지 못하게 한다.
 	BehaviorAttackCommitUntilTimeSeconds = 0.0f;
 	BehaviorAttackCommittedTarget.Reset();

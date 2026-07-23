@@ -989,6 +989,13 @@ void AEnemyAIController::SetBlackboardTargetActor(AActor* NewTargetActor)
 		return;
 	}
 
+	if (AGP_EnemyCharacter* EnemyPawn = Cast<AGP_EnemyCharacter>(GetPawn()))
+	{
+		// A newly selected player must enter the attack band on their own distance,
+		// instead of inheriting the previous player's exit hysteresis in multiplayer.
+		EnemyPawn->ResetBehaviorAttackBandLatch();
+	}
+
 	if (!IsValid(CurrentTargetActor) && IsValid(NewTargetActor))
 	{
 		UE_LOG(LogEnemyAI, Log, TEXT("[Perception] Target acquired: %s"), *EnemyAIDebugUtils::DescribeActor(NewTargetActor));

@@ -34,8 +34,22 @@ bool UGP_AbilitySystemComponent::TryActivateAbilityByTag(const FGameplayTag& Abi
 		return false;
 	}
 
-	// 태그 기반 실행 규약을 컨트롤러와 BT 태스크에서도 재사용한다.
-	return TryActivateAbilitiesByTag(AbilityTag.GetSingleTagContainer());
+	FGameplayAbilitySpecHandle MatchingHandle;
+	{
+		FScopedAbilityListLock AbilityListLock(*this);
+		for (const FGameplayAbilitySpec& AbilitySpec : GetActivatableAbilities())
+		{
+			if (IsValid(AbilitySpec.Ability)
+				&& AbilitySpec.Ability->GetAssetTags().HasTagExact(AbilityTag))
+			{
+				// One BT request owns exactly one deterministic spec even if legacy Blueprint data contains duplicates.
+				MatchingHandle = AbilitySpec.Handle;
+				break;
+			}
+		}
+	}
+
+	return MatchingHandle.IsValid() && TryActivateAbility(MatchingHandle);
 }
 
 // 어빌리티의 태그를 검사하여 특정 태그가 있다면 실행시키는 로직

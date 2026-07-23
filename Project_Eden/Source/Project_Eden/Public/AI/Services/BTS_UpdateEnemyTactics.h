@@ -54,6 +54,10 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "AI|Tactics")
 	bool bRestartTreeOnTacticalStateChange = true;
 
+	// Stationary cooldown holds still consume the live target by turning at a readable, non-snapping rate.
+	UPROPERTY(EditAnywhere, Category = "AI|Tactics", meta = (ClampMin = "0.0", Units = "deg/s"))
+	float CombatHoldFacingTurnRateDegreesPerSecond = 240.0f;
+
 	// When a chase pulls the enemy too far from its anchor, pause target selection and return home.
 	UPROPERTY(EditAnywhere, Category = "AI|Leash")
 	bool bEnableLeashReturnHome = true;

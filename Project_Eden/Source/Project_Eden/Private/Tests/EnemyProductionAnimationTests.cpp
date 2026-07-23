@@ -1,6 +1,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Animation/AnimMontage.h"
+#include "Animation/AnimSequence.h"
 #include "Animation/GP_AnimNotify_SendGameplayEvent.h"
 #include "Animation/PDA_CharacterAnimationSet.h"
 #include "Animation/PDA_EnemyAnimationSet.h"
@@ -168,6 +169,34 @@ namespace EnemyProductionAnimationTests
 		}
 	}
 
+	void ValidateCombatTransitionAnimation(
+		FAutomationTestBase& Test,
+		const UAnimSequence* TransitionAnimation,
+		const USkeletalMesh* Mesh,
+		const FString& Context,
+		float DurationSeconds)
+	{
+		Test.TestNotNull(FString::Printf(TEXT("%s resolves a transition animation"), *Context), TransitionAnimation);
+		if (!IsValid(TransitionAnimation))
+		{
+			return;
+		}
+
+		if (IsValid(Mesh))
+		{
+			// Never let the temporary fallback cross enemy skeleton families.
+			Test.TestTrue(
+				FString::Printf(TEXT("%s matches the enemy skeleton"), *Context),
+				TransitionAnimation->GetSkeleton() == Mesh->GetSkeleton());
+		}
+		Test.TestTrue(
+			FString::Printf(TEXT("%s has playable source frames"), *Context),
+			TransitionAnimation->GetPlayLength() > KINDA_SMALL_NUMBER);
+		Test.TestTrue(
+			FString::Printf(TEXT("%s has a positive bridge duration"), *Context),
+			DurationSeconds > KINDA_SMALL_NUMBER);
+	}
+
 	void ValidateEnemyAnimationContract(
 		FAutomationTestBase& Test,
 		const UClass* EnemyClass,
@@ -200,6 +229,25 @@ namespace EnemyProductionAnimationTests
 		Test.TestTrue(
 			FString::Printf(TEXT("%s has an animation blueprint class"), *Context),
 			IsValid(AnimBlueprintClass));
+
+		if (IsValid(EnemySet))
+		{
+			Test.TestFalse(
+				FString::Printf(TEXT("%s has a transition montage slot"), *Context),
+				EnemySet->CombatTransitionSlotName.IsNone());
+			ValidateCombatTransitionAnimation(
+				Test,
+				EnemySet->ResolveAttackPrepareAnimation(),
+				Mesh,
+				FString::Printf(TEXT("%s / AttackPrepare"), *Context),
+				EnemySet->AttackPrepareDurationSeconds);
+			ValidateCombatTransitionAnimation(
+				Test,
+				EnemySet->ResolveChaseResumeAnimation(),
+				Mesh,
+				FString::Printf(TEXT("%s / ChaseResume"), *Context),
+				EnemySet->ChaseResumeDurationSeconds);
+		}
 
 		const TArray<const UAnimMontage*> AttackMontages = ResolveSelectableAttackMontages(Enemy);
 		Test.TestTrue(

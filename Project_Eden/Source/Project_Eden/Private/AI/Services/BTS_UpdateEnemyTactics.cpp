@@ -120,6 +120,7 @@ namespace BTS_UpdateEnemyTactics_Internal
 
 		return FMath::Clamp(AttributeSet->GetHealth() / MaxHealth, 0.0f, 1.0f);
 	}
+
 }
 
 UBTS_UpdateEnemyTactics::UBTS_UpdateEnemyTactics()
@@ -278,6 +279,11 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 
 	if (bPreserveCommittedAction && !IsValid(TargetActor))
 	{
+		if (IsValid(EnemyCharacter))
+		{
+			// A targetless committed action must not retain the previous cooldown-facing state.
+			EnemyCharacter->ClearBasicEnemyCombatHoldFacing();
+		}
 		// Disconnect/파괴로 타깃 키가 비어도 진행 중 액션은 Combat 분기를 소유하고 이동을 계속 잠근다.
 		BTS_UpdateEnemyTactics_Internal::SetCombatStateTag(BlackboardComponent, GPTags::AI::State::Combat);
 		BlackboardComponent->SetValueAsFloat(EnemyBlackboardKeys::DistanceToTarget, 0.0f);
@@ -296,6 +302,8 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 	{
 		if (IsValid(EnemyCharacter))
 		{
+			// Leash movement restores locomotion-facing instead of carrying combat hold toward home.
+			EnemyCharacter->ClearBasicEnemyCombatHoldFacing();
 			EnemyCharacter->ResetBehaviorAttackBandLatch();
 		}
 
@@ -344,6 +352,8 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 	{
 		if (IsValid(EnemyCharacter))
 		{
+			// Losing all perceived players returns stationary facing to ordinary idle/patrol ownership.
+			EnemyCharacter->ClearBasicEnemyCombatHoldFacing();
 			EnemyCharacter->ResetBehaviorAttackBandLatch();
 		}
 
@@ -387,6 +397,13 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 	}
 	if (IsValid(EnemyCharacter) && EnemyCharacter->IsBasicEnemyAttackInProgress())
 	{
+		// The attack task now owns per-frame windup rotation until the shared hit lock.
+		EnemyCharacter->ClearBasicEnemyCombatHoldFacing();
+		// Keep live observations current during the montage even though the committed attack branch cannot change yet.
+		BlackboardComponent->SetValueAsFloat(
+			EnemyBlackboardKeys::DistanceToTarget,
+			FVector::Distance(ControlledPawn->GetActorLocation(), TargetActor->GetActorLocation()));
+		BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bHasLineOfSight, AIController->LineOfSightTo(TargetActor));
 		BTS_UpdateEnemyTactics_Internal::SetCombatStateTag(BlackboardComponent, GPTags::AI::State::Combat);
 		BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldRetreat, false);
 		// Keep the branch which activated this ability selected. Closing this condition aborts
@@ -410,13 +427,24 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 	const bool bModePrefersHold = EnemyMode == FEnemyLLMEvaluationParser::ToBlackboardName(EEnemyMode::Hold);
 	const bool bModePrefersPressure = EnemyMode == FEnemyLLMEvaluationParser::ToBlackboardName(EEnemyMode::Pressure);
 
-	// The attack band is intentionally tunable here, while branch selection remains in BT decorators.
-	const float AttackWindow = FMath::Max(AttackWindowFloor, FMath::Lerp(MinAttackWindow, MaxAttackWindow, Aggression));
-	const float MinAttackRange = FMath::Max(0.0f, PreferredRange - AttackWindow);
-	const float MaxAttackRange = PreferredRange + AttackWindow;
+	const bool bIsBasicMeleeArchetype = IsValid(EnemyCharacter)
+		&& !EnemyCharacter->IsBossEnemy()
+		&& EnemyCharacter->GetCombatArchetype() == EGPEnemyCombatArchetype::Melee;
 	const bool bIsBasicRangedArchetype = IsValid(EnemyCharacter)
 		&& !EnemyCharacter->IsBossEnemy()
 		&& EnemyCharacter->GetCombatArchetype() != EGPEnemyCombatArchetype::Melee;
+	// Personality still shapes the band, while melee's physical reach supplies an authoritative outer cap.
+	const float AttackWindow = FMath::Max(AttackWindowFloor, FMath::Lerp(MinAttackWindow, MaxAttackWindow, Aggression));
+	const float MinAttackRange = bIsBasicMeleeArchetype
+		? 0.0f
+		: FMath::Max(0.0f, PreferredRange - AttackWindow);
+	const float MaxAttackRange = EnemyAttackTransitionPolicy::ResolveMaximumAttackRange(
+		PreferredRange + AttackWindow,
+		bIsBasicMeleeArchetype,
+		IsValid(EnemyCharacter) ? EnemyCharacter->GetBasicMeleeAttackStartRange() : 0.0f);
+	const float EffectiveAttackRangeExitHysteresis = bIsBasicMeleeArchetype && IsValid(EnemyCharacter)
+		? EnemyCharacter->GetBasicMeleeAttackExitHysteresis()
+		: AttackRangeExitHysteresis;
 	const bool bAllowAttacksInsideEffectiveRange = bAllowAttacksInsidePreferredRange && !bIsBasicRangedArchetype;
 	const bool bInsideAttackBand = IsValid(EnemyCharacter) && !EnemyCharacter->IsBossEnemy()
 		? EnemyCharacter->UpdateBehaviorAttackBandLatch(
@@ -424,14 +452,14 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 			MinAttackRange,
 			MaxAttackRange,
 			bAllowAttacksInsideEffectiveRange,
-			AttackRangeExitHysteresis)
+			EffectiveAttackRangeExitHysteresis)
 		: EnemyAttackTransitionPolicy::IsInsideAttackBand(
 			DistanceToTarget,
 			MinAttackRange,
 			MaxAttackRange,
 			bAllowAttacksInsideEffectiveRange,
 			bPreviousCanAttack,
-			AttackRangeExitHysteresis);
+			EffectiveAttackRangeExitHysteresis);
 	const bool bTooClose = !bAllowAttacksInsideEffectiveRange && DistanceToTarget < MinAttackRange;
 	const bool bTooFar = DistanceToTarget > MaxAttackRange;
 	const bool bAttackCadenceReady = !IsValid(EnemyCharacter) || EnemyCharacter->IsBasicEnemyAttackReady();
@@ -448,20 +476,38 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 	// Turn-in-place owns movement until its root motion finishes, but an already committed attack still has priority.
 	const bool bTurnMovementHold = bTurnInPlaceActive && !bPreserveCommittedAction;
 	bool bCanAttack = AttackIntent == EEnemyAttackTransitionIntent::Attack && !bTurnMovementHold;
-	const bool bShouldCombatHold = AttackIntent == EEnemyAttackTransitionIntent::CombatHold || bTurnMovementHold;
+	const bool bShouldPursueDuringCadence = EnemyAttackTransitionPolicy::ShouldPursueDuringCadenceRecovery(
+		AttackIntent,
+		bIsBasicMeleeArchetype,
+		bPreviousShouldChase,
+		DistanceToTarget,
+		IsValid(EnemyCharacter) ? EnemyCharacter->GetBasicMeleeCadenceHoldRange() : 0.0f,
+		IsValid(EnemyCharacter) ? EnemyCharacter->GetBasicMeleeAttackExitHysteresis() : 0.0f);
+	const bool bShouldCombatHold = (AttackIntent == EEnemyAttackTransitionIntent::CombatHold && !bShouldPursueDuringCadence)
+		|| bTurnMovementHold;
 	bool bShouldReposition = false;
 	bool bShouldChase = false;
 
 	if (!bShouldRetreat && !bCanAttack && !bShouldCombatHold)
 	{
 		const bool bCoverDrivenReposition = CoverPreference >= CoverRepositionThreshold && !bHasLineOfSight;
-		const bool bRangeDrivenReposition = bTooClose || (bModePrefersHold && !bTooFar);
+		// Cadence pursuit has priority over a personality hold so melee does not sidestep instead of closing the live gap.
+		const bool bRangeDrivenReposition = bTooClose
+			|| (bModePrefersHold && !bTooFar && !bShouldPursueDuringCadence);
 
 		bShouldReposition = bCoverDrivenReposition || bRangeDrivenReposition;
-		bShouldChase = bTooFar || (!bHasLineOfSight && ChasePersistence >= LostLineOfSightChaseThreshold) || (bModePrefersPressure && !bHasLineOfSight);
+		bShouldChase = bShouldPursueDuringCadence
+			|| bTooFar
+			|| (!bHasLineOfSight && ChasePersistence >= LostLineOfSightChaseThreshold)
+			|| (bModePrefersPressure && !bHasLineOfSight);
 
-		// When reposition and chase both pass, prefer the behavior that matches the current tuning.
-		if (bShouldReposition && bShouldChase)
+		if (bShouldPursueDuringCadence)
+		{
+			// Closing the between-swing gap is a physical melee requirement, so cover scoring cannot replace it with a sidestep.
+			bShouldReposition = false;
+		}
+		// When reposition and chase both pass otherwise, prefer the behavior that matches the current tuning.
+		else if (bShouldReposition && bShouldChase)
 		{
 			if (bModePrefersHold || CoverPreference >= Aggression)
 			{
@@ -491,8 +537,28 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 
 	if (ShouldDeferTacticalBranchSelection())
 	{
+		if (IsValid(EnemyCharacter))
+		{
+			// Specialized boss services own their own stationary-facing presentation.
+			EnemyCharacter->ClearBasicEnemyCombatHoldFacing();
+		}
 		// Derived boss services consume the shared observations and publish one final branch state.
 		return;
+	}
+
+	if (IsValid(EnemyCharacter))
+	{
+		if (bShouldCombatHold && !bTurnInPlaceActive)
+		{
+			// Character Tick samples the actor every frame, avoiding the service interval's 4-5 Hz staircase rotation.
+			EnemyCharacter->BeginBasicEnemyCombatHoldFacing(
+				TargetActor,
+				CombatHoldFacingTurnRateDegreesPerSecond);
+		}
+		else
+		{
+			EnemyCharacter->ClearBasicEnemyCombatHoldFacing();
+		}
 	}
 
 	BlackboardComponent->SetValueAsBool(EnemyBlackboardKeys::bShouldRetreat, bShouldRetreat);
@@ -503,9 +569,10 @@ void UBTS_UpdateEnemyTactics::UpdateTactics(UBehaviorTreeComponent& OwnerComp) c
 
 	if (ControlledPawn->GetName().Contains(TEXT("FurnaceWalker")))
 	{
+		// Keep high-frequency movement traces available for opt-in diagnostics without flooding normal demo logs.
 		UE_LOG(
 			LogEnemyAI,
-			Log,
+			VeryVerbose,
 			TEXT("[MoveTrace] Tactics Pawn=%s Pos=%s Target=%s MoveTo=%s Vel=%.0f MoveStatus=%d Chase=%d Attack=%d Reposition=%d Retreat=%d Turn=%d AttackLock=%d Dist=%.0f Range=%.0f..%.0f LOS=%d"),
 			*GetNameSafe(ControlledPawn),
 			*ControlledPawn->GetActorLocation().ToCompactString(),

@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-21T08:30:00+09:00
+updated: 2026-07-21T22:24:01+09:00
 status: active
 tags:
   - memoc
@@ -11,7 +11,7 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-07-21T08:30:00+09:00
+Last synced: 2026-07-21T22:24:01+09:00
 
 ## Current Status
 
@@ -19,7 +19,7 @@ Last synced: 2026-07-21T08:30:00+09:00
 - Current verification: Editor build; DemoFlow 7/7; RegionEvents 8/8; Minimap 1/1; Dark Armor Knight combat 6/6 plus selector 1/1; three-player runtime starts 1/1; Landscape integrity 1/1. No live server or multiplayer PIE session was run by request. Manual P0 remains three-player objective/quorum traversal, all three Shrine UI deliveries, gold marker readability, boss reveal/attack, and result travel.
 - The product contract is now exactly three network players (`5e0a4fcb` through `4ca8c603`). `AGP_ThreePlayerGameSession` fixes players/spectators/split-screen to `3/0/1` in lobby and gameplay, exact-three Ready is required, the one authored Landscape PlayerStart expands into three collision/ground-validated stable slots, and debug ForceStart is disabled in Shipping and limited to an explicit `-AllowLobbyForceStart` local host.
 - Verification is current: Editor and Development Server builds pass; WindowsServer Cook/Stage/Pak/Archive passed after `729d334d` removed the unused broken projectile scaffold backup; the completed baseline used one packaged dedicated server plus three clients and reached three unique owned Pawns with HUD/ASC/input ready. The final local AI/Dark Knight/lobby/network regression is 30/30. The user requested no further live server tests unless explicitly asked; keep future verification to server-compatible implementation, builds, and local automation.
-- Graduation-demo enemy transition polish is current (`80f64845` through `a0c674e1`). Regular enemies use range hysteresis, smooth facing, GAS-lifetime attack commits, and recovery/cadence sequencing; target loss or leash reevaluation no longer opens movement during a committed attack, while death/groggy-style interrupts cancel immediately. Matador holds its body stationary while a live bull owns the pattern, cleans the bull state on every destroy path, and uses independent actor/task stuck caps of 18/20 seconds. `Project_EdenEditor` builds and all 21 `ProjectEden.AI` tests pass.
+- Graduation-demo enemy combat polish is current through `788facec`. Regular attacks run `Face -> AttackPrepare -> complete GAS montage -> Recovery -> ChaseResume`; `ActionEnd` closes only the hit window. One activation locks one player identity, follows that player's live position until `AttackHit`, then locks the strike direction. Melee personality range is capped by physical execution: Furnace forward-step starts at 350cm, Cyclops in-place at 240cm; cadence pursuit uses 275cm/225cm hysteresis and close hold faces per frame. Target swaps reset attack-band state, ranged shots use the committed player's hit-frame position, and one request activates one exact-tag GAS spec. `Project_EdenEditor` builds and all 25 `ProjectEden.AI` tests pass.
 - Dark Armor Knight pattern grants are repaired at `b7eb11d6`. The production Blueprint had serialized an empty `DarkKnightAbilityClasses` override, so BT selected valid attacks but GAS rejected every candidate as ungranted. Configured replacements now win by exact tag, while missing Basic/Heavy/Charge/DarkWave/GroundCrack/Groggy specs receive idempotent native fallbacks on authority. The production BP contract test verifies one spec per tag and a real Basic `Started=1`; Editor build, all 6 Dark Knight combat tests, and all 21 AI tests pass.
 - Dark Armor Knight range selection is aligned with authored damage at `0a22e69e`: Basic is melee-only through `350cm`, Heavy through `420cm`, and Dark Wave is clamped to its real `520cm` cone instead of the obsolete `2200cm` ranged gate. Charge and GroundCrack remain valid ranged choices. Service, selector, execution context, and GAS activation share the same exact boundaries; without a reachable ready pattern the boss keeps chasing. Editor build, Dark Knight 6/6, and AI 21/21 pass; no live server session was run.
 - Release confidence remains conditional on manual P0 checks that automation cannot prove: every selectable montage's contact/ActionEnd timing, FurnaceWalker/Cyclops duplicate-slot runtime evaluation, and Dark Knight impact/charge travel. Keep flying enemies out of the scripted demo unless their chase/altitude/attack loop passes PIE.
@@ -237,7 +237,7 @@ Last synced: 2026-05-23T00:00:00
 ## Open Tasks
 
 - Remove stale EarlyTransition notify states from the 22 referenced UEFN Run/Slide animations in the editor and resave them; the broken legacy notify package is intentionally absent, so load-all checks currently emit warning-only missing-package messages.
-- Run the first integration gate: two-player listen PIE from Lobby Ready through seamless travel to `L_LandscapeMap`, then Development Server Cook/package and packaged server-client travel. Do not mark the slice release-ready until connection, pawn/input/HUD recovery, and cooked map dependencies pass.
+- Manually demo-check the current three-player flow in PIE when requested; dedicated/live server execution is not required for the current implementation pass.
 - PIE-check boss target marker VFX in a multi-player/session setup: first target acquisition and target swaps should flash on the selected player's torso only.
 - PIE-check Crystal Seraph before/after target acquisition and after tactical teleports; `[Patrol] Fallback move location selected` must not spam and `[Leash] Return home finished` must remain reachable.
 - PIE-check Crystal Seraph's visible fall, grounded hit gate, and return-to-hover timing; tune `GroggyDuration` / `FinalPhaseGroggyDuration` on the boss Blueprint if needed.
@@ -249,6 +249,7 @@ Last synced: 2026-05-23T00:00:00
 
 ## Completed Tasks
 
+- 2026-07-21: Fixed regular-enemy live-target combat through `788facec`: one-hit activation, physical melee ranges, cadence pursuit/hold hysteresis, per-frame hold facing, activation-time target identity, windup tracking, bounded forward step, and single exact-tag GAS activation. Editor build and AI 25/25 passed; protected assets unchanged.
 - 2026-07-21: Integrated local `main` through `b1baeb60` with `origin/main` through `8c9cd99b`, preserving the three-player, Dark Knight, committed-action, Furnace turn/step, Foley, and Niagara work. Full editor build and local automation passed: AI 22/22, Dark Knight 6/6, Network 2/2, Lobby 2/2. Live server tests were intentionally skipped.
 - Merged `origin/main` into `feature/vfx-skills`; resolved C++ conflicts by combining both sides and kept the current branch `WBP_PlayerHUDWidget.uasset` LFS pointer to preserve skill HUD icon work.
 - Merged latest `origin/main` into `feature/vfx-skills`; resolved `.memoc` memory conflicts while code merged automatically.

@@ -106,22 +106,32 @@ EBTNodeResult::Type UBTT_ExecuteEnemyAttack::ExecuteTask(UBehaviorTreeComponent&
 		EnemyCharacter->BeginBehaviorAttackCommit(TargetActor, AttackTimeoutSeconds);
 	}
 
-	if (bFaceTargetBeforeAttack && IsValid(TargetActor) && !IsFacingCommittedTarget())
+	if (bFaceTargetBeforeAttack && IsValid(TargetActor))
 	{
-		// 이동 회전과 공격 조준이 동시에 ActorRotation을 덮어쓰지 않도록 준비 구간만 소유권을 가져온다.
+		// Own rotation through preparation and windup even when the pawn was already aligned on the first frame.
 		BeginFacingOwnership(ControlledPawn);
-		ExecutionPhase = EEnemyAttackTaskPhase::FacingTarget;
-		return EBTNodeResult::InProgress;
+		if (!IsFacingCommittedTarget())
+		{
+			ExecutionPhase = EEnemyAttackTaskPhase::FacingTarget;
+			return EBTNodeResult::InProgress;
+		}
 	}
 
-	return ActivateBasicAttack()
+	return BeginAttackAfterFacing()
 		? EBTNodeResult::InProgress
 		: EBTNodeResult::Failed;
 }
 
 bool UBTT_ExecuteEnemyAttack::ActivateBasicAttack()
 {
-	RestoreFacingOwnership();
+	EndCombatTransition();
+	if (bUseBossPatternSelector)
+	{
+		// Boss patterns retain their own authored facing contracts instead of regular-enemy windup tracking.
+		RestoreFacingOwnership();
+	}
+	// Preparation time is outside the ability lifecycle timeout budget.
+	TotalElapsedSeconds = 0.0f;
 	UAbilitySystemComponent* ASC = ActiveAbilitySystemComponent.Get();
 	AGP_EnemyCharacter* EnemyCharacter = ActiveEnemyCharacter.Get();
 	if (!IsValid(ASC) || !ActiveAbilityTag.IsValid())
@@ -131,6 +141,25 @@ bool UBTT_ExecuteEnemyAttack::ActivateBasicAttack()
 			EnemyCharacter->FinishBehaviorAttackCommit(0.0f);
 		}
 		return false;
+	}
+
+	if (!bUseBossPatternSelector
+		&& IsValid(EnemyCharacter)
+		&& !EnemyCharacter->IsBossEnemy()
+		&& EnemyCharacter->GetCombatArchetype() == EGPEnemyCombatArchetype::Melee)
+	{
+		const AActor* LiveCommittedTarget = CommittedTargetActor.Get();
+		const float MaximumActivationRange = EnemyCharacter->GetBasicMeleeAttackStartRange()
+			+ EnemyCharacter->GetBasicMeleeAttackExitHysteresis();
+		const bool bTargetStillReachable = IsValid(LiveCommittedTarget)
+			&& FVector::Dist2D(EnemyCharacter->GetActorLocation(), LiveCommittedTarget->GetActorLocation()) <= MaximumActivationRange;
+		if (!bTargetStillReachable)
+		{
+			// A player who escaped during AttackPrepare sends melee back to chase instead of activating a guaranteed miss.
+			EnemyCharacter->FinishBehaviorAttackCommit(0.0f);
+			RestoreFacingOwnership();
+			return false;
+		}
 	}
 
 	bool bActivated = false;
@@ -186,6 +215,12 @@ bool UBTT_ExecuteEnemyAttack::ActivateBasicAttack()
 			*ActiveAbilityTag.ToString());
 
 		bAttackActivationAccepted = true;
+		if (!bUseBossPatternSelector
+			&& (!IsValid(EnemyCharacter) || !EnemyCharacter->IsBasicEnemyAttackAimTracking()))
+		{
+			// Immediate-hit abilities have already reached their lock frame before this task regains control.
+			RestoreFacingOwnership();
+		}
 		ExecutionPhase = IsTrackedAbilityActive()
 			? EEnemyAttackTaskPhase::AwaitingAbilityEnd
 			: EEnemyAttackTaskPhase::FallbackCommit;
@@ -213,6 +248,7 @@ void UBTT_ExecuteEnemyAttack::TickTask(
 	if (bLatentAbortPending && IsExplicitAttackInterruptActive())
 	{
 		// 대기 중 새로 사망·그로기 상태가 들어오면 자연 종료를 기다리지 않고 즉시 상위 분기에 제어권을 돌린다.
+		EndCombatTransition();
 		CancelTrackedAttackAction();
 		ScheduleBasicAttackCadence();
 		if (AGP_EnemyCharacter* EnemyCharacter = ActiveEnemyCharacter.Get())
@@ -229,8 +265,42 @@ void UBTT_ExecuteEnemyAttack::TickTask(
 		return;
 	}
 
+	if (ExecutionPhase == EEnemyAttackTaskPhase::AttackPreparation)
+	{
+		if (bFaceTargetBeforeAttack
+			&& !TickCommittedTargetFacing(DeltaSeconds, AttackWindupTurnRateDegreesPerSecond))
+		{
+			FinishFailedExecution(OwnerComp);
+			return;
+		}
+		if (PhaseElapsedSeconds >= CurrentTransitionDurationSeconds
+			&& !BeginAttackAfterFacing())
+		{
+			FinishFailedExecution(OwnerComp);
+		}
+		return;
+	}
+
 	if (ExecutionPhase == EEnemyAttackTaskPhase::AwaitingAbilityEnd)
 	{
+		if (!bUseBossPatternSelector && bFaceTargetBeforeAttack)
+		{
+			AGP_EnemyCharacter* EnemyCharacter = ActiveEnemyCharacter.Get();
+			if (IsValid(EnemyCharacter) && EnemyCharacter->IsBasicEnemyAttackAimTracking())
+			{
+				if (!TickCommittedTargetFacing(DeltaSeconds, AttackWindupTurnRateDegreesPerSecond))
+				{
+					// A lost committed player freezes this strike direction instead of retargeting another teammate.
+					EnemyCharacter->LockBasicEnemyAttackAim();
+					RestoreFacingOwnership();
+				}
+			}
+			else
+			{
+				RestoreFacingOwnership();
+			}
+		}
+
 		const bool bTracksExternalBullAction = ActiveAbilityTag.MatchesTagExact(
 			GPTags::Ability::Enemy::Utility_MatadorBullPattern);
 		const float EffectiveLifecycleTimeoutSeconds = bTracksExternalBullAction
@@ -310,6 +380,13 @@ void UBTT_ExecuteEnemyAttack::TickTask(
 		&& PhaseElapsedSeconds >= EffectiveRecoverySeconds)
 	{
 		FinishRecovery(OwnerComp);
+		return;
+	}
+
+	if (ExecutionPhase == EEnemyAttackTaskPhase::ChasePreparation
+		&& PhaseElapsedSeconds >= CurrentTransitionDurationSeconds)
+	{
+		FinishAttackSequence(OwnerComp);
 	}
 }
 
@@ -317,7 +394,6 @@ EBTNodeResult::Type UBTT_ExecuteEnemyAttack::AbortTask(
 	UBehaviorTreeComponent& OwnerComp,
 	uint8* NodeMemory)
 {
-	RestoreFacingOwnership();
 	if (ShouldDeferAbortForCommittedAction())
 	{
 		// Blackboard observer/root reevaluation은 보류하되 태스크 tick은 계속 받아 실제 액션 종료를 관찰한다.
@@ -325,7 +401,10 @@ EBTNodeResult::Type UBTT_ExecuteEnemyAttack::AbortTask(
 		return EBTNodeResult::InProgress;
 	}
 
+	// Non-deferred exits release the movement component before cancelling the action.
+	RestoreFacingOwnership();
 	// 사망·그로기·안전 타임아웃은 진행 중 GAS까지 함께 끊어 잔여 피해가 새 분기와 겹치지 않게 한다.
+	EndCombatTransition();
 	CancelTrackedAttackAction();
 	ScheduleBasicAttackCadence();
 	if (AGP_EnemyCharacter* EnemyCharacter = ActiveEnemyCharacter.Get())
@@ -384,11 +463,7 @@ void UBTT_ExecuteEnemyAttack::TickFacingTarget(
 	const AActor* TargetActor = CommittedTargetActor.Get();
 	if (!IsValid(ControlledPawn) || !IsValid(TargetActor))
 	{
-		if (AGP_EnemyCharacter* EnemyCharacter = ActiveEnemyCharacter.Get())
-		{
-			EnemyCharacter->FinishBehaviorAttackCommit(0.0f);
-		}
-		FinishLatentTask(OwnerComp, EBTNodeResult::Failed);
+		FinishFailedExecution(OwnerComp);
 		return;
 	}
 
@@ -408,15 +483,48 @@ void UBTT_ExecuteEnemyAttack::TickFacingTarget(
 
 	if (IsFacingCommittedTarget() || PhaseElapsedSeconds >= MaximumAttackFacingSeconds)
 	{
-		if (!ActivateBasicAttack())
+		if (!BeginAttackAfterFacing())
 		{
-			FinishLatentTask(OwnerComp, EBTNodeResult::Failed);
+			FinishFailedExecution(OwnerComp);
 		}
 	}
 }
 
+bool UBTT_ExecuteEnemyAttack::TickCommittedTargetFacing(
+	float DeltaSeconds,
+	float TurnRateDegreesPerSecond)
+{
+	APawn* ControlledPawn = ActiveControlledPawn.Get();
+	const AActor* TargetActor = CommittedTargetActor.Get();
+	if (!IsValid(ControlledPawn) || !IsValid(TargetActor))
+	{
+		return false;
+	}
+
+	FVector LookDirection = TargetActor->GetActorLocation() - ControlledPawn->GetActorLocation();
+	LookDirection.Z = 0.0f;
+	if (!LookDirection.IsNearlyZero())
+	{
+		FRotator NewRotation = ControlledPawn->GetActorRotation();
+		NewRotation.Yaw = EnemyAttackTransitionPolicy::StepFacingYaw(
+			NewRotation.Yaw,
+			LookDirection.Rotation().Yaw,
+			TurnRateDegreesPerSecond,
+			DeltaSeconds);
+		// Authoritative actor rotation replicates the same capped live-target aim to all three players.
+		ControlledPawn->SetActorRotation(NewRotation);
+	}
+
+	return true;
+}
+
 void UBTT_ExecuteEnemyAttack::BeginFacingOwnership(APawn* ControlledPawn)
 {
+	if (bOwnsFacingRotation)
+	{
+		return;
+	}
+
 	ACharacter* Character = Cast<ACharacter>(ControlledPawn);
 	UCharacterMovementComponent* MovementComponent = IsValid(Character)
 		? Character->GetCharacterMovement()
@@ -450,6 +558,62 @@ void UBTT_ExecuteEnemyAttack::RestoreFacingOwnership()
 
 	FacingMovementComponent.Reset();
 	bOwnsFacingRotation = false;
+}
+
+bool UBTT_ExecuteEnemyAttack::BeginCombatTransition(EEnemyAttackTaskPhase TaskPhase)
+{
+	AGP_EnemyCharacter* EnemyCharacter = ActiveEnemyCharacter.Get();
+	if (!bUseBasicEnemyTransitionAnimations
+		|| bUseBossPatternSelector
+		|| !IsValid(EnemyCharacter)
+		|| EnemyCharacter->IsBossEnemy())
+	{
+		return false;
+	}
+
+	EGPEnemyCombatTransitionPhase CharacterPhase = EGPEnemyCombatTransitionPhase::None;
+	if (TaskPhase == EEnemyAttackTaskPhase::AttackPreparation)
+	{
+		CharacterPhase = EGPEnemyCombatTransitionPhase::AttackPrepare;
+	}
+	else if (TaskPhase == EEnemyAttackTaskPhase::ChasePreparation)
+	{
+		CharacterPhase = EGPEnemyCombatTransitionPhase::ChaseResume;
+	}
+	else
+	{
+		return false;
+	}
+
+	CurrentTransitionDurationSeconds = EnemyCharacter->BeginCombatTransitionAnimation(CharacterPhase);
+	if (CurrentTransitionDurationSeconds <= KINDA_SMALL_NUMBER)
+	{
+		return false;
+	}
+
+	ExecutionPhase = TaskPhase;
+	PhaseElapsedSeconds = 0.0f;
+	return true;
+}
+
+void UBTT_ExecuteEnemyAttack::EndCombatTransition()
+{
+	if (AGP_EnemyCharacter* EnemyCharacter = ActiveEnemyCharacter.Get())
+	{
+		EnemyCharacter->EndCombatTransitionAnimation();
+	}
+	CurrentTransitionDurationSeconds = 0.0f;
+}
+
+bool UBTT_ExecuteEnemyAttack::BeginAttackAfterFacing()
+{
+	if (ExecutionPhase != EEnemyAttackTaskPhase::AttackPreparation
+		&& BeginCombatTransition(EEnemyAttackTaskPhase::AttackPreparation))
+	{
+		return true;
+	}
+
+	return ActivateBasicAttack();
 }
 
 bool UBTT_ExecuteEnemyAttack::IsTrackedAbilityActive() const
@@ -506,7 +670,7 @@ bool UBTT_ExecuteEnemyAttack::IsExplicitAttackInterruptActive() const
 bool UBTT_ExecuteEnemyAttack::ShouldDeferAbortForCommittedAction() const
 {
 	const AGP_EnemyCharacter* EnemyCharacter = ActiveEnemyCharacter.Get();
-	return bAttackActivationAccepted
+	return ExecutionPhase != EEnemyAttackTaskPhase::Idle
 		&& IsValid(EnemyCharacter)
 		&& EnemyAttackTransitionPolicy::ShouldPreserveCommittedAction(
 			EnemyCharacter->IsBehaviorAttackCommitted(),
@@ -535,16 +699,40 @@ void UBTT_ExecuteEnemyAttack::CancelTrackedAttackAction()
 	ASC->CancelAbilities(&ActiveTagContainer);
 }
 
+void UBTT_ExecuteEnemyAttack::FinishFailedExecution(UBehaviorTreeComponent& OwnerComp)
+{
+	EndCombatTransition();
+	RestoreFacingOwnership();
+	if (AGP_EnemyCharacter* EnemyCharacter = ActiveEnemyCharacter.Get())
+	{
+		EnemyCharacter->FinishBehaviorAttackCommit(0.0f);
+	}
+
+	if (bLatentAbortPending)
+	{
+		// Once AbortTask returned InProgress, only the abort completion API can release the BT branch safely.
+		FinishLatentAbort(OwnerComp);
+		return;
+	}
+
+	FinishLatentTask(OwnerComp, EBTNodeResult::Failed);
+}
+
 void UBTT_ExecuteEnemyAttack::CompleteBasicAttack(UBehaviorTreeComponent& OwnerComp)
 {
-	ScheduleBasicAttackCadence();
 	const float EffectiveRecoverySeconds = bUseBossPatternSelector
 		? BossAttackRecoverySeconds
 		: AttackRecoverySeconds;
 	if (AGP_EnemyCharacter* EnemyCharacter = ActiveEnemyCharacter.Get())
 	{
 		// cadence는 공격 시작이 아니라 실제 종료 뒤부터 계산해 긴 몽타주와 다음 공격이 겹치지 않게 한다.
-		EnemyCharacter->FinishBehaviorAttackCommit(EffectiveRecoverySeconds);
+		const float ChaseResumeSeconds = bUseBasicEnemyTransitionAnimations && !EnemyCharacter->IsBossEnemy()
+			? EnemyCharacter->GetCombatTransitionDurationSeconds(EGPEnemyCombatTransitionPhase::ChaseResume)
+			: 0.0f;
+		// Keep the same commit through recovery and the chase bridge so a root
+		// reevaluation cannot open movement over either presentation phase.
+		EnemyCharacter->FinishBehaviorAttackCommit(
+			EffectiveRecoverySeconds + ChaseResumeSeconds + 0.5f);
 	}
 
 	ExecutionPhase = EEnemyAttackTaskPhase::Recovery;
@@ -557,9 +745,27 @@ void UBTT_ExecuteEnemyAttack::CompleteBasicAttack(UBehaviorTreeComponent& OwnerC
 
 void UBTT_ExecuteEnemyAttack::FinishRecovery(UBehaviorTreeComponent& OwnerComp)
 {
+	if (BeginCombatTransition(EEnemyAttackTaskPhase::ChasePreparation))
+	{
+		return;
+	}
+
+	FinishAttackSequence(OwnerComp);
+}
+
+void UBTT_ExecuteEnemyAttack::FinishAttackSequence(UBehaviorTreeComponent& OwnerComp)
+{
+	EndCombatTransition();
+	ScheduleBasicAttackCadence();
+	if (AGP_EnemyCharacter* EnemyCharacter = ActiveEnemyCharacter.Get())
+	{
+		EnemyCharacter->FinishBehaviorAttackCommit(0.0f);
+	}
+
 	if (bLatentAbortPending)
 	{
-		// 액션과 회복까지 끝난 시점에 보류했던 상위 분기 변경을 다시 허용한다.
+		// Release a deferred branch change only after attack, recovery, and the
+		// chase-resume bridge have all yielded their animation ownership.
 		FinishLatentAbort(OwnerComp);
 		return;
 	}
@@ -590,6 +796,7 @@ void UBTT_ExecuteEnemyAttack::ScheduleBasicAttackCadence()
 
 void UBTT_ExecuteEnemyAttack::ResetExecutionState()
 {
+	EndCombatTransition();
 	RestoreFacingOwnership();
 	ExecutionPhase = EEnemyAttackTaskPhase::Idle;
 	ActiveAbilitySystemComponent.Reset();
@@ -601,6 +808,7 @@ void UBTT_ExecuteEnemyAttack::ResetExecutionState()
 	PhaseElapsedSeconds = 0.0f;
 	TotalElapsedSeconds = 0.0f;
 	CurrentFallbackCommitSeconds = 0.0f;
+	CurrentTransitionDurationSeconds = 0.0f;
 	bAttackActivationAccepted = false;
 	bCadenceScheduled = false;
 	bUseBossPatternSelector = false;
@@ -612,7 +820,7 @@ void UBTT_ExecuteEnemyAttack::ResetExecutionState()
 FString UBTT_ExecuteEnemyAttack::GetStaticDescription() const
 {
 	return FString::Printf(
-		TEXT("Attack tag: %s\nWait for GAS/external action, recovery %.2fs (boss %.2fs)"),
+		TEXT("Attack tag: %s\nRegular: Face > AttackPrepare > GAS > Recovery > ChaseResume\nRecovery %.2fs (boss %.2fs)"),
 		*AttackAbilityTag.ToString(),
 		AttackRecoverySeconds,
 		BossAttackRecoverySeconds);
