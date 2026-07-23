@@ -6,6 +6,7 @@
 
 class AGP_EnemyCharacter;
 class AGP_EnemySpawnMarker;
+class AActor;
 class APlayerState;
 class UBoxComponent;
 
@@ -69,6 +70,8 @@ public:
 	const TArray<int32>& GetRegionsToRevive() const { return RegionsToRevive; }
 	int32 GetCorruptionRegionId() const;
 	const TArray<FGP_EnemySpawnEntry>& GetSpawns() const { return Spawns; }
+	const TArray<FGP_EnemySpawnEntry>& GetBossSpawns() const { return BossSpawns; }
+	bool HasBossPhase() const { return !BossSpawns.IsEmpty(); }
 	const TArray<TObjectPtr<AGP_EnemySpawnMarker>>& GetMarkers() const { return Markers; }
 	int32 GetMarkerCount() const { return Markers.Num(); }
 
@@ -84,6 +87,7 @@ public:
 	void NotifyMarkerTriggered(AGP_EnemySpawnMarker* Marker);
 
 	FVector GetSpawnPoint(bool bRandomizeInVolume, bool& bOutProjected) const;
+	FVector GetBossSpawnPoint(bool& bOutProjected) const;
 	FVector GetSpawnPointNearMarker(const AGP_EnemySpawnMarker* Marker, bool& bOutProjected) const;
 
 	UPROPERTY(BlueprintAssignable, Category = "Zone")
@@ -132,9 +136,31 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Zone")
 	TArray<FGP_EnemySpawnEntry> Spawns;
 
+	// Optional second phase. When configured, the zone waits for every normal enemy and marker
+	// to clear, then spawns this composition at the actor tagged BossSpawnPoint.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Zone|Boss")
+	TArray<FGP_EnemySpawnEntry> BossSpawns;
+
+	// Place Target Point actors with these tags inside the same Level Instance as this zone.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Zone|Spawn Points")
+	FName EnemySpawnPointTag = TEXT("EnemySpawnPoint");
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Zone|Spawn Points")
+	FName BossSpawnPointTag = TEXT("BossSpawnPoint");
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Zone|Spawn Points",
+		meta = (ClampMin = "0.0", Units = "cm"))
+	float EnemySpawnPointScatterRadius = 300.0f;
+
 private:
 	UPROPERTY()
 	TArray<TObjectPtr<AGP_EnemySpawnMarker>> Markers;
+
+	UPROPERTY()
+	TArray<TObjectPtr<AActor>> EnemySpawnPoints;
+
+	UPROPERTY()
+	TObjectPtr<AActor> BossSpawnPoint;
 
 	bool bUnlocked = false;
 	bool bEntered = false;
@@ -143,6 +169,9 @@ private:
 	FVector ProjectToNavmesh(const FVector& DesiredLocation, const FVector& QueryExtent, bool& bOutProjected) const;
 	FVector GetSpawnProjectionExtent() const;
 	FVector GetRandomPointInSpawnBox() const;
+	FVector GetPointWithScatter(const FVector& Origin, float ScatterRadius) const;
+	bool IsPointInsideSpawnBox(const FVector& WorldLocation) const;
+	void CollectTaggedSpawnPoints();
 
 	UFUNCTION()
 	void HandleBoxOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,

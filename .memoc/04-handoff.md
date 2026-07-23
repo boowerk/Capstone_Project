@@ -351,3 +351,9 @@ Search first, then open only files named above.
 - Range selection is limited to `GP_VillageTypes.h`, `GP_VillageSelectionPolicy.cpp`, and `VillageSelectionTests.cpp`. It adds opt-in deterministic `MinPickCount..MaxPickCount` while leaving fixed mode and saved-map behavior unchanged.
 - Editor build and `ProjectEden.Game.WorldLayout.VillageSelection` / `ProjectEden.Game.RunSeed.Flow` passed on 2026-07-22 with the editor closed. Tests cover fixed compatibility, exact/ranged counts, determinism, candidate-order independence, validation, required/optional clamping, reflection, and defaults.
 - To permit zero villages, keep the group optional and tune `SpawnChance`; do not set Min to zero. Next content task is adding more authored slots/presets and explicitly enabling range mode when desired.
+
+### 2026-07-24 Village boss-phase handoff
+
+- Village boss-phase source is complete and uncommitted. `AGP_EnemySpawnVolume::BossSpawns` is opt-in: after all normal markers and all registered normal/RegionEvent enemies are dead, GameMode spawns the boss composition and completes only after those bosses die.
+- Normal box spawns prefer same-LevelInstance, in-box actors tagged `EnemySpawnPoint`; the boss prefers `BossSpawnPoint`. Tight NavMesh projection avoids rooftop snapping, while missing authored points retain safe fallbacks.
+- Full `Project_EdenEditor Win64 Development` build/link succeeds. Author each `L_Village_00..03` once: several grounded TargetPoints tagged `EnemySpawnPoint`, one plaza TargetPoint tagged `BossSpawnPoint`, and one boss class/count in the Zone's `Boss Spawns`; `bIsBossZone` is not required.

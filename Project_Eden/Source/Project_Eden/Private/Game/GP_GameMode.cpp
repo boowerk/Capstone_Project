@@ -470,6 +470,7 @@ void AGP_GameMode::StartZone(int32 ZoneIndex)
 	bRunStarted = true;
 	CurrentZoneIndex = ZoneIndex;
 	AliveZoneEnemies = 0;
+	bCurrentZoneBossPhaseStarted = false;
 	bHasLastDeathLocation = false;
 
 	AGP_EnemySpawnVolume* Zone = OrderedZones[ZoneIndex];
@@ -605,6 +606,20 @@ void AGP_GameMode::MaybeCompleteZone()
 	const bool bAllMarkersDone = (MarkersTotal == 0) || (MarkersTriggered >= MarkersTotal);
 	if (bAllMarkersDone && AliveZoneEnemies == 0)
 	{
+		AGP_EnemySpawnVolume* Zone =
+			OrderedZones.IsValidIndex(CurrentZoneIndex) ? OrderedZones[CurrentZoneIndex] : nullptr;
+		if (IsValid(Zone) && Zone->HasBossPhase() && !bCurrentZoneBossPhaseStarted)
+		{
+			bCurrentZoneBossPhaseStarted = true;
+			if (SpawnZoneBossEnemies(Zone) > 0)
+			{
+				return;
+			}
+
+			UE_LOG(LogTemp, Error,
+				TEXT("[GP_GameMode] Zone '%s' boss phase had no successful spawns; completing zone to avoid a soft lock."),
+				*Zone->GetZoneId().ToString());
+		}
 		CompleteCurrentZone();
 	}
 }
@@ -654,6 +669,57 @@ void AGP_GameMode::SpawnZoneEnemies(AGP_EnemySpawnVolume* Zone)
 			RegisterZoneEnemy(SpawnedEnemy, Zone, Zone->GetCorruptionRegionId());
 		}
 	}
+}
+
+int32 AGP_GameMode::SpawnZoneBossEnemies(AGP_EnemySpawnVolume* Zone)
+{
+	UWorld* World = GetWorld();
+	if (!IsValid(Zone) || !World)
+	{
+		return 0;
+	}
+
+	int32 SpawnedCount = 0;
+	for (const FGP_EnemySpawnEntry& Entry : Zone->GetBossSpawns())
+	{
+		if (!*Entry.EnemyClass)
+		{
+			continue;
+		}
+
+		for (int32 SpawnIndex = 0; SpawnIndex < Entry.Count; ++SpawnIndex)
+		{
+			bool bProjected = false;
+			const FVector SpawnLocation = Zone->GetBossSpawnPoint(bProjected);
+			if (!bProjected)
+			{
+				UE_LOG(LogTemp, Warning,
+					TEXT("[GP_GameMode] Skipped boss spawn in zone '%s': no navmesh at BossSpawnPoint."),
+					*Zone->GetName());
+				continue;
+			}
+
+			FActorSpawnParameters SpawnParameters;
+			SpawnParameters.SpawnCollisionHandlingOverride =
+				ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+			if (AGP_EnemyCharacter* Boss = World->SpawnActor<AGP_EnemyCharacter>(
+				Entry.EnemyClass,
+				SpawnLocation,
+				FRotator::ZeroRotator,
+				SpawnParameters))
+			{
+				Boss->SpawnDefaultController();
+				RegisterZoneEnemy(Boss, Zone, Zone->GetCorruptionRegionId());
+				++SpawnedCount;
+			}
+		}
+	}
+
+	UE_LOG(LogTemp, Log,
+		TEXT("[GP_GameMode] Zone '%s' started boss phase with %d enemy(s)."),
+		*Zone->GetZoneId().ToString(),
+		SpawnedCount);
+	return SpawnedCount;
 }
 
 void AGP_GameMode::RegisterZoneEnemy(
@@ -927,6 +993,7 @@ void AGP_GameMode::StartStagedZone(AGP_EnemySpawnVolume* Zone)
 	State->MarkersTotal = Zone->GetMarkerCount();
 	State->MarkersTriggered = 0;
 	State->AliveEnemies = 0;
+	State->bBossPhaseStarted = false;
 	State->bHasLastEnemyDeathLocation = false;
 	bRunStarted = true;
 
@@ -965,6 +1032,18 @@ void AGP_GameMode::MaybeCompleteStagedZone(AGP_EnemySpawnVolume* Zone)
 		State->MarkersTotal == 0 || State->MarkersTriggered >= State->MarkersTotal;
 	if (bAllMarkersDone && State->AliveEnemies == 0)
 	{
+		if (Zone->HasBossPhase() && !State->bBossPhaseStarted)
+		{
+			State->bBossPhaseStarted = true;
+			if (SpawnZoneBossEnemies(Zone) > 0)
+			{
+				return;
+			}
+
+			UE_LOG(LogTemp, Error,
+				TEXT("[GP_GameMode] Zone '%s' boss phase had no successful spawns; completing zone to avoid a soft lock."),
+				*Zone->GetZoneId().ToString());
+		}
 		CompleteStagedZone(Zone);
 	}
 }

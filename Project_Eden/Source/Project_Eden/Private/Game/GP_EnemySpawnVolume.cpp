@@ -14,6 +14,7 @@ namespace GPEnemySpawnVolume
 	constexpr float MinProjectionHorizontalExtent = 600.0f;
 	constexpr float MinProjectionVerticalExtent = 1000.0f;
 	constexpr float ProjectionVerticalPadding = 200.0f;
+	const FVector AuthoredPointProjectionExtent(200.0f, 200.0f, 300.0f);
 }
 
 AGP_EnemySpawnVolume::AGP_EnemySpawnVolume()
@@ -74,6 +75,8 @@ void AGP_EnemySpawnVolume::BeginPlay()
 		}
 	}
 	UE_LOG(LogTemp, Log, TEXT("[GP_EnemySpawnVolume] Zone '%s' collected %d markers"), *GetName(), Markers.Num());
+
+	CollectTaggedSpawnPoints();
 }
 
 void AGP_EnemySpawnVolume::Unlock()
@@ -208,6 +211,29 @@ FVector AGP_EnemySpawnVolume::GetRandomPointInSpawnBox() const
 
 FVector AGP_EnemySpawnVolume::GetSpawnPoint(bool bRandomizeInVolume, bool& bOutProjected) const
 {
+	if (!EnemySpawnPoints.IsEmpty())
+	{
+		for (int32 AttemptIndex = 0; AttemptIndex < GPEnemySpawnVolume::SpawnProjectionAttempts; ++AttemptIndex)
+		{
+			const AActor* SpawnPoint = EnemySpawnPoints[FMath::RandRange(0, EnemySpawnPoints.Num() - 1)];
+			if (!IsValid(SpawnPoint))
+			{
+				continue;
+			}
+
+			const FVector DesiredLocation =
+				GetPointWithScatter(SpawnPoint->GetActorLocation(), EnemySpawnPointScatterRadius);
+			const FVector ProjectedLocation = ProjectToNavmesh(
+				DesiredLocation,
+				GPEnemySpawnVolume::AuthoredPointProjectionExtent,
+				bOutProjected);
+			if (bOutProjected)
+			{
+				return ProjectedLocation;
+			}
+		}
+	}
+
 	if (bRandomizeInVolume)
 	{
 		for (int32 AttemptIndex = 0; AttemptIndex < GPEnemySpawnVolume::SpawnProjectionAttempts; ++AttemptIndex)
@@ -244,6 +270,19 @@ FVector AGP_EnemySpawnVolume::GetSpawnPoint(bool bRandomizeInVolume, bool& bOutP
 	return CenterLocation;
 }
 
+FVector AGP_EnemySpawnVolume::GetBossSpawnPoint(bool& bOutProjected) const
+{
+	const FVector DesiredLocation =
+		IsValid(BossSpawnPoint)
+			? BossSpawnPoint->GetActorLocation()
+			: (SpawnBox ? SpawnBox->GetComponentLocation() : GetActorLocation());
+
+	return ProjectToNavmesh(
+		DesiredLocation,
+		GPEnemySpawnVolume::AuthoredPointProjectionExtent,
+		bOutProjected);
+}
+
 FVector AGP_EnemySpawnVolume::GetSpawnPointNearMarker(const AGP_EnemySpawnMarker* Marker, bool& bOutProjected) const
 {
 	if (!Marker)
@@ -259,4 +298,63 @@ FVector AGP_EnemySpawnVolume::GetSpawnPointNearMarker(const AGP_EnemySpawnMarker
 		+ FVector(Dist * FMath::Cos(Angle), Dist * FMath::Sin(Angle), 0.0f);
 
 	return ProjectToNavmesh(DesiredLocation, bOutProjected);
+}
+
+FVector AGP_EnemySpawnVolume::GetPointWithScatter(const FVector& Origin, float ScatterRadius) const
+{
+	const float Angle = FMath::FRandRange(0.0f, 2.0f * PI);
+	const float Distance = FMath::Max(0.0f, ScatterRadius) * FMath::Sqrt(FMath::FRand());
+	return Origin + FVector(Distance * FMath::Cos(Angle), Distance * FMath::Sin(Angle), 0.0f);
+}
+
+bool AGP_EnemySpawnVolume::IsPointInsideSpawnBox(const FVector& WorldLocation) const
+{
+	if (!SpawnBox)
+	{
+		return false;
+	}
+
+	const FVector Local = SpawnBox->GetComponentTransform().InverseTransformPosition(WorldLocation);
+	const FVector Extent = SpawnBox->GetScaledBoxExtent();
+	return FMath::Abs(Local.X) <= Extent.X
+		&& FMath::Abs(Local.Y) <= Extent.Y
+		&& FMath::Abs(Local.Z) <= Extent.Z;
+}
+
+void AGP_EnemySpawnVolume::CollectTaggedSpawnPoints()
+{
+	auto CollectPointsWithTag = [this](FName Tag, TArray<TObjectPtr<AActor>>& OutPoints)
+	{
+		if (Tag.IsNone())
+		{
+			return;
+		}
+
+		TArray<AActor*> TaggedActors;
+		UGameplayStatics::GetAllActorsWithTag(this, Tag, TaggedActors);
+		for (AActor* Actor : TaggedActors)
+		{
+			if (IsValid(Actor)
+				&& Actor->GetLevel() == GetLevel()
+				&& IsPointInsideSpawnBox(Actor->GetActorLocation()))
+			{
+				OutPoints.Add(Actor);
+			}
+		}
+	};
+
+	CollectPointsWithTag(EnemySpawnPointTag, EnemySpawnPoints);
+
+	TArray<TObjectPtr<AActor>> BossPoints;
+	CollectPointsWithTag(BossSpawnPointTag, BossPoints);
+	if (!BossPoints.IsEmpty())
+	{
+		BossSpawnPoint = BossPoints[0];
+	}
+
+	UE_LOG(LogTemp, Log,
+		TEXT("[GP_EnemySpawnVolume] Zone '%s' collected %d enemy spawn point(s), boss point=%s."),
+		*GetName(),
+		EnemySpawnPoints.Num(),
+		IsValid(BossSpawnPoint) ? *BossSpawnPoint->GetName() : TEXT("None"));
 }

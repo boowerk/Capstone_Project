@@ -26,6 +26,7 @@ struct FGPZoneRuntimeState
 	int32 MarkersTotal = 0;
 	int32 MarkersTriggered = 0;
 	int32 AliveEnemies = 0;
+	bool bBossPhaseStarted = false;
 	FVector LastEnemyDeathLocation = FVector::ZeroVector;
 	bool bHasLastEnemyDeathLocation = false;
 	bool bStarted = false;
@@ -210,6 +211,7 @@ private:
 	bool bHasLastDeathLocation = false;
 	int32 MarkersTotal = 0;
 	int32 MarkersTriggered = 0;
+	bool bCurrentZoneBossPhaseStarted = false;
 	bool bRunStarted = false;
 	bool bRunFinished = false;
 
@@ -229,6 +231,7 @@ private:
 	void StartZone(int32 ZoneIndex);
 	void StartRegionEventForZone(AGP_EnemySpawnVolume* Zone, EGPRegionEventTrigger Trigger);
 	void SpawnZoneEnemies(AGP_EnemySpawnVolume* Zone);
+	int32 SpawnZoneBossEnemies(AGP_EnemySpawnVolume* Zone);
 	void SpawnMarkerEnemies(AGP_EnemySpawnVolume* Zone, AGP_EnemySpawnMarker* Marker);
 	void RegisterZoneEnemy(
 		AGP_EnemyCharacter* Enemy,
