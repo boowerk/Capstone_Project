@@ -13,10 +13,12 @@ tags: [memoc, memoc/state]
 - Merged `origin/feature/no-mcp-work`: eight-slot radial skill selection UI and HUD top-left restyle features included.
 - Skill ground position targeting trace restored to `ECC_WorldStatic` only.
 - Ground target preview updated to show ground decal only while suppressing Niagara accent effect.
+- PCG vegetation generation excluded inside village slot bounds (`PCG_Vegetation_Global`).
 
 ## Verified
 - Full `Project_EdenEditor Win64 Development` build/link succeeds.
 - Target preview actor compile passed.
+- `PCG_Vegetation_Global` asset updated and saved.
 
 ## Next
-- PIE-check clean background, radial skill icons (K/Q/E), and ground target decal.
+- PIE-check village slot PCG vegetation exclusion and ground target decal.
