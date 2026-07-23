@@ -443,13 +443,12 @@ Search first, then open only files named above.
 - Editor build and `ProjectEden.Game.WorldLayout.VillageSelection` / `ProjectEden.Game.RunSeed.Flow` passed on 2026-07-22 with the editor closed. Tests cover fixed compatibility, exact/ranged counts, determinism, candidate-order independence, validation, required/optional clamping, reflection, and defaults.
 - To permit zero villages, keep the group optional and tune `SpawnChance`; do not set Min to zero. Next content task is adding more authored slots/presets and explicitly enabling range mode when desired.
 
-<<<<<<< HEAD
 ### 2026-07-24 Village boss-phase handoff
 
 - Village boss-phase source is complete and uncommitted. `AGP_EnemySpawnVolume::BossSpawns` is opt-in: after all normal markers and all registered normal/RegionEvent enemies are dead, GameMode spawns the boss composition and completes only after those bosses die.
 - Normal box spawns prefer same-LevelInstance, in-box actors tagged `EnemySpawnPoint`; the boss prefers `BossSpawnPoint`. Tight NavMesh projection avoids rooftop snapping, while missing authored points retain safe fallbacks.
 - Full `Project_EdenEditor Win64 Development` build/link succeeds. Author each `L_Village_00..03` once: several grounded TargetPoints tagged `EnemySpawnPoint`, one plaza TargetPoint tagged `BossSpawnPoint`, and one boss class/count in the Zone's `Boss Spawns`; `bIsBossZone` is not required.
-=======
+
 ### 2026-07-23 Radial skill selection handoff
 
 - C++ implementation covers the eight-slot runtime wheel, center detail, Q/E click/key assignment, duplicate prevention with opposite-slot swap, K/Escape close, and local input blocking without world pause.
@@ -460,4 +459,10 @@ Search first, then open only files named above.
 - The importer has not run: `Content/UI/Asset/SkillIcons/Radial/Textures` and `[RadialSkillIcons]` log output are absent. Do not diagnose this as a runtime brush problem until the importer completes.
 - Pending: stop PIE, execute the importer in the editor, confirm `[RadialSkillIcons] Completed successfully`, close the editor, run a normal build, then PIE-check K/Q/E, swap/move behavior, the inactive eighth slot, and 1280x720 plus another DPI scale.
 - Do not stage the unrelated user-owned `Content/Asset/Nature/Materials/Bark_DeadTree_011.uasset`.
->>>>>>> origin/feature/no-mcp-work
+
+### 2026-07-24 Post-merge build repair
+
+- `991d2230` manually introduced nested conflict blocks; `709efd9b`/`3a0ae4d3` removed markers but retained duplicate and malformed code. The repair preserves Stage Zones, village boss phase, three-player spawning, and the current intentional no-RegionEvent runtime contract.
+- Removed duplicate enemy registrations/death-budget increments, repaired Dark Knight grants, restored Zone region fallback, removed stale deleted-runtime calls, and cleaned Config conflict markers.
+- Full Editor build/link succeeds; `ProjectEden.Game.ZoneProgression.Contracts` and `ProjectEden.Combat.DarkArmorKnight.ProductionAbilityGrantContract` pass.
+- Restored the three damaged LFS assets: Lobby/Map from valid `feature/vfx-skills` OIDs and FurnaceWalker from the valid pre-corruption `main` OID. `ProjectEden.Game.Lobby.LandscapeTravelConfiguration`, `ProjectEden.Game.LandscapeMap.Integrity`, and `ProjectEden.AI.Enemy.ProductionAnimationContract` all pass.

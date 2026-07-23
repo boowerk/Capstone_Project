@@ -1,6 +1,5 @@
 #include "Game/GP_GameState.h"
 
-#include "Game/Corruption/GP_WorldCorruptionComponent.h"
 #include "GameFramework/PlayerState.h"
 #include "Net/UnrealNetwork.h"
 

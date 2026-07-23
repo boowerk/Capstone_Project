@@ -2,19 +2,7 @@
 memoc: true
 type: state
 scope: project-memory
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-updated: 2026-07-24T06:22:00+09:00
-=======
-updated: 2026-07-24T07:01:06+09:00
->>>>>>> origin/main
-=======
-updated: 2026-07-24T07:01:06+09:00
->>>>>>> origin/main
-=======
-updated: 2026-07-24T07:01:06+09:00
->>>>>>> origin/main
+updated: 2026-07-24T07:50:00+09:00
 status: active
 tags:
   - memoc
@@ -23,37 +11,15 @@ created: 2026-07-18T07:01:20
 ---
 # Session Summary
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
 ## Status
-- Stage Zone/Nav Invoker progression, boss phase, and PCG vegetation clearing are committed.
-- Merged `origin/feature/no-mcp-work`: eight-slot radial skill selection UI and HUD top-left restyle features included.
-- Skill ground position targeting trace restored to `ECC_WorldStatic` only.
-- Ground target preview updated to show ground decal only while suppressing Niagara accent effect.
-- PCG vegetation generation excluded inside village slot bounds (`PCG_Vegetation_Global`).
+- Repaired source/config corruption introduced by `991d2230`, `709efd9b`, and `3a0ae4d3`; Stage Zones, boss phase, three-player spawning, and current no-RegionEvent runtime contract are preserved.
+- Restored `BP_LobbyGameMode` and `L_LandscapeMap` from the last valid `feature/vfx-skills` snapshot and `BP_FurnaceWalker` from the last valid pre-corruption `main` snapshot.
 
 ## Verified
 - Full `Project_EdenEditor Win64 Development` build/link succeeds.
-- Target preview actor compile passed.
-- `PCG_Vegetation_Global` asset updated and saved.
+- Zone progression and Dark Knight production ability grant tests pass.
+- Lobby travel, Landscape map integrity, and FurnaceWalker production animation tests pass after the LFS restore.
+- No conflict markers remain in Config/Source.
 
 ## Next
-- PIE-check village slot PCG vegetation exclusion and ground target decal.
-=======
-=======
->>>>>>> origin/main
-=======
->>>>>>> origin/main
-- `10451155` adds the dedicated Sans Ground Hands circular decal; `6ffa4614` connects the production actor and locks its contract.
-- The warning is a soft-edged radial mask, pure red at `0.62` opacity. Sweep keeps its separate fan material; hand timing, collision, and damage are unchanged.
-- Editor build and all 13 `ProjectEden.AI.Boss` tests pass. Flat/sloped-floor PIE visual confirmation remains; no server test was run.
-- Regular-enemy death absorption remains fall-then-absorb with `SpriteSize=10`.
-- Fixed demo/event flow remains removed; the product contract remains three players.
-<<<<<<< HEAD
-<<<<<<< HEAD
->>>>>>> origin/main
-=======
->>>>>>> origin/main
-=======
->>>>>>> origin/main
+- Unrelated asset-reference warnings remain for Fab fence meshes and `SK_KnightBoss`; they do not block the repaired build or targeted tests.

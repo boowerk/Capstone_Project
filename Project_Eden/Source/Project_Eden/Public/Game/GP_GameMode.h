@@ -9,14 +9,11 @@ class AGP_EnemySpawnVolume;
 class AGP_GameState;
 class AGP_RunPortal;
 class AGP_EnemySpawnMarker;
-class AGP_RegionEventActor;
-class AGP_RegionEventDirector;
 class AGP_VillageLayoutDirector;
 class AGP_PlayerController;
 class APlayerState;
 class APawn;
 class APlayerStart;
-enum class EGPRegionEventTrigger : uint8;
 enum class EGPZoneStage : uint8;
 
 struct FGPZoneRuntimeState
@@ -209,10 +206,8 @@ private:
 	void InitializeZoneProgression();
 	void BindZoneDelegates(AGP_EnemySpawnVolume* Zone);
 	void ResolveVillageLayoutDirector();
-	void ResolveRegionEventDirector();
 	void ResolveRuntimeRegionConfiguration();
 	void InitializeRegionStates();
-	void SpawnCorruptionPresentation();
 	void RegisterZoneNavigationInvoker(AGP_EnemySpawnVolume* Zone);
 	void UnregisterZoneNavigationInvoker(AGP_EnemySpawnVolume* Zone);
 	void UnregisterAllZoneNavigationInvokers();

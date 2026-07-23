@@ -7,65 +7,30 @@
 #include "Game/GP_GameState.h"
 #include "Game/GP_RunSeed.h"
 #include "Game/GP_RunPortal.h"
-#include "Game/RegionEvents/GP_RegionEventActor.h"
-#include "Game/RegionEvents/GP_RegionEventDirector.h"
+#include "Game/GP_ThreePlayerGameSession.h"
+#include "Game/Regions/GP_RegionSpatialSubsystem.h"
 #include "Game/WorldLayout/GP_VillageLayoutDirector.h"
 #include "EngineUtils.h"
+#include "Engine/World.h"
+#include "GameFramework/Character.h"
+#include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerStart.h"
 #include "GameFramework/PlayerState.h"
 #include "Kismet/GameplayStatics.h"
 #include "NavigationSystem.h"
-#include "Player/GP_PlayerController.h"
-#include "UI/GP_MinimapSubsystem.h"
-#include "Game/GP_ThreePlayerGameSession.h"
-#include "Game/Regions/GP_RegionSpatialSubsystem.h"
-#include "EngineUtils.h"
-#include "Engine/World.h"
-#include "GameFramework/Character.h"
-#include "GameFramework/CharacterMovementComponent.h"
-#include "GameFramework/PlayerController.h"
-#include "GameFramework/Pawn.h"
-#include "GameFramework/PlayerStart.h"
-#include "Kismet/GameplayStatics.h"
-#include "Game/GP_ThreePlayerGameSession.h"
-#include "Game/Regions/GP_RegionSpatialSubsystem.h"
-#include "EngineUtils.h"
-#include "Engine/World.h"
-#include "GameFramework/Character.h"
-#include "GameFramework/CharacterMovementComponent.h"
-#include "GameFramework/PlayerController.h"
-#include "GameFramework/Pawn.h"
-#include "GameFramework/PlayerStart.h"
-#include "Kismet/GameplayStatics.h"
-#include "Game/GP_ThreePlayerGameSession.h"
-#include "Game/Regions/GP_RegionSpatialSubsystem.h"
-#include "EngineUtils.h"
-#include "Engine/World.h"
-#include "GameFramework/Character.h"
-#include "GameFramework/CharacterMovementComponent.h"
-#include "GameFramework/PlayerController.h"
-#include "GameFramework/Pawn.h"
-#include "GameFramework/PlayerStart.h"
-#include "Kismet/GameplayStatics.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "Player/GP_PlayerController.h"
 #include "Player/GP_PlayerState.h"
 #include "TimerManager.h"
+#include "UI/GP_MinimapSubsystem.h"
 
 AGP_GameMode::AGP_GameMode()
 {
 	GameStateClass = AGP_GameState::StaticClass();
-	RegionEventDirectorClass = AGP_RegionEventDirector::StaticClass();
-	CorruptionPresentationClass = AGP_CorruptionPresentationActor::StaticClass();
 	VillageLayoutDirectorClass = AGP_VillageLayoutDirector::StaticClass();
-	// Preserve the three-player admission cap if a client attempts to join
-	// directly after seamless travel reaches the gameplay map.
-	GameSessionClass = AGP_ThreePlayerGameSession::StaticClass();
-	// Preserve the three-player admission cap if a client attempts to join
-	// directly after seamless travel reaches the gameplay map.
-	GameSessionClass = AGP_ThreePlayerGameSession::StaticClass();
 	// Preserve the three-player admission cap if a client attempts to join
 	// directly after seamless travel reaches the gameplay map.
 	GameSessionClass = AGP_ThreePlayerGameSession::StaticClass();
@@ -388,8 +353,6 @@ void AGP_GameMode::BeginPlay()
 	Super::BeginPlay();
 
 	ResolveVillageLayoutDirector();
-	ResolveRegionEventDirector();
-	SpawnCorruptionPresentation();
 #if !UE_BUILD_SHIPPING
 	BeginThreePlayerGameplaySmokeProbe();
 #endif
@@ -445,26 +408,6 @@ void AGP_GameMode::ResolveVillageLayoutDirector()
 				SpawnParameters);
 		}
 	}
-}
-
-#if !UE_BUILD_SHIPPING
-void AGP_GameMode::BeginThreePlayerGameplaySmokeProbe()
-{
-	UWorld* World = GetWorld();
-	if (!IsValid(World)
-		|| !World->GetMapName().Contains(TEXT("L_LandscapeMap"))
-		|| !FParse::Param(FCommandLine::Get(), TEXT("LobbySmokeAutoReady")))
-	{
-		return;
-	}
-
-	ThreePlayerGameplaySmokeAttempts = 0;
-	World->GetTimerManager().SetTimer(
-		ThreePlayerGameplaySmokeTimerHandle,
-		this,
-		&ThisClass::TryThreePlayerGameplaySmokeProbe,
-		0.25f,
-		false);
 }
 
 #if !UE_BUILD_SHIPPING
@@ -739,42 +682,6 @@ void AGP_GameMode::BindZoneDelegates(AGP_EnemySpawnVolume* Zone)
 		this,
 		&AGP_GameMode::HandlePlayerExitedZoneDetailed);
 	Zone->OnMarkerTriggered.AddUniqueDynamic(this, &AGP_GameMode::HandleMarkerTriggered);
-}
-
-void AGP_GameMode::ResolveRegionEventDirector()
-{
-	TArray<AActor*> FoundDirectors;
-	UGameplayStatics::GetAllActorsOfClass(this, AGP_RegionEventDirector::StaticClass(), FoundDirectors);
-
-	for (AActor* FoundActor : FoundDirectors)
-	{
-		if (AGP_RegionEventDirector* FoundDirector = Cast<AGP_RegionEventDirector>(FoundActor))
-		{
-			RegionEventDirector = FoundDirector;
-			break;
-		}
-	}
-
-	if (!RegionEventDirector && bAutoSpawnRegionEventDirector && *RegionEventDirectorClass)
-	{
-		if (UWorld* World = GetWorld())
-		{
-			FActorSpawnParameters SpawnParameters;
-			SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-			RegionEventDirector = World->SpawnActor<AGP_RegionEventDirector>(
-				RegionEventDirectorClass,
-				FVector::ZeroVector,
-				FRotator::ZeroRotator,
-				SpawnParameters);
-		}
-	}
-
-	if (RegionEventDirector)
-	{
-		// The director is server orchestration; spawned event actors replicate their own presentation state.
-		RegionEventDirector->InitializeRegionEventDirector(RegionCount);
-		RegionEventDirector->OnRegionEventEnemySpawned.AddDynamic(this, &ThisClass::HandleRegionEventEnemySpawned);
-	}
 }
 
 void AGP_GameMode::UnlockZone(int32 ZoneIndex)
@@ -1062,9 +969,6 @@ void AGP_GameMode::SpawnMarkerEnemies(AGP_EnemySpawnVolume* Zone, AGP_EnemySpawn
 
 			SpawnedEnemy->SpawnDefaultController();
 			RegisterZoneEnemy(SpawnedEnemy, Zone, Zone->GetCorruptionRegionId());
-			RegisterZoneEnemy(SpawnedEnemy);
-			RegisterZoneEnemy(SpawnedEnemy);
-			RegisterZoneEnemy(SpawnedEnemy);
 		}
 	}
 }
@@ -1136,9 +1040,6 @@ void AGP_GameMode::SpawnZoneEnemies(AGP_EnemySpawnVolume* Zone)
 
 			SpawnedEnemy->SpawnDefaultController();
 			RegisterZoneEnemy(SpawnedEnemy, Zone, Zone->GetCorruptionRegionId());
-			RegisterZoneEnemy(SpawnedEnemy);
-			RegisterZoneEnemy(SpawnedEnemy);
-			RegisterZoneEnemy(SpawnedEnemy);
 		}
 	}
 }
@@ -1198,9 +1099,6 @@ void AGP_GameMode::RegisterZoneEnemy(
 	AGP_EnemyCharacter* Enemy,
 	AGP_EnemySpawnVolume* OwningZone,
 	int32 CorruptionRegionId)
-void AGP_GameMode::RegisterZoneEnemy(AGP_EnemyCharacter* Enemy)
-void AGP_GameMode::RegisterZoneEnemy(AGP_EnemyCharacter* Enemy)
-void AGP_GameMode::RegisterZoneEnemy(AGP_EnemyCharacter* Enemy)
 {
 	if (bRunFinished || !IsValid(Enemy))
 	{
@@ -1212,10 +1110,6 @@ void AGP_GameMode::RegisterZoneEnemy(AGP_EnemyCharacter* Enemy)
 		return;
 	}
 
-	// The explicit event/zone id lets enemies retain their regional strength even after progression advances.
-	Enemy->SetCorruptionRegionId(CorruptionRegionId != INDEX_NONE ? CorruptionRegionId : CurrentZoneIndex);
-
-	Enemy->OnEnemyDied.AddDynamic(this, &AGP_GameMode::HandleZoneEnemyDied);
 	if (bUseStagedZoneProgression && IsValid(OwningZone))
 	{
 		FGPZoneRuntimeState& State = ZoneRuntimeStates.FindOrAdd(OwningZone);
@@ -1229,7 +1123,6 @@ void AGP_GameMode::RegisterZoneEnemy(AGP_EnemyCharacter* Enemy)
 	}
 	// The terminal death delegate also fires for scripted encounter cleanup, unlike the HP-zero reward delegate.
 	Enemy->OnEnemyDeathStarted.AddDynamic(this, &AGP_GameMode::HandleZoneEnemyDied);
-	++AliveZoneEnemies;
 
 	if (AGP_GameState* GPGameState = GetGPGameState())
 	{
@@ -1281,16 +1174,6 @@ void AGP_GameMode::HandleZoneEnemyDied(AGP_EnemyCharacter* DeadEnemy, AActor* De
 	MaybeCompleteZone();
 }
 
-void AGP_GameMode::HandleRegionEventEnemySpawned(AGP_RegionEventActor* EventActor, AGP_EnemyCharacter* Enemy)
-{
-	// Event-spawned enemies join the current zone budget so events cannot be ignored during a city clear.
-	const int32 RegionId = IsValid(EventActor) ? EventActor->GetRegionId() : INDEX_NONE;
-	RegisterZoneEnemy(
-		Enemy,
-		bUseStagedZoneProgression ? FindActiveZoneForRegion(RegionId) : nullptr,
-		RegionId);
-}
-
 void AGP_GameMode::CompleteCurrentZone()
 {
 	if (bRunFinished || !OrderedZones.IsValidIndex(CurrentZoneIndex))
@@ -1312,7 +1195,6 @@ void AGP_GameMode::CompleteCurrentZone()
 	}
 
 	OnZoneCompleted(CurrentZoneIndex, ClearedZone);
-	StartRegionEventForZone(ClearedZone, EGPRegionEventTrigger::ZoneCompleted);
 	UnregisterZoneNavigationInvoker(ClearedZone);
 	AdvanceZone();
 }
@@ -1478,7 +1360,6 @@ void AGP_GameMode::StartStagedZone(AGP_EnemySpawnVolume* Zone)
 				: EGPMatchPhase::InCity);
 	}
 
-	StartRegionEventForZone(Zone, EGPRegionEventTrigger::ZoneStarted);
 	const int32 ZoneIndex = OrderedZones.IndexOfByKey(Zone);
 	OnZoneStarted(ZoneIndex, Zone);
 
@@ -1529,11 +1410,6 @@ void AGP_GameMode::CompleteStagedZone(AGP_EnemySpawnVolume* Zone)
 	}
 
 	State->bCompleted = true;
-	if (RegionEventDirector)
-	{
-		RegionEventDirector->CompleteEventsForZone(Zone);
-	}
-
 	if (AGP_GameState* GPGameState = GetGPGameState())
 	{
 		for (int32 RegionId : Zone->GetRegionsToRevive())
@@ -1559,7 +1435,6 @@ void AGP_GameMode::CompleteStagedZone(AGP_EnemySpawnVolume* Zone)
 	}
 
 	OnZoneCompleted(OrderedZones.IndexOfByKey(Zone), Zone);
-	StartRegionEventForZone(Zone, EGPRegionEventTrigger::ZoneCompleted);
 	UnregisterZoneNavigationInvoker(Zone);
 	EvaluateStagedProgression();
 }

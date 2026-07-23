@@ -4,7 +4,6 @@
 #include "GameFramework/GameStateBase.h"
 #include "GP_GameState.generated.h"
 
-class UGP_WorldCorruptionComponent;
 class APlayerState;
 
 // Replicated phase of the linear city-progression run. Drives HUD and client-side presentation.

@@ -92,6 +92,21 @@ void AGP_EnemySpawnVolume::ConfigureRuntimeZone(
 	}
 }
 
+int32 AGP_EnemySpawnVolume::GetCorruptionRegionId() const
+{
+	if (CorruptionRegionId != INDEX_NONE)
+	{
+		return CorruptionRegionId;
+	}
+
+	if (!RegionsToRevive.IsEmpty())
+	{
+		return RegionsToRevive[0];
+	}
+
+	return ZoneOrder;
+}
+
 void AGP_EnemySpawnVolume::ActivateMarkers()
 {
 	for (AGP_EnemySpawnMarker* Marker : Markers)

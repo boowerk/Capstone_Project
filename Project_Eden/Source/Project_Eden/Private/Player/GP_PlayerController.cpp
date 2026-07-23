@@ -264,12 +264,6 @@ bool AGP_PlayerController::RequestOpenAugmentSelect()
 	return OpenAugmentSelectWidget(CandidateAugments);
 }
 
-void AGP_PlayerController::ClientOpenRegionEventAugmentSelect_Implementation()
-{
-	// Region shrine rewards are chosen locally so each client sees the regular augment picker flow.
-	RequestOpenAugmentSelect();
-}
-
 void AGP_PlayerController::ClientOpenMiddleTravelMap_Implementation(
 	const TArray<FGPMiddleTravelDestination>& Destinations)
 {
