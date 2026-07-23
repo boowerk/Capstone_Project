@@ -2,7 +2,7 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-07-24T01:20:09+09:00
+updated: 2026-07-24T01:57:40+09:00
 status: active
 tags:
   - memoc
@@ -11,7 +11,7 @@ created: 2026-07-18T07:01:20
 ---
 # Session Summary
 
-- `ebd6847d` removes world corruption plus ambient/weighted/random Region Events; `08861a81` migrates affected assets and deletes Crystal Corruption/examples.
-- Fixed demo remains Red Rift -> Structure Defense -> full-party Shrine -> center Dark Armor Knight, with seed-varied route and two-of-three approach quorum.
-- Build passed. RegionEvents 5/5, DemoFlow 7/7, Landscape 1/1, enemy production asset 1/1, and Crystal Seraph animation 1/1 passed. No server/PIE run.
-- Protected `L_LandscapeMap`, `TestMap`, `DA_RegionEventData`, and `L_MainMap` were untouched.
+- `c78e88a9`/`ba0f2bfa`/`29baec37` remove the fixed inward demo, objective marker, scripted Region Events, and automatic Dark Armor Knight/result path.
+- Three-player session/start expansion, RegionState/PCG, general Zone flow, enemy AI, and Dark Armor Knight combat remain.
+- `L_LandscapeMap` has no zones, so it currently opens as three-player free exploration. Protected map/data assets were untouched; empty native shells preserve their serialized references.
+- Editor build and four focused NullRHI tests passed. No server/PIE run.
