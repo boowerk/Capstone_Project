@@ -23,6 +23,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Skill Selection")
 	void SetEquipped(bool bNewEquipped);
 
+	UFUNCTION(BlueprintCallable, Category = "Skill Selection")
+	void SetSelected(bool bNewSelected);
+
+	UFUNCTION(BlueprintCallable, Category = "Skill Selection")
+	void SetCompactWheelMode(bool bNewCompactWheelMode);
+
 	UFUNCTION(BlueprintPure, Category = "Skill Selection")
 	UGP_SkillData* GetSkillData() const { return SkillData.Get(); }
 
@@ -42,6 +48,9 @@ protected:
 	TObjectPtr<UImage> Image_Icon;
 
 	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UImage> Image_Selected;
+
+	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> Text_Name;
 
 	UPROPERTY(meta = (BindWidgetOptional))
@@ -54,5 +63,12 @@ private:
 	UFUNCTION()
 	void HandleRootClicked();
 
+	void EnsureCompactWheelLayout();
 	void RefreshView();
+	void RefreshStateVisuals();
+
+	bool bIsEquipped = false;
+	bool bIsSelected = false;
+	bool bCompactWheelMode = false;
+	bool bCompactWheelLayoutBuilt = false;
 };

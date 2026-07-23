@@ -3,7 +3,8 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-23T20:25:00+09:00
+<<<<<<< HEAD
+updated: 2026-07-24T06:22:00+09:00
 status: active
 tags:
   - memoc
@@ -11,16 +12,13 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-07-24T00:25:00+09:00
+Last synced: 2026-07-24T06:22:00+09:00
 
 ## Current Status
 
-- Stage-based village Zone progression is implemented but uncommitted. The Director configures streamed `AGP_EnemySpawnVolume` actors from each selected slot's `GroupId`, waits for sequential PCG completion, then signals GameMode. Outer zones can run concurrently; clearing a Middle zone grants every recorded participant replicated credit in GameState; Center/Colosseum wait for all active players to be simultaneously present. Players are deterministically teleported to PlayerStarts contained in selected Outer levels. Active/unlocked Zones now register as Navigation Invokers (180m generation, 220m removal), completed Zones unregister, Recast defaults to Dynamic, and spawn/portal logic waits up to 10s for asynchronous NavMesh readiness. Legacy linear zones remain the default. Editor build plus `ProjectEden.Game.ZoneProgression.Contracts` and `ProjectEden.Game.WorldLayout.VillageSelection` pass. User set Outer Required/Pick=3 and Middle Required/Pick=4. Pending authoring: one Zone and PlayerStart per village preset, unique slot RegionIds, and Center/Colosseum zones.
+- Player top-left HUD restyle is applied but not yet PIE-verified. `/Game/UI/HUD/PlayerStatus/Textures` contains the shared grayscale fill mask, dark track, B2 backplate, and optional accent. `WBP_PlayerHealthBar`, `WBP_PlayerManaBar`, and `WBP_PlayerStaminaBar` keep their existing `GP_AttributeWidget`/`HealthBar` contracts while sharing the track/fill brushes and using dark red, muted blue, and ochre/olive tints. `WBP_PlayerHUDWidget.TopLeftFrame` keeps its existing Border hierarchy and now draws `T_UI_HUD_TopLeft_Backplate_B2` as an untiled Image. All four Widget Blueprints compiled and saved in the editor; `T_UI_HUD_TopLeft_Accent_B2` is imported but intentionally not placed.
+- Stage-based village Zone progression is implemented (Outer -> Middle -> Center -> Colosseum). Active/unlocked Zones register as Navigation Invokers (180m generation, 220m removal), completed Zones unregister, Recast defaults to Dynamic, and spawn/portal logic waits up to 10s for asynchronous NavMesh readiness. PCG vegetation clearing around portal spawn locations restored. Center and Colosseum boss zone progression configured. Portal visual effects updated.
 - Village Zones support an optional second boss phase. A non-empty `BossSpawns` array delays completion until normal marker, normal spawn, and RegionEvent enemies are all dead, then spawns the configured boss at a same-LevelInstance `BossSpawnPoint`; its death completes the Zone. Same-LevelInstance actors tagged `EnemySpawnPoint` provide grounded authored positions for normal box spawns, with the old random box behavior retained as fallback. Full Editor build/link passes; village assets still need TargetPoint tags and boss-class assignments.
-- Village presets now use `/Game/WorldLayout/DA_VillagePresetCatalog`. `UGP_VillagePresetCatalog` owns content-authored additions, while the Director keeps Village_00 as the legacy primary and appends unique legacy inline entries for backward compatibility; catalog duplicates are authoritative. `FGP_VillagePresetDefinition::PresetSizeClass` now requires exact equality with the slot class, while the existing Footprint fit remains a safety check. Village_01/02 are Small; Village_00/03 are Medium. Village_03 uses `/Game/WorldLayout/L_Village_03`, offset `(0,0,-1500)`, half extent `(11500,11500,3000)`, and weight `1.0`. The Editor build and strengthened `ProjectEden.Game.WorldLayout.VillageSelection` test pass; PIE generation remains unchecked.
-- Village slot capacity support is implemented but uncommitted. `SlotSizeClass` exposes Small (130m) and Medium (230m); existing slots default to Medium. Preset assignment filters by each preset's actual offset+extent, so Medium accepts Village_00/01 while Small accepts only compact Village_01. Overlap selection still uses assigned actual Footprints. Slots show a separate orange capacity visualization and inner assigned Footprint; the runtime root remains non-editor-only. Full Editor build and `ProjectEden.Game.WorldLayout.VillageSelection` pass. A Development Game build is blocked before project compile by the unrelated installed `PCGExtendedToolkit` missing `PCGExCore.precompiled`. Pending authoring choice: which `Village_A..E` slots should be Small.
-- Village_01 Footprint centering is committed as `e4acdb19`; follow-up `35682b31` removes the accidental local `Y +2000cm` double correction from its five authored layout actors while keeping their relative layout and `PCGWorldActor0` at origin. `BP_CityAnchor` is now at level XY `(0,0)`. Native defaults and the placed `L_LandscapeMap` Director retain Footprint offset `(0,0,-1500)` and the 130m square extent. Rebuild Preview seed 186 in Top Orthographic shows exact XY center alignment.
-- Landscape Region GameMap2 now has an uncommitted world-space macro BaseColor variation pass. `M_StateMask` samples `T_RegionGround_MacroNoise_1024` once in world XY, varies only ground BaseColor before the slope/cliff overlay, and keeps the master switch default false. `MI_RegionLandscape_GameMap2` alone enables it at 180m scale and 0.16 strength; the noise texture is linear (`sRGB=false`). `ApplyRegionMacroVariation.py` is an idempotent editor automation script. UE commandlet verification passed with the material still Opaque and V2.2 still enabled; in-editor visual inspection remains pending because Computer Use was accidentally cancelled during startup shader compilation.
 - Village authoring now has a Director-owned transient editor preview. `Rebuild Preview` runs the deterministic selection with `PreviewSeed`, loads one non-saveable Level Instance per selected slot at the exact runtime transform, applies the same instance-unique Road/District tags and graph overrides, and optionally schedules PCG sequentially in Preview mode. `Clear Village Preview`, footprint refresh, and Director destruction unload/clean the preview. `bUsePreviewSeedInPIE` defaults on, so PIE village selection matches Rebuild Preview even when GameState generated another RunSeed; packaged games still use their real RunSeed. Runtime remains Generate On Demand. The slot Footprint is also a flat visualization-only XY box at local Z=0. Full `Project_EdenEditor` build and `ProjectEden.Game.WorldLayout.VillageSelection` pass. `L_LandscapeMap` now has five unique SlotIds `Village_A..E`; PreviewSeed 186 selects `Village_A=Village_01` and `Village_E=Village_00`, loads two transient Level Instances, and schedules two isolated PCG components.
 - Village footprint-aware selection is committed as `f32ef1a2`. Slots display yaw-aware XY OBB footprints, red means overlap, and deterministic feasibility selection excludes conflicting combinations while preserving required-group lookahead. The `/Game/WorldLayout/L_Village_00` primary now uses half extent `(11500,11500,3000)` cm (230x230m full XY) and offset `(0,0,-1500)` cm.
 - Mixed village presets are committed. The legacy level/footprint remains the canonical primary, while `/Game/WorldLayout/L_Village_01` now uses centered offset `(0,0,-1500)` cm and half extent `(6500,6500,3000)` cm (130x130m full XY). Source defaults, automation expectations, and the saved `L_LandscapeMap` Director overrides match these sizes. Full Editor build and `ProjectEden.Game.WorldLayout.VillageSelection` pass. Multiplayer client streaming and explicit cook registration remain follow-up work.
@@ -221,7 +219,7 @@ Last synced: 2026-05-23T00:00:00
 ## Project Snapshot
 
 <!-- memoc:snapshot:start -->
-- Last synced: 2026-06-17T04:47:15
+- Last synced: 2026-07-24T01:25:00+09:00
 - Detected stack: Not detected
 
 ### Source Directories
@@ -265,6 +263,8 @@ Last synced: 2026-05-23T00:00:00
 
 ## Commands
 
+- Unreal Python: execute `Scripts/Editor/import_radial_skill_icons.py` to import the seven radial textures and assign every player-pool SkillData icon.
+- Editor build: close Unreal Editor before the final link; the changed radial-skill C++ already passes UHT and compilation.
 - Unreal Python: created `/Game/Characters/PlayerCharacter/ABP_UEFNSource_Player`
 - Unreal BP edit: assigned `BP_GP_PlayerCharacter.UEFNSourceMesh.AnimClass = ABP_UEFNSource_Player`
 - C++ edit: added `PoseSearch`/`Chooser` support, runtime trajectory bridging, runtime pose-search DB fallback, and chooser-facing context variables in `GP_CharacterAnimInstance`
@@ -320,3 +320,15 @@ See `.memoc/worklog/` and generated `.memoc/activity.md`.
 - `FGPVillageGroupRule` keeps fixed `PickCount` as the default contract and optionally selects a deterministic count from inclusive `MinPickCount..MaxPickCount`.
 - `Min==Max` consumes no count RNG and matches fixed selection exactly. Required groups fail when eligible candidates are below Min; optional groups clamp. Use optional group plus `SpawnChance` for a zero-village outcome.
 - Editor build and both village-selection/run-seed automation tests pass with the editor closed. No map/content asset was changed by this feature or its tests.
+
+### 2026-07-23 Player status HUD restyle
+
+- The top-left HUD uses the B2 backplate and shared track/fill-mask textures with distinct health, mana, and stamina tints.
+- `Vignette`, `CrestText`, `LocationTextBlock`, and `StatusHint` were removed from `WBP_PlayerHUDWidget`; the panel now retains only the three status bars.
+
+### 2026-07-23 Radial skill selection redesign
+
+- `UGP_SkillSelectWidget` now presents the player pool in a fixed eight-slot radial wheel, keeping the pool array order and showing an inactive future slot when only seven skills exist.
+- Selecting a wheel entry updates center icon/name/description/cooldown; Q/E click or key equips it, and assigning the opposite equipped skill swaps the two slots instead of duplicating it.
+- The local picker uses UI-only input and blocks move/look/skill input without pausing the multiplayer world. The runtime fallback collapses the complete legacy screen; each `112x112` outer slot owns a centered `96x96` icon layer, names stay in the centered detail panel, and the detail icon is `128x128`.
+- The approved PNG importer has not yet run; `/Game/UI/Asset/SkillIcons/Radial/Textures` must be created and the seven SkillData icons assigned before the new art can appear.

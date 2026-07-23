@@ -35,6 +35,8 @@ UGP_Skill_LightningStrike::UGP_Skill_LightningStrike()
 	SelectionMode = EGP_SkillSelectionMode::GroundPosition;
 	bAllowSecondaryConfirm = false;
 	bRequireBlockingHit = true;
+	bUseProductionTargetPreview = true;
+	PreviewVisualStyle = EGP_SkillTargetPreviewStyle::Lightning;
 	HitEventTag = GPTags::Event::Enemy::HitReact;
 }
 

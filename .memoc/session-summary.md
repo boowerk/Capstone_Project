@@ -2,22 +2,22 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-07-24T05:54:00+09:00
+updated: 2026-07-24T06:22:00+09:00
 status: active
-tags:
-  - memoc
-  - memoc/state
-created: 2026-07-23T20:54:04
+tags: [memoc, memoc/state]
 ---
 # Session Summary
 
 ## Status
-- Village Zone boss phase is source-complete and uncommitted. Optional `BossSpawns` starts only after every normal/RegionEvent enemy dies.
-- Tagged `EnemySpawnPoint`/`BossSpawnPoint` actors are isolated by Level Instance and constrained to the Zone box.
-- Stage Zone/Nav Invoker and Outer-to-Middle travel UI work also remain uncommitted.
+- Stage Zone/Nav Invoker progression, boss phase, and PCG vegetation clearing are committed.
+- Merged `origin/feature/no-mcp-work`: eight-slot radial skill selection UI and HUD top-left restyle features included.
+- Eight-slot radial skill selection is implemented; seven approved RGBA icons are ready.
 
 ## Verified
 - Full `Project_EdenEditor Win64 Development` build/link succeeds.
+- Prior UHT/changed C++ compile passed.
+- Radial skill icon PNGs pass RGBA, transparency, and alpha checks.
 
-## Pending User
-- In each village preset, place ground TargetPoints inside its Zone, tag normal/boss points, and assign one boss class in `Boss Spawns`.
+## Next
+- PIE-check clean background, radial skill icons (K/Q/E), and layout.
+- In each village preset, place ground TargetPoints inside its Zone, tag normal/boss points, and assign boss classes if needed.

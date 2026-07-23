@@ -133,6 +133,12 @@ Last synced: 2026-07-23T17:08:56+09:00
 - Commits `d64bc60c` and `88d85765` prevent attack-time flicker with front/back render targets, RHI-fence promotion, and player exclusion. Build and `ProjectEden.UI.Minimap.CaptureStability` passed; PIE-check repeated attacks with production VFX. No editor setup is required.
 - Commits `2641dbab`, `c46e718f`, and tests fix FullMap Z accumulation, preserve Follow mode, stop brush reflow, and use flat opaque FinalColorLDR. BaseColor was rejected because its alpha can make direct UMG display transparent. Build and `ProjectEden.UI.Minimap.CaptureStability` passed; PIE-check final contrast.
 
+## Player HUD Restyle Handoff
+
+- The B2 top-left HUD styling is saved but still needs PIE visual confirmation at 1280x720 and another DPI scale. The three attribute WBP assets share `T_UI_HUD_AttributeTrack_B` and `T_UI_HUD_AttributeFillMask_B`; `WBP_PlayerHUDWidget.TopLeftFrame` uses `T_UI_HUD_TopLeft_Backplate_B2` as `Draw As: Image`, `No Tile`. The editor reported successful compile/save for all four widgets.
+- Source/import automation is `Project_Eden/Scripts/Editor/apply_player_status_hud.py`. It is idempotent and preserves the existing GAS bindings/widget names. `T_UI_HUD_TopLeft_Accent_B2` is imported but unused. If the background is too weak on bright terrain, tune the Backplate PNG/Brush tint after PIE rather than adding another opaque panel.
+- Existing data caveat: `UGP_AttributeSet` has Health/MaxHealth and Mana/MaxMana but no Stamina pair; the Stamina WBP is likely a visual placeholder. Do not treat the successful visual restyle as proof that stamina gameplay data is implemented.
+
 ## Enemy Leash Handoff
 
 - Commits `93ac0b15` and `177bc9ad` finalize anchor leash behavior: crossing the outer distance starts return, and a visible player re-engages inside the default 75% inner boundary. Editor build and `ProjectEden.AI.Enemy.LeashPolicy` passed; PIE-check actual BT movement at both boundaries.
@@ -322,9 +328,13 @@ _None yet._
 
 ## Resume Notes
 
+<<<<<<< HEAD
 - 2026-07-24 Stage Zone work is code-complete but awaits content. User already set `Outer` Required/Pick=3 and `Middle` Required/Pick=4 on `L_LandscapeMap`. Reopen after the successful Editor build, add exactly one `AGP_EnemySpawnVolume` and one `APlayerStart` to every `L_Village_00..03`, keep streamed Zone Stage as Legacy because Director overrides it, and author each placed slot's landscape `RegionId`. Add persistent Center/Colosseum zones with explicit stages. Do not PIE-test until those actors exist; otherwise GameMode correctly logs that no zones were found.
 - 2026-07-24 Zone-only navigation is implemented in GameMode. Unlocked stage Zones are invokers; completed/end-play Zones unregister. Defaults are generation `18000cm`, removal `22000cm`, retry `0.25s`, timeout `10s`. `DefaultEngine.ini` enables invoker-only generation and Dynamic Recast. The main map binary contains NavMeshBoundsVolume/RecastNavMesh. PIE still needs `P` visualization and runtime log validation after village Zone actors are authored.
 - 2026-07-24 Outer→Middle travel-map foundation is implemented and uncommitted. Outer clear now spawns one persistent selection portal per Outer; overlap opens a client-only `UGP_MiddleTravelMapWidget` populated with current uncleared Middle zones. Marker selection RPC is server-validated by stage, ZoneId, incomplete state, and 600cm portal proximity, then teleports only that player to a same-LevelInstance actor tagged `MiddleArrivalAnchor` (Zone NavMesh fallback). Existing fixed Middle→Center→Colosseum portals remain unchanged. Editor build, Zone contracts, and minimap stability pass. Pending editor work: create `WBP_MiddleTravelMap`, assign it on `/Game/GAS_Pattern/Player/BP_GP_PlayerController`, and add `VillagePortalAnchor` plus `MiddleArrivalAnchor` TargetPoints to village presets.
+=======
+- PIE-check the simplified top-left HUD after removing `Vignette`, `CrestText`, `LocationTextBlock`, and `StatusHint`; verify the remaining frame height and padding do not leave excess empty space.
+>>>>>>> origin/feature/no-mcp-work
 
 - `ABP_UEFNSource_Player` EventGraph already does `Try Get Pawn Owner -> Cast BP_GP_PlayerCharacter -> Get CharacterTrajectory -> Set Character Trajectory`.
 - `GP_CharacterAnimInstance` now reflects `CharacterTrajectory` off the owning character class instead of requiring a fragile nested property-access node in the AnimGraph.
@@ -352,8 +362,21 @@ Search first, then open only files named above.
 - Editor build and `ProjectEden.Game.WorldLayout.VillageSelection` / `ProjectEden.Game.RunSeed.Flow` passed on 2026-07-22 with the editor closed. Tests cover fixed compatibility, exact/ranged counts, determinism, candidate-order independence, validation, required/optional clamping, reflection, and defaults.
 - To permit zero villages, keep the group optional and tune `SpawnChance`; do not set Min to zero. Next content task is adding more authored slots/presets and explicitly enabling range mode when desired.
 
+<<<<<<< HEAD
 ### 2026-07-24 Village boss-phase handoff
 
 - Village boss-phase source is complete and uncommitted. `AGP_EnemySpawnVolume::BossSpawns` is opt-in: after all normal markers and all registered normal/RegionEvent enemies are dead, GameMode spawns the boss composition and completes only after those bosses die.
 - Normal box spawns prefer same-LevelInstance, in-box actors tagged `EnemySpawnPoint`; the boss prefers `BossSpawnPoint`. Tight NavMesh projection avoids rooftop snapping, while missing authored points retain safe fallbacks.
 - Full `Project_EdenEditor Win64 Development` build/link succeeds. Author each `L_Village_00..03` once: several grounded TargetPoints tagged `EnemySpawnPoint`, one plaza TargetPoint tagged `BossSpawnPoint`, and one boss class/count in the Zone's `Boss Spawns`; `bIsBossZone` is not required.
+=======
+### 2026-07-23 Radial skill selection handoff
+
+- C++ implementation covers the eight-slot runtime wheel, center detail, Q/E click/key assignment, duplicate prevention with opposite-slot swap, K/Escape close, and local input blocking without world pause.
+- UHT and all changed C++ translation units compiled successfully. The final build stopped only at `LNK1104` because the running editor owns `Binaries/Win64/UnrealEditor-Project_Eden.dll`.
+- Seven final PNGs live under `Content/UI/Asset/SkillIcons/Radial/Source`; their exact importer/SkillData linker is `Scripts/Editor/import_radial_skill_icons.py`.
+- 2026-07-24 screenshot review found the old authored screen still visible under the runtime wheel and entry labels spilling sideways. The fallback now collapses every existing host-canvas child before adding itself, and compact wheel entries hide their redundant label while the center detail retains the selected skill name.
+- Compact wheel mode now replaces the authored button content with a dedicated centered `96x96` icon inside each `112x112` slot; the center-detail icon host is `128x128`.
+- The importer has not run: `Content/UI/Asset/SkillIcons/Radial/Textures` and `[RadialSkillIcons]` log output are absent. Do not diagnose this as a runtime brush problem until the importer completes.
+- Pending: stop PIE, execute the importer in the editor, confirm `[RadialSkillIcons] Completed successfully`, close the editor, run a normal build, then PIE-check K/Q/E, swap/move behavior, the inactive eighth slot, and 1280x720 plus another DPI scale.
+- Do not stage the unrelated user-owned `Content/Asset/Nature/Materials/Bark_DeadTree_011.uasset`.
+>>>>>>> origin/feature/no-mcp-work

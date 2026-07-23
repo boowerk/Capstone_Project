@@ -196,6 +196,9 @@ bool UGP_TargetedSkillBase::ResolveGroundLocation(
 
 	FCollisionObjectQueryParams ObjectQueryParams;
 	ObjectQueryParams.AddObjectTypesToQuery(ECC_WorldStatic);
+	// Runtime-generated and test-map floors may use WorldDynamic while still
+	// being valid ground for targeted skills.
+	ObjectQueryParams.AddObjectTypesToQuery(ECC_WorldDynamic);
 
 	FHitResult GroundHit;
 	if (!AvatarActor->GetWorld()->LineTraceSingleByObjectType(
@@ -392,29 +395,60 @@ void UGP_TargetedSkillBase::BeginSelection()
 	AddSelectionLooseTags();
 	RegisterSelectionEvents();
 
-	if (PreviewActorClass && IsLocallyControlled())
+	TSubclassOf<AActor> EffectivePreviewActorClass = PreviewActorClass;
+	if (bUseProductionTargetPreview)
+	{
+		EffectivePreviewActorClass = AGP_SkillTargetPreviewActor::StaticClass();
+	}
+
+	if (EffectivePreviewActorClass && IsLocallyControlled())
 	{
 		if (AActor* AvatarActor = GetAvatarActorFromActorInfo())
 		{
+			const FGP_SkillTargetData InitialTargetData =
+				GetCurrentTargetData();
+			const FVector PreviewSpawnLocation =
+				bUseProductionTargetPreview
+					? InitialTargetData.TargetLocation
+					: AvatarActor->GetActorLocation();
+			const FRotator PreviewSpawnRotation =
+				bUseProductionTargetPreview
+					? (SelectionMode == EGP_SkillSelectionMode::GroundPosition
+						? FRotator::ZeroRotator
+						: InitialTargetData.AimDirection.Rotation())
+					: AvatarActor->GetActorRotation();
+
 			FActorSpawnParameters SpawnParams;
 			SpawnParams.Owner = AvatarActor;
 			SpawnParams.Instigator = Cast<APawn>(AvatarActor);
 			SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
 			PreviewActor = AvatarActor->GetWorld()->SpawnActor<AActor>(
-				PreviewActorClass,
-				AvatarActor->GetActorLocation(),
-				AvatarActor->GetActorRotation(),
+				EffectivePreviewActorClass,
+				PreviewSpawnLocation,
+				PreviewSpawnRotation,
 				SpawnParams);
 
 			if (IsValid(PreviewActor))
 			{
-				PreviewActorBaseScale = PreviewActor->GetActorScale3D();
-				const FBox PreviewBounds = PreviewActor->GetComponentsBoundingBox(true);
-				if (PreviewBounds.IsValid)
+				if (AGP_SkillTargetPreviewActor* ProductionPreview =
+					Cast<AGP_SkillTargetPreviewActor>(PreviewActor))
 				{
-					const FVector BoundsExtent = PreviewBounds.GetExtent();
-					PreviewActorBaseRadius = FMath::Max(BoundsExtent.X, BoundsExtent.Y);
+					ProductionPreview->InitializePreview(
+						PreviewVisualStyle,
+						GetPreviewActorRadius(),
+						InitialTargetData.bBlockingHit);
+				}
+				else
+				{
+					PreviewActorBaseScale = PreviewActor->GetActorScale3D();
+					const FBox PreviewBounds = PreviewActor->GetComponentsBoundingBox(true);
+					if (PreviewBounds.IsValid)
+					{
+						const FVector BoundsExtent = PreviewBounds.GetExtent();
+						PreviewActorBaseRadius =
+							FMath::Max(BoundsExtent.X, BoundsExtent.Y);
+					}
 				}
 			}
 		}
@@ -530,14 +564,22 @@ void UGP_TargetedSkillBase::UpdatePreview()
 	{
 		PreviewActor->SetActorLocationAndRotation(TargetData.TargetLocation, PreviewRotation);
 		const float DesiredRadius = GetPreviewActorRadius();
-		if (DesiredRadius > 0.0f && PreviewActorBaseRadius > KINDA_SMALL_NUMBER)
+		if (AGP_SkillTargetPreviewActor* ProductionPreview =
+			Cast<AGP_SkillTargetPreviewActor>(PreviewActor))
+		{
+			ProductionPreview->UpdatePreview(
+				DesiredRadius,
+				TargetData.bBlockingHit);
+		}
+		else if (DesiredRadius > 0.0f &&
+			PreviewActorBaseRadius > KINDA_SMALL_NUMBER)
 		{
 			const float RadiusScale = DesiredRadius / PreviewActorBaseRadius;
 			PreviewActor->SetActorScale3D(PreviewActorBaseScale * RadiusScale);
 		}
 	}
 
-	if (!bDrawSelectionDebug && !ShouldDrawDebug())
+	if (!bDrawSelectionDebug || !ShouldDrawDebug())
 	{
 		return;
 	}
