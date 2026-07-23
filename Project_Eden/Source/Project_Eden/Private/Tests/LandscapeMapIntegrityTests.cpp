@@ -46,7 +46,7 @@ bool FGPLandscapeMapIntegrityTest::RunTest(const FString& Parameters)
 	const FName LandscapeComponentClassName(TEXT("LandscapeComponent"));
 	const FName LandscapeCollisionClassName(TEXT("LandscapeHeightfieldCollisionComponent"));
 	const FName NavigationBoundsClassName(TEXT("NavMeshBoundsVolume"));
-	const FName RegionEventDirectorClassName(TEXT("GP_RegionEventDirector"));
+	const FName LegacyDirectorClassName(TEXT("GP_RegionEventDirector"));
 	const FName RegionSeedClassName(TEXT("BP_RegionSeed_C"));
 	UPackage* MapPackage = LoadPackage(nullptr, MapPackagePath, LOAD_None);
 	TestNotNull(TEXT("L_LandscapeMap package loads"), MapPackage);
@@ -65,8 +65,8 @@ bool FGPLandscapeMapIntegrityTest::RunTest(const FString& Parameters)
 	int32 PlayerStartCount = 0;
 	int32 NavigationBoundsCount = 0;
 	int32 RegionSeedActorCount = 0;
-	int32 RegionEventDirectorCount = 0;
-	AActor* RegionEventDirectorActor = nullptr;
+	int32 LegacyDirectorCount = 0;
+	AActor* LegacyDirectorActor = nullptr;
 	float LowestPlayerStartZ = TNumericLimits<float>::Max();
 	FBox LandscapeBounds(EForceInit::ForceInit);
 	FBox NavigationBounds(EForceInit::ForceInit);
@@ -104,10 +104,10 @@ bool FGPLandscapeMapIntegrityTest::RunTest(const FString& Parameters)
 			NavigationBounds += Actor->GetComponentsBoundingBox(true);
 		}
 
-		if (HasClassInHierarchy(*Actor, RegionEventDirectorClassName))
+		if (HasClassInHierarchy(*Actor, LegacyDirectorClassName))
 		{
-			++RegionEventDirectorCount;
-			RegionEventDirectorActor = Actor;
+			++LegacyDirectorCount;
+			LegacyDirectorActor = Actor;
 		}
 
 		if (HasClassInHierarchy(*Actor, RegionSeedClassName))
@@ -147,7 +147,7 @@ bool FGPLandscapeMapIntegrityTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Landscape collision components remain present"), LandscapeCollisionCount > 0);
 	TestEqual(TEXT("Production landscape contains no generated test-deck actors"), TestEnvironmentActorCount, 0);
 
-	// Immediate-play infrastructure prevents players, AI, and corruption events from starting in an unusable world.
+	// Immediate-play infrastructure prevents players and AI from starting in an unusable world.
 	TestTrue(TEXT("Production landscape contains a PlayerStart"), PlayerStartCount > 0);
 	TestTrue(
 		TEXT("Every PlayerStart is above the sculpted ground baseline"),
@@ -193,59 +193,48 @@ bool FGPLandscapeMapIntegrityTest::RunTest(const FString& Parameters)
 			*FString::Printf(TEXT("Region SeedIndex %d is addressable"), ExpectedRegionId),
 			AddressableRegionIndices.Contains(ExpectedRegionId));
 	}
-	TestEqual(TEXT("Landscape contains one region event director"), RegionEventDirectorCount, 1);
+	TestEqual(
+		TEXT("Landscape keeps one serialization-only legacy director actor"),
+		LegacyDirectorCount,
+		1);
 
-	if (IsValid(RegionEventDirectorActor))
+	if (IsValid(LegacyDirectorActor))
 	{
-		const FBoolProperty* EnableScriptedEventsProperty =
-			FindFProperty<FBoolProperty>(RegionEventDirectorActor->GetClass(), TEXT("bEnableScriptedEvents"));
-		const FIntProperty* MaxActiveEventsProperty =
-			FindFProperty<FIntProperty>(RegionEventDirectorActor->GetClass(), TEXT("MaxActiveEvents"));
-		const FArrayProperty* GuidedEventPoolProperty =
-			FindFProperty<FArrayProperty>(RegionEventDirectorActor->GetClass(), TEXT("GuidedEventPool"));
-		TestNotNull(TEXT("Director exposes scripted-event enablement"), EnableScriptedEventsProperty);
-		TestNotNull(TEXT("Director exposes scripted-event concurrency"), MaxActiveEventsProperty);
-		TestNotNull(TEXT("Director exposes its guided event pool"), GuidedEventPoolProperty);
-		if (EnableScriptedEventsProperty && MaxActiveEventsProperty && GuidedEventPoolProperty)
+		const FName RemovedRuntimeProperties[] =
 		{
-			// Production keeps one readable scripted objective active and resolves only the three guided beats.
-			TestTrue(TEXT("Scripted events are enabled in the production landscape"),
-				EnableScriptedEventsProperty->GetPropertyValue_InContainer(RegionEventDirectorActor));
-			TestEqual(TEXT("Only one scripted objective can be active"),
-				MaxActiveEventsProperty->GetPropertyValue_InContainer(RegionEventDirectorActor),
-				1);
-
-			FScriptArrayHelper GuidedEventPool(
-				GuidedEventPoolProperty,
-				GuidedEventPoolProperty->ContainerPtrToValuePtr<void>(RegionEventDirectorActor));
-			TestEqual(TEXT("Landscape director resolves three guided event definitions"), GuidedEventPool.Num(), 3);
-		}
-
-		const FName RemovedRandomProperties[] =
-		{
+			TEXT("bEnableScriptedEvents"),
+			TEXT("MaxActiveEvents"),
+			TEXT("GuidedEventPool"),
+			TEXT("RegionEventActorClass"),
+			TEXT("SpawnOffset"),
+			TEXT("FinishedEventLifeSpan"),
 			TEXT("RandomSeed"),
 			TEXT("EventPool"),
 			TEXT("bEnableRegionEvents"),
-			TEXT("bEnableExplorationEvents"),
-			TEXT("ExplorationEventPool"),
-			TEXT("InitialExplorationDelaySeconds"),
-			TEXT("ExplorationEvaluationIntervalSeconds"),
-			TEXT("RegionDwellSeconds"),
-			TEXT("BaseExplorationChance"),
-			TEXT("FullCorruptionChanceBonus"),
-			TEXT("GlobalExplorationCooldownSeconds"),
-			TEXT("MaxActiveExplorationEvents"),
-			TEXT("MinimumExplorationSpawnDistance"),
-			TEXT("MaximumExplorationSpawnDistance"),
-			TEXT("ExplorationNavProjectionExtent"),
-			TEXT("bUseDeterministicRandomSeed")
+			TEXT("bEnableExplorationEvents")
 		};
-		for (const FName RemovedPropertyName : RemovedRandomProperties)
+		for (const FName RemovedPropertyName : RemovedRuntimeProperties)
 		{
-			// Removed ambient/weighted knobs must not silently return through a native or Blueprint parent.
+			// The protected map actor may deserialize, but it must not retain any event configuration.
 			TestNull(
-				*FString::Printf(TEXT("Director no longer exposes removed random property %s"), *RemovedPropertyName.ToString()),
-				FindFProperty<FProperty>(RegionEventDirectorActor->GetClass(), RemovedPropertyName));
+				*FString::Printf(TEXT("Legacy actor has no runtime property %s"), *RemovedPropertyName.ToString()),
+				FindFProperty<FProperty>(LegacyDirectorActor->GetClass(), RemovedPropertyName));
+		}
+
+		const FName RemovedRuntimeFunctions[] =
+		{
+			TEXT("InitializeRegionEventDirector"),
+			TEXT("TryStartGuidedRegionEventAtLocation"),
+			TEXT("CompleteEventsForRegion"),
+			TEXT("HasActiveEventForRegion"),
+			TEXT("GetActiveEventCount")
+		};
+		for (const FName RemovedFunctionName : RemovedRuntimeFunctions)
+		{
+			// No callable entry point remains that could restart the fixed demo flow.
+			TestNull(
+				*FString::Printf(TEXT("Legacy actor has no runtime function %s"), *RemovedFunctionName.ToString()),
+				LegacyDirectorActor->FindFunction(RemovedFunctionName));
 		}
 	}
 	return true;

@@ -35,11 +35,9 @@ public:
 	bool ShouldResumeHeldSprint() const { return !bIsSprintToggle && bSprintInputHeld; }
 	bool IsCrouchInputHeld() const { return bCrouchInputHeld; }
 
+	// General skill progression still opens this picker without depending on a scripted world event.
 	UFUNCTION(BlueprintCallable, Category = "UI|Augment")
 	bool RequestOpenAugmentSelect();
-
-	UFUNCTION(Client, Reliable, BlueprintCallable, Category = "UI|Augment")
-	void ClientOpenRegionEventAugmentSelect();
 
 	UFUNCTION(BlueprintCallable, Category = "UI|Augment")
 	bool OpenAugmentSelectWidget(const TArray<UGP_SkillAugmentData*>& Candidates);

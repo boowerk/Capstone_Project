@@ -204,6 +204,7 @@ void AGP_PlayerController::TryThreePlayerGameplaySmokeProbe()
 
 bool AGP_PlayerController::RequestOpenAugmentSelect()
 {
+	// Keep augment selection local and reusable by ordinary progression/UI callers.
 	if (!IsLocalController())
 	{
 		return false;
@@ -229,12 +230,6 @@ bool AGP_PlayerController::RequestOpenAugmentSelect()
 		ExcludedAugments,
 		CurrentElementTag);
 	return OpenAugmentSelectWidget(CandidateAugments);
-}
-
-void AGP_PlayerController::ClientOpenRegionEventAugmentSelect_Implementation()
-{
-	// Region shrine rewards are chosen locally so each client sees the regular augment picker flow.
-	RequestOpenAugmentSelect();
 }
 
 bool AGP_PlayerController::RequestEquipSkill(UGP_SkillData* SkillData, FGameplayTag SlotTag)
