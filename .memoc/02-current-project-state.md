@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-24T07:01:06+09:00
+updated: 2026-07-24T08:21:17+09:00
 status: active
 tags:
   - memoc
@@ -11,9 +11,11 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-07-24T07:01:06+09:00
+Last synced: 2026-07-24T08:21:17+09:00
 
 ## Current Status
+
+- `origin/main` repair tip `e2bb3c31` is semantically merged into local `main`. Conflict resolution keeps the newer local no-corruption/no-random-event/no-fixed-demo runtime and the validated local `L_LandscapeMap`/`BP_LobbyGameMode` LFS packages; the remote repair history remains recorded without reviving its staged village/MiddleTravel flow. Unmerged entries and conflict markers are zero. Full Editor build plus Landscape integrity, three-player runtime starts, lobby Landscape travel, and enemy production-animation contracts pass 4/4 under `NullRHI`; no live server test was run.
 
 - Regular enemy death absorption is current through `9796240f` and `c971a3c2`. `/Game/Niagara/Dissolve_SK/NS_EnemyDeath_Absorb` samples the actual dead enemy through `User.SourceMesh`, keeps the designer-tuned `10x10` grain size, falls under gravity first, then curves toward the server-selected killer's live chest with constant attraction and drag instead of a synchronized distance-scaled spring. Attraction starts at `0.38s`, gravity fades from `0.28s` to `0.60s`, strength ramps to `800` over `0.80s`, playback is `2.6x`, and the effect stops at `1.90s` within the two-second corpse window. If the killer is unusable, authority selects the nearest living connected player once; a reliable multicast gives all three clients the same target. Bosses keep their bespoke death effects. Editor build and the policy, production-asset contract, and enemy-death lifecycle tests pass; relevant Niagara warning/error and NaN scans are clean. PIE visual tuning remains.
 

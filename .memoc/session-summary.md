@@ -2,7 +2,7 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-07-24T07:01:06+09:00
+updated: 2026-07-24T08:21:17+09:00
 status: active
 tags:
   - memoc
@@ -11,8 +11,8 @@ created: 2026-07-18T07:01:20
 ---
 # Session Summary
 
-- `10451155` adds the dedicated Sans Ground Hands circular decal; `6ffa4614` connects the production actor and locks its contract.
-- The warning is a soft-edged radial mask, pure red at `0.62` opacity. Sweep keeps its separate fan material; hand timing, collision, and damage are unchanged.
-- Editor build and all 13 `ProjectEden.AI.Boss` tests pass. Flat/sloped-floor PIE visual confirmation remains; no server test was run.
-- Regular-enemy death absorption remains fall-then-absorb with `SpriteSize=10`.
-- Fixed demo/event flow remains removed; the product contract remains three players.
+- Merged `origin/main` repair tip `e2bb3c31` while preserving three-player free exploration.
+- Corruption, random events, MiddleTravel, and the fixed demo remain removed.
+- Local Landscape/lobby LFS packages match size, SHA-256, and Unreal magic; conflicts and markers are zero.
+- Editor build and four Landscape/three-player/lobby/enemy-animation tests pass under `NullRHI`; no live server test ran.
+- Sans red circular warnings and fall-then-absorb enemy death grains remain current.
