@@ -654,9 +654,6 @@ void AGP_DarkArmorKnightBossCharacter::GrantDarkKnightAbilities()
 		return;
 	}
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
 	// Canonical native list is authoritative. A Blueprint child that re-saves DarkKnightAbilityClasses can serialize a
 	// stale/empty array (e.g. a single None) that overrides the constructor default and silently ungrants patterns,
 	// which leaves the pattern selector with candidates it can never activate and the boss frozen. Always grant natives,
@@ -672,10 +669,8 @@ void AGP_DarkArmorKnightBossCharacter::GrantDarkKnightAbilities()
 	};
 
 	auto GrantAbility = [ASC](const TSubclassOf<UGameplayAbility>& AbilityClass)
-=======
 	// Give designer-authored replacements first so their exact tags suppress the native fallback.
 	for (const TSubclassOf<UGameplayAbility>& AbilityClass : DarkKnightAbilityClasses)
->>>>>>> origin/main
 	{
 		GrantConfiguredAbilityWithoutTagOverlap(ASC, AbilityClass);
 	}
@@ -713,15 +708,12 @@ void AGP_DarkArmorKnightBossCharacter::GrantDarkKnightAbilities()
 	for (const TSubclassOf<UGameplayAbility>& AbilityClass : DarkKnightAbilityClasses)
 	{
 		GrantAbility(AbilityClass);
-=======
 	// Give designer-authored replacements first so their exact tags suppress the native fallback.
 	for (const TSubclassOf<UGameplayAbility>& AbilityClass : DarkKnightAbilityClasses)
 	{
-=======
 	// Give designer-authored replacements first so their exact tags suppress the native fallback.
 	for (const TSubclassOf<UGameplayAbility>& AbilityClass : DarkKnightAbilityClasses)
 	{
->>>>>>> origin/main
 		GrantConfiguredAbilityWithoutTagOverlap(ASC, AbilityClass);
 	}
 
@@ -749,7 +741,6 @@ void AGP_DarkArmorKnightBossCharacter::GrantDarkKnightAbilities()
 			// patterns are restored by tag while preserving any configured replacement that was granted above.
 			ASC->GiveAbility(FGameplayAbilitySpec(RequiredAbility.NativeClass));
 		}
->>>>>>> origin/main
 	}
 }
 

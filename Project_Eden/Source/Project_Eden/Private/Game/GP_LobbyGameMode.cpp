@@ -3,19 +3,10 @@
 #include "Blueprint/UserWidget.h"
 #include "Game/GP_LobbyPlayerController.h"
 #include "Game/GP_LobbyPlayerState.h"
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
 #include "Game/GP_RunSeed.h"
-=======
 #include "Game/GP_ThreePlayerGameSession.h"
->>>>>>> origin/main
-=======
 #include "Game/GP_ThreePlayerGameSession.h"
->>>>>>> origin/main
-=======
 #include "Game/GP_ThreePlayerGameSession.h"
->>>>>>> origin/main
 #include "GameFramework/PlayerController.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"

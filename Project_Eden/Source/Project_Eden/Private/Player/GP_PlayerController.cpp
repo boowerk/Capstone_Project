@@ -264,9 +264,6 @@ bool AGP_PlayerController::RequestOpenAugmentSelect()
 	return OpenAugmentSelectWidget(CandidateAugments);
 }
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
 void AGP_PlayerController::ClientOpenRegionEventAugmentSelect_Implementation()
 {
 	// Region shrine rewards are chosen locally so each client sees the regular augment picker flow.
@@ -362,12 +359,6 @@ void AGP_PlayerController::Server_RequestMiddleTravel_Implementation(
 	}
 }
 
-=======
->>>>>>> origin/main
-=======
->>>>>>> origin/main
-=======
->>>>>>> origin/main
 bool AGP_PlayerController::RequestEquipSkill(UGP_SkillData* SkillData, FGameplayTag SlotTag)
 {
 	UGP_SkillData* Slot01Skill = nullptr;

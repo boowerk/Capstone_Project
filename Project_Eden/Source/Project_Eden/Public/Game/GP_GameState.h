@@ -4,18 +4,9 @@
 #include "GameFramework/GameStateBase.h"
 #include "GP_GameState.generated.h"
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
 class UGP_WorldCorruptionComponent;
 class APlayerState;
 
-=======
->>>>>>> origin/main
-=======
->>>>>>> origin/main
-=======
->>>>>>> origin/main
 // Replicated phase of the linear city-progression run. Drives HUD and client-side presentation.
 UENUM(BlueprintType)
 enum class EGPMatchPhase : uint8

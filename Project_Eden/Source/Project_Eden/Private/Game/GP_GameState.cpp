@@ -1,16 +1,7 @@
 #include "Game/GP_GameState.h"
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
 #include "Game/Corruption/GP_WorldCorruptionComponent.h"
 #include "GameFramework/PlayerState.h"
-=======
->>>>>>> origin/main
-=======
->>>>>>> origin/main
-=======
->>>>>>> origin/main
 #include "Net/UnrealNetwork.h"
 
 void AGP_GameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

@@ -9,14 +9,13 @@ class AGP_EnemySpawnVolume;
 class AGP_GameState;
 class AGP_RunPortal;
 class AGP_EnemySpawnMarker;
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
 class AGP_RegionEventActor;
 class AGP_RegionEventDirector;
 class AGP_VillageLayoutDirector;
 class AGP_PlayerController;
 class APlayerState;
+class APawn;
+class APlayerStart;
 enum class EGPRegionEventTrigger : uint8;
 enum class EGPZoneStage : uint8;
 
@@ -34,18 +33,6 @@ struct FGPZoneRuntimeState
 	bool bStarted = false;
 	bool bCompleted = false;
 };
-=======
-class APawn;
-class APlayerStart;
->>>>>>> origin/main
-=======
-class APawn;
-class APlayerStart;
->>>>>>> origin/main
-=======
-class APawn;
-class APlayerStart;
->>>>>>> origin/main
 
 /**
  * Server-authoritative progression manager for the linear "city -> boss room -> next city" loop.
@@ -72,44 +59,20 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Run")
 	void NotifyAllPlayersDead();
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
 	// Called by a Middle-selection portal on the server.
 	void OpenMiddleTravelSelection(AGP_PlayerController* PlayerController);
 	bool RequestMiddleTravel(
 		AGP_PlayerController* PlayerController,
 		FName DestinationZoneId);
-=======
 	virtual void RestartPlayer(AController* NewPlayer) override;
->>>>>>> origin/main
-=======
-	virtual void RestartPlayer(AController* NewPlayer) override;
->>>>>>> origin/main
-=======
-	virtual void RestartPlayer(AController* NewPlayer) override;
->>>>>>> origin/main
 
 protected:
 	virtual void InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage) override;
 	virtual void InitGameState() override;
 	virtual void BeginPlay() override;
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
-=======
 	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
 	virtual void Logout(AController* Exiting) override;
->>>>>>> origin/main
-=======
-	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
-	virtual void Logout(AController* Exiting) override;
->>>>>>> origin/main
-=======
-	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
-	virtual void Logout(AController* Exiting) override;
->>>>>>> origin/main
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "Run|Zone")
 	void OnZoneStarted(int32 ZoneIndex, AGP_EnemySpawnVolume* Zone);
@@ -151,9 +114,6 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Network|Spawn", meta = (ClampMin = "150.0", Units = "cm"))
 	float PartyPlayerStartSpacing = 260.0f;
-<<<<<<< HEAD
-<<<<<<< HEAD
-
 	// Optional run-layout coordinator. The native default only selects VillageSlot candidates;
 	// it does not spawn cities or change gameplay zones.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Village Layout")
@@ -193,10 +153,6 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Middle Travel",
 		meta = (ClampMin = "100.0", Units = "cm"))
 	float MiddleTravelPortalUseRadius = 600.0f;
-=======
->>>>>>> origin/main
-=======
->>>>>>> origin/main
 
 private:
 	int32 RunSeed = INDEX_NONE;
@@ -213,8 +169,6 @@ private:
 
 	// Populated from placed BP_RegionSeed actors when a map authors distinct biome states.
 	TArray<uint8> RuntimeInitialRegionStates;
-<<<<<<< HEAD
-<<<<<<< HEAD
 
 	UPROPERTY(Transient)
 	TObjectPtr<AGP_VillageLayoutDirector> VillageLayoutDirector;
@@ -226,10 +180,6 @@ private:
 	TSet<TWeakObjectPtr<AGP_EnemySpawnVolume>> RegisteredNavigationInvokerZones;
 	bool bUseStagedZoneProgression = false;
 	bool bZoneProgressionInitialized = false;
-=======
->>>>>>> origin/main
-=======
->>>>>>> origin/main
 
 	int32 CurrentZoneIndex = INDEX_NONE;
 	int32 PendingZoneIndex = INDEX_NONE;
@@ -256,51 +206,24 @@ private:
 		float RadiusMultiplier);
 	int32 ResolvePartyStartSlot(AController* Player);
 	void GatherZones();
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
 	void InitializeZoneProgression();
 	void BindZoneDelegates(AGP_EnemySpawnVolume* Zone);
 	void ResolveVillageLayoutDirector();
 	void ResolveRegionEventDirector();
+	void ResolveRuntimeRegionConfiguration();
 	void InitializeRegionStates();
 	void SpawnCorruptionPresentation();
 	void RegisterZoneNavigationInvoker(AGP_EnemySpawnVolume* Zone);
 	void UnregisterZoneNavigationInvoker(AGP_EnemySpawnVolume* Zone);
 	void UnregisterAllZoneNavigationInvokers();
-=======
-	void ResolveRuntimeRegionConfiguration();
-	void InitializeRegionStates();
->>>>>>> origin/main
-=======
-	void ResolveRuntimeRegionConfiguration();
-	void InitializeRegionStates();
->>>>>>> origin/main
-=======
-	void ResolveRuntimeRegionConfiguration();
-	void InitializeRegionStates();
->>>>>>> origin/main
 	void UnlockZone(int32 ZoneIndex);
 	void StartZone(int32 ZoneIndex);
 	void SpawnZoneEnemies(AGP_EnemySpawnVolume* Zone);
 	int32 SpawnZoneBossEnemies(AGP_EnemySpawnVolume* Zone);
 	void SpawnMarkerEnemies(AGP_EnemySpawnVolume* Zone, AGP_EnemySpawnMarker* Marker);
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
 	void RegisterZoneEnemy(
 		AGP_EnemyCharacter* Enemy,
-		AGP_EnemySpawnVolume* OwningZone,
-		int32 CorruptionRegionId = INDEX_NONE);
-=======
-	void RegisterZoneEnemy(AGP_EnemyCharacter* Enemy);
->>>>>>> origin/main
-=======
-	void RegisterZoneEnemy(AGP_EnemyCharacter* Enemy);
->>>>>>> origin/main
-=======
-	void RegisterZoneEnemy(AGP_EnemyCharacter* Enemy);
->>>>>>> origin/main
+		AGP_EnemySpawnVolume* OwningZone = nullptr,
 	void MaybeCompleteZone();
 	void CompleteCurrentZone();
 	void AdvanceZone();
