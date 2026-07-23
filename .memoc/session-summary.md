@@ -2,22 +2,20 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-07-23T11:19:05+09:00
+updated: 2026-07-23T13:39:22+09:00
 status: active
-tags:
-  - memoc
-  - memoc/state
+tags: [memoc, memoc/state]
 created: 2026-07-18T13:21:02
 ---
 # Session Summary
 
 ## Status
-- Footprint checks committed as `f32ef1a2`.
-- Mixed 00/01 preset selection is committed; 01 uses a measured 130m x 170m footprint.
+- Mixed 00/01 presets are committed as `8f794c86`.
+- Current: flat footprints and transient `Rebuild/Clear Preview`. PIE defaults to `PreviewSeed`; packaged runtime uses GameState RunSeed and On-Demand PCG.
+- Saved map slots are now uniquely identified as `Village_A..E`.
 
 ## Verified
-- Editor build and `VillageSelection` automation pass.
-- PIE spawned `Village_B=Village_01` plus `Village_C=Village_00`; isolated PCG completed 2/2.
+- Full Editor build and `ProjectEden.Game.WorldLayout.VillageSelection` pass.
 
 ## Next
-- Add more authored presets/slots; later verify multiplayer streaming and explicit cook registration.
+- PreviewSeed 186 selects A/01 + E/00. Continue authoring slots/presets.

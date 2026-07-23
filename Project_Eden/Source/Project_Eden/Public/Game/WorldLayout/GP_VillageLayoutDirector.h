@@ -7,6 +7,7 @@
 #include "GP_VillageLayoutDirector.generated.h"
 
 class AGP_VillageSlot;
+class ALevelInstance;
 class UPCGComponent;
 class USceneComponent;
 class ULevelStreamingDynamic;
@@ -25,6 +26,9 @@ public:
 
 	UFUNCTION(CallInEditor, BlueprintCallable, Category = "Village|Debug")
 	void RebuildPreview();
+
+	UFUNCTION(CallInEditor, BlueprintCallable, Category = "Village|Debug")
+	void ClearVillagePreview();
 
 	UFUNCTION(CallInEditor, BlueprintCallable, Category = "Village|Footprint")
 	void RefreshFootprintPreview();
@@ -60,6 +64,7 @@ protected:
 	virtual void OnConstruction(const FTransform& Transform) override;
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+	virtual void Destroyed() override;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Village")
 	TObjectPtr<USceneComponent> SceneRoot;
@@ -94,6 +99,16 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Village|Debug", meta = (ClampMin = "0"))
 	int32 PreviewSeed = 1337;
 
+	// Keeps PIE village placement identical to RebuildPreview without changing
+	// the packaged game's RunSeed behavior.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Village|Debug")
+	bool bUsePreviewSeedInPIE = true;
+
+	// RebuildPreview loads transient Level Instances in the editor and optionally
+	// runs their city PCG graphs so the authored village layout is visible before PIE.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Village|Debug")
+	bool bGeneratePCGInEditorPreview = true;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Village|Debug")
 	bool bDrawDebug = true;
 
@@ -116,6 +131,14 @@ private:
 	UPROPERTY(Transient)
 	TMap<FName, int32> AssignedVillagePresetIndices;
 
+#if WITH_EDITORONLY_DATA
+	UPROPERTY(Transient, DuplicateTransient)
+	TArray<TObjectPtr<ALevelInstance>> EditorPreviewVillageInstances;
+
+	UPROPERTY(Transient, DuplicateTransient)
+	TArray<TObjectPtr<UPCGComponent>> EditorPreviewPCGComponents;
+#endif
+
 	TSet<FName> ConfiguredVillageLevelIds;
 	TSet<FName> GenerationRequestedVillageLevelIds;
 	TSet<FName> GeneratedVillageLevelIds;
@@ -132,6 +155,9 @@ private:
 	void AssignVillagePresets(int32 InRunSeed, int32 AssignmentAttempt = 0);
 	TArray<FGP_VillagePresetDefinition> BuildEffectiveVillagePresetPool() const;
 	void ApplyFootprintPreview();
+	bool BuildEditorVillagePreview();
+	void ClearEditorVillagePreview();
+	UPCGComponent* FindVillagePCGComponent(ULevelStreamingDynamic* StreamingLevel) const;
 	bool ResolveVillagePreset(
 		FName SlotId,
 		TSoftObjectPtr<UWorld>& OutLevel,
@@ -175,7 +201,12 @@ private:
 	void HandleVillageLevelShown();
 
 #if WITH_EDITOR
+	void HandleEditorPreviewPCGGenerated(UPCGComponent* PCGComponent);
+	void HandleEditorPreviewPCGCancelled(UPCGComponent* PCGComponent);
 	virtual bool ActorTypeSupportsDataLayer() const override { return false; }
 	virtual bool ActorTypeSupportsExternalDataLayer() const override { return false; }
+
+	TSet<TObjectPtr<UPCGComponent>> EditorPreviewSynchronousGeneratedComponents;
+	TSet<TObjectPtr<UPCGComponent>> EditorPreviewSynchronousCancelledComponents;
 #endif
 };

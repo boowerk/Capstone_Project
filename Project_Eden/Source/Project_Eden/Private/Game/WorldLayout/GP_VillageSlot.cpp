@@ -21,6 +21,9 @@ AGP_VillageSlot::AGP_VillageSlot()
 	FootprintBounds->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	FootprintBounds->SetGenerateOverlapEvents(false);
 	FootprintBounds->SetHiddenInGame(true);
+#if WITH_EDITORONLY_DATA
+	FootprintBounds->SetIsVisualizationComponent(true);
+#endif
 	ApplyFootprint(FGP_VillageFootprint());
 
 #if WITH_EDITORONLY_DATA
@@ -59,20 +62,27 @@ void AGP_VillageSlot::ApplyFootprint(const FGP_VillageFootprint& Footprint)
 		return;
 	}
 
-	const FVector SanitizedExtent(
+	constexpr float PreviewHalfHeight = 1.0f;
+	const FVector PreviewOffset(
+		Footprint.FootprintOffset.X,
+		Footprint.FootprintOffset.Y,
+		0.0f);
+	const FVector PreviewExtent(
 		FMath::Max(FMath::Abs(Footprint.FootprintExtent.X), 1.0f),
 		FMath::Max(FMath::Abs(Footprint.FootprintExtent.Y), 1.0f),
-		FMath::Max(FMath::Abs(Footprint.FootprintExtent.Z), 1.0f));
+		PreviewHalfHeight);
 	const FVector ActorScale = GetActorScale3D();
 	const FVector InverseActorScale(
 		FMath::IsNearlyZero(ActorScale.X) ? 1.0f : 1.0f / ActorScale.X,
 		FMath::IsNearlyZero(ActorScale.Y) ? 1.0f : 1.0f / ActorScale.Y,
 		FMath::IsNearlyZero(ActorScale.Z) ? 1.0f : 1.0f / ActorScale.Z);
-	// Level streaming and overlap tests intentionally use unit scale. Cancel any
-	// authored slot scale so the editor footprint displays that same contract.
-	FootprintBounds->SetRelativeLocation(Footprint.FootprintOffset * InverseActorScale);
+	// The footprint is an XY placement preview. Keep it flat at the slot origin so
+	// editor floor snapping does not lift the runtime village origin into the air.
+	// Level streaming and overlap tests intentionally use unit scale, so cancel any
+	// authored slot scale while displaying that same XY contract.
+	FootprintBounds->SetRelativeLocation(PreviewOffset * InverseActorScale);
 	FootprintBounds->SetRelativeScale3D(InverseActorScale);
-	FootprintBounds->SetBoxExtent(SanitizedExtent, false);
+	FootprintBounds->SetBoxExtent(PreviewExtent, false);
 	FootprintBounds->UpdateBounds();
 	UpdatePreviewColor();
 }

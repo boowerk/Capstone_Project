@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-23T11:19:05+09:00
+updated: 2026-07-23T12:38:00+09:00
 status: active
 tags:
   - memoc
@@ -16,6 +16,8 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 ## Decision Log
 
 ### 2026-07-23
+- Keep village runtime PCG as Generate On Demand so the Director can apply instance-unique tags, graph parameters, and deterministic seeds before sequential generation. For immediate editor authoring feedback, use transient `ALevelInstance` previews owned by the Director, with PCG Preview editing mode and DuplicateTransient flags; do not change the production component to Generate At Runtime merely to see layouts.
+- Treat the village Footprint component as a flat XY editor preview, not the runtime spawn origin or a selectable placement component. Keep it at slot-local Z=0 with minimal thickness and mark it visualization-only; the `AGP_VillageSlot` actor transform remains the authoritative Level Instance transform. Use pivot snapping (`Alt+End`) for authored ground placement.
 - Keep the legacy `VillageLevelPreset` + footprint as the canonical primary preset so existing instance overrides remain valid. Store additional choices as `FGP_VillagePresetDefinition { PresetId, Level, Footprint, Weight }`; the first additional preset is compact `L_Village_01`. Ignore duplicate preset IDs or level paths deterministically.
 - Assign presets before calculating conflicts, but retry up to 32 deterministic RunSeed/SlotId assignment salts and keep the successful result with the largest selected count. This preserves random visual variety without letting an unlucky large-preset assignment hide a valid mixed/small-preset layout.
 - Preserve `AGP_VillageSlot`'s native root and render the assigned preset footprint through a child box so existing placed-actor transforms remain compatible.

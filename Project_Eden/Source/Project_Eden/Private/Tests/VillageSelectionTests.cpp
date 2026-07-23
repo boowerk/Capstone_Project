@@ -489,6 +489,47 @@ bool FVillageSelectionPolicyTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Required group still selects every eligible fallback"), TooManyRequiredResult.SelectedSlotIds.Num(), 3);
 
 	TestNotNull(TEXT("VillageSlot owns an editor footprint box"), GetDefault<AGP_VillageSlot>()->GetSlotBounds());
+#if WITH_EDITORONLY_DATA
+	TestTrue(TEXT("VillageSlot footprint box is editor visualization only"),
+		GetDefault<AGP_VillageSlot>()->GetSlotBounds()->IsVisualizationComponent());
+#endif
+	const UFunction* RebuildPreviewFunction =
+		AGP_VillageLayoutDirector::StaticClass()->FindFunctionByName(TEXT("RebuildPreview"));
+	const UFunction* ClearPreviewFunction =
+		AGP_VillageLayoutDirector::StaticClass()->FindFunctionByName(TEXT("ClearVillagePreview"));
+	TestNotNull(TEXT("Village director exposes an editor rebuild-preview action"), RebuildPreviewFunction);
+	TestNotNull(TEXT("Village director exposes an editor clear-preview action"), ClearPreviewFunction);
+	TestTrue(TEXT("Village rebuild-preview action is callable in editor"),
+		RebuildPreviewFunction && RebuildPreviewFunction->HasMetaData(TEXT("CallInEditor")));
+	TestTrue(TEXT("Village clear-preview action is callable in editor"),
+		ClearPreviewFunction && ClearPreviewFunction->HasMetaData(TEXT("CallInEditor")));
+	TestNotNull(TEXT("Village director exposes the editor PCG preview toggle"),
+		FindFProperty<FBoolProperty>(
+			AGP_VillageLayoutDirector::StaticClass(),
+			TEXT("bGeneratePCGInEditorPreview")));
+	const FBoolProperty* PIESeedOverrideProperty =
+		FindFProperty<FBoolProperty>(
+			AGP_VillageLayoutDirector::StaticClass(),
+			TEXT("bUsePreviewSeedInPIE"));
+	TestNotNull(TEXT("Village director exposes the PIE preview-seed override"), PIESeedOverrideProperty);
+	TestTrue(TEXT("Village PIE preview-seed override is enabled by default"),
+		PIESeedOverrideProperty
+		&& PIESeedOverrideProperty->GetPropertyValue_InContainer(
+			GetDefault<AGP_VillageLayoutDirector>()));
+#if WITH_EDITORONLY_DATA
+	const FProperty* EditorPreviewInstancesProperty =
+		AGP_VillageLayoutDirector::StaticClass()->FindPropertyByName(
+			TEXT("EditorPreviewVillageInstances"));
+	const FProperty* EditorPreviewPCGProperty =
+		AGP_VillageLayoutDirector::StaticClass()->FindPropertyByName(
+			TEXT("EditorPreviewPCGComponents"));
+	TestTrue(TEXT("Village Level Instance preview references are not copied with the Director"),
+		EditorPreviewInstancesProperty
+		&& EditorPreviewInstancesProperty->HasAnyPropertyFlags(CPF_DuplicateTransient));
+	TestTrue(TEXT("Village PCG preview references are not copied with the Director"),
+		EditorPreviewPCGProperty
+		&& EditorPreviewPCGProperty->HasAnyPropertyFlags(CPF_DuplicateTransient));
+#endif
 	TestNull(TEXT("VillageSlot Data Layer is explicitly authored per placed slot"),
 		GetDefault<AGP_VillageSlot>()->GetVillageDataLayer());
 	TestNotNull(TEXT("VillageSlot exposes a VillageDataLayer property"),
@@ -523,9 +564,12 @@ bool FVillageSelectionPolicyTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Default village footprint is centered below the slot origin"),
 		DefaultFootprint.FootprintOffset,
 		FVector(0.0f, 0.0f, -1500.0f));
-	TestEqual(TEXT("VillageSlot visualizes the default footprint extent"),
+	TestEqual(TEXT("VillageSlot visualizes the default footprint as a flat XY plane"),
 		GetDefault<AGP_VillageSlot>()->GetSlotBounds()->GetUnscaledBoxExtent(),
-		DefaultFootprint.FootprintExtent);
+		FVector(DefaultFootprint.FootprintExtent.X, DefaultFootprint.FootprintExtent.Y, 1.0f));
+	TestEqual(TEXT("VillageSlot keeps the flat preview at the placement origin"),
+		GetDefault<AGP_VillageSlot>()->GetSlotBounds()->GetRelativeLocation(),
+		FVector(DefaultFootprint.FootprintOffset.X, DefaultFootprint.FootprintOffset.Y, 0.0f));
 
 	const TArray<FGP_VillagePresetDefinition> DefaultPresetPool =
 		GetDefault<AGP_VillageLayoutDirector>()->GetVillagePresetPool();
