@@ -86,6 +86,17 @@ void AGP_LobbyGameMode::BroadcastLoading()
 	}
 }
 
+void AGP_LobbyGameMode::BroadcastLoadingCancelled()
+{
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		if (AGP_LobbyPlayerController* LPC = Cast<AGP_LobbyPlayerController>(It->Get()))
+		{
+			LPC->ClientHideLoading();
+		}
+	}
+}
+
 void AGP_LobbyGameMode::OnPlayerReadyChanged(AGP_LobbyPlayerState* PlayerState, bool bIsReady)
 {
 	if (IsLobbySmokeEnabled())
@@ -248,6 +259,8 @@ void AGP_LobbyGameMode::TravelToGame()
 	if (!GetWorld()->ServerTravel(URL))
 	{
 		bTravelStarted = false;
+		bTravelInitiated = false;
+		BroadcastLoadingCancelled();
 		UE_LOG(LogTemp, Error, TEXT("[GP_LobbyGameMode] ServerTravel failed for '%s'."), *URL);
 	}
 }

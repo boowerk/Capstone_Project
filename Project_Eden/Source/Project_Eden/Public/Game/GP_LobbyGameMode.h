@@ -61,6 +61,7 @@ private:
 
 	void BroadcastRefreshPlayerList();
 	void BroadcastLoading();
+	void BroadcastLoadingCancelled();
 	void TravelToGame();
 
 	// Last Ready, Blueprint callbacks, and an allowed debug force-start can

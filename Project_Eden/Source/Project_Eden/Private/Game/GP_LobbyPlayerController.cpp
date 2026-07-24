@@ -2,6 +2,7 @@
 
 #include "Blueprint/UserWidget.h"
 #include "Engine/World.h"
+#include "Game/GP_GameInstance.h"
 #include "Game/GP_LobbyGameMode.h"
 #include "Game/GP_LobbyPlayerState.h"
 #include "Misc/CommandLine.h"
@@ -110,10 +111,31 @@ void AGP_LobbyPlayerController::ClientRefreshPlayerList_Implementation()
 
 void AGP_LobbyPlayerController::ClientShowLoading_Implementation()
 {
+	if (UGP_GameInstance* GameInstance = GetGameInstance<UGP_GameInstance>())
+	{
+		GameInstance->ShowInitialOuterLoadingScreen();
+	}
+
 	if (IsValid(LobbyWidget))
 	{
 		LobbyWidget->ShowLoadingState();
 	}
+}
+
+void AGP_LobbyPlayerController::ClientHideLoading_Implementation()
+{
+	if (UGP_GameInstance* GameInstance = GetGameInstance<UGP_GameInstance>())
+	{
+		GameInstance->HideInitialOuterLoadingScreen();
+	}
+
+	if (IsValid(LobbyWidget))
+	{
+		LobbyWidget->HideLoadingState();
+	}
+
+	SetInputMode(FInputModeUIOnly());
+	SetShowMouseCursor(true);
 }
 
 void AGP_LobbyPlayerController::ServerForceStart_Implementation()

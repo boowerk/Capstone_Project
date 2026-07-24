@@ -2257,6 +2257,12 @@ void AGP_GameMode::AssignPlayersToOuterVillageStarts()
 			continue;
 		}
 		OuterAssignmentRevisions.Add(PlayerKey, LayoutRevision);
+		if (AGP_PlayerController* GPPlayerController =
+			Cast<AGP_PlayerController>(PlayerController))
+		{
+			GPPlayerController->ClientAwaitInitialOuterPlacement(
+				Pawn->GetActorLocation());
+		}
 		UE_LOG(LogTemp, Log,
 			TEXT("[GP_GameMode] Assigned player %d to outer start '%s' after visual Revision=%d."),
 			PartySlotIndex,

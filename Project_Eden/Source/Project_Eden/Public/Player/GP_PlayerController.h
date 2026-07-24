@@ -73,6 +73,11 @@ public:
 	// and generating visual PCG. The server gates the initial Outer teleport on it.
 	void NotifyVillageVisualReady(int32 LayoutRevision);
 
+	// The server sends the authoritative post-teleport location. The client keeps
+	// the loading screen up until its pawn replication reaches that location.
+	UFUNCTION(Client, Reliable, Category = "UI|Loading")
+	void ClientAwaitInitialOuterPlacement(FVector_NetQuantize TargetLocation);
+
 	bool GetSkillSelectionCursorLocation(FVector& OutTargetLocation) const;
 
 protected:
@@ -151,6 +156,14 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UGP_PlayerHUDWidget> HUDWidget;
+
+	bool bInitialOuterLoadingInputBlocked = false;
+	FVector PendingInitialOuterLocation = FVector::ZeroVector;
+	FTimerHandle InitialOuterPlacementTimerHandle;
+
+	void BeginInitialOuterLoadingGate();
+	void TryFinishInitialOuterLoading();
+	void FinishInitialOuterLoading();
 
 	UPROPERTY(EditDefaultsOnly, Category = "UI|Middle Travel")
 	TSubclassOf<UGP_MiddleTravelMapWidget> MiddleTravelMapWidgetClass;

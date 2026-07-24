@@ -31,6 +31,7 @@ public:
 	// Called by the server just before ServerTravel. Locks the UI and shows
 	// "로딩중" for all players so the last ready-state update is never missed.
 	void ShowLoadingState();
+	void HideLoadingState();
 
 protected:
 	virtual void NativeConstruct() override;

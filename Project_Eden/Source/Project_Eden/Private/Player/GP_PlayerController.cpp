@@ -18,6 +18,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Abilities/GameplayAbilityTypes.h"
 #include "GameplayTags/GP_Tags.h"
+#include "Game/GP_GameInstance.h"
 #include "Game/GP_GameMode.h"
 #include "Game/WorldLayout/GP_VillageLayoutDirector.h"
 #include "InputCoreTypes.h"
@@ -40,6 +41,22 @@
 
 namespace
 {
+constexpr float InitialOuterArrivalTolerance = 100.0f;
+constexpr float InitialOuterArrivalPollInterval = 0.05f;
+
+bool IsInitialOuterGameplayWorld(const UWorld* World)
+{
+	if (!IsValid(World))
+	{
+		return false;
+	}
+
+	const ENetMode NetMode = World->GetNetMode();
+	return NetMode != NM_Standalone
+		&& NetMode != NM_DedicatedServer
+		&& World->GetMapName().Contains(TEXT("L_LandscapeMap"));
+}
+
 bool AreSameEquippedSkill(
 	const UGP_SkillData* Left,
 	const UGP_SkillData* Right)
@@ -85,6 +102,18 @@ void AGP_PlayerController::BeginPlay()
 		// mode (the lobby controller set it). Force game input back on.
 		SetInputMode(FInputModeGameOnly());
 		SetShowMouseCursor(false);
+
+		if (UGP_GameInstance* GameInstance = GetGameInstance<UGP_GameInstance>())
+		{
+			if (GameInstance->IsInitialOuterLoadingScreenActive()
+				|| IsInitialOuterGameplayWorld(GetWorld()))
+			{
+				// Reattach after lobby travel, and cover a direct join or
+				// reconnect that enters the gameplay map without LobbyMap.
+				GameInstance->ShowInitialOuterLoadingScreen();
+				BeginInitialOuterLoadingGate();
+			}
+		}
 
 		// Covers the inverse replication order: the client may finish applying
 		// the village snapshot before its local controller reaches BeginPlay.
@@ -329,6 +358,79 @@ void AGP_PlayerController::NotifyVillageVisualReady(int32 LayoutRevision)
 	}
 
 	Server_NotifyVillageVisualReady(LayoutRevision);
+}
+
+void AGP_PlayerController::ClientAwaitInitialOuterPlacement_Implementation(
+	FVector_NetQuantize TargetLocation)
+{
+	if (!IsLocalController())
+	{
+		return;
+	}
+
+	if (UGP_GameInstance* GameInstance = GetGameInstance<UGP_GameInstance>())
+	{
+		// Fallback for an unusually tight travel where the lobby RPC could not
+		// construct the viewport overlay before the destination world arrived.
+		GameInstance->ShowInitialOuterLoadingScreen();
+	}
+
+	BeginInitialOuterLoadingGate();
+	PendingInitialOuterLocation = TargetLocation;
+	TryFinishInitialOuterLoading();
+}
+
+void AGP_PlayerController::BeginInitialOuterLoadingGate()
+{
+	if (bInitialOuterLoadingInputBlocked)
+	{
+		return;
+	}
+
+	SetIgnoreMoveInput(true);
+	SetIgnoreLookInput(true);
+	bInitialOuterLoadingInputBlocked = true;
+}
+
+void AGP_PlayerController::TryFinishInitialOuterLoading()
+{
+	const APawn* ControlledPawn = GetPawn();
+	if (IsValid(ControlledPawn)
+		&& FVector::DistSquared(
+			ControlledPawn->GetActorLocation(),
+			PendingInitialOuterLocation)
+			<= FMath::Square(InitialOuterArrivalTolerance))
+	{
+		FinishInitialOuterLoading();
+		return;
+	}
+
+	GetWorldTimerManager().SetTimer(
+		InitialOuterPlacementTimerHandle,
+		this,
+		&ThisClass::TryFinishInitialOuterLoading,
+		InitialOuterArrivalPollInterval,
+		false);
+}
+
+void AGP_PlayerController::FinishInitialOuterLoading()
+{
+	GetWorldTimerManager().ClearTimer(InitialOuterPlacementTimerHandle);
+
+	if (UGP_GameInstance* GameInstance = GetGameInstance<UGP_GameInstance>())
+	{
+		GameInstance->HideInitialOuterLoadingScreen();
+	}
+
+	if (bInitialOuterLoadingInputBlocked)
+	{
+		SetIgnoreMoveInput(false);
+		SetIgnoreLookInput(false);
+		bInitialOuterLoadingInputBlocked = false;
+	}
+
+	SetInputMode(FInputModeGameOnly());
+	SetShowMouseCursor(false);
 }
 
 void AGP_PlayerController::Server_NotifyVillageVisualReady_Implementation(int32 LayoutRevision)

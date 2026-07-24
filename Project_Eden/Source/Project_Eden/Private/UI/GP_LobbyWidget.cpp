@@ -242,3 +242,15 @@ void UGP_LobbyWidget::ShowLoadingState()
 
 	RefreshPlayerList();
 }
+
+void UGP_LobbyWidget::HideLoadingState()
+{
+	bIsLoading = false;
+
+	if (Button_Ready)
+	{
+		Button_Ready->SetIsEnabled(true);
+	}
+
+	RefreshPlayerList();
+}

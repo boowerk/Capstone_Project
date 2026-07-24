@@ -18,6 +18,9 @@ public:
 	UFUNCTION(Client, Reliable)
 	void ClientShowLoading();
 
+	UFUNCTION(Client, Reliable)
+	void ClientHideLoading();
+
 	// Debug/solo start request. The server accepts it from an opted-in local
 	// host or Development dedicated server when -AllowLobbyForceStart is set.
 	UFUNCTION(Server, Reliable)

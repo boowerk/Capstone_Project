@@ -5,6 +5,8 @@
 #include "Engine/EngineBaseTypes.h"
 #include "GP_GameInstance.generated.h"
 
+class SWidget;
+
 /**
  * Handles connection lifecycle errors so a failed join or a dropped host never
  * leaves a client stuck on a dead map:
@@ -34,6 +36,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Flow")
 	void ClearLastConnectionError() { LastConnectionError.Empty(); }
 
+	// Lives on the GameViewport rather than either travel world's viewport UI,
+	// so it remains visible from LobbyMap until the local pawn reaches Outer.
+	void ShowInitialOuterLoadingScreen();
+	void HideInitialOuterLoadingScreen();
+	bool IsInitialOuterLoadingScreenActive() const { return bInitialOuterLoadingActive; }
+
 protected:
 	// Main menu level to fall back to. Must match the asset under /Game/Maps/.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Flow")
@@ -51,4 +59,6 @@ private:
 	bool IsAuthority(const UWorld* World) const;
 
 	FString LastConnectionError;
+	bool bInitialOuterLoadingActive = false;
+	TSharedPtr<SWidget> InitialOuterLoadingWidget;
 };
