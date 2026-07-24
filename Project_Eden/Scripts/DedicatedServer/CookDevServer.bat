@@ -38,8 +38,47 @@ echo Output: %ARCHIVE_DIR%
 echo This script uses the already-built Project_EdenServer.exe.
 echo If server code changed, run BuildDevServer.bat before this script.
 rem 로비가 동적으로 Landscape로 ServerTravel하므로 쿠커가 찾을 수 있도록 목적지 맵을 명시합니다.
-set "COOK_MAPS=/Game/Maps/MainMap/LobbyMap+/Game/Maps/MainMap/L_LandscapeMap+/Game/WorldLayout/L_Village_00+/Game/Maps/DemoMap/ServerTest+/Game/Maps/DemoMap/ServerEmptyTest"
+set "COOK_MAPS=/Game/Maps/MainMap/LobbyMap+/Game/Maps/MainMap/L_LandscapeMap+/Game/WorldLayout/L_Village_00+/Game/WorldLayout/L_Village_01+/Game/WorldLayout/L_Village_02+/Game/WorldLayout/L_Village_03+/Game/Maps/DemoMap/ServerTest+/Game/Maps/DemoMap/ServerEmptyTest"
+rem SHIFT does not change %%* in a batch file. Collect the remaining arguments
+rem explicitly so an engine-root argument is never forwarded to RunUAT.
+set "EXTRA_ARGS="
+:CollectExtraArgs
+if "%~1"=="" goto ExtraArgsDone
+set "EXTRA_ARGS=%EXTRA_ARGS% %1"
+shift /1
+goto CollectExtraArgs
+
+:ExtraArgsDone
 echo Cook maps: %COOK_MAPS%
-call "%RUN_UAT%" BuildCookRun -project="%UPROJECT%" -noP4 -server -noclient -serverplatform=Win64 -serverconfig=Development -nocompile -nocompileeditor -cook -stage -package -pak -archive -archivedirectory="%ARCHIVE_DIR%" -map=%COOK_MAPS% -utf8output %*
+call "%RUN_UAT%" BuildCookRun -project="%UPROJECT%" -noP4 -server -noclient -serverplatform=Win64 -serverconfig=Development -nocompile -nocompileeditor -cook -stage -package -pak -archive -archivedirectory="%ARCHIVE_DIR%" -map=%COOK_MAPS% -utf8output %EXTRA_ARGS%
+set "COOK_EXIT_CODE=%ERRORLEVEL%"
+if not "%COOK_EXIT_CODE%"=="0" (
+    echo Server cook failed with exit code %COOK_EXIT_CODE%.
+    pause
+    exit /b %COOK_EXIT_CODE%
+)
+
+set "COOK_STAMP_NAME=.project_eden_server_cook_complete"
+set "ARCHIVE_STAMP=%ARCHIVE_DIR%\WindowsServer\%COOK_STAMP_NAME%"
+set "STAGED_STAMP=%PROJECT_ROOT%Saved\StagedBuilds\WindowsServer\%COOK_STAMP_NAME%"
+
+if exist "%ARCHIVE_DIR%\WindowsServer\" (
+    >"%ARCHIVE_STAMP%" echo Project_Eden server cook completed successfully.
+)
+if exist "%PROJECT_ROOT%Saved\StagedBuilds\WindowsServer\" (
+    >"%STAGED_STAMP%" echo Project_Eden server cook completed successfully.
+)
+
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0ResolveCookedServer.ps1" -ProjectRoot "%PROJECT_ROOT%"
+set "VERIFY_EXIT_CODE=%ERRORLEVEL%"
+if not "%VERIFY_EXIT_CODE%"=="0" (
+    if exist "%ARCHIVE_STAMP%" del /q "%ARCHIVE_STAMP%"
+    if exist "%STAGED_STAMP%" del /q "%STAGED_STAMP%"
+    echo Server cook verification failed with exit code %VERIFY_EXIT_CODE%.
+    pause
+    exit /b %VERIFY_EXIT_CODE%
+)
+
+echo Server cook completed and contains BP_RunPortal.
 pause
-exit /b %ERRORLEVEL%
+exit /b 0

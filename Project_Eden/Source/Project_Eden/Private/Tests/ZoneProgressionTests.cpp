@@ -81,6 +81,25 @@ bool FGPZoneProgressionContractTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Zone runtime begins with no enemies"), RuntimeDefaults.AliveEnemies, 0);
 	TestFalse(TEXT("Zone runtime begins inactive"), RuntimeDefaults.bStarted);
 	TestFalse(TEXT("Zone runtime begins uncleared"), RuntimeDefaults.bCompleted);
+
+	TestTrue(
+		TEXT("A solo run advances after its one assigned Outer zone clears"),
+		AGP_GameMode::IsOuterStageReady(1, 1, 1));
+	TestTrue(
+		TEXT("A two-player run ignores the third unassigned Outer candidate"),
+		AGP_GameMode::IsOuterStageReady(2, 2, 2));
+	TestFalse(
+		TEXT("A party waits until every active player's assigned Outer zone clears"),
+		AGP_GameMode::IsOuterStageReady(3, 3, 2));
+	TestTrue(
+		TEXT("A three-player party advances after its three assigned Outer zones clear"),
+		AGP_GameMode::IsOuterStageReady(3, 3, 3));
+	TestFalse(
+		TEXT("Missing or duplicate Outer assignments cannot advance the stage"),
+		AGP_GameMode::IsOuterStageReady(3, 2, 2));
+	TestFalse(
+		TEXT("An empty server cannot advance the Outer stage"),
+		AGP_GameMode::IsOuterStageReady(0, 0, 0));
 	return true;
 }
 

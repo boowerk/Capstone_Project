@@ -3,11 +3,7 @@ setlocal EnableExtensions
 
 set "PROJECT_ROOT=%~dp0..\..\"
 set "UPROJECT=%PROJECT_ROOT%Project_Eden.uproject"
-set "PACKAGED_SERVER_EXE=%PROJECT_ROOT%Saved\DedicatedServer\WindowsServer\Project_EdenServer.exe"
-set "PACKAGED_SERVER_EXE_ALT=%PROJECT_ROOT%Saved\DedicatedServer\WindowsServer\Project_Eden\Binaries\Win64\Project_EdenServer.exe"
-set "STAGED_SERVER_EXE=%PROJECT_ROOT%Saved\StagedBuilds\WindowsServer\Project_EdenServer.exe"
-set "STAGED_SERVER_EXE_ALT=%PROJECT_ROOT%Saved\StagedBuilds\WindowsServer\Project_Eden\Binaries\Win64\Project_EdenServer.exe"
-set "LOCAL_SERVER_EXE=%PROJECT_ROOT%Binaries\Win64\Project_EdenServer.exe"
+set "COOKED_SERVER_RESOLVER=%~dp0ResolveCookedServer.ps1"
 
 rem Optional first argument: engine root folder that contains the Engine directory.
 rem Example: StartDevServer_Cooked.bat "C:\Engine\Windows"
@@ -30,31 +26,17 @@ if "%UE_SERVER_ROOT%"=="" (
     exit /b 1
 )
 
-if exist "%PACKAGED_SERVER_EXE%" (
-    set "SERVER_EXE=%PACKAGED_SERVER_EXE%"
-) else if exist "%PACKAGED_SERVER_EXE_ALT%" (
-    set "SERVER_EXE=%PACKAGED_SERVER_EXE_ALT%"
-) else if exist "%STAGED_SERVER_EXE%" (
-    set "SERVER_EXE=%STAGED_SERVER_EXE%"
-) else if exist "%STAGED_SERVER_EXE_ALT%" (
-    set "SERVER_EXE=%STAGED_SERVER_EXE_ALT%"
-) else (
-    set "SERVER_EXE=%LOCAL_SERVER_EXE%"
-    echo Packaged server exe was not found:
-    echo %PACKAGED_SERVER_EXE%
-    echo %PACKAGED_SERVER_EXE_ALT%
-    echo %STAGED_SERVER_EXE%
-    echo %STAGED_SERVER_EXE_ALT%
-    echo.
-    echo Falling back to local build exe. If it crashes while loading AssetRegistry,
-    echo run CookDevServer.bat first and start this script again.
-    echo.
+if not exist "%COOKED_SERVER_RESOLVER%" (
+    echo Cooked server resolver not found: %COOKED_SERVER_RESOLVER%
+    pause
+    exit /b 1
 )
 
-if not exist "%SERVER_EXE%" (
-    echo Server exe not found: %SERVER_EXE%
-    echo Run CookDevServer.bat first with this engine root:
-    echo %UE_SERVER_ROOT%
+for /f "usebackq delims=" %%I in (`powershell -NoProfile -ExecutionPolicy Bypass -File "%COOKED_SERVER_RESOLVER%" -ProjectRoot "%PROJECT_ROOT%"`) do set "SERVER_EXE=%%I"
+if "%SERVER_EXE%"=="" (
+    echo.
+    echo No current cooked server package is safe to start.
+    echo Run BuildDevServer.bat and CookDevServer.bat first.
     pause
     exit /b 1
 )

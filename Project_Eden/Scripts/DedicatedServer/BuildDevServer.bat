@@ -34,7 +34,21 @@ if not exist "%BUILD_BAT%" (
     exit /b 1
 )
 
+rem SHIFT does not change %%* in a batch file. Collect the remaining arguments
+rem explicitly so an engine-root argument is never forwarded to UnrealBuildTool.
+set "EXTRA_ARGS="
+:CollectExtraArgs
+if "%~1"=="" goto ExtraArgsDone
+set "EXTRA_ARGS=%EXTRA_ARGS% %1"
+shift /1
+goto CollectExtraArgs
+
+:ExtraArgsDone
 echo Building Project_EdenServer with engine root: %UE_SERVER_ROOT%
-call "%BUILD_BAT%" Project_EdenServer Win64 Development -Project="%UPROJECT%" -WaitMutex -FromMsBuild -architecture=x64 %*
+call "%BUILD_BAT%" Project_EdenServer Win64 Development -Project="%UPROJECT%" -WaitMutex -FromMsBuild -architecture=x64 %EXTRA_ARGS%
+set "BUILD_EXIT_CODE=%ERRORLEVEL%"
+if not "%BUILD_EXIT_CODE%"=="0" (
+    echo Server build failed with exit code %BUILD_EXIT_CODE%.
+)
 pause
-exit /b %ERRORLEVEL%
+exit /b %BUILD_EXIT_CODE%

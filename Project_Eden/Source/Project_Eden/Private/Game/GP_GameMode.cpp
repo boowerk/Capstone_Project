@@ -40,6 +40,16 @@ AGP_GameMode::AGP_GameMode()
 	bUseSeamlessTravel = true;
 }
 
+bool AGP_GameMode::IsOuterStageReady(
+	int32 ActivePlayerCount,
+	int32 AssignedOuterZoneCount,
+	int32 CompletedAssignedOuterZoneCount)
+{
+	return ActivePlayerCount > 0
+		&& AssignedOuterZoneCount == ActivePlayerCount
+		&& CompletedAssignedOuterZoneCount == AssignedOuterZoneCount;
+}
+
 void AGP_GameMode::InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage)
 {
 	Super::InitGame(MapName, Options, ErrorMessage);
@@ -98,6 +108,13 @@ void AGP_GameMode::Logout(AController* Exiting)
 {
 	// Release the deterministic slot immediately so a reconnect does not wait for garbage collection.
 	PartyStartSlotByController.Remove(TWeakObjectPtr<AController>(Exiting));
+	APlayerState* ExitingPlayerState =
+		IsValid(Exiting) ? Exiting->GetPlayerState<APlayerState>() : nullptr;
+	if (IsValid(ExitingPlayerState))
+	{
+		AssignedOuterZonesByPlayer.Remove(
+			TWeakObjectPtr<APlayerState>(ExitingPlayerState));
+	}
 	if (APlayerController* PlayerController = Cast<APlayerController>(Exiting))
 	{
 		const TWeakObjectPtr<APlayerController> PlayerKey(PlayerController);
@@ -105,6 +122,13 @@ void AGP_GameMode::Logout(AController* Exiting)
 		OuterAssignmentRevisions.Remove(PlayerKey);
 	}
 	Super::Logout(Exiting);
+
+	// A disconnected player must no longer hold the rest of the active party at
+	// the Outer gate. Super removes its PlayerState from GameState first.
+	if (bZoneProgressionInitialized && !bRunFinished)
+	{
+		EvaluateStagedProgression();
+	}
 }
 
 void AGP_GameMode::EnsurePartyPlayerStarts(AController* Player)
@@ -641,6 +665,7 @@ void AGP_GameMode::InitializeZoneProgression()
 		});
 
 	ZoneRuntimeStates.Reset();
+	AssignedOuterZonesByPlayer.Reset();
 	for (AGP_EnemySpawnVolume* Zone : OrderedZones)
 	{
 		if (!IsValid(Zone))
@@ -1268,9 +1293,16 @@ void AGP_GameMode::AdvanceZone()
 void AGP_GameMode::SpawnPortalToZone(int32 FromZoneIndex, int32 ToZoneIndex)
 {
 	UWorld* World = GetWorld();
-	if (!World || !*PortalClass || !OrderedZones.IsValidIndex(FromZoneIndex) || !OrderedZones.IsValidIndex(ToZoneIndex))
+	if (!World || !OrderedZones.IsValidIndex(FromZoneIndex) || !OrderedZones.IsValidIndex(ToZoneIndex))
 	{
-		// No portal class set (or bad index): fall back to walking into the unlocked zone.
+		return;
+	}
+	if (!*PortalClass)
+	{
+		UE_LOG(LogTemp, Error,
+			TEXT("[GP_GameMode] Cannot spawn portal from zone %d to %d: PortalClass is not configured or was not cooked."),
+			FromZoneIndex,
+			ToZoneIndex);
 		return;
 	}
 
@@ -1298,6 +1330,19 @@ void AGP_GameMode::SpawnPortalToZone(int32 FromZoneIndex, int32 ToZoneIndex)
 	if (IsValid(Portal))
 	{
 		Portal->SetTargetLocation(TargetPos);
+		UE_LOG(LogTemp, Log,
+			TEXT("[GP_GameMode] Spawned portal '%s' from zone %d to %d."),
+			*Portal->GetName(),
+			FromZoneIndex,
+			ToZoneIndex);
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error,
+			TEXT("[GP_GameMode] SpawnActor failed for portal from zone %d to %d using class '%s'."),
+			FromZoneIndex,
+			ToZoneIndex,
+			*GetNameSafe(PortalClass.Get()));
 	}
 }
 
@@ -1485,13 +1530,17 @@ void AGP_GameMode::CompleteStagedZone(AGP_EnemySpawnVolume* Zone)
 
 void AGP_GameMode::EvaluateStagedProgression()
 {
-	if (AreAllZonesInStageCompleted(EGPZoneStage::Outer)
+	TArray<AGP_EnemySpawnVolume*> ActiveOuterZones;
+	if (GetActiveAssignedOuterZones(ActiveOuterZones)
 		&& !UnlockedStages.Contains(EGPZoneStage::Middle))
 	{
 		UnlockStage(EGPZoneStage::Middle);
-		for (AGP_EnemySpawnVolume* OuterZone : OrderedZones)
+		UE_LOG(LogTemp, Log,
+			TEXT("[GP_GameMode] All %d active-player Outer zone(s) completed; advancing without requiring unused authored Outer slots."),
+			ActiveOuterZones.Num());
+		for (AGP_EnemySpawnVolume* OuterZone : ActiveOuterZones)
 		{
-			if (!IsValid(OuterZone) || OuterZone->GetZoneStage() != EGPZoneStage::Outer)
+			if (!IsValid(OuterZone))
 			{
 				continue;
 			}
@@ -1586,6 +1635,63 @@ bool AGP_GameMode::AreAllZonesInStageCompleted(EGPZoneStage Stage) const
 		}
 	}
 	return bFoundZone;
+}
+
+bool AGP_GameMode::GetActiveAssignedOuterZones(
+	TArray<AGP_EnemySpawnVolume*>& OutAssignedZones) const
+{
+	OutAssignedZones.Reset();
+
+	const AGP_GameState* GPGameState = GetGPGameState();
+	if (!GPGameState)
+	{
+		return false;
+	}
+
+	int32 ActivePlayerCount = 0;
+	TSet<TWeakObjectPtr<AGP_EnemySpawnVolume>> UniqueAssignedZones;
+	for (APlayerState* PlayerState : GPGameState->PlayerArray)
+	{
+		if (!IsValid(PlayerState) || PlayerState->IsOnlyASpectator())
+		{
+			continue;
+		}
+
+		++ActivePlayerCount;
+		const TWeakObjectPtr<AGP_EnemySpawnVolume>* AssignedZone =
+			AssignedOuterZonesByPlayer.Find(
+				TWeakObjectPtr<APlayerState>(PlayerState));
+		if (AssignedZone
+			&& AssignedZone->IsValid()
+			&& AssignedZone->Get()->GetZoneStage() == EGPZoneStage::Outer
+			&& ZoneRuntimeStates.Contains(*AssignedZone))
+		{
+			UniqueAssignedZones.Add(*AssignedZone);
+		}
+	}
+
+	int32 CompletedAssignedZoneCount = 0;
+	for (AGP_EnemySpawnVolume* Zone : OrderedZones)
+	{
+		if (!IsValid(Zone)
+			|| !UniqueAssignedZones.Contains(
+				TWeakObjectPtr<AGP_EnemySpawnVolume>(Zone)))
+		{
+			continue;
+		}
+
+		OutAssignedZones.Add(Zone);
+		const FGPZoneRuntimeState* State = ZoneRuntimeStates.Find(Zone);
+		if (State && State->bCompleted)
+		{
+			++CompletedAssignedZoneCount;
+		}
+	}
+
+	return IsOuterStageReady(
+		ActivePlayerCount,
+		OutAssignedZones.Num(),
+		CompletedAssignedZoneCount);
 }
 
 bool AGP_GameMode::HaveAllActivePlayersMiddleCredit() const
@@ -1820,8 +1926,15 @@ void AGP_GameMode::SpawnMiddleSelectionPortal(
 	const FVector& PreferredSpawnLocation)
 {
 	UWorld* World = GetWorld();
-	if (!World || !*PortalClass || !IsValid(FromZone))
+	if (!World || !IsValid(FromZone))
 	{
+		return;
+	}
+	if (!*PortalClass)
+	{
+		UE_LOG(LogTemp, Error,
+			TEXT("[GP_GameMode] Cannot spawn Middle selection portal for zone '%s': PortalClass is not configured or was not cooked."),
+			*GetNameSafe(FromZone));
 		return;
 	}
 
@@ -1840,6 +1953,18 @@ void AGP_GameMode::SpawnMiddleSelectionPortal(
 		SpawnParameters))
 	{
 		Portal->SetMiddleDestinationSelection(true);
+		UE_LOG(LogTemp, Log,
+			TEXT("[GP_GameMode] Spawned Middle selection portal '%s' for active Outer zone '%s' at %s."),
+			*Portal->GetName(),
+			*FromZone->GetZoneId().ToString(),
+			*SpawnLocation.ToCompactString());
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error,
+			TEXT("[GP_GameMode] SpawnActor failed for Middle selection portal in Outer zone '%s' using class '%s'."),
+			*FromZone->GetZoneId().ToString(),
+			*GetNameSafe(PortalClass.Get()));
 	}
 }
 
@@ -1903,8 +2028,16 @@ void AGP_GameMode::SpawnPortalBetweenZones(
 	int32 RetryCount)
 {
 	UWorld* World = GetWorld();
-	if (!World || !*PortalClass || !IsValid(FromZone) || !IsValid(ToZone))
+	if (!World || !IsValid(FromZone) || !IsValid(ToZone))
 	{
+		return;
+	}
+	if (!*PortalClass)
+	{
+		UE_LOG(LogTemp, Error,
+			TEXT("[GP_GameMode] Cannot spawn staged portal from '%s' to '%s': PortalClass is not configured or was not cooked."),
+			*GetNameSafe(FromZone),
+			*GetNameSafe(ToZone));
 		return;
 	}
 
@@ -1959,6 +2092,19 @@ void AGP_GameMode::SpawnPortalBetweenZones(
 		SpawnParameters))
 	{
 		Portal->SetTargetLocation(TargetPosition);
+		UE_LOG(LogTemp, Log,
+			TEXT("[GP_GameMode] Spawned staged portal '%s' from '%s' to '%s'."),
+			*Portal->GetName(),
+			*FromZone->GetZoneId().ToString(),
+			*ToZone->GetZoneId().ToString());
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error,
+			TEXT("[GP_GameMode] SpawnActor failed for staged portal from '%s' to '%s' using class '%s'."),
+			*FromZone->GetZoneId().ToString(),
+			*ToZone->GetZoneId().ToString(),
+			*GetNameSafe(PortalClass.Get()));
 	}
 }
 
@@ -1985,6 +2131,7 @@ void AGP_GameMode::AssignPlayersToOuterVillageStarts()
 	TArray<AActor*> FoundStarts;
 	UGameplayStatics::GetAllActorsOfClass(this, APlayerStart::StaticClass(), FoundStarts);
 	TArray<APlayerStart*> OuterStarts;
+	TArray<AGP_EnemySpawnVolume*> OuterZonesWithStarts;
 	for (AGP_EnemySpawnVolume* Zone : OuterZones)
 	{
 		APlayerStart* MatchingStart = nullptr;
@@ -2003,6 +2150,7 @@ void AGP_GameMode::AssignPlayersToOuterVillageStarts()
 		if (MatchingStart)
 		{
 			OuterStarts.Add(MatchingStart);
+			OuterZonesWithStarts.Add(Zone);
 		}
 	}
 
@@ -2027,20 +2175,45 @@ void AGP_GameMode::AssignPlayersToOuterVillageStarts()
 		: 0;
 	const bool bRequiresClientVisualReady =
 		IsValid(VillageLayoutDirector) && LayoutRevision > 0;
+	bool bOuterAssignmentsChanged = false;
+	int32 ActivePlayerCount = 0;
 	for (APlayerController* PlayerController : Players)
 	{
-		if (!IsValid(PlayerController))
+		APlayerState* PlayerState =
+			IsValid(PlayerController)
+				? PlayerController->GetPlayerState<APlayerState>()
+				: nullptr;
+		if (!IsValid(PlayerController)
+			|| !IsValid(PlayerState)
+			|| PlayerState->IsOnlyASpectator())
 		{
 			continue;
 		}
+		++ActivePlayerCount;
 
 		// Reuse the stable party slot assigned at login instead of the player's
 		// current sorted-array index. This prevents a reconnect from sharing an
 		// occupied outer village after another player leaves.
 		const int32 PartySlotIndex = ResolvePartyStartSlot(PlayerController);
-		if (!OuterStarts.IsValidIndex(PartySlotIndex))
+		if (!OuterStarts.IsValidIndex(PartySlotIndex)
+			|| !OuterZonesWithStarts.IsValidIndex(PartySlotIndex))
 		{
 			continue;
+		}
+
+		const TWeakObjectPtr<APlayerState> PlayerStateKey(PlayerState);
+		AGP_EnemySpawnVolume* AssignedOuterZone =
+			OuterZonesWithStarts[PartySlotIndex];
+		const TWeakObjectPtr<AGP_EnemySpawnVolume>* ExistingOuterZone =
+			AssignedOuterZonesByPlayer.Find(PlayerStateKey);
+		if (!ExistingOuterZone || ExistingOuterZone->Get() != AssignedOuterZone)
+		{
+			AssignedOuterZonesByPlayer.Add(PlayerStateKey, AssignedOuterZone);
+			bOuterAssignmentsChanged = true;
+			UE_LOG(LogTemp, Log,
+				TEXT("[GP_GameMode] Assigned active player %d to required Outer zone '%s'."),
+				PartySlotIndex,
+				*AssignedOuterZone->GetZoneId().ToString());
 		}
 
 		const TWeakObjectPtr<APlayerController> PlayerKey(PlayerController);
@@ -2070,11 +2243,19 @@ void AGP_GameMode::AssignPlayersToOuterVillageStarts()
 			continue;
 		}
 
-		Pawn->TeleportTo(
+		const bool bTeleported = Pawn->TeleportTo(
 			PlayerStart->GetActorLocation(),
 			PlayerStart->GetActorRotation(),
 			false,
 			true);
+		if (!bTeleported)
+		{
+			UE_LOG(LogTemp, Error,
+				TEXT("[GP_GameMode] Failed to teleport player %d to outer start '%s'; assignment revision was not committed."),
+				PartySlotIndex,
+				*PlayerStart->GetName());
+			continue;
+		}
 		OuterAssignmentRevisions.Add(PlayerKey, LayoutRevision);
 		UE_LOG(LogTemp, Log,
 			TEXT("[GP_GameMode] Assigned player %d to outer start '%s' after visual Revision=%d."),
@@ -2083,12 +2264,19 @@ void AGP_GameMode::AssignPlayersToOuterVillageStarts()
 			LayoutRevision);
 	}
 
-	if (OuterStarts.Num() < Players.Num())
+	if (OuterStarts.Num() < ActivePlayerCount)
 	{
-		UE_LOG(LogTemp, Warning,
-			TEXT("[GP_GameMode] Found %d player(s) but only %d streamed outer PlayerStart(s)."),
-			Players.Num(),
+		UE_LOG(LogTemp, Error,
+			TEXT("[GP_GameMode] Found %d active player(s) but only %d streamed Outer PlayerStart(s); verify Small Outer presets."),
+			ActivePlayerCount,
 			OuterStarts.Num());
+	}
+
+	// This also covers a zone that completed before a late/restarted player's
+	// streamed village assignment became available.
+	if (bOuterAssignmentsChanged)
+	{
+		EvaluateStagedProgression();
 	}
 }
 

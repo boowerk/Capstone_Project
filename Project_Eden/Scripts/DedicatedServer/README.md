@@ -36,7 +36,13 @@ Saved/DedicatedServer/WindowsServer/Project_EdenServer.exe
 Saved/StagedBuilds/WindowsServer/Project_EdenServer.exe
 ```
 
-It falls back to the local server exe only if cooked or staged builds are missing.
+The launcher rejects a package when its successful-cook stamp is missing, a
+project input is newer, or the package index does not contain `BP_RunPortal`.
+It never falls back to a loose executable because that can silently combine
+new server code with stale cooked assets.
+
+The server cook explicitly includes all four village maps (`L_Village_00` through
+`L_Village_03`) because the village catalog loads them dynamically.
 
 ## Cooked Client Loop
 

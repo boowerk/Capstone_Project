@@ -67,6 +67,13 @@ public:
 		int32 LayoutRevision);
 	virtual void RestartPlayer(AController* NewPlayer) override;
 
+	// Pure progression policy: authored Outer slots are candidates, while only
+	// the unique zones assigned to active players are required for advancement.
+	static bool IsOuterStageReady(
+		int32 ActivePlayerCount,
+		int32 AssignedOuterZoneCount,
+		int32 CompletedAssignedOuterZoneCount);
+
 protected:
 	virtual void InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage) override;
 	virtual void InitGameState() override;
@@ -181,6 +188,8 @@ private:
 	TSet<TWeakObjectPtr<AGP_EnemySpawnVolume>> RegisteredNavigationInvokerZones;
 	TMap<TWeakObjectPtr<APlayerController>, int32> VillageVisualReadyRevisions;
 	TMap<TWeakObjectPtr<APlayerController>, int32> OuterAssignmentRevisions;
+	TMap<TWeakObjectPtr<APlayerState>, TWeakObjectPtr<AGP_EnemySpawnVolume>>
+		AssignedOuterZonesByPlayer;
 	bool bUseStagedZoneProgression = false;
 	bool bZoneProgressionInitialized = false;
 
@@ -238,6 +247,8 @@ private:
 	void CompleteStagedZone(AGP_EnemySpawnVolume* Zone);
 	void EvaluateStagedProgression();
 	bool AreAllZonesInStageCompleted(EGPZoneStage Stage) const;
+	bool GetActiveAssignedOuterZones(
+		TArray<AGP_EnemySpawnVolume*>& OutAssignedZones) const;
 	bool HaveAllActivePlayersMiddleCredit() const;
 	bool AreAllActivePlayersPresent(const FGPZoneRuntimeState& State) const;
 	int32 GetTotalAliveZoneEnemies() const;
