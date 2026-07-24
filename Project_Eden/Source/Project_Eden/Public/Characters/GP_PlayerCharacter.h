@@ -53,6 +53,9 @@ public:
 	virtual void PossessedBy(AController* NewController) override;
 	virtual void OnRep_PlayerState() override;
 
+	UFUNCTION(BlueprintPure, Category = "Run|Life State")
+	bool IsEliminated() const;
+
 	// The game mode assigns the deterministic party spawn slot after possession.
 	// Slot 0 retains the default character; slots 1 and 2 use the Blueprint-configured party meshes.
 	void SetPartyVisualSlot(int32 NewPartyVisualSlot);
@@ -161,6 +164,14 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "GAS|Events")
 	FOnSkillEquipped OnSkillEquipped;
 
+	// A single knockout becomes a short spectator window. The party only loses
+	// when everybody is eliminated before any recovery completes.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Life State", meta = (ClampMin = "0.1", Units = "s"))
+	float EliminationRecoveryDelay = 8.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Life State", meta = (ClampMin = "0.01", ClampMax = "1.0"))
+	float RecoveryHealthFraction = 0.5f;
+
 protected:
 	// =========================================================================
 	// 8. 가속도 제어 & 무브먼트 튜닝 함수군 (Movement Acceleration & Tuning)
@@ -185,6 +196,15 @@ protected:
 
 	UFUNCTION()
 	void OnRep_PartyVisualSlot();
+
+	UFUNCTION()
+	void BindPlayerLifeState(UAbilitySystemComponent* ASC, UAttributeSet* AS);
+
+	UFUNCTION()
+	void HandleOutOfHealth(AActor* InstigatorActor, AActor* OutOfHealthTargetActor);
+
+	UFUNCTION()
+	void HandlePlayerEliminatedChanged(bool bNewEliminated);
 
 	// =========================================================================
 	// 10. 컴뱃 & 록온 (Combat & LockOn Variables)
@@ -438,6 +458,8 @@ private:
 	float PrimaryAttackMovementAssistSpeedRatio = 0.35f;
 	bool bPrimaryAttackInProgress = false;
 	float LastPrimaryAttackMovementLogTime = -1000.0f;
+	bool bEliminationStateApplied = false;
+	FTimerHandle EliminationRecoveryTimerHandle;
 
 	bool bTrackActionMotion = false;
 	FVector LastActionMotionSampleLocation = FVector::ZeroVector;
@@ -466,4 +488,8 @@ private:
 	// =========================================================================
 	bool GiveAbilityToSlot(FGameplayTag SlotTag, TSubclassOf<UGameplayAbility> AbilityClass, UObject* SourceObject = nullptr);
 	void ClearAbilitySlot(FGameplayTag SlotTag);
+	void ApplyEliminationState(bool bNewEliminated);
+	void TryRecoverFromElimination();
+	AGP_PlayerCharacter* FindLivingRecoveryAnchor() const;
+	void RequestEnemyTargetRefresh() const;
 };

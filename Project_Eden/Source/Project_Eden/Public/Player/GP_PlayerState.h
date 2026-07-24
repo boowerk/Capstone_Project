@@ -21,6 +21,9 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
 	FOnEquippedSkillChanged,
 	FGameplayTag, SlotTag,
 	UGP_SkillData*, SkillData);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(
+	FGPOnPlayerEliminatedChanged,
+	bool, bIsEliminated);
 
 UCLASS()
 class PROJECT_EDEN_API AGP_PlayerState : public APlayerState, public IAbilitySystemInterface
@@ -31,6 +34,19 @@ public:
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 	
 	UAttributeSet* GetAttributeSet() const { return AttributeSet; }
+
+	UFUNCTION(BlueprintPure, Category = "Run|Life State")
+	bool IsEliminated() const { return bEliminated; }
+
+	// Server-authoritative run life state. Kept on PlayerState so every client can
+	// count survivors even when the eliminated pawn is no longer a useful target.
+	void SetEliminated(bool bNewEliminated, float RecoveryEndServerTime = 0.0f);
+
+	UFUNCTION(BlueprintPure, Category = "Run|Life State")
+	float GetEliminationRecoveryEndServerTime() const { return EliminationRecoveryEndServerTime; }
+
+	UPROPERTY(BlueprintAssignable, Category = "Run|Life State")
+	FGPOnPlayerEliminatedChanged OnPlayerEliminatedChanged;
 
 	UFUNCTION(BlueprintCallable, Category = "Equipment")
 	bool EquipWeaponFromCollection(UPDA_WeaponItemCollection* WeaponCollection, FName WeaponId);
@@ -153,6 +169,12 @@ private:
 	UPROPERTY(ReplicatedUsing = OnRep_Slot02SkillData, BlueprintReadOnly, Category = "Skill|Equipment", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UGP_SkillData> Slot02SkillData;
 
+	UPROPERTY(ReplicatedUsing = OnRep_Eliminated, BlueprintReadOnly, Category = "Run|Life State", meta = (AllowPrivateAccess = "true"))
+	bool bEliminated = false;
+
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Run|Life State", meta = (AllowPrivateAccess = "true"))
+	float EliminationRecoveryEndServerTime = 0.0f;
+
 	UFUNCTION()
 	void OnRep_EquippedWeaponData();
 
@@ -176,6 +198,9 @@ private:
 
 	UFUNCTION()
 	void OnRep_Slot02SkillData();
+
+	UFUNCTION()
+	void OnRep_Eliminated();
 
 	UFUNCTION(NetMulticast, Unreliable)
 	void MulticastShowXPDebug(float AddedXP, int32 PreviousLevel, int32 NewLevel, float NewXP, float NewXPToNextLevel);

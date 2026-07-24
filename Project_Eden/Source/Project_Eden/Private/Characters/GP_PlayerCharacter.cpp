@@ -8,6 +8,7 @@
 #include "HAL/IConsoleManager.h"
 #include "UObject/UnrealType.h"
 #include "Engine/OverlapResult.h"
+#include "EngineUtils.h"
 #include "Perception/AISense_Hearing.h"
 
 // Framework / Component Headers
@@ -19,7 +20,9 @@
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "NavigationInvokerComponent.h"
+#include "NavigationSystem.h"
 #include "Player/GP_PlayerController.h"
+#include "AI/Controllers/EnemyAIController.h"
 
 // Animation Headers
 #include "Animation/AnimInstance.h"
@@ -30,6 +33,8 @@
 
 // Project Specific Headers
 #include "Player/GP_PlayerState.h"
+#include "AbilitySystem/GP_AttributeSet.h"
+#include "AbilitySystem/GP_AbilitySystemComponent.h"
 #include "Actors/GP_WhiteVoidSetActor.h"
 #include "Actors/GP_WhiteVoidSetComponent.h"
 #include "Animation/GP_CharacterAnimInstance.h"
@@ -37,6 +42,8 @@
 #include "CharacterTrajectoryComponent.h"
 #include "GameplayTags/GP_Tags.h"
 #include "Utils/GP_BlueprintLibrary.h"
+#include "Game/GP_GameMode.h"
+#include "Game/GP_GameState.h"
 
 static int32 GGPActionInertiaDebug = 0;
 static FAutoConsoleVariableRef CVarGPActionInertiaDebug(
@@ -104,6 +111,8 @@ AGP_PlayerCharacter::AGP_PlayerCharacter()
 
 	WhiteVoidSetClass = AGP_WhiteVoidSetActor::StaticClass();
 
+	OnASCInitialized.AddDynamic(this, &ThisClass::BindPlayerLifeState);
+
 	// 태그 추가 함수 추가후 호출 예정지
 }
 
@@ -112,6 +121,7 @@ AGP_PlayerCharacter::~AGP_PlayerCharacter()
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(RestoreLagTimerHandle);
+		World->GetTimerManager().ClearTimer(EliminationRecoveryTimerHandle);
 	}
 
 	OnActionRootMotionCancelInput.Clear();
@@ -167,6 +177,11 @@ void AGP_PlayerCharacter::OnEndCrouch(float HalfHeightAdjust, float ScaledHalfHe
 void AGP_PlayerCharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+
+	if (IsEliminated())
+	{
+		return;
+	}
 
 	// 1. 소스 메시의 루트 모션 소비 (메시 이탈 방지를 위해 매 틱 무조건 Consume)
 	FRotator RootMotionDeltaRot = FRotator::ZeroRotator;
@@ -1061,6 +1076,12 @@ UAttributeSet* AGP_PlayerCharacter::GetAttributeSet() const
 	return GPPlayerState ? GPPlayerState->GetAttributeSet() : nullptr;
 }
 
+bool AGP_PlayerCharacter::IsEliminated() const
+{
+	const AGP_PlayerState* GPPlayerState = GetPlayerState<AGP_PlayerState>();
+	return IsValid(GPPlayerState) && GPPlayerState->IsEliminated();
+}
+
 void AGP_PlayerCharacter::PossessedBy(AController* NewController)
 {
 	Super::PossessedBy(NewController);
@@ -1094,6 +1115,11 @@ void AGP_PlayerCharacter::OnRep_PlayerState()
 
 void AGP_PlayerCharacter::AddMovementInput(FVector WorldDirection, float ScaleValue, bool bForce)
 {
+	if (IsEliminated())
+	{
+		return;
+	}
+
 	if (FMath::Abs(ScaleValue) > KINDA_SMALL_NUMBER && !WorldDirection.IsNearlyZero())
 	{
 		LastActionRootMotionCancelMovementDirection = WorldDirection.GetSafeNormal2D();
@@ -1122,6 +1148,289 @@ void AGP_PlayerCharacter::AddMovementInput(FVector WorldDirection, float ScaleVa
 	}
 
 	Super::AddMovementInput(WorldDirection, ScaleValue, bForce);
+}
+
+void AGP_PlayerCharacter::BindPlayerLifeState(UAbilitySystemComponent* ASC, UAttributeSet* AS)
+{
+	if (UGP_AttributeSet* GPAttributeSet = Cast<UGP_AttributeSet>(AS))
+	{
+		GPAttributeSet->OnOutOfHealth.AddUniqueDynamic(this, &ThisClass::HandleOutOfHealth);
+	}
+
+	if (AGP_PlayerState* GPPlayerState = GetPlayerState<AGP_PlayerState>())
+	{
+		GPPlayerState->OnPlayerEliminatedChanged.AddUniqueDynamic(
+			this,
+			&ThisClass::HandlePlayerEliminatedChanged);
+		HandlePlayerEliminatedChanged(GPPlayerState->IsEliminated());
+	}
+}
+
+void AGP_PlayerCharacter::HandleOutOfHealth(AActor* InstigatorActor, AActor* OutOfHealthTargetActor)
+{
+	if (!HasAuthority() || OutOfHealthTargetActor != this)
+	{
+		return;
+	}
+
+	AGP_PlayerState* GPPlayerState = GetPlayerState<AGP_PlayerState>();
+	UWorld* World = GetWorld();
+	if (!IsValid(GPPlayerState) || !IsValid(World) || GPPlayerState->IsEliminated())
+	{
+		return;
+	}
+
+	const float SafeRecoveryDelay = FMath::Max(0.1f, EliminationRecoveryDelay);
+	GPPlayerState->SetEliminated(true, World->GetTimeSeconds() + SafeRecoveryDelay);
+
+	World->GetTimerManager().SetTimer(
+		EliminationRecoveryTimerHandle,
+		this,
+		&ThisClass::TryRecoverFromElimination,
+		SafeRecoveryDelay,
+		false);
+
+	if (AGP_GameMode* GPGameMode = World->GetAuthGameMode<AGP_GameMode>())
+	{
+		GPGameMode->NotifyPlayerEliminated(GPPlayerState);
+	}
+}
+
+void AGP_PlayerCharacter::HandlePlayerEliminatedChanged(bool bNewEliminated)
+{
+	ApplyEliminationState(bNewEliminated);
+}
+
+void AGP_PlayerCharacter::ApplyEliminationState(bool bNewEliminated)
+{
+	if (bEliminationStateApplied == bNewEliminated)
+	{
+		return;
+	}
+
+	bEliminationStateApplied = bNewEliminated;
+	if (bNewEliminated)
+	{
+		if (UAbilitySystemComponent* ASC = GetAbilitySystemComponent())
+		{
+			ASC->CancelAllAbilities();
+		}
+
+		StopSprinting();
+		StopJumping();
+		UnCrouch();
+		StopPrimaryAttackMovementAssist();
+		StopActionMotionTracking();
+		StopUEFNSourceFallbackMontage(0.15f);
+		PrimaryAttackAutoFacingTarget = nullptr;
+		TargetActor = nullptr;
+
+		if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+		{
+			MoveComp->StopMovementImmediately();
+			MoveComp->DisableMovement();
+		}
+
+		SetCanBeDamaged(false);
+		SetActorEnableCollision(false);
+		RequestEnemyTargetRefresh();
+		return;
+	}
+
+	SetActorEnableCollision(true);
+	SetCanBeDamaged(true);
+	if (UCapsuleComponent* Capsule = GetCapsuleComponent())
+	{
+		Capsule->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	}
+	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+	{
+		MoveComp->SetMovementMode(MOVE_Walking);
+		MoveComp->StopMovementImmediately();
+	}
+	if (UGP_AbilitySystemComponent* GPASC = Cast<UGP_AbilitySystemComponent>(GetAbilitySystemComponent()))
+	{
+		GPASC->RefreshAutoActivatedAbilities();
+	}
+	RefreshCurrentMaxWalkSpeed();
+	RequestEnemyTargetRefresh();
+}
+
+void AGP_PlayerCharacter::TryRecoverFromElimination()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	AGP_PlayerState* GPPlayerState = GetPlayerState<AGP_PlayerState>();
+	AGP_GameState* GPGameState = GetWorld() ? GetWorld()->GetGameState<AGP_GameState>() : nullptr;
+	if (!IsValid(GPPlayerState) || !GPPlayerState->IsEliminated() || !IsValid(GPGameState))
+	{
+		return;
+	}
+
+	if (GPGameState->GetMatchPhase() == EGPMatchPhase::Victory
+		|| GPGameState->GetMatchPhase() == EGPMatchPhase::Defeat)
+	{
+		return;
+	}
+
+	const auto ScheduleRecoveryRetry = [this]()
+	{
+		GetWorldTimerManager().SetTimer(
+			EliminationRecoveryTimerHandle,
+			this,
+			&ThisClass::TryRecoverFromElimination,
+			0.5f,
+			false);
+	};
+
+	AGP_PlayerCharacter* RecoveryAnchor = FindLivingRecoveryAnchor();
+	if (!IsValid(RecoveryAnchor))
+	{
+		// A living pawn can be briefly unavailable during possession/streaming.
+		// Party-defeat evaluation will end the run when nobody is actually alive.
+		ScheduleRecoveryRetry();
+		return;
+	}
+
+	const float SideSign = (GPPlayerState->GetPlayerId() & 1) == 0 ? 1.0f : -1.0f;
+	UWorld* World = GetWorld();
+	UNavigationSystemV1* NavigationSystem = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
+	UCapsuleComponent* Capsule = GetCapsuleComponent();
+	if (!IsValid(NavigationSystem) || !IsValid(Capsule))
+	{
+		ScheduleRecoveryRetry();
+		return;
+	}
+
+	const FVector AnchorLocation = RecoveryAnchor->GetActorLocation();
+	const FVector AnchorForward = RecoveryAnchor->GetActorForwardVector();
+	const FVector AnchorRight = RecoveryAnchor->GetActorRightVector();
+	const TArray<FVector> RecoveryCandidates =
+	{
+		AnchorLocation - AnchorForward * 160.0f + AnchorRight * (260.0f * SideSign),
+		AnchorLocation - AnchorForward * 160.0f - AnchorRight * (260.0f * SideSign),
+		AnchorLocation - AnchorForward * 340.0f,
+		AnchorLocation + AnchorRight * (340.0f * SideSign),
+		AnchorLocation - AnchorRight * (340.0f * SideSign),
+		AnchorLocation + AnchorForward * 300.0f
+	};
+
+	const float CapsuleRadius = Capsule->GetScaledCapsuleRadius();
+	const float CapsuleHalfHeight = Capsule->GetScaledCapsuleHalfHeight();
+	const FCollisionShape RecoveryCapsule = FCollisionShape::MakeCapsule(
+		CapsuleRadius,
+		CapsuleHalfHeight);
+	FCollisionQueryParams RecoveryQueryParams(SCENE_QUERY_STAT(GP_EliminationRecovery), false, this);
+	const FRotator RecoveryRotation = RecoveryAnchor->GetActorRotation();
+
+	FVector SafeRecoveryLocation = FVector::ZeroVector;
+	bool bFoundSafeRecoveryLocation = false;
+	for (const FVector& RecoveryCandidate : RecoveryCandidates)
+	{
+		FNavLocation ProjectedRecoveryLocation;
+		if (!NavigationSystem->ProjectPointToNavigation(
+			RecoveryCandidate,
+			ProjectedRecoveryLocation,
+			FVector(300.0f, 300.0f, 500.0f)))
+		{
+			continue;
+		}
+
+		const FVector CandidateCapsuleCenter = ProjectedRecoveryLocation.Location
+			+ FVector(0.0f, 0.0f, CapsuleHalfHeight + 2.0f);
+		if (World->OverlapBlockingTestByProfile(
+			CandidateCapsuleCenter,
+			RecoveryRotation.Quaternion(),
+			Capsule->GetCollisionProfileName(),
+			RecoveryCapsule,
+			RecoveryQueryParams))
+		{
+			continue;
+		}
+
+		SafeRecoveryLocation = CandidateCapsuleCenter;
+		bFoundSafeRecoveryLocation = true;
+		break;
+	}
+
+	if (!bFoundSafeRecoveryLocation)
+	{
+		ScheduleRecoveryRetry();
+		return;
+	}
+
+	if (!TeleportTo(
+		SafeRecoveryLocation,
+		RecoveryRotation,
+		/*bIsATest=*/false,
+		// The capsule-profile overlap above is independent of this actor's
+		// temporarily disabled collision, unlike TeleportTo's internal check.
+		/*bNoCheck=*/true))
+	{
+		ScheduleRecoveryRetry();
+		return;
+	}
+
+	if (UGP_AttributeSet* GPAttributeSet = Cast<UGP_AttributeSet>(GetAttributeSet()))
+	{
+		const float RecoveredHealth = FMath::Max(
+			1.0f,
+			GPAttributeSet->GetMaxHealth() * FMath::Clamp(RecoveryHealthFraction, 0.01f, 1.0f));
+		GPAttributeSet->SetHealth(RecoveredHealth);
+		GPAttributeSet->ResetOutOfHealthEventForRecovery();
+	}
+
+	GPPlayerState->SetEliminated(false);
+}
+
+AGP_PlayerCharacter* AGP_PlayerCharacter::FindLivingRecoveryAnchor() const
+{
+	const AGP_GameState* GPGameState = GetWorld() ? GetWorld()->GetGameState<AGP_GameState>() : nullptr;
+	if (!IsValid(GPGameState))
+	{
+		return nullptr;
+	}
+
+	AGP_PlayerCharacter* BestAnchor = nullptr;
+	float BestDistanceSquared = TNumericLimits<float>::Max();
+	for (APlayerState* PartyPlayerState : GPGameState->PlayerArray)
+	{
+		const AGP_PlayerState* GPPartyPlayerState = Cast<AGP_PlayerState>(PartyPlayerState);
+		AGP_PlayerCharacter* CandidatePawn = IsValid(GPPartyPlayerState)
+			? Cast<AGP_PlayerCharacter>(GPPartyPlayerState->GetPawn())
+			: nullptr;
+		if (!IsValid(CandidatePawn)
+			|| CandidatePawn == this
+			|| GPPartyPlayerState->IsEliminated())
+		{
+			continue;
+		}
+
+		const float DistanceSquared = FVector::DistSquared(GetActorLocation(), CandidatePawn->GetActorLocation());
+		if (DistanceSquared < BestDistanceSquared)
+		{
+			BestDistanceSquared = DistanceSquared;
+			BestAnchor = CandidatePawn;
+		}
+	}
+
+	return BestAnchor;
+}
+
+void AGP_PlayerCharacter::RequestEnemyTargetRefresh() const
+{
+	if (!HasAuthority() || !IsValid(GetWorld()))
+	{
+		return;
+	}
+
+	for (TActorIterator<AEnemyAIController> It(GetWorld()); It; ++It)
+	{
+		It->RequestTargetActorReevaluation();
+	}
 }
 
 void AGP_PlayerCharacter::ToggleSprinting()

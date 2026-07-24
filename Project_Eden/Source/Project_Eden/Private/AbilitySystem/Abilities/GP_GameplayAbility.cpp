@@ -1,6 +1,9 @@
 #include "AbilitySystem/Abilities/GP_GameplayAbility.h"
 
+#include "Game/GP_GameState.h"
+#include "GameFramework/Pawn.h"
 #include "HAL/IConsoleManager.h"
+#include "Player/GP_PlayerState.h"
 
 namespace
 {
@@ -23,6 +26,49 @@ bool UGP_GameplayAbility::IsSkillDebugDrawEnabled()
 bool UGP_GameplayAbility::ShouldDrawDebug() const
 {
 	return bDrawDebugs && IsSkillDebugDrawEnabled();
+}
+
+bool UGP_GameplayAbility::CanActivateAbility(
+	const FGameplayAbilitySpecHandle Handle,
+	const FGameplayAbilityActorInfo* ActorInfo,
+	const FGameplayTagContainer* SourceTags,
+	const FGameplayTagContainer* TargetTags,
+	FGameplayTagContainer* OptionalRelevantTags) const
+{
+	if (!Super::CanActivateAbility(
+		Handle,
+		ActorInfo,
+		SourceTags,
+		TargetTags,
+		OptionalRelevantTags))
+	{
+		return false;
+	}
+
+	const AActor* OwnerActor = ActorInfo ? ActorInfo->OwnerActor.Get() : nullptr;
+	const AActor* AvatarActor = ActorInfo ? ActorInfo->AvatarActor.Get() : nullptr;
+	const AGP_PlayerState* GPPlayerState = Cast<AGP_PlayerState>(OwnerActor);
+	if (!IsValid(GPPlayerState))
+	{
+		if (const APawn* AvatarPawn = Cast<APawn>(AvatarActor))
+		{
+			GPPlayerState = AvatarPawn->GetPlayerState<AGP_PlayerState>();
+		}
+	}
+	if (IsValid(GPPlayerState) && GPPlayerState->IsEliminated())
+	{
+		// The authority repeats this check when it validates a predicted client
+		// activation, closing the replication-delay window after elimination.
+		return false;
+	}
+
+	const AActor* WorldContextActor = IsValid(AvatarActor) ? AvatarActor : OwnerActor;
+	const AGP_GameState* GPGameState = IsValid(WorldContextActor) && WorldContextActor->GetWorld()
+		? WorldContextActor->GetWorld()->GetGameState<AGP_GameState>()
+		: nullptr;
+	return !IsValid(GPGameState)
+		|| (GPGameState->GetMatchPhase() != EGPMatchPhase::Victory
+			&& GPGameState->GetMatchPhase() != EGPMatchPhase::Defeat);
 }
 
 void UGP_GameplayAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle,

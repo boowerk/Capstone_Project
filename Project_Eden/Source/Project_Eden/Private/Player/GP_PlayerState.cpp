@@ -25,6 +25,28 @@ UAbilitySystemComponent* AGP_PlayerState::GetAbilitySystemComponent() const {
 	return AbilitySystemComponent;
 }
 
+void AGP_PlayerState::SetEliminated(bool bNewEliminated, float RecoveryEndServerTime)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	const float NewRecoveryEndServerTime = bNewEliminated
+		? FMath::Max(0.0f, RecoveryEndServerTime)
+		: 0.0f;
+	if (bEliminated == bNewEliminated
+		&& FMath::IsNearlyEqual(EliminationRecoveryEndServerTime, NewRecoveryEndServerTime))
+	{
+		return;
+	}
+
+	bEliminated = bNewEliminated;
+	EliminationRecoveryEndServerTime = NewRecoveryEndServerTime;
+	OnPlayerEliminatedChanged.Broadcast(bEliminated);
+	ForceNetUpdate();
+}
+
 bool AGP_PlayerState::EquipWeaponFromCollection(UPDA_WeaponItemCollection* WeaponCollection, FName WeaponId)
 {
 	if (!HasAuthority() || !IsValid(AbilitySystemComponent) || !IsValid(WeaponCollection) || WeaponId.IsNone())
@@ -463,6 +485,8 @@ void AGP_PlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
 	DOREPLIFETIME(AGP_PlayerState, XPToNextLevel);
 	DOREPLIFETIME(AGP_PlayerState, Slot01SkillData);
 	DOREPLIFETIME(AGP_PlayerState, Slot02SkillData);
+	DOREPLIFETIME(AGP_PlayerState, bEliminated);
+	DOREPLIFETIME(AGP_PlayerState, EliminationRecoveryEndServerTime);
 }
 
 void AGP_PlayerState::OnRep_EquippedWeaponData()
@@ -509,4 +533,9 @@ void AGP_PlayerState::OnRep_Slot01SkillData()
 void AGP_PlayerState::OnRep_Slot02SkillData()
 {
 	OnEquippedSkillChanged.Broadcast(GPTags::Ability::Skill::Slot02, Slot02SkillData);
+}
+
+void AGP_PlayerState::OnRep_Eliminated()
+{
+	OnPlayerEliminatedChanged.Broadcast(bEliminated);
 }
