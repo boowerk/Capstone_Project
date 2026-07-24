@@ -5,6 +5,8 @@
 #include "GP_RunPortal.generated.h"
 
 class AGP_PlayerCharacter;
+class AGP_EnemySpawnVolume;
+class APlayerState;
 class USphereComponent;
 
 /**
@@ -23,10 +25,18 @@ public:
 	virtual void GetLifetimeReplicatedProps(
 		TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
-	// Set by GameMode at spawn: where players are sent when they enter this portal.
-	void SetTargetLocation(const FVector& InTargetLocation) { TargetLocation = InTargetLocation; }
-	void SetMiddleDestinationSelection(bool bEnabled) { bMiddleDestinationSelection = bEnabled; }
+	// Set by GameMode at spawn. Keeping the authoritative destination zone lets
+	// progression distinguish a legitimate portal arrival from a debug teleport
+	// or an ordinary overlap at the same world position.
+	void SetDestination(
+		AGP_EnemySpawnVolume* InTargetZone,
+		const FVector& InTargetLocation);
+	void SetMiddleDestinationSelection(bool bEnabled);
 	bool IsMiddleDestinationSelection() const { return bMiddleDestinationSelection; }
+	bool IsDestinationConfigured() const { return bDestinationConfigured; }
+	static bool IsActivePartyComplete(
+		int32 ActivePlayerCount,
+		int32 EnteredActivePlayerCount);
 
 protected:
 	virtual void BeginPlay() override;
@@ -49,14 +59,22 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Portal")
 	FVector TargetLocation = FVector::ZeroVector;
 
+	UPROPERTY(Transient)
+	TObjectPtr<AGP_EnemySpawnVolume> TargetZone;
+
 	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category = "Portal")
 	bool bMiddleDestinationSelection = false;
 
 private:
-	// Tracks which players have already passed through to prevent double-teleport.
-	TSet<TObjectPtr<AGP_PlayerCharacter>> PlayersEntered;
+	// PlayerState identity survives pawn replacement and lets stale disconnected
+	// entries be ignored when comparing against the current active party.
+	TSet<TWeakObjectPtr<APlayerState>> PlayersEntered;
+	bool bDestinationConfigured = false;
 
 	UFUNCTION()
 	void HandleOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
 		UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+	void HandleExistingOverlaps();
+	void TryHandlePlayer(AGP_PlayerCharacter* Player);
+	bool HaveAllActivePlayersEntered() const;
 };

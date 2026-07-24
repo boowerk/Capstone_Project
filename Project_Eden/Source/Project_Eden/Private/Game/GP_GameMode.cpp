@@ -1,5 +1,6 @@
 #include "Game/GP_GameMode.h"
 
+#include "Actors/GP_LevelBuildAnimator.h"
 #include "Characters/GP_EnemyCharacter.h"
 #include "Characters/GP_PlayerCharacter.h"
 #include "Game/GP_EnemySpawnMarker.h"
@@ -58,6 +59,44 @@ bool AGP_GameMode::IsPartyDefeated(
 		&& EliminatedParticipantCount >= ParticipantCount;
 }
 
+bool AGP_GameMode::CanCountStagedZonePresence(
+	EGPZoneStage ZoneStage,
+	bool bHasMatchingPortalArrival)
+{
+	return ZoneStage != EGPZoneStage::Colosseum
+		|| bHasMatchingPortalArrival;
+}
+
+bool AGP_GameMode::ShouldStartColosseumIntro(
+	bool bAllActivePlayersPresent,
+	bool bIntroStarted,
+	bool bIntroCompleted)
+{
+	return bAllActivePlayersPresent
+		&& !bIntroStarted
+		&& !bIntroCompleted;
+}
+
+bool AGP_GameMode::RequiresFullPartyAtEncounterStart(
+	EGPZoneStage ZoneStage)
+{
+	// Colosseum admission is frozen when its intro starts. Only Center still
+	// needs a live presence check at the point the encounter itself starts.
+	return ZoneStage == EGPZoneStage::Center;
+}
+
+bool AGP_GameMode::ShouldRelocateJoiningPlayerToZone(
+	EGPZoneStage ZoneStage,
+	bool bIntroStarted,
+	bool bIntroCompleted,
+	bool bEncounterStarted,
+	bool bZoneCompleted)
+{
+	return ZoneStage == EGPZoneStage::Colosseum
+		&& !bZoneCompleted
+		&& (bIntroStarted || bIntroCompleted || bEncounterStarted);
+}
+
 void AGP_GameMode::InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage)
 {
 	Super::InitGame(MapName, Options, ErrorMessage);
@@ -102,6 +141,7 @@ void AGP_GameMode::RestartPlayer(AController* NewPlayer)
 {
 	Super::RestartPlayer(NewPlayer);
 
+	bool bRelocatedToColosseum = false;
 	if (AGP_PlayerCharacter* PlayerCharacter = NewPlayer ? Cast<AGP_PlayerCharacter>(NewPlayer->GetPawn()) : nullptr)
 	{
 		if (AGP_PlayerState* GPPlayerState = NewPlayer->GetPlayerState<AGP_PlayerState>())
@@ -112,11 +152,16 @@ void AGP_GameMode::RestartPlayer(AController* NewPlayer)
 			GPPlayerState->SetEliminated(false);
 		}
 		PlayerCharacter->SetPartyVisualSlot(ResolvePartyStartSlot(NewPlayer));
+		bRelocatedToColosseum =
+			TryRelocatePlayerToActiveColosseum(NewPlayer);
 	}
 
 	// A remote client can acknowledge its village visuals before its gameplay pawn
 	// exists. Retry the outer assignment after the pawn has been restarted.
-	AssignPlayersToOuterVillageStarts();
+	if (!bRelocatedToColosseum)
+	{
+		AssignPlayersToOuterVillageStarts();
+	}
 }
 
 void AGP_GameMode::Logout(AController* Exiting)
@@ -142,6 +187,7 @@ void AGP_GameMode::Logout(AController* Exiting)
 	// the Outer gate. Super removes its PlayerState from GameState first.
 	if (bZoneProgressionInitialized && !bRunFinished)
 	{
+		TryStartPendingColosseumIntros();
 		EvaluateStagedProgression();
 		EvaluatePartyDefeat();
 	}
@@ -436,6 +482,16 @@ void AGP_GameMode::BeginPlay()
 
 void AGP_GameMode::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	for (const TPair<
+		TWeakObjectPtr<AGP_LevelBuildAnimator>,
+		TWeakObjectPtr<AGP_EnemySpawnVolume>>& Pair : ColosseumIntroZonesByAnimator)
+	{
+		if (Pair.Key.IsValid())
+		{
+			Pair.Key->OnBuildFinishedNative.RemoveAll(this);
+		}
+	}
+	ColosseumIntroZonesByAnimator.Reset();
 	UnregisterAllZoneNavigationInvokers();
 	Super::EndPlay(EndPlayReason);
 }
@@ -785,19 +841,72 @@ void AGP_GameMode::HandlePlayerEnteredZoneDetailed(
 		return;
 	}
 
+	const bool bHasMatchingPortalArrival =
+		State->PortalArrivals.Contains(PlayerState);
+	if (!CanCountStagedZonePresence(
+		Zone->GetZoneStage(),
+		bHasMatchingPortalArrival))
+	{
+		UE_LOG(LogTemp, Verbose,
+			TEXT("[GP_GameMode] Ignored non-portal Colosseum entry for player '%s' in zone '%s'."),
+			*GetNameSafe(PlayerState),
+			*Zone->GetZoneId().ToString());
+		return;
+	}
+
 	State->Participants.Add(PlayerState);
 	State->PresentPlayers.Add(PlayerState);
 
 	if (!State->bStarted)
 	{
-		const bool bRequiresFullParty =
-			Zone->GetZoneStage() == EGPZoneStage::Center
-			|| Zone->GetZoneStage() == EGPZoneStage::Colosseum;
-		if (!bRequiresFullParty || AreAllActivePlayersPresent(*State))
+		if (Zone->GetZoneStage() == EGPZoneStage::Colosseum)
 		{
-			StartStagedZone(Zone);
+			TryStartColosseumIntro(Zone);
+		}
+		else
+		{
+			const bool bRequiresFullParty =
+				Zone->GetZoneStage() == EGPZoneStage::Center;
+			if (!bRequiresFullParty || AreAllActivePlayersPresent(*State))
+			{
+				StartStagedZone(Zone);
+			}
 		}
 	}
+}
+
+void AGP_GameMode::NotifyPlayerArrivedViaPortal(
+	AGP_PlayerCharacter* PlayerCharacter,
+	AGP_EnemySpawnVolume* DestinationZone)
+{
+	if (!HasAuthority()
+		|| bRunFinished
+		|| !bUseStagedZoneProgression
+		|| !IsValid(PlayerCharacter)
+		|| !IsValid(DestinationZone)
+		|| DestinationZone->GetZoneStage() != EGPZoneStage::Colosseum
+		|| !UnlockedStages.Contains(EGPZoneStage::Colosseum))
+	{
+		return;
+	}
+
+	APlayerState* PlayerState = PlayerCharacter->GetPlayerState();
+	FGPZoneRuntimeState* State = ZoneRuntimeStates.Find(DestinationZone);
+	if (!IsValid(PlayerState) || !State || State->bCompleted)
+	{
+		return;
+	}
+
+	State->PortalArrivals.Add(PlayerState);
+
+	// TeleportTo can update overlaps before it returns. Record the authoritative
+	// credit and process entry explicitly so callback ordering cannot lose arrival.
+	HandlePlayerEnteredZoneDetailed(DestinationZone, PlayerState);
+
+	UE_LOG(LogTemp, Log,
+		TEXT("[GP_GameMode] Credited portal arrival for player '%s' in Colosseum zone '%s'."),
+		*GetNameSafe(PlayerState),
+		*DestinationZone->GetZoneId().ToString());
 }
 
 void AGP_GameMode::RegisterZoneNavigationInvoker(AGP_EnemySpawnVolume* Zone)
@@ -1339,13 +1448,17 @@ void AGP_GameMode::SpawnPortalToZone(int32 FromZoneIndex, int32 ToZoneIndex)
 		return;
 	}
 
-	FActorSpawnParameters SpawnParameters;
-	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-
-	AGP_RunPortal* Portal = World->SpawnActor<AGP_RunPortal>(PortalClass, SpawnPos, FRotator::ZeroRotator, SpawnParameters);
+	const FTransform SpawnTransform(FRotator::ZeroRotator, SpawnPos);
+	AGP_RunPortal* Portal = World->SpawnActorDeferred<AGP_RunPortal>(
+		PortalClass,
+		SpawnTransform,
+		this,
+		nullptr,
+		ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
 	if (IsValid(Portal))
 	{
-		Portal->SetTargetLocation(TargetPos);
+		Portal->SetDestination(OrderedZones[ToZoneIndex], TargetPos);
+		UGameplayStatics::FinishSpawningActor(Portal, SpawnTransform);
 		UE_LOG(LogTemp, Log,
 			TEXT("[GP_GameMode] Spawned portal '%s' from zone %d to %d."),
 			*Portal->GetName(),
@@ -1398,9 +1511,18 @@ void AGP_GameMode::StartStagedZone(AGP_EnemySpawnVolume* Zone)
 		return;
 	}
 
+	if (Zone->GetZoneStage() == EGPZoneStage::Colosseum
+		&& !State->bIntroCompleted)
+	{
+		TryStartColosseumIntro(Zone);
+		return;
+	}
+
+	// Colosseum already froze the admission decision when every active player
+	// was present and the intro began. Rechecking PlayerArray after the intro
+	// would let a join/reconnect during playback permanently block the boss.
 	const bool bRequiresFullParty =
-		Zone->GetZoneStage() == EGPZoneStage::Center
-		|| Zone->GetZoneStage() == EGPZoneStage::Colosseum;
+		RequiresFullPartyAtEncounterStart(Zone->GetZoneStage());
 	if (bRequiresFullParty && !AreAllActivePlayersPresent(*State))
 	{
 		return;
@@ -1476,6 +1598,187 @@ void AGP_GameMode::StartStagedZone(AGP_EnemySpawnVolume* Zone)
 
 	SpawnZoneEnemies(Zone);
 	MaybeCompleteStagedZone(Zone);
+}
+
+void AGP_GameMode::TryStartColosseumIntro(AGP_EnemySpawnVolume* Zone)
+{
+	FGPZoneRuntimeState* State = ZoneRuntimeStates.Find(Zone);
+	if (bRunFinished
+		|| !IsValid(Zone)
+		|| Zone->GetZoneStage() != EGPZoneStage::Colosseum
+		|| !State
+		|| State->bStarted
+		|| State->bCompleted)
+	{
+		return;
+	}
+
+	if (State->bIntroCompleted)
+	{
+		StartStagedZone(Zone);
+		return;
+	}
+
+	if (!ShouldStartColosseumIntro(
+		AreAllActivePlayersPresent(*State),
+		State->bIntroStarted,
+		State->bIntroCompleted))
+	{
+		return;
+	}
+
+	State->bIntroStarted = true;
+	AGP_LevelBuildAnimator* Animator = FindColosseumBuildAnimator(Zone);
+	if (!IsValid(Animator))
+	{
+		UE_LOG(LogTemp, Error,
+			TEXT("[GP_GameMode] Colosseum zone '%s' has no GP_LevelBuildAnimator in its level; skipping the entrance presentation to avoid a run softlock."),
+			*Zone->GetZoneId().ToString());
+		State->bIntroCompleted = true;
+		StartStagedZone(Zone);
+		return;
+	}
+
+	ColosseumIntroZonesByAnimator.Add(Animator, Zone);
+	Animator->OnBuildFinishedNative.RemoveAll(this);
+	Animator->OnBuildFinishedNative.AddUObject(
+		this,
+		&ThisClass::HandleColosseumBuildFinished);
+
+	if (Animator->GetPlaybackPhase() == EGPLevelBuildPlaybackPhase::Finished)
+	{
+		HandleColosseumBuildFinished(Animator);
+		return;
+	}
+
+	if (Animator->GetPlaybackPhase() == EGPLevelBuildPlaybackPhase::Playing)
+	{
+		return;
+	}
+
+	if (!Animator->StartBuildAuthoritative())
+	{
+		UE_LOG(LogTemp, Error,
+			TEXT("[GP_GameMode] Colosseum animator '%s' failed to start for zone '%s'; skipping the entrance presentation to avoid a run softlock."),
+			*GetNameSafe(Animator),
+			*Zone->GetZoneId().ToString());
+		HandleColosseumBuildFinished(Animator);
+		return;
+	}
+
+	UE_LOG(LogTemp, Log,
+		TEXT("[GP_GameMode] Started Colosseum entrance presentation '%s' after the active party arrived through the portal."),
+		*GetNameSafe(Animator));
+}
+
+void AGP_GameMode::TryStartPendingColosseumIntros()
+{
+	for (TPair<
+		TWeakObjectPtr<AGP_EnemySpawnVolume>,
+		FGPZoneRuntimeState>& Pair : ZoneRuntimeStates)
+	{
+		AGP_EnemySpawnVolume* Zone = Pair.Key.Get();
+		if (IsValid(Zone)
+			&& Zone->GetZoneStage() == EGPZoneStage::Colosseum
+			&& !Pair.Value.bStarted
+			&& !Pair.Value.bCompleted)
+		{
+			TryStartColosseumIntro(Zone);
+		}
+	}
+}
+
+AGP_LevelBuildAnimator* AGP_GameMode::FindColosseumBuildAnimator(
+	const AGP_EnemySpawnVolume* Zone) const
+{
+	UWorld* World = GetWorld();
+	if (!World || !IsValid(Zone))
+	{
+		return nullptr;
+	}
+
+	AGP_LevelBuildAnimator* NearestExactAnimator = nullptr;
+	AGP_LevelBuildAnimator* NearestFallbackAnimator = nullptr;
+	double NearestExactDistanceSquared = TNumericLimits<double>::Max();
+	double NearestFallbackDistanceSquared = TNumericLimits<double>::Max();
+	for (TActorIterator<AGP_LevelBuildAnimator> It(World); It; ++It)
+	{
+		AGP_LevelBuildAnimator* Candidate = *It;
+		if (!IsValid(Candidate))
+		{
+			continue;
+		}
+
+		const TWeakObjectPtr<AGP_EnemySpawnVolume>* ExistingZone =
+			ColosseumIntroZonesByAnimator.Find(Candidate);
+		if (ExistingZone
+			&& ExistingZone->IsValid()
+			&& ExistingZone->Get() != Zone)
+		{
+			continue;
+		}
+
+		const FName ConfiguredZoneId = Candidate->GetColosseumZoneId();
+		const bool bExactZoneMatch =
+			!ConfiguredZoneId.IsNone()
+			&& ConfiguredZoneId == Zone->GetZoneId();
+		if (!ConfiguredZoneId.IsNone() && !bExactZoneMatch)
+		{
+			continue;
+		}
+
+		const double DistanceSquared = FVector::DistSquared(
+			Candidate->GetActorLocation(),
+			Zone->GetActorLocation());
+		if (bExactZoneMatch
+			&& DistanceSquared < NearestExactDistanceSquared)
+		{
+			NearestExactDistanceSquared = DistanceSquared;
+			NearestExactAnimator = Candidate;
+		}
+		else if (ConfiguredZoneId.IsNone()
+			&& DistanceSquared < NearestFallbackDistanceSquared)
+		{
+			NearestFallbackDistanceSquared = DistanceSquared;
+			NearestFallbackAnimator = Candidate;
+		}
+	}
+	return NearestExactAnimator
+		? NearestExactAnimator
+		: NearestFallbackAnimator;
+}
+
+void AGP_GameMode::HandleColosseumBuildFinished(
+	AGP_LevelBuildAnimator* Animator)
+{
+	if (!HasAuthority() || !IsValid(Animator))
+	{
+		return;
+	}
+
+	const TWeakObjectPtr<AGP_EnemySpawnVolume>* ZonePtr =
+		ColosseumIntroZonesByAnimator.Find(Animator);
+	AGP_EnemySpawnVolume* Zone = ZonePtr ? ZonePtr->Get() : nullptr;
+	if (!IsValid(Zone))
+	{
+		return;
+	}
+
+	Animator->OnBuildFinishedNative.RemoveAll(this);
+	ColosseumIntroZonesByAnimator.Remove(Animator);
+
+	FGPZoneRuntimeState* State = ZoneRuntimeStates.Find(Zone);
+	if (!State || State->bCompleted)
+	{
+		return;
+	}
+
+	State->bIntroStarted = true;
+	State->bIntroCompleted = true;
+	UE_LOG(LogTemp, Log,
+		TEXT("[GP_GameMode] Colosseum entrance presentation finished for zone '%s'; starting the boss encounter."),
+		*Zone->GetZoneId().ToString());
+	StartStagedZone(Zone);
 }
 
 void AGP_GameMode::MaybeCompleteStagedZone(AGP_EnemySpawnVolume* Zone)
@@ -1959,16 +2262,20 @@ void AGP_GameMode::SpawnMiddleSelectionPortal(
 	const FVector SpawnLocation =
 		PortalAnchor ? PortalAnchor->GetActorLocation() : PreferredSpawnLocation;
 
-	FActorSpawnParameters SpawnParameters;
-	SpawnParameters.SpawnCollisionHandlingOverride =
-		ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	if (AGP_RunPortal* Portal = World->SpawnActor<AGP_RunPortal>(
+	const FTransform SpawnTransform(
+		PortalAnchor
+			? PortalAnchor->GetActorRotation()
+			: FRotator::ZeroRotator,
+		SpawnLocation);
+	if (AGP_RunPortal* Portal = World->SpawnActorDeferred<AGP_RunPortal>(
 		PortalClass,
-		SpawnLocation,
-		PortalAnchor ? PortalAnchor->GetActorRotation() : FRotator::ZeroRotator,
-		SpawnParameters))
+		SpawnTransform,
+		this,
+		nullptr,
+		ESpawnActorCollisionHandlingMethod::AlwaysSpawn))
 	{
 		Portal->SetMiddleDestinationSelection(true);
+		UGameplayStatics::FinishSpawningActor(Portal, SpawnTransform);
 		UE_LOG(LogTemp, Log,
 			TEXT("[GP_GameMode] Spawned Middle selection portal '%s' for active Outer zone '%s' at %s."),
 			*Portal->GetName(),
@@ -2037,6 +2344,109 @@ bool AGP_GameMode::IsPlayerNearMiddleSelectionPortal(
 	return false;
 }
 
+AGP_EnemySpawnVolume* AGP_GameMode::FindJoinableColosseumZone() const
+{
+	AGP_EnemySpawnVolume* IntroZone = nullptr;
+	for (AGP_EnemySpawnVolume* Zone : OrderedZones)
+	{
+		if (!IsValid(Zone)
+			|| Zone->GetZoneStage() != EGPZoneStage::Colosseum)
+		{
+			continue;
+		}
+
+		const FGPZoneRuntimeState* State = ZoneRuntimeStates.Find(Zone);
+		if (!State
+			|| !ShouldRelocateJoiningPlayerToZone(
+				Zone->GetZoneStage(),
+				State->bIntroStarted,
+				State->bIntroCompleted,
+				State->bStarted,
+				State->bCompleted))
+		{
+			continue;
+		}
+
+		if (State->bStarted)
+		{
+			return Zone;
+		}
+		if (!IntroZone
+			&& (State->bIntroStarted || State->bIntroCompleted))
+		{
+			IntroZone = Zone;
+		}
+	}
+	return IntroZone;
+}
+
+bool AGP_GameMode::TryRelocatePlayerToActiveColosseum(
+	AController* PlayerController)
+{
+	if (!HasAuthority()
+		|| bRunFinished
+		|| !bUseStagedZoneProgression
+		|| !IsValid(PlayerController))
+	{
+		return false;
+	}
+
+	AGP_EnemySpawnVolume* Zone = FindJoinableColosseumZone();
+	APawn* PlayerPawn = PlayerController->GetPawn();
+	APlayerState* PlayerState =
+		PlayerController->GetPlayerState<APlayerState>();
+	if (!IsValid(Zone)
+		|| !IsValid(PlayerPawn)
+		|| !IsValid(PlayerState))
+	{
+		return false;
+	}
+
+	FGPZoneRuntimeState* State = ZoneRuntimeStates.Find(Zone);
+	if (!State)
+	{
+		return false;
+	}
+
+	bool bProjected = false;
+	FVector ArrivalLocation =
+		Zone->GetSpawnPoint(/*bRandomizeInVolume=*/false, bProjected);
+	if (!bProjected)
+	{
+		ArrivalLocation = Zone->GetActorLocation();
+	}
+
+	const FVector SafeArrival =
+		ArrivalLocation
+		+ FVector(
+			0.0f,
+			0.0f,
+			PlayerPawn->GetSimpleCollisionHalfHeight() + 10.0f);
+	if (!PlayerPawn->TeleportTo(
+		SafeArrival,
+		PlayerPawn->GetActorRotation(),
+		false,
+		true))
+	{
+		UE_LOG(LogTemp, Error,
+			TEXT("[GP_GameMode] Failed to relocate joining player '%s' to active Colosseum zone '%s'."),
+			*GetNameSafe(PlayerState),
+			*Zone->GetZoneId().ToString());
+		return false;
+	}
+
+	// The original portal admission already started the intro. Give a joining
+	// PlayerState equivalent server-side admission so it can participate rather
+	// than respawning at an Outer village after the portal has closed.
+	State->PortalArrivals.Add(PlayerState);
+	HandlePlayerEnteredZoneDetailed(Zone, PlayerState);
+	UE_LOG(LogTemp, Log,
+		TEXT("[GP_GameMode] Relocated joining player '%s' to active Colosseum zone '%s'."),
+		*GetNameSafe(PlayerState),
+		*Zone->GetZoneId().ToString());
+	return true;
+}
+
 void AGP_GameMode::SpawnPortalBetweenZones(
 	AGP_EnemySpawnVolume* FromZone,
 	AGP_EnemySpawnVolume* ToZone,
@@ -2098,16 +2508,18 @@ void AGP_GameMode::SpawnPortalBetweenZones(
 		return;
 	}
 
-	FActorSpawnParameters SpawnParameters;
-	SpawnParameters.SpawnCollisionHandlingOverride =
-		ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	if (AGP_RunPortal* Portal = World->SpawnActor<AGP_RunPortal>(
-		PortalClass,
-		PreferredSpawnLocation,
+	const FTransform SpawnTransform(
 		FRotator::ZeroRotator,
-		SpawnParameters))
+		PreferredSpawnLocation);
+	if (AGP_RunPortal* Portal = World->SpawnActorDeferred<AGP_RunPortal>(
+		PortalClass,
+		SpawnTransform,
+		this,
+		nullptr,
+		ESpawnActorCollisionHandlingMethod::AlwaysSpawn))
 	{
-		Portal->SetTargetLocation(TargetPosition);
+		Portal->SetDestination(ToZone, TargetPosition);
+		UGameplayStatics::FinishSpawningActor(Portal, SpawnTransform);
 		UE_LOG(LogTemp, Log,
 			TEXT("[GP_GameMode] Spawned staged portal '%s' from '%s' to '%s'."),
 			*Portal->GetName(),
@@ -2128,6 +2540,12 @@ void AGP_GameMode::AssignPlayersToOuterVillageStarts()
 {
 	if (!bUseStagedZoneProgression || !GetWorld())
 	{
+		return;
+	}
+	if (FindJoinableColosseumZone())
+	{
+		// A late visual-ready callback must not pull a player back to their old
+		// Outer start after RestartPlayer admitted them to the active boss room.
 		return;
 	}
 

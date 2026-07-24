@@ -4,6 +4,8 @@
 #include "GameFramework/Actor.h"
 #include "GP_LevelBuildAnimator.generated.h"
 
+class AGP_LevelBuildAnimator;
+
 UENUM(BlueprintType)
 enum class EGPLevelBuildOrderMode : uint8
 {
@@ -19,6 +21,36 @@ enum class EGPLevelBuildSizeTimingMode : uint8
 	Constant UMETA(DisplayName = "Constant"),
 	SmallPiecesFaster UMETA(DisplayName = "Small Pieces Faster")
 };
+
+UENUM(BlueprintType)
+enum class EGPLevelBuildPlaybackPhase : uint8
+{
+	Waiting UMETA(DisplayName = "Waiting"),
+	Playing UMETA(DisplayName = "Playing"),
+	Finished UMETA(DisplayName = "Finished")
+};
+
+USTRUCT(BlueprintType)
+struct FGPLevelBuildPlaybackSnapshot
+{
+	GENERATED_BODY()
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Level Build")
+	int32 Revision = 0;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Level Build")
+	EGPLevelBuildPlaybackPhase Phase = EGPLevelBuildPlaybackPhase::Waiting;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Level Build")
+	double StartServerTime = 0.0;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Level Build")
+	float Duration = 0.0f;
+};
+
+DECLARE_MULTICAST_DELEGATE_OneParam(
+	FGPOnLevelBuildFinishedNative,
+	AGP_LevelBuildAnimator*);
 
 USTRUCT(BlueprintType)
 struct FGPLevelBuildPiece
@@ -80,6 +112,8 @@ public:
 	AGP_LevelBuildAnimator();
 
 	virtual void Tick(float DeltaSeconds) override;
+	virtual void GetLifetimeReplicatedProps(
+		TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	UFUNCTION(BlueprintCallable, Category = "Level Build")
 	void RebuildPieceList();
@@ -99,6 +133,29 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Level Build")
 	float GetBuildAlpha() const;
 
+	UFUNCTION(BlueprintPure, Category = "Level Build")
+	float GetTotalBuildTime() const { return TotalBuildTime; }
+
+	UFUNCTION(BlueprintPure, Category = "Level Build|Network")
+	FName GetColosseumZoneId() const { return ColosseumZoneId; }
+
+	UFUNCTION(BlueprintPure, Category = "Level Build|Network")
+	EGPLevelBuildPlaybackPhase GetPlaybackPhase() const
+	{
+		return PlaybackSnapshot.Phase;
+	}
+
+	const FGPLevelBuildPlaybackSnapshot& GetPlaybackSnapshot() const
+	{
+		return PlaybackSnapshot;
+	}
+
+	// Authority-only entry point used after the server verifies the complete
+	// party arrived through the Colosseum portal.
+	bool StartBuildAuthoritative();
+
+	FGPOnLevelBuildFinishedNative OnBuildFinishedNative;
+
 protected:
 	virtual void BeginPlay() override;
 
@@ -115,7 +172,15 @@ protected:
 	void BP_OnBuildFinished();
 
 private:
+	bool HasServerAuthority() const;
 	bool ShouldControlActor(const AActor* Candidate) const;
+	void StartBuildAtElapsedTime(
+		float ElapsedSeconds,
+		bool bNotifyBuildStarted);
+	void ApplyPlaybackSnapshot();
+	void MarkBuildFinishedAuthoritative();
+	void HandleAuthoritativeBuildTimerExpired();
+	double GetSynchronizedWorldTimeSeconds() const;
 	void SortPieces();
 	void BuildSortKeys();
 	void PrepareStartTransforms();
@@ -134,6 +199,9 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Level Build|01 Target", meta = (AllowPrivateAccess = "true", ToolTip = "Actors with this tag are controlled by the build animation. Add this tag to PLAZA_DE_TOROS structure actors in the level."))
 	FName TargetActorTag = TEXT("PLAZA_DE_TOROS");
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Level Build|01 Target", meta = (AllowPrivateAccess = "true", ToolTip = "Optional explicit Colosseum ZoneId. Leave None when this is the only Colosseum animator in the world."))
+	FName ColosseumZoneId = NAME_None;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Level Build|01 Target", meta = (AllowPrivateAccess = "true", ToolTip = "If false, actors hidden in editor/game are ignored when building the piece list."))
 	bool bIncludeHiddenActors = false;
 
@@ -141,7 +209,10 @@ private:
 	bool bIncludeSelfAttachedActors = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Level Build|02 Playback", meta = (AllowPrivateAccess = "true", ToolTip = "Starts the construction automatically on BeginPlay. Disable this if another Blueprint should call StartBuild manually."))
-	bool bAutoStartOnBeginPlay = true;
+	bool bAutoStartOnBeginPlay = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Level Build|02 Playback", meta = (AllowPrivateAccess = "true", ToolTip = "Keeps this map-placed animator reset until the authoritative Colosseum portal arrival starts its replicated playback."))
+	bool bWaitForColosseumPortalArrival = true;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Level Build|03 Ordering", meta = (AllowPrivateAccess = "true", ToolTip = "Controls which piece starts first. Height modes build from low Z to high Z."))
 	EGPLevelBuildOrderMode OrderMode = EGPLevelBuildOrderMode::HeightThenDistance;
@@ -238,4 +309,14 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Level Build", meta = (AllowPrivateAccess = "true"))
 	float TotalBuildTime = 0.0f;
+
+	UPROPERTY(ReplicatedUsing = OnRep_PlaybackSnapshot, VisibleAnywhere, BlueprintReadOnly, Category = "Level Build|Network", meta = (AllowPrivateAccess = "true"))
+	FGPLevelBuildPlaybackSnapshot PlaybackSnapshot;
+
+	UFUNCTION()
+	void OnRep_PlaybackSnapshot();
+
+	int32 LastAppliedPlaybackRevision = INDEX_NONE;
+	bool bUseSynchronizedBuildClock = false;
+	FTimerHandle AuthoritativeBuildTimerHandle;
 };
