@@ -50,6 +50,14 @@ bool AGP_GameMode::IsOuterStageReady(
 		&& CompletedAssignedOuterZoneCount == AssignedOuterZoneCount;
 }
 
+bool AGP_GameMode::IsPartyDefeated(
+	int32 ParticipantCount,
+	int32 EliminatedParticipantCount)
+{
+	return ParticipantCount > 0
+		&& EliminatedParticipantCount >= ParticipantCount;
+}
+
 void AGP_GameMode::InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage)
 {
 	Super::InitGame(MapName, Options, ErrorMessage);
@@ -96,6 +104,13 @@ void AGP_GameMode::RestartPlayer(AController* NewPlayer)
 
 	if (AGP_PlayerCharacter* PlayerCharacter = NewPlayer ? Cast<AGP_PlayerCharacter>(NewPlayer->GetPawn()) : nullptr)
 	{
+		if (AGP_PlayerState* GPPlayerState = NewPlayer->GetPlayerState<AGP_PlayerState>())
+		{
+			// PlayerState survives seamless travel. Clear the previous run only
+			// after Super produced a valid gameplay pawn; otherwise a failed
+			// restart would create a pawn-less phantom survivor.
+			GPPlayerState->SetEliminated(false);
+		}
 		PlayerCharacter->SetPartyVisualSlot(ResolvePartyStartSlot(NewPlayer));
 	}
 
@@ -128,6 +143,7 @@ void AGP_GameMode::Logout(AController* Exiting)
 	if (bZoneProgressionInitialized && !bRunFinished)
 	{
 		EvaluateStagedProgression();
+		EvaluatePartyDefeat();
 	}
 }
 
@@ -2289,6 +2305,77 @@ void AGP_GameMode::AssignPlayersToOuterVillageStarts()
 void AGP_GameMode::NotifyAllPlayersDead()
 {
 	FinishRun(/*bVictory=*/false);
+}
+
+void AGP_GameMode::NotifyPlayerEliminated(AGP_PlayerState* EliminatedPlayerState)
+{
+	if (bRunFinished
+		|| !IsValid(EliminatedPlayerState)
+		|| !EliminatedPlayerState->IsEliminated())
+	{
+		return;
+	}
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().SetTimerForNextTick(
+			FTimerDelegate::CreateWeakLambda(this, [this]()
+			{
+				EvaluatePartyDefeat();
+			}));
+	}
+}
+
+void AGP_GameMode::EvaluatePartyDefeat()
+{
+	if (bRunFinished)
+	{
+		return;
+	}
+
+	const AGP_GameState* GPGameState = GetGPGameState();
+	if (!IsValid(GPGameState))
+	{
+		return;
+	}
+
+	int32 ParticipantCount = 0;
+	int32 EliminatedParticipantCount = 0;
+	for (APlayerState* PartyPlayerState : GPGameState->PlayerArray)
+	{
+		if (!IsValid(PartyPlayerState) || PartyPlayerState->IsOnlyASpectator())
+		{
+			continue;
+		}
+
+		const AGP_PlayerState* GPPlayerState = Cast<AGP_PlayerState>(PartyPlayerState);
+		if (!IsValid(GPPlayerState))
+		{
+			continue;
+		}
+
+		if (GPPlayerState->IsEliminated())
+		{
+			// An eliminated member remains part of the run even if their pawn is
+			// later destroyed while the final party decision is being made.
+			++ParticipantCount;
+			++EliminatedParticipantCount;
+			continue;
+		}
+
+		// A connecting PlayerState can replicate before possession. Do not let
+		// that temporary pawn-less slot masquerade as a survivor and prevent an
+		// otherwise valid dedicated-server party wipe.
+		if (IsValid(Cast<AGP_PlayerCharacter>(GPPlayerState->GetPawn())))
+		{
+			++ParticipantCount;
+		}
+	}
+
+	if (IsPartyDefeated(ParticipantCount, EliminatedParticipantCount))
+	{
+		NotifyAllPlayersDead();
+	}
 }
 
 void AGP_GameMode::FinishRun(bool bVictory)

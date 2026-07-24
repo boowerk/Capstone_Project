@@ -37,6 +37,10 @@ public:
 	// Health reaching zero is a separate domain event so death does not depend on one specific damage implementation.
 	UPROPERTY(BlueprintAssignable, Category = "GAS|Events")
 	FOnOutOfHealth OnOutOfHealth;
+
+	// A recovered player reuses the PlayerState-owned AttributeSet. Re-arm the
+	// zero-health edge after authoritative health has been restored.
+	void ResetOutOfHealthEventForRecovery();
 	
 	UPROPERTY(ReplicatedUsing = OnRep_AttributesInitialized)
 	bool bAttributesInitialized = false;

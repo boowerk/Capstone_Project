@@ -154,6 +154,14 @@ void UGP_AttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallbac
 	}
 }
 
+void UGP_AttributeSet::ResetOutOfHealthEventForRecovery()
+{
+	if (GetHealth() > KINDA_SMALL_NUMBER)
+	{
+		bOutOfHealthEventSent = false;
+	}
+}
+
 void UGP_AttributeSet::PreAttributeBaseChange(const FGameplayAttribute& Attribute, float& NewValue) const
 {
 	Super::PreAttributeBaseChange(Attribute, NewValue);

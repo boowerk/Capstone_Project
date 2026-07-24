@@ -20,6 +20,7 @@
 #include "GameplayTags/GP_Tags.h"
 #include "Game/GP_GameInstance.h"
 #include "Game/GP_GameMode.h"
+#include "Game/GP_GameState.h"
 #include "Game/WorldLayout/GP_VillageLayoutDirector.h"
 #include "InputCoreTypes.h"
 #include "EngineUtils.h"
@@ -38,6 +39,7 @@
 #include "Game/WorldLayout/GP_VillageSlot.h"
 #include "GameFramework/Volume.h"
 #include "UI/GP_PlayerHUDWidget.h"
+#include "UI/GP_RunResultWidget.h"
 
 namespace
 {
@@ -85,6 +87,7 @@ AGP_PlayerController::AGP_PlayerController()
 {
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.bStartWithTickEnabled = true;
+	RunResultWidgetClass = UGP_RunResultWidget::StaticClass();
 }
 
 void AGP_PlayerController::BeginPlay()
@@ -128,6 +131,9 @@ void AGP_PlayerController::BeginPlay()
 				}
 			}
 		}
+
+		EnsureRunStateBindings();
+		RefreshRunStatePresentation();
 	}
 
 #if !UE_BUILD_SHIPPING
@@ -287,6 +293,15 @@ bool AGP_PlayerController::RequestOpenAugmentSelect()
 		return false;
 	}
 
+	const AGP_GameState* GPGameState = GetWorld() ? GetWorld()->GetGameState<AGP_GameState>() : nullptr;
+	const bool bRunIsTerminal = IsValid(GPGameState)
+		&& (GPGameState->GetMatchPhase() == EGPMatchPhase::Victory
+			|| GPGameState->GetMatchPhase() == EGPMatchPhase::Defeat);
+	if (bRunIsTerminal)
+	{
+		return false;
+	}
+
 	if (!IsValid(AugmentPoolData))
 	{
 		UE_LOG(LogTemp, Warning, TEXT("AugmentPoolData is not set on %s."), *GetName());
@@ -306,13 +321,33 @@ bool AGP_PlayerController::RequestOpenAugmentSelect()
 		AugmentCandidateCount,
 		ExcludedAugments,
 		CurrentElementTag);
+
+	if (IsGameplaySuppressedByRunState())
+	{
+		// A level-up can race the elimination replication/UI transition. Keep
+		// the actual rolled choices so recovery does not silently consume the
+		// player's reward or reroll it.
+		DeferredAugmentCandidates.Reset();
+		for (UGP_SkillAugmentData* Candidate : CandidateAugments)
+		{
+			if (IsValid(Candidate))
+			{
+				DeferredAugmentCandidates.Add(Candidate);
+			}
+		}
+		return !DeferredAugmentCandidates.IsEmpty();
+	}
+
 	return OpenAugmentSelectWidget(CandidateAugments);
 }
 
 void AGP_PlayerController::ClientOpenMiddleTravelMap_Implementation(
 	const TArray<FGPMiddleTravelDestination>& Destinations)
 {
-	if (!IsLocalController() || Destinations.IsEmpty() || !EnsureMiddleTravelMapWidget())
+	if (!IsLocalController()
+		|| IsGameplaySuppressedByRunState()
+		|| Destinations.IsEmpty()
+		|| !EnsureMiddleTravelMapWidget())
 	{
 		return;
 	}
@@ -333,7 +368,9 @@ void AGP_PlayerController::ClientConfirmMiddleTravel_Implementation()
 
 void AGP_PlayerController::RequestMiddleTravel(FName DestinationZoneId)
 {
-	if (!IsLocalController() || DestinationZoneId.IsNone())
+	if (!IsLocalController()
+		|| IsGameplaySuppressedByRunState()
+		|| DestinationZoneId.IsNone())
 	{
 		return;
 	}
@@ -488,6 +525,11 @@ void AGP_PlayerController::ApplyMiddleTravelInputMode(bool bMenuOpen)
 void AGP_PlayerController::Server_RequestMiddleTravel_Implementation(
 	FName DestinationZoneId)
 {
+	if (IsGameplaySuppressedByRunState())
+	{
+		return;
+	}
+
 	if (AGP_GameMode* GameMode = GetWorld() ? GetWorld()->GetAuthGameMode<AGP_GameMode>() : nullptr)
 	{
 		GameMode->RequestMiddleTravel(this, DestinationZoneId);
@@ -496,6 +538,11 @@ void AGP_PlayerController::Server_RequestMiddleTravel_Implementation(
 
 bool AGP_PlayerController::RequestEquipSkill(UGP_SkillData* SkillData, FGameplayTag SlotTag)
 {
+	if (IsGameplaySuppressedByRunState())
+	{
+		return false;
+	}
+
 	UGP_SkillData* Slot01Skill = nullptr;
 	UGP_SkillData* Slot02Skill = nullptr;
 	if (!BuildSkillLoadoutAfterEquip(
@@ -513,6 +560,11 @@ bool AGP_PlayerController::RequestEquipSkill(UGP_SkillData* SkillData, FGameplay
 
 void AGP_PlayerController::Server_EquipSkill_Implementation(UGP_SkillData* SkillData, FGameplayTag SlotTag)
 {
+	if (IsGameplaySuppressedByRunState())
+	{
+		return;
+	}
+
 	UGP_SkillData* Slot01Skill = nullptr;
 	UGP_SkillData* Slot02Skill = nullptr;
 	if (!BuildSkillLoadoutAfterEquip(
@@ -616,7 +668,9 @@ bool AGP_PlayerController::BuildSkillLoadoutAfterEquip(
 
 bool AGP_PlayerController::OpenAugmentSelectWidget(const TArray<UGP_SkillAugmentData*>& Candidates)
 {
-	if (!IsLocalController() || Candidates.IsEmpty())
+	if (!IsLocalController()
+		|| IsGameplaySuppressedByRunState()
+		|| Candidates.IsEmpty())
 	{
 		return false;
 	}
@@ -637,6 +691,8 @@ bool AGP_PlayerController::OpenAugmentSelectWidget(const TArray<UGP_SkillAugment
 	}
 
 	AugmentSelectWidget->SetCandidateAugments(Candidates);
+	DeferredAugmentCandidates.Reset();
+	bResumeAugmentSelectAfterRunState = false;
 
 	// SetIgnoreMoveInput/SetIgnoreLookInput push onto a ref-count stack, not a
 	// bool — only arm them on the closed->open transition, otherwise a second
@@ -663,6 +719,9 @@ bool AGP_PlayerController::OpenAugmentSelectWidget(const TArray<UGP_SkillAugment
 
 void AGP_PlayerController::CloseAugmentSelectWidget()
 {
+	bResumeAugmentSelectAfterRunState = false;
+	DeferredAugmentCandidates.Reset();
+
 	const bool bWasOpen = IsValid(AugmentSelectWidget) && AugmentSelectWidget->IsInViewport();
 
 	if (IsValid(AugmentSelectWidget))
@@ -685,13 +744,103 @@ void AGP_PlayerController::CloseAugmentSelectWidget()
 	SetInputMode(FInputModeGameOnly());
 }
 
+void AGP_PlayerController::SuspendAugmentSelectWidgetForRunState()
+{
+	if (!IsValid(AugmentSelectWidget) || !AugmentSelectWidget->IsInViewport())
+	{
+		return;
+	}
+
+	bResumeAugmentSelectAfterRunState = true;
+	AugmentSelectWidget->RemoveFromParent();
+}
+
+void AGP_PlayerController::RestoreDeferredAugmentSelectWidget()
+{
+	if (!IsLocalController() || IsGameplaySuppressedByRunState())
+	{
+		return;
+	}
+
+	if (bResumeAugmentSelectAfterRunState && IsValid(AugmentSelectWidget))
+	{
+		bResumeAugmentSelectAfterRunState = false;
+		if (!DeferredAugmentCandidates.IsEmpty())
+		{
+			TArray<UGP_SkillAugmentData*> DeferredCandidates;
+			DeferredCandidates.Reserve(DeferredAugmentCandidates.Num());
+			for (UGP_SkillAugmentData* Candidate : DeferredAugmentCandidates)
+			{
+				if (IsValid(Candidate))
+				{
+					DeferredCandidates.Add(Candidate);
+				}
+			}
+			if (!DeferredCandidates.IsEmpty())
+			{
+				// Match the ordinary already-open behavior: the latest level-up
+				// roll replaces the visible choices without losing the reward.
+				AugmentSelectWidget->SetCandidateAugments(DeferredCandidates);
+			}
+			DeferredAugmentCandidates.Reset();
+		}
+
+		if (!AugmentSelectWidget->IsInViewport())
+		{
+			AugmentSelectWidget->AddToViewport(80);
+		}
+		AugmentSelectWidget->SetVisibility(ESlateVisibility::Visible);
+
+		bShowMouseCursor = true;
+		SetIgnoreMoveInput(true);
+		SetIgnoreLookInput(true);
+
+		FInputModeGameAndUI InputMode;
+		InputMode.SetWidgetToFocus(AugmentSelectWidget->TakeWidget());
+		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+		InputMode.SetHideCursorDuringCapture(false);
+		SetInputMode(InputMode);
+		return;
+	}
+
+	if (DeferredAugmentCandidates.IsEmpty())
+	{
+		return;
+	}
+
+	TArray<UGP_SkillAugmentData*> Candidates;
+	Candidates.Reserve(DeferredAugmentCandidates.Num());
+	for (UGP_SkillAugmentData* Candidate : DeferredAugmentCandidates)
+	{
+		if (IsValid(Candidate))
+		{
+			Candidates.Add(Candidate);
+		}
+	}
+	OpenAugmentSelectWidget(Candidates);
+}
+
 void AGP_PlayerController::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
-	UpdateMovementSpeed(DeltaSeconds);
-	UpdateCharacterRotation(DeltaSeconds);
-	UpdateSkillSelectionInputMode();
+	if (IsLocalController())
+	{
+		EnsureRunStateBindings();
+		RunStateRefreshAccumulator += DeltaSeconds;
+		if (RunStateRefreshAccumulator >= FMath::Max(0.05f, RunStateRefreshInterval))
+		{
+			RunStateRefreshAccumulator = 0.0f;
+			RefreshRunStatePresentation();
+		}
+	}
+
+	if (!IsGameplaySuppressedByRunState())
+	{
+		UpdateMovementSpeed(DeltaSeconds);
+		UpdateCharacterRotation(DeltaSeconds);
+		UpdateSkillSelectionInputMode();
+	}
 	if (HUDWidget)
 	{
 		// Controller tick keeps minimap updates alive even if the widget native tick is disabled.
@@ -707,6 +856,317 @@ void AGP_PlayerController::Tick(float DeltaSeconds)
 		BossRefreshAccumulator = 0.0f;
 		RefreshBossHUD();
 	}
+}
+
+bool AGP_PlayerController::EnsureRunResultWidget()
+{
+	if (!IsLocalController())
+	{
+		return false;
+	}
+
+	if (IsValid(RunResultWidget))
+	{
+		return true;
+	}
+
+	UClass* WidgetClass = RunResultWidgetClass ? RunResultWidgetClass.Get() : nullptr;
+	if (!IsValid(WidgetClass))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[RunResultUI] RunResultWidgetClass is not set on %s."), *GetName());
+		return false;
+	}
+
+	RunResultWidget = CreateWidget<UGP_RunResultWidget>(this, WidgetClass);
+	if (!IsValid(RunResultWidget))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[RunResultUI] Failed to create %s on %s."), *GetNameSafe(WidgetClass), *GetName());
+		return false;
+	}
+
+	RunResultWidget->AddToViewport(300);
+	RunResultWidget->HidePresentation();
+	return true;
+}
+
+void AGP_PlayerController::EnsureRunStateBindings()
+{
+	if (!IsLocalController())
+	{
+		return;
+	}
+
+	bool bBindingChanged = false;
+	AGP_GameState* CurrentGameState = GetWorld() ? GetWorld()->GetGameState<AGP_GameState>() : nullptr;
+	if (BoundRunGameState.Get() != CurrentGameState)
+	{
+		if (AGP_GameState* PreviousGameState = BoundRunGameState.Get())
+		{
+			PreviousGameState->OnMatchPhaseChanged.RemoveDynamic(
+				this,
+				&ThisClass::HandleMatchPhaseChanged);
+		}
+
+		BoundRunGameState = CurrentGameState;
+		if (IsValid(CurrentGameState))
+		{
+			CurrentGameState->OnMatchPhaseChanged.AddUniqueDynamic(
+				this,
+				&ThisClass::HandleMatchPhaseChanged);
+		}
+		bBindingChanged = true;
+	}
+
+	AGP_PlayerState* CurrentPlayerState = GetPlayerState<AGP_PlayerState>();
+	if (BoundRunPlayerState.Get() != CurrentPlayerState)
+	{
+		if (AGP_PlayerState* PreviousPlayerState = BoundRunPlayerState.Get())
+		{
+			PreviousPlayerState->OnPlayerEliminatedChanged.RemoveDynamic(
+				this,
+				&ThisClass::HandlePlayerEliminatedChanged);
+		}
+
+		BoundRunPlayerState = CurrentPlayerState;
+		if (IsValid(CurrentPlayerState))
+		{
+			CurrentPlayerState->OnPlayerEliminatedChanged.AddUniqueDynamic(
+				this,
+				&ThisClass::HandlePlayerEliminatedChanged);
+		}
+		bBindingChanged = true;
+	}
+
+	EnsureRunResultWidget();
+	if (bBindingChanged)
+	{
+		// Replication can beat widget/controller initialization on a dedicated
+		// client, so always consume the current state after binding.
+		RefreshRunStatePresentation();
+	}
+}
+
+void AGP_PlayerController::RefreshRunStatePresentation()
+{
+	if (!IsLocalController() || !EnsureRunResultWidget())
+	{
+		return;
+	}
+
+	const AGP_GameState* GPGameState = BoundRunGameState.Get();
+	const EGPMatchPhase MatchPhase = IsValid(GPGameState)
+		? GPGameState->GetMatchPhase()
+		: EGPMatchPhase::Preparing;
+
+	if (MatchPhase == EGPMatchPhase::Victory)
+	{
+		RunResultWidget->ShowVictory();
+		ApplyRunStateInputLock(true);
+		return;
+	}
+
+	if (MatchPhase == EGPMatchPhase::Defeat)
+	{
+		RunResultWidget->ShowDefeat();
+		ApplyRunStateInputLock(true);
+		return;
+	}
+
+	const AGP_PlayerState* GPPlayerState = BoundRunPlayerState.Get();
+	if (IsValid(GPPlayerState) && GPPlayerState->IsEliminated())
+	{
+		int32 LivingPlayerCount = 0;
+		FText SpectatedPlayerName;
+		APawn* SpectatorTarget = ResolveLivingSpectatorTarget(
+			LivingPlayerCount,
+			SpectatedPlayerName);
+		if (IsValid(SpectatorTarget) && GetViewTarget() != SpectatorTarget)
+		{
+			SetViewTargetWithBlend(SpectatorTarget, 0.45f);
+		}
+
+		const float ServerWorldTime = IsValid(GPGameState)
+			? GPGameState->GetServerWorldTimeSeconds()
+			: (GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f);
+		const float RecoverySecondsRemaining = FMath::Max(
+			0.0f,
+			GPPlayerState->GetEliminationRecoveryEndServerTime() - ServerWorldTime);
+		RunResultWidget->ShowEliminated(
+			SpectatedPlayerName,
+			LivingPlayerCount,
+			RecoverySecondsRemaining);
+		ApplyRunStateInputLock(true);
+		return;
+	}
+
+	RunResultWidget->HidePresentation();
+	if (IsValid(GetPawn()) && GetViewTarget() != GetPawn())
+	{
+		SetViewTargetWithBlend(GetPawn(), 0.35f);
+	}
+	LivingSpectatorTarget.Reset();
+	ApplyRunStateInputLock(false);
+}
+
+void AGP_PlayerController::ApplyRunStateInputLock(bool bShouldLock)
+{
+	if (!IsLocalController())
+	{
+		return;
+	}
+
+	const bool bLockStateChanged = bRunStateInputLocked != bShouldLock;
+	if (!bShouldLock && !bLockStateChanged)
+	{
+		// Do not overwrite the input mode of an ordinary gameplay menu while
+		// the run-state presentation is inactive.
+		return;
+	}
+
+	bRunStateInputLocked = bShouldLock;
+	if (bShouldLock)
+	{
+		const AGP_GameState* GPGameState = BoundRunGameState.Get();
+		const bool bRunIsTerminal = IsValid(GPGameState)
+			&& (GPGameState->GetMatchPhase() == EGPMatchPhase::Victory
+				|| GPGameState->GetMatchPhase() == EGPMatchPhase::Defeat);
+
+		if (bRunIsTerminal)
+		{
+			// The run is over, so an unclaimed in-run reward no longer needs to
+			// survive the result screen or the upcoming lobby travel.
+			CloseAugmentSelectWidget();
+		}
+		else if (bLockStateChanged)
+		{
+			SuspendAugmentSelectWidgetForRunState();
+		}
+
+		if (bLockStateChanged)
+		{
+			// Terminal/life-state UI owns the screen. Close lower-priority menus
+			// before applying the one authoritative input mode.
+			CloseSkillSelect();
+			CloseMiddleTravelMap();
+			CloseCharacterStatsMenu();
+			CancelSkillSelectionIfActive();
+
+			CurrentMoveInput = FVector2D::ZeroVector;
+			bSprintInputHeld = false;
+			bCrouchInputHeld = false;
+			Server_ClearMoveInput();
+		}
+
+		// Reapply idempotently. A late UI RPC must not be able to replace the
+		// terminal/death input mode after this lock has already been entered.
+		ResetIgnoreInputFlags();
+		SetIgnoreMoveInput(true);
+		SetIgnoreLookInput(true);
+
+		FInputModeUIOnly InputMode;
+		if (IsValid(RunResultWidget))
+		{
+			InputMode.SetWidgetToFocus(RunResultWidget->TakeWidget());
+		}
+		SetInputMode(InputMode);
+		SetShowMouseCursor(false);
+		return;
+	}
+
+	ResetIgnoreInputFlags();
+	SetInputMode(FInputModeGameOnly());
+	SetShowMouseCursor(false);
+	RestoreDeferredAugmentSelectWidget();
+}
+
+APawn* AGP_PlayerController::ResolveLivingSpectatorTarget(
+	int32& OutLivingPlayerCount,
+	FText& OutPlayerName)
+{
+	OutLivingPlayerCount = 0;
+	OutPlayerName = FText::GetEmpty();
+
+	const AGP_GameState* GPGameState = BoundRunGameState.Get();
+	if (!IsValid(GPGameState))
+	{
+		LivingSpectatorTarget.Reset();
+		return nullptr;
+	}
+
+	APawn* BestTarget = nullptr;
+	AGP_PlayerState* BestPlayerState = nullptr;
+	float BestDistanceSquared = TNumericLimits<float>::Max();
+	const FVector Origin = IsValid(GetPawn()) ? GetPawn()->GetActorLocation() : FVector::ZeroVector;
+
+	for (APlayerState* PartyPlayerState : GPGameState->PlayerArray)
+	{
+		AGP_PlayerState* GPPartyPlayerState = Cast<AGP_PlayerState>(PartyPlayerState);
+		APawn* CandidatePawn = IsValid(GPPartyPlayerState) ? GPPartyPlayerState->GetPawn() : nullptr;
+		if (!IsValid(GPPartyPlayerState)
+			|| GPPartyPlayerState == BoundRunPlayerState.Get()
+			|| GPPartyPlayerState->IsOnlyASpectator()
+			|| GPPartyPlayerState->IsEliminated()
+			|| !IsValid(CandidatePawn))
+		{
+			continue;
+		}
+
+		++OutLivingPlayerCount;
+		if (CandidatePawn == LivingSpectatorTarget.Get())
+		{
+			BestTarget = CandidatePawn;
+			BestPlayerState = GPPartyPlayerState;
+			BestDistanceSquared = -1.0f;
+			continue;
+		}
+
+		if (BestDistanceSquared < 0.0f)
+		{
+			continue;
+		}
+
+		const float DistanceSquared = FVector::DistSquared(Origin, CandidatePawn->GetActorLocation());
+		if (DistanceSquared < BestDistanceSquared)
+		{
+			BestDistanceSquared = DistanceSquared;
+			BestTarget = CandidatePawn;
+			BestPlayerState = GPPartyPlayerState;
+		}
+	}
+
+	LivingSpectatorTarget = BestTarget;
+	if (IsValid(BestPlayerState))
+	{
+		const FString PlayerName = BestPlayerState->GetPlayerName();
+		OutPlayerName = PlayerName.IsEmpty()
+			? FText::FromString(TEXT("아군"))
+			: FText::FromString(PlayerName);
+	}
+	return BestTarget;
+}
+
+bool AGP_PlayerController::IsGameplaySuppressedByRunState() const
+{
+	if (const AGP_PlayerState* GPPlayerState = GetPlayerState<AGP_PlayerState>();
+		IsValid(GPPlayerState) && GPPlayerState->IsEliminated())
+	{
+		return true;
+	}
+
+	const AGP_GameState* GPGameState = GetWorld() ? GetWorld()->GetGameState<AGP_GameState>() : nullptr;
+	return IsValid(GPGameState)
+		&& (GPGameState->GetMatchPhase() == EGPMatchPhase::Victory
+			|| GPGameState->GetMatchPhase() == EGPMatchPhase::Defeat);
+}
+
+void AGP_PlayerController::HandleMatchPhaseChanged(EGPMatchPhase NewPhase)
+{
+	RefreshRunStatePresentation();
+}
+
+void AGP_PlayerController::HandlePlayerEliminatedChanged(bool bIsEliminated)
+{
+	RefreshRunStatePresentation();
 }
 
 void AGP_PlayerController::SetupInputComponent()
@@ -814,6 +1274,7 @@ void AGP_PlayerController::AddInputMappingContexts()
 
 void AGP_PlayerController::Input_Move(const FInputActionValue& Value)
 {
+	if (IsGameplaySuppressedByRunState()) return;
 	if (!IsValid(GetPawn())) return;
 
 	const FVector2D MovementVector = Value.Get<FVector2D>().GetClampedToMaxSize(1.f);
@@ -909,6 +1370,7 @@ void AGP_PlayerController::Input_MoveCompleted(const FInputActionValue& Value)
 
 void AGP_PlayerController::Input_Look(const FInputActionValue& Value)
 {
+	if (IsGameplaySuppressedByRunState()) return;
 	if (!IsValid(GetPawn())) return;
 	const FVector2D LookAxisVector = Value.Get<FVector2D>();
 
@@ -918,6 +1380,7 @@ void AGP_PlayerController::Input_Look(const FInputActionValue& Value)
 
 void AGP_PlayerController::Input_Jump()
 {
+	if (IsGameplaySuppressedByRunState()) return;
 	if (!IsValid(GetCharacter())) return;
 	GetCharacter()->Jump();
 }
@@ -930,6 +1393,11 @@ void AGP_PlayerController::Input_StopJump()
 
 void AGP_PlayerController::Input_CrouchPressed()
 {
+	if (IsGameplaySuppressedByRunState())
+	{
+		return;
+	}
+
 	CancelSkillSelectionIfActive();
 	bCrouchInputHeld = true;
 
@@ -969,6 +1437,11 @@ void AGP_PlayerController::Input_CrouchReleased()
 
 void AGP_PlayerController::Input_ToggleSprint()
 {
+	if (IsGameplaySuppressedByRunState())
+	{
+		return;
+	}
+
 	if (auto* PC = Cast<AGP_PlayerCharacter>(GetPawn()))
 	{
 		PC->ToggleSprinting();
@@ -977,6 +1450,11 @@ void AGP_PlayerController::Input_ToggleSprint()
 
 void AGP_PlayerController::Input_SprintPressed()
 {
+	if (IsGameplaySuppressedByRunState())
+	{
+		return;
+	}
+
 	CancelSkillSelectionIfActive();
 	bSprintInputHeld = true;
 
@@ -997,6 +1475,11 @@ void AGP_PlayerController::Input_SprintReleased()
 }
 void AGP_PlayerController::Input_Dash()
 {
+	if (IsGameplaySuppressedByRunState())
+	{
+		return;
+	}
+
 	CancelSkillSelectionIfActive();
 
 	if (AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetCharacter()))
@@ -1016,6 +1499,11 @@ void AGP_PlayerController::Input_Dash()
 
 void AGP_PlayerController::Input_PrimaryAttack()
 {
+	if (IsGameplaySuppressedByRunState())
+	{
+		return;
+	}
+
 	if (IsSkillSelectionActive())
 	{
 		SendSkillSelectionEvent(GPTags::Event::Skill::ConfirmPrimary);
@@ -1058,6 +1546,11 @@ void AGP_PlayerController::Input_PrimaryAttack()
 
 void AGP_PlayerController::Input_SecondarySkillConfirm()
 {
+	if (IsGameplaySuppressedByRunState())
+	{
+		return;
+	}
+
 	if (IsSkillSelectionActive())
 	{
 		SendSkillSelectionEvent(GPTags::Event::Skill::ConfirmSecondary);
@@ -1094,6 +1587,11 @@ void AGP_PlayerController::Input_SkillSlotReleased()
 
 bool AGP_PlayerController::ActivateAbilityByTag(const FGameplayTag& AbilityTag) const
 {
+	if (IsGameplaySuppressedByRunState())
+	{
+		return false;
+	}
+
 	UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn());
 	if (!IsValid(ASC)) return false;
 
@@ -1123,6 +1621,12 @@ bool AGP_PlayerController::IsGroundPositionSelectionActive() const
 
 bool AGP_PlayerController::SendSkillSelectionEvent(const FGameplayTag& EventTag) const
 {
+	const bool bIsCancelEvent = EventTag.MatchesTagExact(GPTags::Event::Skill::Cancel);
+	if (IsGameplaySuppressedByRunState() && !bIsCancelEvent)
+	{
+		return false;
+	}
+
 	APawn* ControlledPawn = GetPawn();
 	if (!IsValid(ControlledPawn) || !EventTag.IsValid())
 	{
@@ -1239,6 +1743,12 @@ void AGP_PlayerController::Server_SendSkillSelectionEvent_Implementation(
 	FVector_NetQuantize TargetLocation,
 	bool bHasTargetLocation)
 {
+	const bool bIsCancelEvent = EventTag.MatchesTagExact(GPTags::Event::Skill::Cancel);
+	if (IsGameplaySuppressedByRunState() && !bIsCancelEvent)
+	{
+		return;
+	}
+
 	APawn* ControlledPawn = GetPawn();
 	if (!IsValid(ControlledPawn) || !EventTag.IsValid())
 	{
@@ -1263,6 +1773,13 @@ bool AGP_PlayerController::Server_UpdateMoveInput_Validate(FVector2D MovementVec
 
 void AGP_PlayerController::Server_UpdateMoveInput_Implementation(FVector2D MovementVector)
 {
+	if (IsGameplaySuppressedByRunState())
+	{
+		CurrentMoveInput = FVector2D::ZeroVector;
+		ResetMoveDirectionSmoothing();
+		return;
+	}
+
 	CurrentMoveInput = MovementVector.GetClampedToMaxSize(1.0f);
 	if (CurrentMoveInput.IsNearlyZero())
 	{
@@ -1355,7 +1872,7 @@ bool AGP_PlayerController::EnsureCharacterStatsMenuWidget()
 
 void AGP_PlayerController::OpenCharacterStatsMenu()
 {
-	if (!EnsureCharacterStatsMenuWidget())
+	if (IsGameplaySuppressedByRunState() || !EnsureCharacterStatsMenuWidget())
 	{
 		return;
 	}
@@ -1470,16 +1987,31 @@ void AGP_PlayerController::UpdateMovementSpeed(float DeltaSeconds)
 
 void AGP_PlayerController::Input_TestToggleSkill()
 {
+	if (IsGameplaySuppressedByRunState())
+	{
+		return;
+	}
+
 	Server_TestToggleSkill();
 }
 
 void AGP_PlayerController::Input_RotateTestSkill()
 {
+	if (IsGameplaySuppressedByRunState())
+	{
+		return;
+	}
+
 	Server_RotateTestSkill();
 }
 
 void AGP_PlayerController::Input_ToggleWhiteVoid()
 {
+	if (IsGameplaySuppressedByRunState())
+	{
+		return;
+	}
+
 	if (AGP_PlayerCharacter* PlayerCharacter = Cast<AGP_PlayerCharacter>(GetPawn()))
 	{
 		PlayerCharacter->ToggleWhiteVoid();
@@ -1532,7 +2064,7 @@ bool AGP_PlayerController::EnsureSkillSelectWidget()
 
 void AGP_PlayerController::OpenSkillSelect()
 {
-	if (!EnsureSkillSelectWidget())
+	if (IsGameplaySuppressedByRunState() || !EnsureSkillSelectWidget())
 	{
 		return;
 	}
@@ -1602,6 +2134,11 @@ bool AGP_PlayerController::Server_TestToggleSkill_Validate()
 
 void AGP_PlayerController::Server_TestToggleSkill_Implementation()
 {
+	if (IsGameplaySuppressedByRunState())
+	{
+		return;
+	}
+
 	AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetPawn());
 	if (!PC) return;
 
@@ -1656,6 +2193,11 @@ bool AGP_PlayerController::Server_RotateTestSkill_Validate()
 
 void AGP_PlayerController::Server_RotateTestSkill_Implementation()
 {
+	if (IsGameplaySuppressedByRunState())
+	{
+		return;
+	}
+
 	// 여기서 프리셋 순환 장착
 	AGP_PlayerCharacter* PC = Cast<AGP_PlayerCharacter>(GetPawn());
 	if (!PC) return;

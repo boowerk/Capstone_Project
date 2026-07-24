@@ -19,6 +19,10 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "GAS|Abilities")
 	bool TryActivateAbilityByTag(const FGameplayTag& AbilityTag);
+
+	// Re-arms abilities marked ActivateOnGiven after a temporary elimination
+	// canceled every active ability.
+	void RefreshAutoActivatedAbilities();
 	
 private:
 	void HandleAutoActivatedAbility(const FGameplayAbilitySpec& AbilitySpec);

@@ -13,7 +13,9 @@
 #include "GameFramework/Actor.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/GameStateBase.h"
 #include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerState.h"
 #include "Kismet/GameplayStatics.h"
 #include "Navigation/PathFollowingComponent.h"
 #include "Perception/AIPerceptionComponent.h"
@@ -23,6 +25,7 @@
 #include "Perception/AISenseConfig_Sight.h"
 #include "TimerManager.h"
 #include "UObject/UObjectGlobals.h"
+#include "Player/GP_PlayerState.h"
 
 namespace
 {
@@ -863,20 +866,35 @@ AActor* AEnemyAIController::SelectFallbackPlayerTargetByDistance() const
 		return nullptr;
 	}
 
-	APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(this, 0);
-	if (!IsValid(PlayerPawn) || !IsValidPerceptionTarget(PlayerPawn))
+	const AGameStateBase* GameState = GetWorld() ? GetWorld()->GetGameState() : nullptr;
+	if (!IsValid(GameState))
 	{
 		return nullptr;
 	}
 
 	const float EffectiveSightRadius = IsValid(SightSenseConfig) ? SightSenseConfig->SightRadius : SightRadius;
-	if (FVector::DistSquared2D(ControlledPawn->GetActorLocation(), PlayerPawn->GetActorLocation()) > FMath::Square(EffectiveSightRadius))
+	APawn* BestPlayerPawn = nullptr;
+	float BestDistanceSquared = FMath::Square(EffectiveSightRadius);
+	for (APlayerState* PartyPlayerState : GameState->PlayerArray)
 	{
-		return nullptr;
+		APawn* PlayerPawn = IsValid(PartyPlayerState) ? PartyPlayerState->GetPawn() : nullptr;
+		if (!IsValid(PlayerPawn) || !IsValidPerceptionTarget(PlayerPawn))
+		{
+			continue;
+		}
+
+		const float DistanceSquared = FVector::DistSquared2D(
+			ControlledPawn->GetActorLocation(),
+			PlayerPawn->GetActorLocation());
+		if (DistanceSquared <= BestDistanceSquared && LineOfSightTo(PlayerPawn))
+		{
+			BestDistanceSquared = DistanceSquared;
+			BestPlayerPawn = PlayerPawn;
+		}
 	}
 
 	// Keep AI Perception as the source of truth, but allow a fresh LOS check to recover after the leash suppresses perception callbacks.
-	return LineOfSightTo(PlayerPawn) ? PlayerPawn : nullptr;
+	return BestPlayerPawn;
 }
 
 void AEnemyAIController::GatherPerceptionTargetCandidates(TArray<AActor*>& OutCurrentlyPerceivedCandidates, TArray<AActor*>& OutKnownCandidates) const
@@ -944,6 +962,15 @@ bool AEnemyAIController::IsValidPerceptionTarget(AActor* CandidateActor) const
 	{
 		const APawn* CandidatePawn = Cast<APawn>(CandidateActor);
 		if (!IsValid(CandidatePawn) || !CandidatePawn->IsPlayerControlled())
+		{
+			return false;
+		}
+	}
+
+	if (const APawn* CandidatePawn = Cast<APawn>(CandidateActor))
+	{
+		const AGP_PlayerState* GPPlayerState = CandidatePawn->GetPlayerState<AGP_PlayerState>();
+		if (IsValid(GPPlayerState) && GPPlayerState->IsEliminated())
 		{
 			return false;
 		}

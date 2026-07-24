@@ -11,6 +11,7 @@ class AGP_RunPortal;
 class AGP_EnemySpawnMarker;
 class AGP_VillageLayoutDirector;
 class AGP_PlayerController;
+class AGP_PlayerState;
 class APlayerController;
 class APlayerState;
 class APawn;
@@ -57,6 +58,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Run")
 	void NotifyAllPlayersDead();
 
+	// Called on the authority when one player's health first reaches zero.
+	// The final defeat check is deferred so a same-frame boss kill can win.
+	void NotifyPlayerEliminated(AGP_PlayerState* EliminatedPlayerState);
+
 	// Called by a Middle-selection portal on the server.
 	void OpenMiddleTravelSelection(AGP_PlayerController* PlayerController);
 	bool RequestMiddleTravel(
@@ -73,6 +78,10 @@ public:
 		int32 ActivePlayerCount,
 		int32 AssignedOuterZoneCount,
 		int32 CompletedAssignedOuterZoneCount);
+
+	static bool IsPartyDefeated(
+		int32 ParticipantCount,
+		int32 EliminatedParticipantCount);
 
 protected:
 	virtual void InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage) override;
@@ -240,6 +249,7 @@ private:
 	void AdvanceZone();
 	void SpawnPortalToZone(int32 FromZoneIndex, int32 ToZoneIndex);
 	void FinishRun(bool bVictory);
+	void EvaluatePartyDefeat();
 	void ReturnToLobby();
 	void UnlockStage(EGPZoneStage Stage);
 	void StartStagedZone(AGP_EnemySpawnVolume* Zone);

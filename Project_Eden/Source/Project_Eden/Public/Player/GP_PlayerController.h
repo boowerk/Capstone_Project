@@ -2,11 +2,13 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
+#include "Game/GP_GameState.h"
 #include "Game/GP_MiddleTravelTypes.h"
 #include "GameplayTagContainer.h"
 #include "GP_PlayerController.generated.h"
 
 class AGP_PlayerCharacter;
+class AGP_PlayerState;
 class UAbilitySystemComponent;
 class AGP_EnemyCharacter;
 class UGP_AugmentSelectWidget;
@@ -18,7 +20,9 @@ class UGP_SkillPoolData;
 class UGP_SkillSelectWidget;
 class UGP_TestSkillSet;
 class UGP_PlayerHUDWidget;
+class UGP_RunResultWidget;
 class UGP_MiddleTravelMapWidget;
+class APawn;
 class UInputAction;
 class UInputMappingContext;
 class UUserWidget;
@@ -165,6 +169,12 @@ private:
 	void TryFinishInitialOuterLoading();
 	void FinishInitialOuterLoading();
 
+	UPROPERTY(EditDefaultsOnly, Category = "UI|Run Result")
+	TSubclassOf<UGP_RunResultWidget> RunResultWidgetClass;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UGP_RunResultWidget> RunResultWidget;
+
 	UPROPERTY(EditDefaultsOnly, Category = "UI|Middle Travel")
 	TSubclassOf<UGP_MiddleTravelMapWidget> MiddleTravelMapWidgetClass;
 
@@ -200,6 +210,9 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UGP_AugmentSelectWidget> AugmentSelectWidget;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UGP_SkillAugmentData>> DeferredAugmentCandidates;
 
 	UPROPERTY(EditDefaultsOnly, Category = "UI|Skill")
 	TObjectPtr<UGP_SkillPoolData> SkillPoolData;
@@ -302,12 +315,36 @@ private:
 	FVector2D ResolveEffectiveMoveInput(const AGP_PlayerCharacter* PlayerCharacter) const;
 	void UpdateMovementSpeed(float DeltaSeconds);
 	void UpdateCharacterRotation(float DeltaSeconds);
+	bool EnsureRunResultWidget();
+	void EnsureRunStateBindings();
+	void RefreshRunStatePresentation();
+	void ApplyRunStateInputLock(bool bShouldLock);
+	void SuspendAugmentSelectWidgetForRunState();
+	void RestoreDeferredAugmentSelectWidget();
+	APawn* ResolveLivingSpectatorTarget(int32& OutLivingPlayerCount, FText& OutPlayerName);
+	bool IsGameplaySuppressedByRunState() const;
+
+	UFUNCTION()
+	void HandleMatchPhaseChanged(EGPMatchPhase NewPhase);
+
+	UFUNCTION()
+	void HandlePlayerEliminatedChanged(bool bIsEliminated);
 
 	bool bSkillsEquipped = false;
 	int32 TestSkillPresetIndex = 0;
 	bool bIsCharacterStatsMenuOpen = false;
 	bool bWasGroundPositionSelectionActive = false;
 	bool bSkillSelectInputBlocked = false;
+	bool bRunStateInputLocked = false;
+	bool bResumeAugmentSelectAfterRunState = false;
+	float RunStateRefreshAccumulator = 0.0f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "UI|Run Result", meta = (ClampMin = "0.05", Units = "s"))
+	float RunStateRefreshInterval = 0.1f;
+
+	TWeakObjectPtr<AGP_GameState> BoundRunGameState;
+	TWeakObjectPtr<AGP_PlayerState> BoundRunPlayerState;
+	TWeakObjectPtr<APawn> LivingSpectatorTarget;
 
 	// --- Movement Input Smoothing ---
 	FVector SmoothedMoveWorldDirection = FVector::ZeroVector;

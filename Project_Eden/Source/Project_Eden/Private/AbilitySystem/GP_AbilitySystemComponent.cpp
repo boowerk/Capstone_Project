@@ -52,6 +52,15 @@ bool UGP_AbilitySystemComponent::TryActivateAbilityByTag(const FGameplayTag& Abi
 	return MatchingHandle.IsValid() && TryActivateAbility(MatchingHandle);
 }
 
+void UGP_AbilitySystemComponent::RefreshAutoActivatedAbilities()
+{
+	FScopedAbilityListLock ActivateScopeLock(*this);
+	for (const FGameplayAbilitySpec& AbilitySpec : GetActivatableAbilities())
+	{
+		HandleAutoActivatedAbility(AbilitySpec);
+	}
+}
+
 // 어빌리티의 태그를 검사하여 특정 태그가 있다면 실행시키는 로직
 void UGP_AbilitySystemComponent::HandleAutoActivatedAbility(const FGameplayAbilitySpec& AbilitySpec)
 {
