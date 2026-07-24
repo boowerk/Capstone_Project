@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-24T16:18:00+09:00
+updated: 2026-07-24T16:30:00+09:00
 status: active
 tags:
   - memoc
@@ -11,10 +11,12 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-07-24T16:18:00+09:00
+Last synced: 2026-07-24T16:30:00+09:00
 
 ## Current Status
 
+- `origin/feature/run-result-ui` is merged into `main`: player elimination/recovery, spectating, party defeat policy, and native victory/defeat/eliminated presentation coexist with the initial Outer loading gate. The conflict union preserves both persistent weapon construction and enemy target refresh. Editor Development build and `ProjectEden.RunOutcome.PartyDefeatPolicy` pass.
+- Client village visual-ready ACK now retries local controller discovery for up to 10 seconds and clears its timer on success/end play. The four affected StylizedProvencal roof/wall/decal materials are saved with Instanced Static Mesh usage, and the current `L_LandscapeMap` is committed. The obsolete RegionID GPU-to-CPU availability experiment was restored because vegetation no longer samples that texture.
 - `BuildCookDeployFinal.bat` now performs one-shot Shipping client/server builds, cooks, packages, and structural verification. It rejects dirty source by default and writes versioned whole-folder releases under `Saved/FinalDeploy/<timestamp>_<commit>_shipping/{Client/Windows,Server/WindowsServer}`. Both packages request UE prerequisites; Shipping server logging is enabled with a unique build environment. Shipping/Development preflight checks pass; the full Shipping build/cook remains to be run.
 - Player top-left HUD restyle is applied but not yet PIE-verified. `/Game/UI/HUD/PlayerStatus/Textures` contains the shared grayscale fill mask, dark track, B2 backplate, and optional accent. `WBP_PlayerHealthBar`, `WBP_PlayerManaBar`, and `WBP_PlayerStaminaBar` keep their existing `GP_AttributeWidget`/`HealthBar` contracts while sharing the track/fill brushes and using dark red, muted blue, and ochre/olive tints. `WBP_PlayerHUDWidget.TopLeftFrame` keeps its existing Border hierarchy and now draws `T_UI_HUD_TopLeft_Backplate_B2` as an untiled Image. All four Widget Blueprints compiled and saved in the editor; `T_UI_HUD_TopLeft_Accent_B2` is imported but intentionally not placed.
 - Stage-based village Zone progression is implemented (Outer -> Middle -> Center -> Colosseum). Active/unlocked Zones register as Navigation Invokers (180m generation, 220m removal), completed Zones unregister, Recast defaults to Dynamic, and spawn/portal logic waits up to 10s for asynchronous NavMesh readiness. PCG vegetation clearing around portal spawn locations restored. Center and Colosseum boss zone progression configured. Portal visual effects updated.
