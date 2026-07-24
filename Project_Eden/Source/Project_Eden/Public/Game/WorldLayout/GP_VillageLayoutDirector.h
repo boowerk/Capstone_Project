@@ -184,6 +184,8 @@ private:
 	TMap<FName, int32> ActiveVillagePCGSeeds;
 	TMap<FName, FName> ActiveVillageInstanceNames;
 	FTimerHandle VillageStreamingTimeoutHandle;
+	FTimerHandle ClientVisualReadyRetryHandle;
+	int32 ClientVisualReadyRetryAttempts = 0;
 	int32 ExpectedVillageLevelCount = 0;
 	bool bVillageLevelBatchFailed = false;
 	bool bSchedulingVillagePCG = false;
@@ -248,6 +250,7 @@ private:
 	void HandleVillageStreamingTimeout();
 	void ClearVillageStreamingTimeout();
 	void MarkRuntimeLayoutReady();
+	void TryNotifyClientVisualReady();
 	void DrawSelectionDebug() const;
 
 	UFUNCTION()

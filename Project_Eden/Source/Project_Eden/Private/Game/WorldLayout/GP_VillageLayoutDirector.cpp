@@ -378,6 +378,10 @@ void AGP_VillageLayoutDirector::OnConstruction(const FTransform& Transform)
 
 void AGP_VillageLayoutDirector::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(ClientVisualReadyRetryHandle);
+	}
 	UnloadActiveVillageLevels();
 	Super::EndPlay(EndPlayReason);
 }
@@ -2371,17 +2375,53 @@ void AGP_VillageLayoutDirector::MarkRuntimeLayoutReady()
 
 	if (!HasAuthority())
 	{
-		if (AGP_PlayerController* PlayerController = Cast<AGP_PlayerController>(
-			GetWorld()->GetFirstPlayerController()))
+		ClientVisualReadyRetryAttempts = 0;
+		TryNotifyClientVisualReady();
+	}
+}
+
+void AGP_VillageLayoutDirector::TryNotifyClientVisualReady()
+{
+	constexpr int32 MaxAttempts = 40;
+	constexpr float RetryIntervalSeconds = 0.25f;
+
+	UWorld* World = GetWorld();
+	if (!World || HasAuthority() || !bRuntimeLayoutReady)
+	{
+		return;
+	}
+
+	++ClientVisualReadyRetryAttempts;
+	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+	{
+		AGP_PlayerController* PlayerController = Cast<AGP_PlayerController>(It->Get());
+		if (IsValid(PlayerController) && PlayerController->IsLocalController())
 		{
+			World->GetTimerManager().ClearTimer(ClientVisualReadyRetryHandle);
 			PlayerController->NotifyVillageVisualReady(AppliedRuntimeLayoutRevision);
-		}
-		else
-		{
-			UE_LOG(LogTemp, Error,
-				TEXT("[VillageLayout] Client layout is ready but no local GP_PlayerController can send the visual-ready ACK."));
+			UE_LOG(LogTemp, Log,
+				TEXT("[VillageLayout] Sent client visual-ready ACK for revision %d after %d attempt(s)."),
+				AppliedRuntimeLayoutRevision,
+				ClientVisualReadyRetryAttempts);
+			return;
 		}
 	}
+
+	if (ClientVisualReadyRetryAttempts >= MaxAttempts)
+	{
+		UE_LOG(LogTemp, Error,
+			TEXT("[VillageLayout] No local GP_PlayerController could send visual-ready ACK for revision %d after %d attempts."),
+			AppliedRuntimeLayoutRevision,
+			ClientVisualReadyRetryAttempts);
+		return;
+	}
+
+	World->GetTimerManager().SetTimer(
+		ClientVisualReadyRetryHandle,
+		this,
+		&ThisClass::TryNotifyClientVisualReady,
+		RetryIntervalSeconds,
+		false);
 }
 
 void AGP_VillageLayoutDirector::DrawSelectionDebug() const
