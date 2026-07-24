@@ -26,17 +26,18 @@ public:
 	// defense in depth so an over-capacity lobby can never begin travel.
 	static bool HasExactPartySize(int32 ConnectedPlayerCount, int32 RequiredPlayerCount);
 
-	// Debug/solo starts are disabled in Shipping and require both an explicit
-	// launch flag and an authoritative local (listen/standalone) controller.
+	// Debug/solo starts are disabled in Shipping and require an explicit launch
+	// flag. Listen/standalone hosts and opted-in dedicated servers may accept it.
 	bool CanForceStart(const APlayerController* RequestingController) const;
 	bool TryForceStartGame(APlayerController* RequestingController);
 
 	// Pure policy seam used to keep every caller aligned with the same
-	// Shipping/authority/local-controller restrictions.
+	// Shipping/authority/host restrictions.
 	static bool IsForceStartRequestAllowed(
 		bool bExplicitlyEnabled,
 		bool bHasAuthority,
-		bool bIsLocalController);
+		bool bIsLocalController,
+		bool bIsDedicatedServer);
 
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Lobby")

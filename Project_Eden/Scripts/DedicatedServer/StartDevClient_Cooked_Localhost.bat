@@ -33,5 +33,5 @@ goto CollectExtraArgs
 :ExtraArgsDone
 echo Starting packaged Project Eden local client.
 echo Client exe: %CLIENT_EXE%
-start "Project Eden Cooked Local Client" "%CLIENT_EXE%" -log %CLIENT_WINDOW_ARGS% %EXTRA_ARGS%
+start "Project Eden Cooked Local Client" "%CLIENT_EXE%" -log -AllowLobbyForceStart %CLIENT_WINDOW_ARGS% %EXTRA_ARGS%
 exit /b 0

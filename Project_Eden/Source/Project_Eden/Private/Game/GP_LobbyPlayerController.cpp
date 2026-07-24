@@ -121,8 +121,8 @@ void AGP_LobbyPlayerController::ServerForceStart_Implementation()
 	UWorld* World = GetWorld();
 	if (AGP_LobbyGameMode* GM = World ? World->GetAuthGameMode<AGP_LobbyGameMode>() : nullptr)
 	{
-		// The GameMode validates Shipping state, the explicit launch flag, and
-		// that this server-side controller belongs to the local host.
+		// The GameMode validates Shipping state, authority, the explicit launch
+		// flag, and whether this is a local host or dedicated debug server.
 		GM->TryForceStartGame(this);
 	}
 }

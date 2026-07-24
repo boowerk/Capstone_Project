@@ -177,7 +177,8 @@ bool AGP_LobbyGameMode::CanForceStart(const APlayerController* RequestingControl
 	return IsForceStartRequestAllowed(
 		bExplicitlyEnabled,
 		IsValid(RequestingController) && RequestingController->HasAuthority(),
-		IsValid(RequestingController) && RequestingController->IsLocalController());
+		IsValid(RequestingController) && RequestingController->IsLocalController(),
+		GetNetMode() == NM_DedicatedServer);
 }
 
 bool AGP_LobbyGameMode::TryForceStartGame(APlayerController* RequestingController)
@@ -209,12 +210,15 @@ bool AGP_LobbyGameMode::TryForceStartGame(APlayerController* RequestingControlle
 bool AGP_LobbyGameMode::IsForceStartRequestAllowed(
 	bool bExplicitlyEnabled,
 	bool bHasAuthority,
-	bool bIsLocalController)
+	bool bIsLocalController,
+	bool bIsDedicatedServer)
 {
 #if UE_BUILD_SHIPPING
 	return false;
 #else
-	return bExplicitlyEnabled && bHasAuthority && bIsLocalController;
+	return bExplicitlyEnabled
+		&& bHasAuthority
+		&& (bIsLocalController || bIsDedicatedServer);
 #endif
 }
 

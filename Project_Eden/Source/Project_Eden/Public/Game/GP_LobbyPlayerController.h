@@ -18,8 +18,8 @@ public:
 	UFUNCTION(Client, Reliable)
 	void ClientShowLoading();
 
-	// Debug/solo start request. The server accepts it only from the local
-	// listen/standalone host when -AllowLobbyForceStart is explicitly present.
+	// Debug/solo start request. The server accepts it from an opted-in local
+	// host or Development dedicated server when -AllowLobbyForceStart is set.
 	UFUNCTION(Server, Reliable)
 	void ServerForceStart();
 

@@ -8,6 +8,8 @@
 #include "Game/GP_LobbyPlayerState.h"
 #include "GameFramework/GameStateBase.h"
 #include "GameFramework/PlayerState.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #include "UI/GP_LobbyPlayerRowWidget.h"
 #include "Game/GP_GameInstance.h"
 #include "TimerManager.h"
@@ -33,11 +35,20 @@ void UGP_LobbyWidget::NativeConstruct()
 		AGP_LobbyGameMode* LobbyGameMode = GetWorld()
 			? GetWorld()->GetAuthGameMode<AGP_LobbyGameMode>()
 			: nullptr;
-		const bool bCanForceStart =
-			LobbyGameMode && LobbyGameMode->CanForceStart(LobbyController);
+		bool bCanForceStart = false;
+#if !UE_BUILD_SHIPPING
+		// Remote dedicated-server clients have no AuthGameMode. The matching
+		// launch flag advertises the button; the server remains authoritative
+		// and validates the same opt-in before accepting the RPC.
+		bCanForceStart =
+			FParse::Param(FCommandLine::Get(), TEXT("AllowLobbyForceStart"));
+#endif
+		if (LobbyGameMode)
+		{
+			bCanForceStart = LobbyGameMode->CanForceStart(LobbyController);
+		}
 
-		// Remote clients and production launches should not advertise a button
-		// whose server RPC is intentionally unavailable to them.
+		// Production and non-opted-in launches must not advertise the bypass.
 		Button_ForceStart->SetVisibility(
 			bCanForceStart ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
 		if (bCanForceStart)

@@ -58,5 +58,5 @@ goto CollectExtraArgs
 echo Starting Project Eden local client (MainMenu)
 echo Client GameDefaultMap override: %CLIENT_DEFAULT_MAP%
 echo Engine root: %UE_SERVER_ROOT%
-start "Project Eden Local Client" "%EDITOR_EXE%" "%UPROJECT%" -game -log -ini:Engine:[/Script/EngineSettings.GameMapsSettings]:GameDefaultMap=%CLIENT_DEFAULT_MAP% %CLIENT_WINDOW_ARGS% %EXTRA_ARGS%
+start "Project Eden Local Client" "%EDITOR_EXE%" "%UPROJECT%" -game -log -AllowLobbyForceStart -ini:Engine:[/Script/EngineSettings.GameMapsSettings]:GameDefaultMap=%CLIENT_DEFAULT_MAP% %CLIENT_WINDOW_ARGS% %EXTRA_ARGS%
 exit /b 0

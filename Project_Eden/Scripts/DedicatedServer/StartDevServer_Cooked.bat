@@ -62,7 +62,8 @@ if not exist "%SERVER_EXE%" (
 set "PATH=%UE_SERVER_ROOT%\Engine\Binaries\Win64;%PATH%"
 echo Starting Project_EdenServer with engine root: %UE_SERVER_ROOT%
 echo Server exe: %SERVER_EXE%
+echo Solo debug start: enabled
 pushd "%PROJECT_ROOT%"
-"%SERVER_EXE%" -log -port=7778
+"%SERVER_EXE%" -log -port=7778 -AllowLobbyForceStart
 popd
 pause

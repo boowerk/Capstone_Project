@@ -54,6 +54,11 @@ StartDevClient_Cooked_Localhost.bat
 that ships Editor/Server binaries but no UnrealGame manifest. When required,
 it prepares an ignored project-local source copy and compiles the Game modules.
 
+The cooked localhost server/client scripts opt into `-AllowLobbyForceStart`.
+This restores the lobby's solo-start button for Development dedicated-server
+testing. The bypass remains unavailable in Shipping and in scripts without the
+explicit flag.
+
 For a remote host:
 
 ```bat

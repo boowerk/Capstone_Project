@@ -375,6 +375,12 @@ See `.memoc/worklog/` and generated `.memoc/activity.md`.
   connected to the cooked landscape server, applied snapshot revision 1, loaded
   seven village instances, and completed client visual PCG 7/7 without crashing.
 - `M_StateMask` still exceeds the SM5 16-sampler limit; SM6 cooking succeeds.
+- Development dedicated servers may accept a solo force-start from their remote
+  lobby controller only when both server and client were explicitly launched
+  with `-AllowLobbyForceStart`. Local cooked scripts add the flag by default;
+  Shipping and unflagged launches still reject and hide the bypass.
+- `ProjectEden.Game.Lobby.ForceStartPolicy` and Editor/Game/Server Development
+  builds pass. Existing cooked inner executables were refreshed.
 
 ### 2026-07-23 Village slot capacities
 
