@@ -509,10 +509,12 @@ bool FVillageSelectionPolicyTest::RunTest(const FString& Parameters)
 		AGP_VillageLayoutDirector::StaticClass()->FindFunctionByName(TEXT("ClearVillagePreview"));
 	TestNotNull(TEXT("Village director exposes an editor rebuild-preview action"), RebuildPreviewFunction);
 	TestNotNull(TEXT("Village director exposes an editor clear-preview action"), ClearPreviewFunction);
+#if WITH_METADATA
 	TestTrue(TEXT("Village rebuild-preview action is callable in editor"),
 		RebuildPreviewFunction && RebuildPreviewFunction->HasMetaData(TEXT("CallInEditor")));
 	TestTrue(TEXT("Village clear-preview action is callable in editor"),
 		ClearPreviewFunction && ClearPreviewFunction->HasMetaData(TEXT("CallInEditor")));
+#endif
 	TestNotNull(TEXT("Village director exposes the editor PCG preview toggle"),
 		FindFProperty<FBoolProperty>(
 			AGP_VillageLayoutDirector::StaticClass(),
