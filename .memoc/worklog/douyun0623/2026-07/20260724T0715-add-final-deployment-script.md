@@ -19,9 +19,9 @@ created: 2026-07-24T07:15:39
 
 ## Summary
 
-- Added a one-shot Shipping client/server build, cook, package, and verification batch.
+- Added a one-shot client/server build, cook, package, and verification batch.
 - Final outputs are versioned under `Saved/FinalDeploy`, with dirty-tree protection and separate Client/Server folders.
-- Shipping server logs and client/server prerequisite staging are enabled for deployment diagnostics and clean hosts.
+- The current engine defaults to supported Development deployment; unsupported Shipping is rejected before compilation.
 
 ## Changed Files
 
@@ -34,9 +34,9 @@ created: 2026-07-24T07:15:39
 
 ## Verification
 
-- Shipping and Development preflight validation passed with explicit dirty-tree opt-in.
+- Development preflight passed; explicit Shipping produced the expected unsupported-engine exit.
 - Help/argument parsing and nested PCGEx `--no-pause` failure behavior passed.
-- Full Shipping build and cook were not run.
+- Full Development build and cook were not run.
 
 ## Follow-up
 

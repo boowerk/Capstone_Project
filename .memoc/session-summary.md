@@ -2,7 +2,7 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-07-24T16:30:00+09:00
+updated: 2026-07-24T16:35:00+09:00
 status: active
 tags:
   - memoc
@@ -15,4 +15,4 @@ created: 2026-07-24T01:26:27
 - Village visual-ready ACK retries controller discovery; instanced material flags and the final landscape map are committed.
 - The obsolete RegionID CPU experiment is restored to GPU availability.
 - The previous eight dirty files are fully resolved and the worktree is clean.
-- Final Shipping client/server build and cook remain to be run through `BuildCookDeployFinal.bat`.
+- The installed engine lacks Shipping Game/Server targets. `BuildCookDeployFinal.bat` now defaults to supported Development deployment and rejects explicit unsupported Shipping before building.

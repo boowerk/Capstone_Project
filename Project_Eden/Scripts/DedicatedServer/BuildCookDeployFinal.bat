@@ -6,7 +6,10 @@ set "UPROJECT=%PROJECT_ROOT%\Project_Eden.uproject"
 set "RESOLVE_ENGINE=%~dp0ResolveEngineRoot.ps1"
 set "PREPARE_PCGEX=%~dp0PreparePCGExClientBuild.bat"
 
-set "BUILD_CONFIG=Shipping"
+rem This installed engine currently provides Game/Server binaries for Development,
+rem not Shipping. --shipping remains available for a future engine distribution
+rem that explicitly includes both Shipping target types.
+set "BUILD_CONFIG=Development"
 set "ALLOW_DIRTY=0"
 set "VALIDATE_ONLY=0"
 set "PAUSE_AT_END=1"
@@ -74,6 +77,23 @@ if not exist "%RUN_UAT%" (
     goto PreflightFailed
 )
 
+set "INSTALLED_BUILD_MARKER=%UE_SERVER_ROOT%\Engine\Build\InstalledBuild.txt"
+set "INSTALLED_ENGINE_INI=%UE_SERVER_ROOT%\Engine\Config\BaseEngine.ini"
+if exist "%INSTALLED_BUILD_MARKER%" if exist "%INSTALLED_ENGINE_INI%" (
+    set "CHECK_BUILD_CONFIG=%BUILD_CONFIG%"
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "$Text = [IO.File]::ReadAllText($env:INSTALLED_ENGINE_INI); $Configuration = [Regex]::Escape($env:CHECK_BUILD_CONFIG); $Game = $Text -match ('Configuration=\"' + $Configuration + '\".*PlatformType=\"Game\"'); $Server = $Text -match ('Configuration=\"' + $Configuration + '\".*PlatformType=\"Server\"'); if (-not ($Game -and $Server)) { exit 1 }"
+    if errorlevel 1 (
+        echo.
+        echo The installed engine does not include %BUILD_CONFIG% Game and Server targets.
+        echo Engine: %UE_SERVER_ROOT%
+        if /I "%BUILD_CONFIG%"=="Shipping" (
+            echo Rerun without --shipping to create the supported Development deployment.
+        )
+        set "FAIL_CODE=6"
+        goto PreflightFailed
+    )
+)
+
 set "PCGEX_GAME_MANIFEST=%UE_SERVER_ROOT%\Engine\Plugins\Marketplace\PCGExtendedToolkit\Intermediate\Build\Win64\x64\UnrealGame\%BUILD_CONFIG%\PCGExCore\PCGExCore.precompiled"
 set "ENGINE_PCGEX=%UE_SERVER_ROOT%\Engine\Plugins\Marketplace\PCGExtendedToolkit\PCGExtendedToolkit.uplugin"
 set "PROJECT_PCGEX=%PROJECT_ROOT%\Plugins\PCGExtendedToolkit\PCGExtendedToolkit.uplugin"
@@ -139,6 +159,7 @@ echo.
 echo Project:       %UPROJECT%
 echo Engine:        %UE_SERVER_ROOT%
 echo Configuration: %BUILD_CONFIG%
+if /I "%BUILD_CONFIG%"=="Development" echo Note:          This engine distribution does not include Shipping Game/Server targets.
 echo Commit:        !GIT_SHA!
 echo Source tree:   !TREE_STATE!
 echo Deploy root:   !RELEASE_ROOT!
@@ -310,8 +331,8 @@ exit /b !FAIL_CODE!
 echo Usage: %~nx0 [EngineRoot] [options]
 echo.
 echo Options:
-echo   --shipping       Build Shipping client and server (default).
-echo   --development    Build Development packages for a release smoke test.
+echo   --development    Build deployable Development packages (default).
+echo   --shipping       Require an engine with Shipping Game and Server targets.
 echo   --allow-dirty    Allow a non-reproducible build from local changes.
 echo   --validate-only  Run preflight checks without building or creating output.
 echo   --no-pause       Do not pause after a completed or failed build.
