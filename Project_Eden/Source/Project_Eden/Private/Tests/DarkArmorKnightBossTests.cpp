@@ -11,6 +11,7 @@
 #include "Characters/GP_DarkArmorKnightBossCharacter.h"
 #include "Characters/GP_DarkArmorKnightStateComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Engine/SkeletalMesh.h"
 #include "Engine/TargetPoint.h"
 #include "Engine/World.h"
 #include "GameplayTags/GP_Tags.h"
@@ -21,6 +22,9 @@
 
 namespace DarkArmorKnightBossTests
 {
+	const FString ExpectedKnightMeshPath =
+		TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_DarkArmorKnight/SK_KnightBoss.SK_KnightBoss");
+
 	const FGPBossAttackPatternCandidate* Select(const FGPBossAttackPatternContext& Context, TArray<FGPBossAttackPatternCandidate>& OutCandidates)
 	{
 		OutCandidates = FGPBossAttackPatternSelector::BuildCandidates(Context);
@@ -180,6 +184,16 @@ bool FDarkArmorKnightAbilityGrantContractTest::RunTest(const FString& Parameters
 		return false;
 	}
 
+	const USkeletalMesh* ProductionKnightMesh = Boss->GetMesh()->GetSkeletalMeshAsset();
+	TestNotNull(TEXT("Production Dark Knight owns its body skeletal mesh"), ProductionKnightMesh);
+	if (IsValid(ProductionKnightMesh))
+	{
+		TestEqual(
+			TEXT("Production Dark Knight uses the relocated body skeletal mesh"),
+			ProductionKnightMesh->GetPathName(),
+			ExpectedKnightMeshPath);
+	}
+
 	UGP_AbilitySystemComponent* ASC = Cast<UGP_AbilitySystemComponent>(Boss->GetAbilitySystemComponent());
 	UGP_DarkArmorKnightStateComponent* State = Boss->GetDarkKnightStateComponent();
 	if (!TestNotNull(TEXT("Production Dark Knight owns the project ASC"), ASC)
@@ -291,7 +305,15 @@ bool FDarkArmorKnightGuardLifecycleTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Recovery clears groggy"), State->IsGroggy());
 	TestEqual(TEXT("Recovery restores guard gauge"), State->GetGuardGauge(), State->GetMaxGuardGauge());
 
-	TestNotNull(TEXT("Boss uses the supplied knightBoss skeletal mesh"), Boss->GetMesh()->GetSkeletalMeshAsset());
+	const USkeletalMesh* NativeKnightMesh = Boss->GetMesh()->GetSkeletalMeshAsset();
+	TestNotNull(TEXT("Boss uses the supplied knightBoss skeletal mesh"), NativeKnightMesh);
+	if (IsValid(NativeKnightMesh))
+	{
+		TestEqual(
+			TEXT("Native Dark Knight uses the current knightBoss asset path"),
+			NativeKnightMesh->GetPathName(),
+			DarkArmorKnightBossTests::ExpectedKnightMeshPath);
+	}
 	AGP_DarkWaveProjectile* Wave = TestWorld->SpawnActor<AGP_DarkWaveProjectile>(FVector::ZeroVector, FRotator::ZeroRotator, Params);
 	AGP_DarkKnightGroundCrackActor* Crack = TestWorld->SpawnActor<AGP_DarkKnightGroundCrackActor>(FVector::ZeroVector, FRotator::ZeroRotator, Params);
 	TestNotNull(TEXT("Sword wave has a replaceable primitive mesh"), IsValid(Wave) ? Wave->FindComponentByClass<UStaticMeshComponent>() : nullptr);

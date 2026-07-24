@@ -133,7 +133,7 @@ AGP_DarkArmorKnightBossCharacter::AGP_DarkArmorKnightBossCharacter()
 		BlackboardAssetOverride = BlackboardFinder.Object;
 	}
 
-	static ConstructorHelpers::FObjectFinder<USkeletalMesh> KnightMeshFinder(TEXT("/Game/Meshes/Monsters/Knight/SK_KnightBoss.SK_KnightBoss"));
+	static ConstructorHelpers::FObjectFinder<USkeletalMesh> KnightMeshFinder(TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_DarkArmorKnight/SK_KnightBoss.SK_KnightBoss"));
 	if (KnightMeshFinder.Succeeded())
 	{
 		// The supplied knightBoss asset is skeletal, so the character mesh owns it directly.
