@@ -38,7 +38,32 @@ Saved/StagedBuilds/WindowsServer/Project_EdenServer.exe
 
 It falls back to the local server exe only if cooked or staged builds are missing.
 
-## Client Scripts
+## Cooked Client Loop
+
+Use the packaged game client for village streaming and PCG validation.
+`UnrealEditor.exe -game` can hit a UE 5.7 editor-only animation metadata
+transaction crash while dynamically streamed village assets are loading.
+
+```bat
+BuildDevClient.bat
+CookDevClient.bat
+StartDevClient_Cooked_Localhost.bat
+```
+
+`BuildDevClient.bat` also handles the installed PCGExtendedToolkit package
+that ships Editor/Server binaries but no UnrealGame manifest. When required,
+it prepares an ignored project-local source copy and compiles the Game modules.
+
+For a remote host:
+
+```bat
+StartDevClient_Cooked_Radmin.bat <RadminVPN server IP>
+```
+
+## Editor Client Scripts
+
+These remain useful for lightweight tests that do not stream the village
+animation dependencies. They are not the release-equivalent client path.
 
 ```bat
 StartEditorClient_Localhost.bat

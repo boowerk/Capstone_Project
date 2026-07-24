@@ -1,6 +1,14 @@
 @echo off
 setlocal EnableExtensions
 
+echo WARNING: UnrealEditor.exe -game can crash in UE 5.7 while legacy animation
+echo curve metadata is migrated during streamed village loading.
+echo For dedicated-server validation, prefer:
+echo   BuildDevClient.bat
+echo   CookDevClient.bat
+echo   StartDevClient_Cooked_Radmin.bat
+echo.
+
 set "PROJECT_ROOT=%~dp0..\..\"
 set "UPROJECT=%PROJECT_ROOT%Project_Eden.uproject"
 set "SERVER_PORT=7778"

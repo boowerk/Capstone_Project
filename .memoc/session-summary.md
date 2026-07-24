@@ -2,7 +2,7 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-07-24T10:25:00+09:00
+updated: 2026-07-24T11:24:00+09:00
 status: active
 tags:
   - memoc
@@ -11,8 +11,8 @@ created: 2026-07-24T01:26:27
 ---
 # Session Summary
 
-- Integrated the actual `origin/main` workline while preserving the verified map/build repairs.
-- The server now replicates exact village layout snapshots; clients stream matching Level Instances and generate visual PCG locally.
-- Outer teleport waits for each remote client's visual-ready ACK. Revisioned names, reconnect-stable slots, and client-only Zone/Marker disabling close race and duplication paths.
-- Server/Editor Development builds and all 9 `ProjectEden.Game` tests pass.
-- Re-cook/package, then verify client PCG completion in the packaged dedicated-server flow.
+- Village layout snapshots replicate exact seven-instance layouts; packaged clients stream matching levels and generate visual PCG locally.
+- `UnrealEditor.exe -game` can crash while animation PostLoad calls an editor transaction with null `GEditor`; use the new cooked Game-client scripts instead.
+- Game/Editor targets and the Win64 client package build successfully. A packaged null-RHI client connected to the cooked landscape server, applied revision 1, and completed PCG 7/7 without the crash.
+- The package is under `Project_Eden/Saved/DedicatedClient/Windows`.
+- Remaining cook warning: `M_StateMask` exceeds the SM5 16-sampler limit; SM6 is valid.

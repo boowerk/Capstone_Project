@@ -361,6 +361,21 @@ Last synced: 2026-05-23T00:00:00
 
 See `.memoc/worklog/` and generated `.memoc/activity.md`.
 
+### 2026-07-24 Packaged dedicated client
+
+- Do not use `UnrealEditor.exe -game` for dedicated-client testing. Animation
+  PostLoad can enter editor-only curve metadata migration and call
+  `GEditor->BeginTransaction()` while `GEditor` is null.
+- `BuildDevClient.bat` prepares an ignored project-local PCGExtendedToolkit
+  source copy when the installed plugin lacks UnrealGame manifests, then builds
+  both Game and the Editor cook host.
+- `CookDevClient.bat` packages the main/lobby/landscape and village maps to
+  `Saved/DedicatedClient/Windows`; cooked localhost/Radmin launchers use it.
+- Win64 client cooking completed with zero errors. A packaged null-RHI client
+  connected to the cooked landscape server, applied snapshot revision 1, loaded
+  seven village instances, and completed client visual PCG 7/7 without crashing.
+- `M_StateMask` still exceeds the SM5 16-sampler limit; SM6 cooking succeeds.
+
 ### 2026-07-23 Village slot capacities
 
 - `817189ac` separates slot capacity from preset footprint: Small is 130m,
