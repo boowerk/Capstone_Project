@@ -52,7 +52,8 @@ goto UsageFailure
 :ArgsDone
 if not exist "%UPROJECT%" (
     echo Project file was not found: %UPROJECT%
-    exit /b 1
+    set "FAIL_CODE=1"
+    goto PreflightFailed
 )
 
 if not exist "%UE_SERVER_ROOT%\Engine\Build\BatchFiles\Build.bat" (
@@ -64,11 +65,13 @@ set "BUILD_BAT=%UE_SERVER_ROOT%\Engine\Build\BatchFiles\Build.bat"
 set "RUN_UAT=%UE_SERVER_ROOT%\Engine\Build\BatchFiles\RunUAT.bat"
 if not exist "%BUILD_BAT%" (
     echo Build.bat was not found. Pass the engine root that contains the Engine directory.
-    exit /b 1
+    set "FAIL_CODE=1"
+    goto PreflightFailed
 )
 if not exist "%RUN_UAT%" (
     echo RunUAT.bat was not found: %RUN_UAT%
-    exit /b 1
+    set "FAIL_CODE=1"
+    goto PreflightFailed
 )
 
 set "PCGEX_GAME_MANIFEST=%UE_SERVER_ROOT%\Engine\Plugins\Marketplace\PCGExtendedToolkit\Intermediate\Build\Win64\x64\UnrealGame\%BUILD_CONFIG%\PCGExCore\PCGExCore.precompiled"
@@ -77,11 +80,13 @@ set "PROJECT_PCGEX=%PROJECT_ROOT%\Plugins\PCGExtendedToolkit\PCGExtendedToolkit.
 if not exist "%PCGEX_GAME_MANIFEST%" if not exist "%PROJECT_PCGEX%" (
     if not exist "%ENGINE_PCGEX%" (
         echo PCGExtendedToolkit source plugin was not found: %ENGINE_PCGEX%
-        exit /b 1
+        set "FAIL_CODE=1"
+        goto PreflightFailed
     )
     if not exist "%PREPARE_PCGEX%" (
         echo PCGExtendedToolkit preparation script was not found: %PREPARE_PCGEX%
-        exit /b 1
+        set "FAIL_CODE=1"
+        goto PreflightFailed
     )
 )
 
@@ -96,11 +101,22 @@ if not errorlevel 1 (
 
 if /I "!TREE_STATE!"=="dirty" if "!ALLOW_DIRTY!"=="0" (
     echo.
-    echo Final deployment stopped because the Git working tree is dirty:
+    echo The Git working tree contains uncommitted files:
     git -C "%PROJECT_ROOT%" status --short
     echo.
-    echo Commit or stash the intended changes, or rerun with --allow-dirty.
-    exit /b 2
+    echo A clean tree is recommended for a reproducible final deployment.
+    if "%PAUSE_AT_END%"=="1" (
+        choice /C YN /N /M "Continue and label this release as dirty? [Y/N] "
+        if errorlevel 2 (
+            set "FAIL_CODE=2"
+            goto PreflightFailed
+        )
+        set "ALLOW_DIRTY=1"
+    ) else (
+        echo Commit or stash the intended changes, or rerun with --allow-dirty.
+        set "FAIL_CODE=2"
+        goto PreflightFailed
+    )
 )
 
 for /f "delims=" %%I in ('powershell -NoProfile -Command "Get-Date -Format yyyyMMdd_HHmmss"') do set "BUILD_STAMP=%%I"
@@ -130,19 +146,22 @@ echo.
 
 if "%VALIDATE_ONLY%"=="1" (
     echo Final deployment preflight validation succeeded.
+    if "%PAUSE_AT_END%"=="1" pause
     exit /b 0
 )
 
 if exist "!RELEASE_ROOT!" (
     echo Release directory already exists; nothing was overwritten:
     echo !RELEASE_ROOT!
-    exit /b 1
+    set "FAIL_CODE=1"
+    goto PreflightFailed
 )
 
 mkdir "!RELEASE_ROOT!" >nul 2>nul
 if errorlevel 1 (
+    set "FAIL_CODE=!ERRORLEVEL!"
     echo Failed to create release directory: !RELEASE_ROOT!
-    exit /b 1
+    goto PreflightFailed
 )
 
 > "!RELEASE_ROOT!\BUILD_INCOMPLETE.txt" echo Build started at %DATE% %TIME%.
@@ -273,11 +292,19 @@ exit /b !FAIL_CODE!
 
 :UsageSuccess
 call :PrintUsage
+if "%PAUSE_AT_END%"=="1" pause
 exit /b 0
 
 :UsageFailure
 call :PrintUsage
-exit /b 2
+set "FAIL_CODE=2"
+goto PreflightFailed
+
+:PreflightFailed
+if not defined FAIL_CODE set "FAIL_CODE=1"
+echo.
+if "%PAUSE_AT_END%"=="1" pause
+exit /b !FAIL_CODE!
 
 :PrintUsage
 echo Usage: %~nx0 [EngineRoot] [options]
