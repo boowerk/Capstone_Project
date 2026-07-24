@@ -16,9 +16,11 @@
 #include "Game/WorldLayout/GP_VillageSlot.h"
 #include "Misc/Crc.h"
 #include "Misc/ScopeExit.h"
+#include "Net/UnrealNetwork.h"
 #include "PCGComponent.h"
 #include "PCGGraph.h"
 #include "PCGManagedResource.h"
+#include "Player/GP_PlayerController.h"
 #include "UObject/ConstructorHelpers.h"
 #include "WorldPartition/DataLayer/DataLayerAsset.h"
 #include "WorldPartition/DataLayer/DataLayerManager.h"
@@ -248,6 +250,9 @@ bool AGP_VillageLayoutDirector::DoVillageFootprintsOverlap(
 AGP_VillageLayoutDirector::AGP_VillageLayoutDirector()
 {
 	PrimaryActorTick.bCanEverTick = false;
+	bReplicates = true;
+	bAlwaysRelevant = true;
+	SetReplicateMovement(false);
 
 	SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("SceneRoot"));
 	SetRootComponent(SceneRoot);
@@ -265,6 +270,14 @@ AGP_VillageLayoutDirector::AGP_VillageLayoutDirector()
 #if WITH_EDITORONLY_DATA
 	bIsSpatiallyLoaded = false;
 #endif
+}
+
+void AGP_VillageLayoutDirector::GetLifetimeReplicatedProps(
+	TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(AGP_VillageLayoutDirector, RuntimeLayoutSnapshot);
 }
 
 TArray<FGP_VillagePresetDefinition> AGP_VillageLayoutDirector::GetVillagePresetPool() const
@@ -379,7 +392,13 @@ void AGP_VillageLayoutDirector::BeginPlay()
 {
 	Super::BeginPlay();
 
-	if (!bAutoBuildOnBeginPlay || !HasAuthority())
+	if (!HasAuthority())
+	{
+		TryApplyReplicatedRuntimeLayout();
+		return;
+	}
+
+	if (!bAutoBuildOnBeginPlay)
 	{
 		return;
 	}
@@ -494,6 +513,12 @@ bool AGP_VillageLayoutDirector::BuildSelectionForSeed(int32 InRunSeed)
 	const bool bShouldStreamVillageLevel = bIsGameWorld && bStreamVillageLevelAtRuntime;
 	const bool bVillageLevelScheduled = !bShouldStreamVillageLevel
 		|| (Result.bSucceeded && StreamSelectedVillageLevels(SelectedSet));
+	if (bIsGameWorld
+		&& HasAuthority()
+		&& (!bShouldStreamVillageLevel || !Result.bSucceeded))
+	{
+		PublishEmptyRuntimeLayoutSnapshot();
+	}
 
 	TArray<FString> SelectedNames;
 	for (FName SlotId : SelectedSlotIds)
@@ -1289,23 +1314,33 @@ bool AGP_VillageLayoutDirector::ApplyDataLayerStates(const TSet<FName>& InSelect
 
 bool AGP_VillageLayoutDirector::StreamSelectedVillageLevels(const TSet<FName>& InSelectedSlotIds)
 {
-	UnloadActiveVillageLevels();
-	bVillageLevelBatchFailed = false;
-
-	if (InSelectedSlotIds.IsEmpty())
+	TArray<FGP_VillageRuntimeInstance> Instances;
+	if (!BuildRuntimeLayoutInstances(InSelectedSlotIds, Instances))
 	{
-		MarkRuntimeLayoutReady();
-		return true;
-	}
-
-	UWorld* World = GetWorld();
-	if (!World)
-	{
+		PublishEmptyRuntimeLayoutSnapshot();
+		UnloadActiveVillageLevels();
 		return false;
 	}
 
-	ExpectedVillageLevelCount = InSelectedSlotIds.Num();
-	int32 ScheduledLevelCount = 0;
+	// Publish before server-side streaming so clients can load and generate their
+	// visual PCG in parallel with the dedicated server.
+	PublishRuntimeLayoutSnapshot(Instances, true);
+	if (StreamRuntimeVillageLevels(Instances))
+	{
+		return true;
+	}
+
+	PublishEmptyRuntimeLayoutSnapshot();
+	return false;
+}
+
+bool AGP_VillageLayoutDirector::BuildRuntimeLayoutInstances(
+	const TSet<FName>& InSelectedSlotIds,
+	TArray<FGP_VillageRuntimeInstance>& OutInstances) const
+{
+	OutInstances.Reset();
+	OutInstances.Reserve(InSelectedSlotIds.Num());
+	const int32 SnapshotRevision = GetNextRuntimeLayoutRevision();
 	for (const AGP_VillageSlot* Slot : CachedSlots)
 	{
 		if (!IsValid(Slot) || !InSelectedSlotIds.Contains(Slot->GetSlotId()))
@@ -1322,16 +1357,92 @@ bool AGP_VillageLayoutDirector::StreamSelectedVillageLevels(const TSet<FName>& I
 			UE_LOG(LogTemp, Error,
 				TEXT("[VillageLayout] No valid village preset is assigned to slot '%s'."),
 				*SlotId.ToString());
+			OutInstances.Reset();
+			return false;
+		}
+
+		FGP_VillageRuntimeInstance& Instance = OutInstances.AddDefaulted_GetRef();
+		Instance.SlotId = SlotId;
+		Instance.PresetId = AssignedPresetId;
+		Instance.VillageLevel = AssignedLevel;
+		Instance.SpawnTransform = FTransform(
+			Slot->GetActorRotation(),
+			Slot->GetActorLocation(),
+			FVector::OneVector);
+		Instance.StableInstanceName = FName(*FString::Printf(
+			TEXT("%s_R%08X"),
+			*MakeStreamingLevelName(SlotId),
+			static_cast<uint32>(SnapshotRevision)));
+		Instance.PCGSeed = MakeVillagePCGSeed(SlotId);
+	}
+
+	if (OutInstances.Num() != InSelectedSlotIds.Num())
+	{
+		UE_LOG(LogTemp, Error,
+			TEXT("[VillageLayout] Built %d of %d selected runtime village instances."),
+			OutInstances.Num(),
+			InSelectedSlotIds.Num());
+		OutInstances.Reset();
+		return false;
+	}
+
+	return true;
+}
+
+bool AGP_VillageLayoutDirector::StreamRuntimeVillageLevels(
+	const TArray<FGP_VillageRuntimeInstance>& Instances)
+{
+	UnloadActiveVillageLevels();
+	bVillageLevelBatchFailed = false;
+
+	if (Instances.IsEmpty())
+	{
+		MarkRuntimeLayoutReady();
+		return true;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return false;
+	}
+
+	TSet<FName> SeenSlotIds;
+	TSet<FName> SeenInstanceNames;
+	for (const FGP_VillageRuntimeInstance& Instance : Instances)
+	{
+		if (Instance.SlotId.IsNone()
+			|| Instance.VillageLevel.IsNull()
+			|| Instance.StableInstanceName.IsNone()
+			|| Instance.PCGSeed < 0
+			|| Instance.SpawnTransform.ContainsNaN()
+			|| SeenSlotIds.Contains(Instance.SlotId)
+			|| SeenInstanceNames.Contains(Instance.StableInstanceName))
+		{
+			UE_LOG(LogTemp, Error,
+				TEXT("[VillageLayout] Invalid or duplicate runtime village instance Slot='%s' Preset='%s' Level='%s' Name='%s' Seed=%d."),
+				*Instance.SlotId.ToString(),
+				*Instance.PresetId.ToString(),
+				*Instance.VillageLevel.ToString(),
+				*Instance.StableInstanceName.ToString(),
+				Instance.PCGSeed);
 			UnloadActiveVillageLevels();
 			return false;
 		}
 
-		const FTransform SpawnTransform(Slot->GetActorRotation(), Slot->GetActorLocation(), FVector::OneVector);
-		const FString StableLevelName = MakeStreamingLevelName(SlotId);
+		SeenSlotIds.Add(Instance.SlotId);
+		SeenInstanceNames.Add(Instance.StableInstanceName);
+	}
+
+	ExpectedVillageLevelCount = Instances.Num();
+	int32 ScheduledLevelCount = 0;
+	for (const FGP_VillageRuntimeInstance& Instance : Instances)
+	{
+		const FString StableLevelName = Instance.StableInstanceName.ToString();
 		ULevelStreamingDynamic::FLoadLevelInstanceParams Params(
 			World,
-			AssignedLevel.ToSoftObjectPath().GetLongPackageName(),
-			SpawnTransform);
+			Instance.VillageLevel.ToSoftObjectPath().GetLongPackageName(),
+			Instance.SpawnTransform);
 		Params.OptionalLevelNameOverride = &StableLevelName;
 		Params.bInitiallyVisible = false;
 		Params.LevelStreamingCreatedCallback = [this](ULevelStreaming* CreatedStreamingLevel)
@@ -1353,29 +1464,34 @@ bool AGP_VillageLayoutDirector::StreamSelectedVillageLevels(const TSet<FName>& I
 		{
 			UE_LOG(LogTemp, Error,
 				TEXT("[VillageLayout] Failed to schedule village preset '%s' (%s) for slot '%s'."),
-				*AssignedPresetId.ToString(),
-				*AssignedLevel.ToString(),
-				*SlotId.ToString());
+				*Instance.PresetId.ToString(),
+				*Instance.VillageLevel.ToString(),
+				*Instance.SlotId.ToString());
 			UnloadActiveVillageLevels();
 			return false;
 		}
 
-		ActiveVillageLevels.Add(SlotId, StreamingLevel);
+		ActiveVillageLevels.Add(Instance.SlotId, StreamingLevel);
+		ActiveVillagePCGSeeds.Add(Instance.SlotId, Instance.PCGSeed);
+		ActiveVillageInstanceNames.Add(Instance.SlotId, Instance.StableInstanceName);
 		++ScheduledLevelCount;
 		UE_LOG(LogTemp, Log,
-			TEXT("[VillageLayout] Scheduled village preset '%s' (%s) at slot '%s' Location=%s."),
-			*AssignedPresetId.ToString(),
-			*AssignedLevel.ToString(),
-			*SlotId.ToString(),
-			*Slot->GetActorLocation().ToCompactString());
+			TEXT("[VillageLayout] %s scheduled village preset '%s' (%s) at slot '%s' Location=%s Instance='%s' PCGSeed=%d."),
+			HasAuthority() ? TEXT("Server") : TEXT("Client"),
+			*Instance.PresetId.ToString(),
+			*Instance.VillageLevel.ToString(),
+			*Instance.SlotId.ToString(),
+			*Instance.SpawnTransform.GetLocation().ToCompactString(),
+			*Instance.StableInstanceName.ToString(),
+			Instance.PCGSeed);
 	}
 
-	if (ScheduledLevelCount != InSelectedSlotIds.Num())
+	if (ScheduledLevelCount != Instances.Num())
 	{
 		UE_LOG(LogTemp, Error,
 			TEXT("[VillageLayout] Scheduled %d of %d selected village slots; rolling back."),
 			ScheduledLevelCount,
-			InSelectedSlotIds.Num());
+			Instances.Num());
 		UnloadActiveVillageLevels();
 		return false;
 	}
@@ -1387,15 +1503,115 @@ bool AGP_VillageLayoutDirector::StreamSelectedVillageLevels(const TSet<FName>& I
 		&& ExpectedVillageLevelCount > 0
 		&& GeneratedVillageLevelIds.Num() < ExpectedVillageLevelCount)
 	{
-		World->GetTimerManager().SetTimer(
-			VillageStreamingTimeoutHandle,
-			this,
-			&AGP_VillageLayoutDirector::HandleVillageStreamingTimeout,
-			FMath::Max(1.0f, VillageStreamingTimeoutSeconds),
-			false);
+		// A slow client must be allowed to finish local visual PCG. The server
+		// retains the authoritative timeout and publishes an unload snapshot if
+		// its gameplay layout cannot finish.
+		if (HasAuthority())
+		{
+			World->GetTimerManager().SetTimer(
+				VillageStreamingTimeoutHandle,
+				this,
+				&AGP_VillageLayoutDirector::HandleVillageStreamingTimeout,
+				FMath::Max(1.0f, VillageStreamingTimeoutSeconds),
+				false);
+		}
 	}
 
 	return !bVillageLevelBatchFailed;
+}
+
+void AGP_VillageLayoutDirector::PublishRuntimeLayoutSnapshot(
+	const TArray<FGP_VillageRuntimeInstance>& Instances,
+	bool bShouldLoad)
+{
+	if (!HasAuthority() || !GetWorld() || !GetWorld()->IsGameWorld())
+	{
+		return;
+	}
+
+	FGP_VillageRuntimeLayoutSnapshot NextSnapshot;
+	NextSnapshot.Revision = GetNextRuntimeLayoutRevision();
+	NextSnapshot.RunSeed = LastRunSeed;
+	NextSnapshot.bShouldLoad = bShouldLoad;
+	NextSnapshot.Instances = Instances;
+	RuntimeLayoutSnapshot = MoveTemp(NextSnapshot);
+	ForceNetUpdate();
+
+	UE_LOG(LogTemp, Log,
+		TEXT("[VillageLayout] Published runtime snapshot Revision=%d Seed=%d Load=%s Instances=%d."),
+		RuntimeLayoutSnapshot.Revision,
+		RuntimeLayoutSnapshot.RunSeed,
+		RuntimeLayoutSnapshot.bShouldLoad ? TEXT("true") : TEXT("false"),
+		RuntimeLayoutSnapshot.Instances.Num());
+}
+
+void AGP_VillageLayoutDirector::PublishEmptyRuntimeLayoutSnapshot()
+{
+	if (RuntimeLayoutSnapshot.Revision > 0
+		&& !RuntimeLayoutSnapshot.bShouldLoad
+		&& RuntimeLayoutSnapshot.Instances.IsEmpty())
+	{
+		return;
+	}
+
+	PublishRuntimeLayoutSnapshot({}, false);
+}
+
+void AGP_VillageLayoutDirector::TryApplyReplicatedRuntimeLayout()
+{
+	if (HasAuthority()
+		|| !HasActorBegunPlay()
+		|| !GetWorld()
+		|| !GetWorld()->IsGameWorld()
+		|| RuntimeLayoutSnapshot.Revision <= 0
+		|| RuntimeLayoutSnapshot.Revision == AppliedRuntimeLayoutRevision)
+	{
+		return;
+	}
+
+	AppliedRuntimeLayoutRevision = RuntimeLayoutSnapshot.Revision;
+	UnloadActiveVillageLevels();
+	SelectedSlotIds.Reset();
+	LastRunSeed = RuntimeLayoutSnapshot.RunSeed;
+
+	if (!RuntimeLayoutSnapshot.bShouldLoad)
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[VillageLayout] Client applied unload snapshot Revision=%d Seed=%d."),
+			RuntimeLayoutSnapshot.Revision,
+			RuntimeLayoutSnapshot.RunSeed);
+		return;
+	}
+
+	if (LastRunSeed < 0)
+	{
+		UE_LOG(LogTemp, Error,
+			TEXT("[VillageLayout] Client rejected runtime snapshot Revision=%d because RunSeed is invalid."),
+			RuntimeLayoutSnapshot.Revision);
+		return;
+	}
+
+	for (const FGP_VillageRuntimeInstance& Instance : RuntimeLayoutSnapshot.Instances)
+	{
+		SelectedSlotIds.Add(Instance.SlotId);
+	}
+
+	UE_LOG(LogTemp, Log,
+		TEXT("[VillageLayout] Client applying runtime snapshot Revision=%d Seed=%d Instances=%d."),
+		RuntimeLayoutSnapshot.Revision,
+		LastRunSeed,
+		RuntimeLayoutSnapshot.Instances.Num());
+	if (!StreamRuntimeVillageLevels(RuntimeLayoutSnapshot.Instances))
+	{
+		UE_LOG(LogTemp, Error,
+			TEXT("[VillageLayout] Client failed to schedule runtime snapshot Revision=%d."),
+			RuntimeLayoutSnapshot.Revision);
+	}
+}
+
+void AGP_VillageLayoutDirector::OnRep_RuntimeLayoutSnapshot()
+{
+	TryApplyReplicatedRuntimeLayout();
 }
 
 void AGP_VillageLayoutDirector::UnloadActiveVillageLevels()
@@ -1445,6 +1661,8 @@ void AGP_VillageLayoutDirector::UnloadActiveVillageLevels()
 	GenerationRequestedVillageLevelIds.Reset();
 	GeneratedVillageLevelIds.Reset();
 	PendingVillagePCGComponents.Reset();
+	ActiveVillagePCGSeeds.Reset();
+	ActiveVillageInstanceNames.Reset();
 	ExpectedVillageLevelCount = 0;
 	bRuntimeLayoutReady = false;
 }
@@ -1606,7 +1824,15 @@ bool AGP_VillageLayoutDirector::ConfigureVillagePCG(
 		return false;
 	}
 
-	const int32 PCGSeed = MakeVillagePCGSeed(SlotId);
+	const int32* PCGSeed = ActiveVillagePCGSeeds.Find(SlotId);
+	if (!PCGSeed)
+	{
+		UE_LOG(LogTemp, Error,
+			TEXT("[VillageLayout] Slot '%s' has no runtime PCG seed."),
+			*SlotId.ToString());
+		return false;
+	}
+
 	for (UPCGComponent* PCGComponent : CityPCGComponents)
 	{
 		UPCGGraphInstance* GraphInstance = IsValid(PCGComponent) ? PCGComponent->GetGraphInstance() : nullptr;
@@ -1620,7 +1846,7 @@ bool AGP_VillageLayoutDirector::ConfigureVillagePCG(
 			return false;
 		}
 
-		PCGComponent->Seed = PCGSeed;
+		PCGComponent->Seed = *PCGSeed;
 		PCGComponent->bActivated = true;
 		PCGComponent->bIsComponentPartitioned = false;
 		PCGComponent->GenerationTrigger = EPCGComponentGenerationTrigger::GenerateOnDemand;
@@ -1898,6 +2124,13 @@ int32 AGP_VillageLayoutDirector::MakeVillagePCGSeed(FName SlotId) const
 	return static_cast<int32>(HashCombineFast(static_cast<uint32>(LastRunSeed), SlotHash) & MAX_int32);
 }
 
+int32 AGP_VillageLayoutDirector::GetNextRuntimeLayoutRevision() const
+{
+	return RuntimeLayoutSnapshot.Revision >= MAX_int32
+		? 1
+		: RuntimeLayoutSnapshot.Revision + 1;
+}
+
 FString AGP_VillageLayoutDirector::MakeStreamingLevelName(FName SlotId) const
 {
 	return FString::Printf(
@@ -1908,7 +2141,11 @@ FString AGP_VillageLayoutDirector::MakeStreamingLevelName(FName SlotId) const
 
 FName AGP_VillageLayoutDirector::MakeVillageRoleTag(FName SlotId, const TCHAR* RoleSuffix) const
 {
-	return FName(*FString::Printf(TEXT("%s_%s"), *MakeStreamingLevelName(SlotId), RoleSuffix));
+	const FName* ActiveInstanceName = ActiveVillageInstanceNames.Find(SlotId);
+	const FString Prefix = ActiveInstanceName
+		? ActiveInstanceName->ToString()
+		: MakeStreamingLevelName(SlotId);
+	return FName(*FString::Printf(TEXT("%s_%s"), *Prefix, RoleSuffix));
 }
 
 void AGP_VillageLayoutDirector::HandleVillageLevelLoaded()
@@ -1938,7 +2175,10 @@ void AGP_VillageLayoutDirector::HandleVillageLevelLoaded()
 		int32 PCGComponentCount = 0;
 		int32 RoadActorCount = 0;
 		int32 DistrictActorCount = 0;
-		ConfigureVillageGameplayActors(Pair.Value, Pair.Key);
+		if (HasAuthority())
+		{
+			ConfigureVillageGameplayActors(Pair.Value, Pair.Key);
+		}
 		if (!ConfigureVillagePCG(
 			Pair.Value,
 			Pair.Key,
@@ -1966,6 +2206,7 @@ void AGP_VillageLayoutDirector::HandleVillageLevelLoaded()
 	{
 		bVillageLevelBatchFailed = true;
 		LastSelectionSummary += TEXT(" Runtime=ConfigurationFailed");
+		PublishEmptyRuntimeLayoutSnapshot();
 		UnloadActiveVillageLevels();
 		return;
 	}
@@ -2007,6 +2248,7 @@ void AGP_VillageLayoutDirector::HandleVillageLevelShown()
 		LastSelectionSummary += TEXT(" Runtime=GenerationFailed");
 		UE_LOG(LogTemp, Error,
 			TEXT("[VillageLayout] Failed to start sequential city PCG generation; rolling back the village batch."));
+		PublishEmptyRuntimeLayoutSnapshot();
 		UnloadActiveVillageLevels();
 	}
 }
@@ -2048,6 +2290,7 @@ void AGP_VillageLayoutDirector::HandleVillagePCGGenerated(UPCGComponent* PCGComp
 		UE_LOG(LogTemp, Error,
 			TEXT("[VillageLayout] Failed to continue sequential city PCG generation after slot '%s'; rolling back the village batch."),
 			*SlotId.ToString());
+		PublishEmptyRuntimeLayoutSnapshot();
 		UnloadActiveVillageLevels();
 	}
 }
@@ -2071,6 +2314,7 @@ void AGP_VillageLayoutDirector::HandleVillagePCGCancelled(UPCGComponent* PCGComp
 	UE_LOG(LogTemp, Error,
 		TEXT("[VillageLayout] City PCG generation was cancelled for slot '%s'; rolling back the village batch."),
 		*SlotId.ToString());
+	PublishEmptyRuntimeLayoutSnapshot();
 	if (!bSchedulingVillagePCG)
 	{
 		UnloadActiveVillageLevels();
@@ -2095,6 +2339,7 @@ void AGP_VillageLayoutDirector::HandleVillageStreamingTimeout()
 		GenerationRequestedVillageLevelIds.Num(),
 		GeneratedVillageLevelIds.Num(),
 		ExpectedVillageLevelCount);
+	PublishEmptyRuntimeLayoutSnapshot();
 	UnloadActiveVillageLevels();
 }
 
@@ -2123,6 +2368,20 @@ void AGP_VillageLayoutDirector::MarkRuntimeLayoutReady()
 		SelectedSlotIds.Num(),
 		GeneratedVillageLevelIds.Num());
 	OnRuntimeLayoutReady.Broadcast();
+
+	if (!HasAuthority())
+	{
+		if (AGP_PlayerController* PlayerController = Cast<AGP_PlayerController>(
+			GetWorld()->GetFirstPlayerController()))
+		{
+			PlayerController->NotifyVillageVisualReady(AppliedRuntimeLayoutRevision);
+		}
+		else
+		{
+			UE_LOG(LogTemp, Error,
+				TEXT("[VillageLayout] Client layout is ready but no local GP_PlayerController can send the visual-ready ACK."));
+		}
+	}
 }
 
 void AGP_VillageLayoutDirector::DrawSelectionDebug() const

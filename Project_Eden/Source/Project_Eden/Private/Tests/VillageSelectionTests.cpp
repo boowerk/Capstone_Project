@@ -554,6 +554,43 @@ bool FVillageSelectionPolicyTest::RunTest(const FString& Parameters)
 		AGP_VillageLayoutDirector::StaticClass()->FindPropertyByName(TEXT("VillagePresetPool")));
 	TestNotNull(TEXT("VillageLayoutDirector exposes a village preset catalog"),
 		AGP_VillageLayoutDirector::StaticClass()->FindPropertyByName(TEXT("VillagePresetCatalog")));
+	const AGP_VillageLayoutDirector* VillageDirectorDefaults =
+		GetDefault<AGP_VillageLayoutDirector>();
+	TestTrue(TEXT("VillageLayoutDirector replicates its runtime layout"),
+		VillageDirectorDefaults->GetIsReplicated());
+	TestTrue(TEXT("VillageLayoutDirector remains relevant to late-joining clients"),
+		VillageDirectorDefaults->bAlwaysRelevant);
+	const FProperty* RuntimeLayoutSnapshotProperty =
+		AGP_VillageLayoutDirector::StaticClass()->FindPropertyByName(
+			TEXT("RuntimeLayoutSnapshot"));
+	TestNotNull(TEXT("VillageLayoutDirector exposes its runtime layout snapshot"),
+		RuntimeLayoutSnapshotProperty);
+	TestTrue(TEXT("Village runtime layout snapshot is replicated"),
+		RuntimeLayoutSnapshotProperty
+		&& RuntimeLayoutSnapshotProperty->HasAnyPropertyFlags(CPF_Net));
+	TestTrue(TEXT("Village runtime layout snapshot uses RepNotify"),
+		RuntimeLayoutSnapshotProperty
+		&& RuntimeLayoutSnapshotProperty->HasAnyPropertyFlags(CPF_RepNotify));
+	TestEqual(TEXT("Village runtime layout snapshot uses the expected RepNotify"),
+		RuntimeLayoutSnapshotProperty ? RuntimeLayoutSnapshotProperty->RepNotifyFunc : NAME_None,
+		FName(TEXT("OnRep_RuntimeLayoutSnapshot")));
+	TestNotNull(TEXT("Village runtime layout snapshot RepNotify exists"),
+		AGP_VillageLayoutDirector::StaticClass()->FindFunctionByName(
+			TEXT("OnRep_RuntimeLayoutSnapshot")));
+	TestNotNull(TEXT("Village runtime instance exposes its stable streaming name"),
+		FGP_VillageRuntimeInstance::StaticStruct()->FindPropertyByName(
+			TEXT("StableInstanceName")));
+	TestNotNull(TEXT("Village runtime instance exposes its exact PCG seed"),
+		FGP_VillageRuntimeInstance::StaticStruct()->FindPropertyByName(TEXT("PCGSeed")));
+	const FGP_VillageRuntimeLayoutSnapshot DefaultRuntimeSnapshot;
+	TestEqual(TEXT("Village runtime snapshot defaults to not received"),
+		DefaultRuntimeSnapshot.Revision,
+		0);
+	TestEqual(TEXT("Village runtime snapshot defaults to an invalid seed"),
+		DefaultRuntimeSnapshot.RunSeed,
+		INDEX_NONE);
+	TestFalse(TEXT("Village runtime snapshot defaults to unload"),
+		DefaultRuntimeSnapshot.bShouldLoad);
 	TestNotNull(TEXT("Village presets expose an explicit size class"),
 		FGP_VillagePresetDefinition::StaticStruct()->FindPropertyByName(TEXT("PresetSizeClass")));
 	TestNotNull(TEXT("VillageSlot exposes a size-class capacity"),

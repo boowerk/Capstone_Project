@@ -11,6 +11,7 @@ class AGP_RunPortal;
 class AGP_EnemySpawnMarker;
 class AGP_VillageLayoutDirector;
 class AGP_PlayerController;
+class APlayerController;
 class APlayerState;
 class APawn;
 class APlayerStart;
@@ -61,6 +62,9 @@ public:
 	bool RequestMiddleTravel(
 		AGP_PlayerController* PlayerController,
 		FName DestinationZoneId);
+	void NotifyVillageClientVisualReady(
+		AGP_PlayerController* PlayerController,
+		int32 LayoutRevision);
 	virtual void RestartPlayer(AController* NewPlayer) override;
 
 protected:
@@ -175,6 +179,8 @@ private:
 	TMap<TWeakObjectPtr<AGP_EnemySpawnVolume>, int32> ZoneNavigationStartRetries;
 	TSet<EGPZoneStage> UnlockedStages;
 	TSet<TWeakObjectPtr<AGP_EnemySpawnVolume>> RegisteredNavigationInvokerZones;
+	TMap<TWeakObjectPtr<APlayerController>, int32> VillageVisualReadyRevisions;
+	TMap<TWeakObjectPtr<APlayerController>, int32> OuterAssignmentRevisions;
 	bool bUseStagedZoneProgression = false;
 	bool bZoneProgressionInitialized = false;
 

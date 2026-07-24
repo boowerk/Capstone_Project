@@ -21,10 +21,16 @@ AGP_EnemySpawnMarker::AGP_EnemySpawnMarker()
 void AGP_EnemySpawnMarker::BeginPlay()
 {
 	Super::BeginPlay();
-	if (HasAuthority())
+
+	// Client copies exist only so their containing village can render locally.
+	// Non-replicated actors still report ROLE_Authority on clients.
+	if (GetNetMode() == NM_Client)
 	{
-		Trigger->OnComponentBeginOverlap.AddDynamic(this, &AGP_EnemySpawnMarker::HandleOverlapBegin);
+		Trigger->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		return;
 	}
+
+	Trigger->OnComponentBeginOverlap.AddDynamic(this, &AGP_EnemySpawnMarker::HandleOverlapBegin);
 }
 
 void AGP_EnemySpawnMarker::Activate(AGP_EnemySpawnVolume* OwningZone)

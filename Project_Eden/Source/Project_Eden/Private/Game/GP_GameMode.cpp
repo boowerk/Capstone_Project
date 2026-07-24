@@ -88,12 +88,22 @@ void AGP_GameMode::RestartPlayer(AController* NewPlayer)
 	{
 		PlayerCharacter->SetPartyVisualSlot(ResolvePartyStartSlot(NewPlayer));
 	}
+
+	// A remote client can acknowledge its village visuals before its gameplay pawn
+	// exists. Retry the outer assignment after the pawn has been restarted.
+	AssignPlayersToOuterVillageStarts();
 }
 
 void AGP_GameMode::Logout(AController* Exiting)
 {
 	// Release the deterministic slot immediately so a reconnect does not wait for garbage collection.
 	PartyStartSlotByController.Remove(TWeakObjectPtr<AController>(Exiting));
+	if (APlayerController* PlayerController = Cast<APlayerController>(Exiting))
+	{
+		const TWeakObjectPtr<APlayerController> PlayerKey(PlayerController);
+		VillageVisualReadyRevisions.Remove(PlayerKey);
+		OuterAssignmentRevisions.Remove(PlayerKey);
+	}
 	Super::Logout(Exiting);
 }
 
@@ -825,6 +835,40 @@ void AGP_GameMode::HandleVillageRuntimeLayoutReady()
 		{
 			MinimapSubsystem->NotifyPcgLayoutReady(0.25f);
 		}
+	}
+}
+
+void AGP_GameMode::NotifyVillageClientVisualReady(
+	AGP_PlayerController* PlayerController,
+	int32 LayoutRevision)
+{
+	if (!HasAuthority() || !IsValid(PlayerController) || !IsValid(VillageLayoutDirector))
+	{
+		return;
+	}
+
+	const int32 CurrentRevision = VillageLayoutDirector->GetRuntimeLayoutRevision();
+	if (LayoutRevision <= 0 || LayoutRevision != CurrentRevision)
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[GP_GameMode] Ignored village visual-ready ACK from '%s': ClientRevision=%d ServerRevision=%d."),
+			*PlayerController->GetName(),
+			LayoutRevision,
+			CurrentRevision);
+		return;
+	}
+
+	VillageVisualReadyRevisions.Add(
+		TWeakObjectPtr<APlayerController>(PlayerController),
+		LayoutRevision);
+	UE_LOG(LogTemp, Log,
+		TEXT("[GP_GameMode] Village visuals ready for '%s' at Revision=%d."),
+		*PlayerController->GetName(),
+		LayoutRevision);
+
+	if (bZoneProgressionInitialized)
+	{
+		AssignPlayersToOuterVillageStarts();
 	}
 }
 
@@ -1978,11 +2022,49 @@ void AGP_GameMode::AssignPlayersToOuterVillageStarts()
 			< (BState ? BState->GetPlayerId() : MAX_int32);
 	});
 
-	const int32 AssignmentCount = FMath::Min(Players.Num(), OuterStarts.Num());
-	for (int32 Index = 0; Index < AssignmentCount; ++Index)
+	const int32 LayoutRevision = IsValid(VillageLayoutDirector)
+		? VillageLayoutDirector->GetRuntimeLayoutRevision()
+		: 0;
+	const bool bRequiresClientVisualReady =
+		IsValid(VillageLayoutDirector) && LayoutRevision > 0;
+	for (APlayerController* PlayerController : Players)
 	{
-		APawn* Pawn = Players[Index] ? Players[Index]->GetPawn() : nullptr;
-		APlayerStart* PlayerStart = OuterStarts[Index];
+		if (!IsValid(PlayerController))
+		{
+			continue;
+		}
+
+		// Reuse the stable party slot assigned at login instead of the player's
+		// current sorted-array index. This prevents a reconnect from sharing an
+		// occupied outer village after another player leaves.
+		const int32 PartySlotIndex = ResolvePartyStartSlot(PlayerController);
+		if (!OuterStarts.IsValidIndex(PartySlotIndex))
+		{
+			continue;
+		}
+
+		const TWeakObjectPtr<APlayerController> PlayerKey(PlayerController);
+		const int32* ReadyRevision = VillageVisualReadyRevisions.Find(PlayerKey);
+		const bool bVisualsReady = !bRequiresClientVisualReady
+			|| PlayerController->IsLocalController()
+			|| (ReadyRevision && *ReadyRevision == LayoutRevision);
+		if (!bVisualsReady)
+		{
+			UE_LOG(LogTemp, Log,
+				TEXT("[GP_GameMode] Waiting to assign '%s' until village visuals are ready for Revision=%d."),
+				*PlayerController->GetName(),
+				LayoutRevision);
+			continue;
+		}
+
+		const int32* AssignedRevision = OuterAssignmentRevisions.Find(PlayerKey);
+		if (AssignedRevision && *AssignedRevision == LayoutRevision)
+		{
+			continue;
+		}
+
+		APawn* Pawn = PlayerController->GetPawn();
+		APlayerStart* PlayerStart = OuterStarts[PartySlotIndex];
 		if (!IsValid(Pawn) || !IsValid(PlayerStart))
 		{
 			continue;
@@ -1993,13 +2075,15 @@ void AGP_GameMode::AssignPlayersToOuterVillageStarts()
 			PlayerStart->GetActorRotation(),
 			false,
 			true);
+		OuterAssignmentRevisions.Add(PlayerKey, LayoutRevision);
 		UE_LOG(LogTemp, Log,
-			TEXT("[GP_GameMode] Assigned player %d to outer start '%s'."),
-			Index,
-			*PlayerStart->GetName());
+			TEXT("[GP_GameMode] Assigned player %d to outer start '%s' after visual Revision=%d."),
+			PartySlotIndex,
+			*PlayerStart->GetName(),
+			LayoutRevision);
 	}
 
-	if (AssignmentCount < Players.Num())
+	if (OuterStarts.Num() < Players.Num())
 	{
 		UE_LOG(LogTemp, Warning,
 			TEXT("[GP_GameMode] Found %d player(s) but only %d streamed outer PlayerStart(s)."),

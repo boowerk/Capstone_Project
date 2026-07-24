@@ -69,6 +69,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "UI|Middle Travel")
 	void CloseMiddleTravelMap();
 
+	// Called locally after the replicated village snapshot has finished loading
+	// and generating visual PCG. The server gates the initial Outer teleport on it.
+	void NotifyVillageVisualReady(int32 LayoutRevision);
+
 	bool GetSkillSelectionCursorLocation(FVector& OutTargetLocation) const;
 
 protected:
@@ -251,6 +255,9 @@ private:
 
 	UFUNCTION(Server, Reliable)
 	void Server_RequestMiddleTravel(FName DestinationZoneId);
+
+	UFUNCTION(Server, Reliable)
+	void Server_NotifyVillageVisualReady(int32 LayoutRevision);
 
 	bool CanEquipSkill(UGP_SkillData* SkillData, FGameplayTag SlotTag) const;
 	bool BuildSkillLoadoutAfterEquip(

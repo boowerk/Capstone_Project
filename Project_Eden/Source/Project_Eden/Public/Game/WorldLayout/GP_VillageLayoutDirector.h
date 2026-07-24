@@ -24,6 +24,8 @@ class PROJECT_EDEN_API AGP_VillageLayoutDirector : public AActor
 public:
 	AGP_VillageLayoutDirector();
 
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
 	UFUNCTION(BlueprintCallable, Category = "Village")
 	bool BuildSelectionForSeed(int32 InRunSeed);
 
@@ -45,6 +47,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Village|Runtime")
 	bool IsRuntimeLayoutReady() const { return bRuntimeLayoutReady; }
+
+	UFUNCTION(BlueprintPure, Category = "Village|Runtime")
+	int32 GetRuntimeLayoutRevision() const { return RuntimeLayoutSnapshot.Revision; }
 
 	UPROPERTY(BlueprintAssignable, Category = "Village|Runtime")
 	FGPOnVillageRuntimeLayoutReady OnRuntimeLayoutReady;
@@ -159,6 +164,11 @@ private:
 	UPROPERTY(Transient)
 	TMap<FName, int32> AssignedVillagePresetIndices;
 
+	// The server publishes the exact selected level, transform, and stable instance
+	// name. Each client then generates the non-replicated visual PCG locally.
+	UPROPERTY(ReplicatedUsing = OnRep_RuntimeLayoutSnapshot)
+	FGP_VillageRuntimeLayoutSnapshot RuntimeLayoutSnapshot;
+
 #if WITH_EDITORONLY_DATA
 	UPROPERTY(Transient, DuplicateTransient)
 	TArray<TObjectPtr<ALevelInstance>> EditorPreviewVillageInstances;
@@ -171,6 +181,8 @@ private:
 	TSet<FName> GenerationRequestedVillageLevelIds;
 	TSet<FName> GeneratedVillageLevelIds;
 	TMap<UPCGComponent*, FName> PendingVillagePCGComponents;
+	TMap<FName, int32> ActiveVillagePCGSeeds;
+	TMap<FName, FName> ActiveVillageInstanceNames;
 	FTimerHandle VillageStreamingTimeoutHandle;
 	int32 ExpectedVillageLevelCount = 0;
 	bool bVillageLevelBatchFailed = false;
@@ -179,6 +191,7 @@ private:
 
 	int32 LastRunSeed = INDEX_NONE;
 	int32 LastPresetAssignmentAttempt = 0;
+	int32 AppliedRuntimeLayoutRevision = 0;
 
 	void CollectSlots();
 	void AssignVillagePresets(int32 InRunSeed, int32 AssignmentAttempt = 0);
@@ -197,6 +210,15 @@ private:
 		const TArray<AGP_VillageSlot*>& CandidateSlots) const;
 	bool ApplyDataLayerStates(const TSet<FName>& InSelectedSlotIds) const;
 	bool StreamSelectedVillageLevels(const TSet<FName>& InSelectedSlotIds);
+	bool BuildRuntimeLayoutInstances(
+		const TSet<FName>& InSelectedSlotIds,
+		TArray<FGP_VillageRuntimeInstance>& OutInstances) const;
+	bool StreamRuntimeVillageLevels(const TArray<FGP_VillageRuntimeInstance>& Instances);
+	void PublishRuntimeLayoutSnapshot(
+		const TArray<FGP_VillageRuntimeInstance>& Instances,
+		bool bShouldLoad);
+	void PublishEmptyRuntimeLayoutSnapshot();
+	void TryApplyReplicatedRuntimeLayout();
 	void UnloadActiveVillageLevels();
 	bool ConfigureVillagePCG(
 		ULevelStreamingDynamic* StreamingLevel,
@@ -218,6 +240,7 @@ private:
 		FName& OutRoadTag,
 		FName& OutDistrictTag) const;
 	int32 MakeVillagePCGSeed(FName SlotId) const;
+	int32 GetNextRuntimeLayoutRevision() const;
 	FString MakeStreamingLevelName(FName SlotId) const;
 	FName MakeVillageRoleTag(FName SlotId, const TCHAR* RoleSuffix) const;
 	void HandleVillagePCGGenerated(UPCGComponent* PCGComponent);
@@ -232,6 +255,9 @@ private:
 
 	UFUNCTION()
 	void HandleVillageLevelShown();
+
+	UFUNCTION()
+	void OnRep_RuntimeLayoutSnapshot();
 
 #if WITH_EDITOR
 	void HandleEditorPreviewPCGGenerated(UPCGComponent* PCGComponent);

@@ -19,7 +19,9 @@
 #include "Abilities/GameplayAbilityTypes.h"
 #include "GameplayTags/GP_Tags.h"
 #include "Game/GP_GameMode.h"
+#include "Game/WorldLayout/GP_VillageLayoutDirector.h"
 #include "InputCoreTypes.h"
+#include "EngineUtils.h"
 #include "Kismet/GameplayStatics.h"
 #include "Logging/LogMacros.h"
 #include "Misc/CommandLine.h"
@@ -83,6 +85,20 @@ void AGP_PlayerController::BeginPlay()
 		// mode (the lobby controller set it). Force game input back on.
 		SetInputMode(FInputModeGameOnly());
 		SetShowMouseCursor(false);
+
+		// Covers the inverse replication order: the client may finish applying
+		// the village snapshot before its local controller reaches BeginPlay.
+		if (GetNetMode() == NM_Client)
+		{
+			for (TActorIterator<AGP_VillageLayoutDirector> It(GetWorld()); It; ++It)
+			{
+				if (It->IsRuntimeLayoutReady())
+				{
+					NotifyVillageVisualReady(It->GetRuntimeLayoutRevision());
+					break;
+				}
+			}
+		}
 	}
 
 #if !UE_BUILD_SHIPPING
@@ -303,6 +319,29 @@ void AGP_PlayerController::CloseMiddleTravelMap()
 		MiddleTravelMapWidget->RemoveFromParent();
 	}
 	ApplyMiddleTravelInputMode(false);
+}
+
+void AGP_PlayerController::NotifyVillageVisualReady(int32 LayoutRevision)
+{
+	if (!IsLocalController() || LayoutRevision <= 0)
+	{
+		return;
+	}
+
+	Server_NotifyVillageVisualReady(LayoutRevision);
+}
+
+void AGP_PlayerController::Server_NotifyVillageVisualReady_Implementation(int32 LayoutRevision)
+{
+	if (LayoutRevision <= 0)
+	{
+		return;
+	}
+
+	if (AGP_GameMode* GameMode = GetWorld() ? GetWorld()->GetAuthGameMode<AGP_GameMode>() : nullptr)
+	{
+		GameMode->NotifyVillageClientVisualReady(this, LayoutRevision);
+	}
 }
 
 bool AGP_PlayerController::EnsureMiddleTravelMapWidget()

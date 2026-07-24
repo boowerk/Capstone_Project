@@ -35,11 +35,17 @@ void AGP_EnemySpawnVolume::BeginPlay()
 {
 	Super::BeginPlay();
 
-	if (HasAuthority())
+	// Dynamically streamed village levels are also loaded locally for client-side
+	// visual PCG. Their non-replicated gameplay actors report ROLE_Authority, so
+	// net mode is the reliable guard against duplicate client encounter logic.
+	if (GetNetMode() == NM_Client)
 	{
-		SpawnBox->OnComponentBeginOverlap.AddDynamic(this, &AGP_EnemySpawnVolume::HandleBoxOverlap);
-		SpawnBox->OnComponentEndOverlap.AddDynamic(this, &AGP_EnemySpawnVolume::HandleBoxEndOverlap);
+		SpawnBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		return;
 	}
+
+	SpawnBox->OnComponentBeginOverlap.AddDynamic(this, &AGP_EnemySpawnVolume::HandleBoxOverlap);
+	SpawnBox->OnComponentEndOverlap.AddDynamic(this, &AGP_EnemySpawnVolume::HandleBoxEndOverlap);
 
 	// Collect AGP_EnemySpawnMarker actors whose centers fall inside this box.
 	TArray<AActor*> AllMarkers;

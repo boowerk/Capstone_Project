@@ -61,6 +61,55 @@ struct FGP_VillagePresetDefinition
 	float SelectionWeight = 1.0f;
 };
 
+// One server-selected village instance. Clients use this compact description to
+// load the same level and generate its visual PCG locally; generated ISMs are not
+// replicated individually.
+USTRUCT()
+struct FGP_VillageRuntimeInstance
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	FName SlotId = NAME_None;
+
+	UPROPERTY()
+	FName PresetId = NAME_None;
+
+	UPROPERTY()
+	TSoftObjectPtr<UWorld> VillageLevel;
+
+	UPROPERTY()
+	FTransform SpawnTransform = FTransform::Identity;
+
+	UPROPERTY()
+	FName StableInstanceName = NAME_None;
+
+	UPROPERTY()
+	int32 PCGSeed = INDEX_NONE;
+};
+
+// Replicated atomically so late-joining clients receive the exact server choice
+// instead of recomputing it from a potentially different catalog.
+USTRUCT()
+struct FGP_VillageRuntimeLayoutSnapshot
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	int32 Revision = 0;
+
+	UPROPERTY()
+	int32 RunSeed = INDEX_NONE;
+
+	// True means Instances is a complete server-approved layout. False tells
+	// clients to unload any previously applied layout (for example after failure).
+	UPROPERTY()
+	bool bShouldLoad = false;
+
+	UPROPERTY()
+	TArray<FGP_VillageRuntimeInstance> Instances;
+};
+
 USTRUCT(BlueprintType)
 struct FGP_VillageGroupRule
 {
