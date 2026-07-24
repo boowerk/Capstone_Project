@@ -3,12 +3,17 @@
 #include "DrawDebugHelpers.h"
 #include "EngineUtils.h"
 #include "Components/SceneComponent.h"
+#include "GameFramework/GameStateBase.h"
+#include "Net/UnrealNetwork.h"
+#include "TimerManager.h"
 
 AGP_LevelBuildAnimator::AGP_LevelBuildAnimator()
 {
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.bStartWithTickEnabled = false;
-	bReplicates = false;
+	bReplicates = true;
+	bAlwaysRelevant = true;
+	SetReplicateMovement(false);
 
 	SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("SceneRoot"));
 	SetRootComponent(SceneRoot);
@@ -20,12 +25,35 @@ void AGP_LevelBuildAnimator::BeginPlay()
 {
 	Super::BeginPlay();
 
+	// A Blueprint child created before native replication was enabled can retain
+	// its old CDO value. Enforce the authoritative runtime contract for the
+	// map-placed Colosseum animator.
+	if (HasServerAuthority())
+	{
+		bAlwaysRelevant = true;
+		SetReplicates(true);
+	}
+
 	RebuildPieceList();
 
-	if (bAutoStartOnBeginPlay)
+	if (bWaitForColosseumPortalArrival)
+	{
+		// Move authority collision and client visuals together. Keeping final
+		// collision only on a dedicated server would fight client prediction.
+		ResetBuild(/*bMovePiecesToStart=*/true);
+		ApplyPlaybackSnapshot();
+	}
+	else if (bAutoStartOnBeginPlay)
 	{
 		StartBuild();
 	}
+}
+
+void AGP_LevelBuildAnimator::GetLifetimeReplicatedProps(
+	TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(AGP_LevelBuildAnimator, PlaybackSnapshot);
 }
 
 void AGP_LevelBuildAnimator::Tick(float DeltaSeconds)
@@ -37,7 +65,21 @@ void AGP_LevelBuildAnimator::Tick(float DeltaSeconds)
 		return;
 	}
 
-	BuildTime += DeltaSeconds;
+	const float PreviousBuildTime = BuildTime;
+	if (bUseSynchronizedBuildClock
+		&& PlaybackSnapshot.Phase == EGPLevelBuildPlaybackPhase::Playing)
+	{
+		const float SynchronizedBuildTime = static_cast<float>(FMath::Max(
+			0.0,
+			GetSynchronizedWorldTimeSeconds() - PlaybackSnapshot.StartServerTime));
+		BuildTime = FMath::Max(
+			BuildTime,
+			FMath::Min(SynchronizedBuildTime, PlaybackSnapshot.Duration));
+	}
+	else
+	{
+		BuildTime += DeltaSeconds;
+	}
 
 	bool bAllFinished = true;
 	for (int32 PieceIndex = 0; PieceIndex < Pieces.Num(); ++PieceIndex)
@@ -55,7 +97,7 @@ void AGP_LevelBuildAnimator::Tick(float DeltaSeconds)
 			continue;
 		}
 
-		if (RawLocalAlpha <= DeltaSeconds / FMath::Max(KINDA_SMALL_NUMBER, Piece.Duration))
+		if (PreviousBuildTime <= Piece.StartTime && BuildTime > Piece.StartTime)
 		{
 			BP_OnBuildPieceStarted(Piece.Actor, PieceIndex);
 		}
@@ -91,6 +133,7 @@ void AGP_LevelBuildAnimator::RebuildPieceList()
 	FRandomStream RandomStream(RandomSeed);
 	const FVector PivotLocation = ResolvePivotLocation();
 
+	TArray<AActor*> Candidates;
 	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
 	{
 		AActor* Candidate = *It;
@@ -98,7 +141,18 @@ void AGP_LevelBuildAnimator::RebuildPieceList()
 		{
 			continue;
 		}
+		Candidates.Add(Candidate);
+	}
 
+	// Every machine must assign the same deterministic random values to the same
+	// authored pieces before applying the replicated start clock.
+	Candidates.Sort([](const AActor& Left, const AActor& Right)
+	{
+		return Left.GetPathName() < Right.GetPathName();
+	});
+
+	for (AActor* Candidate : Candidates)
+	{
 		FGPLevelBuildPiece Piece;
 		Piece.Actor = Candidate;
 		Piece.FinalTransform = Candidate->GetActorTransform();
@@ -123,6 +177,16 @@ void AGP_LevelBuildAnimator::RebuildPieceList()
 
 void AGP_LevelBuildAnimator::StartBuild()
 {
+	bUseSynchronizedBuildClock = false;
+	StartBuildAtElapsedTime(
+		0.0f,
+		/*bNotifyBuildStarted=*/true);
+}
+
+void AGP_LevelBuildAnimator::StartBuildAtElapsedTime(
+	float ElapsedSeconds,
+	bool bNotifyBuildStarted)
+{
 	if (Pieces.Num() == 0)
 	{
 		RebuildPieceList();
@@ -133,25 +197,58 @@ void AGP_LevelBuildAnimator::StartBuild()
 		return;
 	}
 
-	BuildTime = 0.0f;
-	bIsBuilding = true;
+	BuildTime = FMath::Clamp(ElapsedSeconds, 0.0f, TotalBuildTime);
+	bIsBuilding = BuildTime < TotalBuildTime;
 	SetActorTickEnabled(true);
 
-	for (FGPLevelBuildPiece& Piece : Pieces)
+	if (bNotifyBuildStarted)
 	{
+		BP_OnBuildStarted();
+	}
+
+	for (int32 PieceIndex = 0; PieceIndex < Pieces.Num(); ++PieceIndex)
+	{
+		FGPLevelBuildPiece& Piece = Pieces[PieceIndex];
 		Piece.bFinished = false;
 		if (IsValid(Piece.Actor))
 		{
 			Piece.Actor->SetActorHiddenInGame(false);
-			Piece.Actor->SetActorTransform(Piece.StartTransform, false, nullptr, ETeleportType::TeleportPhysics);
+			if (BuildTime <= Piece.StartTime)
+			{
+				Piece.Actor->SetActorTransform(
+					Piece.StartTransform,
+					false,
+					nullptr,
+					ETeleportType::TeleportPhysics);
+				continue;
+			}
+
+			const float LocalAlpha = FMath::Clamp(
+				(BuildTime - Piece.StartTime)
+					/ FMath::Max(KINDA_SMALL_NUMBER, Piece.Duration),
+				0.0f,
+				1.0f);
+			// A remote client normally receives the replicated start a few
+			// frames late. Start effects for pieces that are still active, but
+			// do not replay effects for every piece a late joiner already missed.
+			if (bNotifyBuildStarted && LocalAlpha < 1.0f)
+			{
+				BP_OnBuildPieceStarted(Piece.Actor, PieceIndex);
+			}
+			ApplyPieceTransform(Piece, LocalAlpha);
+			Piece.bFinished = LocalAlpha >= 1.0f;
 		}
 	}
 
-	BP_OnBuildStarted();
+	if (!bIsBuilding)
+	{
+		FinishBuild();
+	}
 }
 
 void AGP_LevelBuildAnimator::ResetBuild(bool bMovePiecesToStart)
 {
+	bUseSynchronizedBuildClock = false;
 	BuildTime = 0.0f;
 	bIsBuilding = false;
 	SetActorTickEnabled(false);
@@ -179,11 +276,18 @@ void AGP_LevelBuildAnimator::FinishBuild()
 
 	const bool bWasBuilding = bIsBuilding;
 	bIsBuilding = false;
+	bUseSynchronizedBuildClock = false;
 	SetActorTickEnabled(false);
 
 	if (bWasBuilding)
 	{
 		BP_OnBuildFinished();
+	}
+
+	if (HasServerAuthority()
+		&& PlaybackSnapshot.Phase == EGPLevelBuildPlaybackPhase::Playing)
+	{
+		MarkBuildFinishedAuthoritative();
 	}
 }
 
@@ -195,6 +299,10 @@ float AGP_LevelBuildAnimator::GetBuildAlpha() const
 bool AGP_LevelBuildAnimator::ShouldControlActor(const AActor* Candidate) const
 {
 	if (!IsValid(Candidate) || Candidate == this)
+	{
+		return false;
+	}
+	if (Candidate->GetLevel() != GetLevel())
 	{
 		return false;
 	}
@@ -215,6 +323,151 @@ bool AGP_LevelBuildAnimator::ShouldControlActor(const AActor* Candidate) const
 	}
 
 	return true;
+}
+
+bool AGP_LevelBuildAnimator::HasServerAuthority() const
+{
+	return GetNetMode() != NM_Client && HasAuthority();
+}
+
+bool AGP_LevelBuildAnimator::StartBuildAuthoritative()
+{
+	if (!HasServerAuthority()
+		|| PlaybackSnapshot.Phase != EGPLevelBuildPlaybackPhase::Waiting)
+	{
+		return false;
+	}
+
+	if (Pieces.IsEmpty())
+	{
+		RebuildPieceList();
+	}
+	if (Pieces.IsEmpty())
+	{
+		UE_LOG(LogTemp, Error,
+			TEXT("[LevelBuildAnimator] Cannot start '%s': no actors use target tag '%s'."),
+			*GetName(),
+			*TargetActorTag.ToString());
+		return false;
+	}
+
+	PlaybackSnapshot.Revision = FMath::Max(1, PlaybackSnapshot.Revision + 1);
+	PlaybackSnapshot.Phase = EGPLevelBuildPlaybackPhase::Playing;
+	PlaybackSnapshot.StartServerTime = GetSynchronizedWorldTimeSeconds();
+	PlaybackSnapshot.Duration = TotalBuildTime;
+	ForceNetUpdate();
+
+	ApplyPlaybackSnapshot();
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().SetTimer(
+			AuthoritativeBuildTimerHandle,
+			this,
+			&ThisClass::HandleAuthoritativeBuildTimerExpired,
+			FMath::Max(0.01f, PlaybackSnapshot.Duration),
+			false);
+	}
+
+	return true;
+}
+
+void AGP_LevelBuildAnimator::OnRep_PlaybackSnapshot()
+{
+	ApplyPlaybackSnapshot();
+}
+
+void AGP_LevelBuildAnimator::ApplyPlaybackSnapshot()
+{
+	if (!HasActorBegunPlay())
+	{
+		return;
+	}
+
+	if (Pieces.IsEmpty())
+	{
+		RebuildPieceList();
+	}
+
+	switch (PlaybackSnapshot.Phase)
+	{
+	case EGPLevelBuildPlaybackPhase::Waiting:
+		if (bWaitForColosseumPortalArrival)
+		{
+			ResetBuild(/*bMovePiecesToStart=*/true);
+		}
+		LastAppliedPlaybackRevision = PlaybackSnapshot.Revision;
+		break;
+
+	case EGPLevelBuildPlaybackPhase::Playing:
+	{
+		const float ElapsedSeconds = static_cast<float>(FMath::Max(
+			0.0,
+			GetSynchronizedWorldTimeSeconds() - PlaybackSnapshot.StartServerTime));
+		const bool bNewPlaybackRevision =
+			LastAppliedPlaybackRevision != PlaybackSnapshot.Revision;
+		if (bNewPlaybackRevision || !bIsBuilding)
+		{
+			bUseSynchronizedBuildClock = true;
+			StartBuildAtElapsedTime(
+				ElapsedSeconds,
+				/*bNotifyBuildStarted=*/bNewPlaybackRevision);
+			bUseSynchronizedBuildClock =
+				PlaybackSnapshot.Phase == EGPLevelBuildPlaybackPhase::Playing
+					&& bIsBuilding;
+		}
+		LastAppliedPlaybackRevision = PlaybackSnapshot.Revision;
+		break;
+	}
+
+	case EGPLevelBuildPlaybackPhase::Finished:
+		FinishBuild();
+		LastAppliedPlaybackRevision = PlaybackSnapshot.Revision;
+		break;
+	}
+}
+
+void AGP_LevelBuildAnimator::MarkBuildFinishedAuthoritative()
+{
+	if (!HasServerAuthority()
+		|| PlaybackSnapshot.Phase != EGPLevelBuildPlaybackPhase::Playing)
+	{
+		return;
+	}
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(AuthoritativeBuildTimerHandle);
+	}
+
+	PlaybackSnapshot.Phase = EGPLevelBuildPlaybackPhase::Finished;
+	ForceNetUpdate();
+	ApplyPlaybackSnapshot();
+	OnBuildFinishedNative.Broadcast(this);
+}
+
+void AGP_LevelBuildAnimator::HandleAuthoritativeBuildTimerExpired()
+{
+	if (!HasServerAuthority()
+		|| PlaybackSnapshot.Phase != EGPLevelBuildPlaybackPhase::Playing)
+	{
+		return;
+	}
+
+	FinishBuild();
+}
+
+double AGP_LevelBuildAnimator::GetSynchronizedWorldTimeSeconds() const
+{
+	if (const UWorld* World = GetWorld())
+	{
+		if (const AGameStateBase* GameState = World->GetGameState())
+		{
+			return GameState->GetServerWorldTimeSeconds();
+		}
+		return World->GetTimeSeconds();
+	}
+	return 0.0;
 }
 
 void AGP_LevelBuildAnimator::SortPieces()

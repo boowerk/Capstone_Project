@@ -6,6 +6,8 @@
 
 class AGP_EnemyCharacter;
 class AGP_EnemySpawnVolume;
+class AGP_LevelBuildAnimator;
+class AGP_PlayerCharacter;
 class AGP_GameState;
 class AGP_RunPortal;
 class AGP_EnemySpawnMarker;
@@ -23,12 +25,15 @@ struct FGPZoneRuntimeState
 	TWeakObjectPtr<AGP_EnemySpawnVolume> Zone;
 	TSet<TWeakObjectPtr<APlayerState>> Participants;
 	TSet<TWeakObjectPtr<APlayerState>> PresentPlayers;
+	TSet<TWeakObjectPtr<APlayerState>> PortalArrivals;
 	int32 MarkersTotal = 0;
 	int32 MarkersTriggered = 0;
 	int32 AliveEnemies = 0;
 	bool bBossPhaseStarted = false;
 	FVector LastEnemyDeathLocation = FVector::ZeroVector;
 	bool bHasLastEnemyDeathLocation = false;
+	bool bIntroStarted = false;
+	bool bIntroCompleted = false;
 	bool bStarted = false;
 	bool bCompleted = false;
 };
@@ -67,6 +72,11 @@ public:
 	bool RequestMiddleTravel(
 		AGP_PlayerController* PlayerController,
 		FName DestinationZoneId);
+	// Called only by an authority-owned run portal after TeleportTo succeeds.
+	// Colosseum entry credit is therefore not granted by position alone.
+	void NotifyPlayerArrivedViaPortal(
+		AGP_PlayerCharacter* PlayerCharacter,
+		AGP_EnemySpawnVolume* DestinationZone);
 	void NotifyVillageClientVisualReady(
 		AGP_PlayerController* PlayerController,
 		int32 LayoutRevision);
@@ -82,6 +92,25 @@ public:
 	static bool IsPartyDefeated(
 		int32 ParticipantCount,
 		int32 EliminatedParticipantCount);
+
+	static bool CanCountStagedZonePresence(
+		EGPZoneStage ZoneStage,
+		bool bHasMatchingPortalArrival);
+
+	static bool ShouldStartColosseumIntro(
+		bool bAllActivePlayersPresent,
+		bool bIntroStarted,
+		bool bIntroCompleted);
+
+	static bool RequiresFullPartyAtEncounterStart(
+		EGPZoneStage ZoneStage);
+
+	static bool ShouldRelocateJoiningPlayerToZone(
+		EGPZoneStage ZoneStage,
+		bool bIntroStarted,
+		bool bIntroCompleted,
+		bool bEncounterStarted,
+		bool bZoneCompleted);
 
 protected:
 	virtual void InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage) override;
@@ -192,6 +221,8 @@ private:
 
 	TMap<TWeakObjectPtr<AGP_EnemySpawnVolume>, FGPZoneRuntimeState> ZoneRuntimeStates;
 	TMap<TWeakObjectPtr<AGP_EnemyCharacter>, TWeakObjectPtr<AGP_EnemySpawnVolume>> EnemyOwningZones;
+	TMap<TWeakObjectPtr<AGP_LevelBuildAnimator>, TWeakObjectPtr<AGP_EnemySpawnVolume>>
+		ColosseumIntroZonesByAnimator;
 	TMap<TWeakObjectPtr<AGP_EnemySpawnVolume>, int32> ZoneNavigationStartRetries;
 	TSet<EGPZoneStage> UnlockedStages;
 	TSet<TWeakObjectPtr<AGP_EnemySpawnVolume>> RegisteredNavigationInvokerZones;
@@ -253,6 +284,11 @@ private:
 	void ReturnToLobby();
 	void UnlockStage(EGPZoneStage Stage);
 	void StartStagedZone(AGP_EnemySpawnVolume* Zone);
+	void TryStartColosseumIntro(AGP_EnemySpawnVolume* Zone);
+	void TryStartPendingColosseumIntros();
+	AGP_LevelBuildAnimator* FindColosseumBuildAnimator(
+		const AGP_EnemySpawnVolume* Zone) const;
+	void HandleColosseumBuildFinished(AGP_LevelBuildAnimator* Animator);
 	void MaybeCompleteStagedZone(AGP_EnemySpawnVolume* Zone);
 	void CompleteStagedZone(AGP_EnemySpawnVolume* Zone);
 	void EvaluateStagedProgression();
@@ -279,6 +315,8 @@ private:
 		FName ActorTag) const;
 	bool IsPlayerNearMiddleSelectionPortal(
 		const AGP_PlayerController* PlayerController) const;
+	AGP_EnemySpawnVolume* FindJoinableColosseumZone() const;
+	bool TryRelocatePlayerToActiveColosseum(AController* PlayerController);
 	void AssignPlayersToOuterVillageStarts();
 
 #if !UE_BUILD_SHIPPING

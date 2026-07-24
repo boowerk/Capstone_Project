@@ -325,6 +325,13 @@ Last synced: 2026-05-23T00:00:00
 
 See `.memoc/worklog/` and generated `.memoc/activity.md`.
 
+### 2026-07-24 Colosseum portal arrival
+
+- `feature/run-result-ui` is integrated through `68b984af`.
+- The Colosseum intro is gated on the active party's authoritative portal arrivals, and the level build animator replicates a synchronized playback snapshot for late clients.
+- Players joining an active Colosseum are relocated there; the server also sends the placement target so the existing initial loading/input gate completes.
+- Editor Development build and all `ProjectEden.Game.Colosseum` automation tests pass.
+
 ### 2026-07-24 Packaged dedicated client
 
 - Do not use `UnrealEditor.exe -game` for dedicated-client testing. Animation

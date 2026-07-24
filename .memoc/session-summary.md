@@ -2,7 +2,7 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-07-24T16:35:00+09:00
+updated: 2026-07-24T16:40:38+09:00
 status: active
 tags:
   - memoc
@@ -11,8 +11,8 @@ created: 2026-07-24T01:26:27
 ---
 # Session Summary
 
-- Run Result UI is merged with Outer loading; Editor build and `ProjectEden.RunOutcome.PartyDefeatPolicy` pass.
-- Village visual-ready ACK retries controller discovery; instanced material flags and the final landscape map are committed.
-- The obsolete RegionID CPU experiment is restored to GPU availability.
-- The previous eight dirty files are fully resolved and the worktree is clean.
-- The installed engine lacks Shipping Game/Server targets. `BuildCookDeployFinal.bat` now defaults to supported Development deployment and rejects explicit unsupported Shipping before building.
+- `feature/run-result-ui` is integrated through `68b984af`.
+- Colosseum boss intro now waits for portal arrival; the build animator replicates one playback snapshot and supports late arrivals.
+- Active-run reconnects relocate to Colosseum and receive the placement RPC so the initial loading/input gate can finish.
+- Editor Development builds and all three `ProjectEden.Game.Colosseum` tests pass.
+- Final deploy defaults to Development because this installed engine distribution has no Shipping Game/Server targets.
