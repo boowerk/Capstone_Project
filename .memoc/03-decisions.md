@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-24T15:49:00+09:00
+updated: 2026-07-24T16:18:00+09:00
 status: active
 tags:
   - memoc
@@ -16,6 +16,7 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 ## Decision Log
 
 ### 2026-07-24
+- Produce final Windows releases with the one-shot Shipping build/cook script and require a clean Git tree unless dirty output is explicitly requested. Deploy the complete versioned Client/Windows and Server/WindowsServer folders, stage prerequisites for both clean hosts, keep Shipping server logging available, and never add the three-player `-AllowLobbyForceStart` debug bypass to the release command.
 - Own the initial Outer loading overlay in `UGP_GameInstance` so it survives seamless travel. Start from the lobby loading RPC or direct gameplay join, but never hide on map load, possession, or village visual-ready ACK; hide only after the server teleports successfully and the owning client observes its pawn at the assigned Outer location.
 - Keep `PCG_Vegetation_Global` active on both clients and dedicated servers, but do not sample RegionID texture pixels in its server path. WindowsServer cooks strip texture platform pixels even when Availability is CPU, so vegetation inputs needed by the server must be server-cookable graph/world data rather than `UTexture` pixel data.
 - Give Sans Ground Hands a dedicated deferred-decal material with a centered radial opacity mask, pure-red material parameter, and equal footprint axes. Do not reuse or parameter-hack the Sans Sweep fan material; the two warning silhouettes have separate production contracts.

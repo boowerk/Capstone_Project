@@ -3,23 +3,32 @@ setlocal EnableExtensions
 
 set "PROJECT_ROOT=%~dp0..\..\"
 set "UPROJECT=%PROJECT_ROOT%Project_Eden.uproject"
+set "PAUSE_AT_END=1"
 
-rem Optional first argument: engine root folder that contains the Engine directory.
-rem Example: PreparePCGExClientBuild.bat "C:\Engine_server\Windows"
-if not "%~1"=="" (
-    if exist "%~1\Engine\Plugins\Marketplace\PCGExtendedToolkit\PCGExtendedToolkit.uplugin" (
-        set "UE_SERVER_ROOT=%~1"
-        shift /1
-    )
+:ParseArgs
+if "%~1"=="" goto ArgsDone
+if /I "%~1"=="--no-pause" (
+    set "PAUSE_AT_END=0"
+    shift /1
+    goto ParseArgs
 )
+if exist "%~1\Engine\Plugins\Marketplace\PCGExtendedToolkit\PCGExtendedToolkit.uplugin" (
+    set "UE_SERVER_ROOT=%~f1"
+    shift /1
+    goto ParseArgs
+)
+echo Unknown argument or invalid engine root: %~1
+if "%PAUSE_AT_END%"=="1" pause
+exit /b 1
 
+:ArgsDone
 if "%UE_SERVER_ROOT%"=="" (
     for /f "usebackq delims=" %%I in (`powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0ResolveEngineRoot.ps1" -UProject "%UPROJECT%" -Kind Build`) do set "UE_SERVER_ROOT=%%I"
 )
 
 if "%UE_SERVER_ROOT%"=="" (
     echo Engine root was not found.
-    pause
+    if "%PAUSE_AT_END%"=="1" pause
     exit /b 1
 )
 
@@ -28,7 +37,7 @@ set "PROJECT_PLUGIN=%PROJECT_ROOT%Plugins\PCGExtendedToolkit"
 if not exist "%SOURCE_PLUGIN%\PCGExtendedToolkit.uplugin" (
     echo PCGExtendedToolkit source plugin was not found:
     echo %SOURCE_PLUGIN%
-    pause
+    if "%PAUSE_AT_END%"=="1" pause
     exit /b 1
 )
 
@@ -38,7 +47,7 @@ for %%D in (Config Content Resources Scripts Source) do (
         xcopy "%SOURCE_PLUGIN%\%%D" "%PROJECT_PLUGIN%\%%D\" /E /I /Y /Q >nul
         if errorlevel 1 (
             echo Failed to copy PCGExtendedToolkit\%%D.
-            pause
+            if "%PAUSE_AT_END%"=="1" pause
             exit /b 1
         )
     )
@@ -47,7 +56,7 @@ for %%D in (Config Content Resources Scripts Source) do (
 copy /Y "%SOURCE_PLUGIN%\PCGExtendedToolkit.uplugin" "%PROJECT_PLUGIN%\PCGExtendedToolkit.uplugin" >nul
 if errorlevel 1 (
     echo Failed to copy PCGExtendedToolkit.uplugin.
-    pause
+    if "%PAUSE_AT_END%"=="1" pause
     exit /b 1
 )
 
@@ -57,7 +66,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ^
     "$Path = '%PROJECT_PLUGIN%\PCGExtendedToolkit.uplugin'; $Text = [IO.File]::ReadAllText($Path); $Text = $Text.Replace('\"Installed\": true', '\"Installed\": false'); [IO.File]::WriteAllText($Path, $Text, [Text.UTF8Encoding]::new($false))"
 if errorlevel 1 (
     echo Failed to mark the project-local PCGExtendedToolkit as source-built.
-    pause
+    if "%PAUSE_AT_END%"=="1" pause
     exit /b 1
 )
 

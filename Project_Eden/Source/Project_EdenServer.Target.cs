@@ -11,5 +11,11 @@ public class Project_EdenServerTarget : TargetRules
 		DefaultBuildSettings = BuildSettingsVersion.V6;
 		IncludeOrderVersion = EngineIncludeOrderVersion.Unreal5_7;
 		ExtraModuleNames.Add("Project_Eden");
+
+		if (Target.Configuration == UnrealTargetConfiguration.Shipping)
+		{
+			BuildEnvironment = TargetBuildEnvironment.Unique;
+			bUseLoggingInShipping = true;
+		}
 	}
 }
