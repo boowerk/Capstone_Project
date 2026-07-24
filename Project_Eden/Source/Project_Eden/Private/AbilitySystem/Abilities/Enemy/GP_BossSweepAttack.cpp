@@ -260,7 +260,7 @@ void UGP_BossSweepAttack::PerformBossSweepHit()
 		ForwardOffset,
 		BossSweepArcAngleDegrees,
 		BossSweepHitBoxElevationOffset,
-		ShouldDrawDebug());
+		bDrawDebugs);
 
 	TSubclassOf<UGameplayEffect> ResolvedDamageEffectClass = DamageEffectClass;
 	if (!ResolvedDamageEffectClass)

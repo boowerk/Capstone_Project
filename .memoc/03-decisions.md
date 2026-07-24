@@ -3,19 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-updated: 2026-07-23T19:03:00+09:00
-=======
 updated: 2026-07-24T07:01:06+09:00
->>>>>>> origin/main
-=======
-updated: 2026-07-24T07:01:06+09:00
->>>>>>> origin/main
-=======
-updated: 2026-07-24T07:01:06+09:00
->>>>>>> origin/main
 status: active
 tags:
   - memoc
@@ -27,54 +15,6 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 
 ## Decision Log
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-### 2026-07-23
-- Keep player attribute values live and reusable: Health/Mana/Stamina share one grayscale fill mask and one track brush, with color supplied by each ProgressBar tint. Preserve the existing `GP_AttributeWidget`, inner `HealthBar`, and parent HUD instance names. Apply the soft top-left backplate through the existing `TopLeftFrame` Border instead of rebuilding the UMG hierarchy; leave the optional accent unplaced unless later visual review asks for it.
-- Keep village runtime PCG as Generate On Demand so the Director can apply instance-unique tags, graph parameters, and deterministic seeds before sequential generation. For immediate editor authoring feedback, use transient `ALevelInstance` previews owned by the Director, with PCG Preview editing mode and DuplicateTransient flags; do not change the production component to Generate At Runtime merely to see layouts.
-- Treat the village Footprint component as a flat XY editor preview, not the runtime spawn origin or a selectable placement component. Keep it at slot-local Z=0 with minimal thickness and mark it visualization-only; the `AGP_VillageSlot` actor transform remains the authoritative Level Instance transform. Use pivot snapping (`Alt+End`) for authored ground placement.
-- Keep the legacy `VillageLevelPreset` + footprint as the canonical primary preset so existing instance overrides remain valid. Store additional choices as `FGP_VillagePresetDefinition { PresetId, Level, Footprint, Weight }`; the first additional preset is compact `L_Village_01`. Ignore duplicate preset IDs or level paths deterministically.
-- Assign presets before calculating conflicts, but retry up to 32 deterministic RunSeed/SlotId assignment salts and keep the successful result with the largest selected count. This preserves random visual variety without letting an unlucky large-preset assignment hide a valid mixed/small-preset layout.
-- Preserve `AGP_VillageSlot`'s native root and render the assigned preset footprint through a child box so existing placed-actor transforms remain compatible.
-- Treat village placement as a unit-scale, yaw-aware 2D footprint problem. Use exact XY OBB SAT for editor warnings and selection; terrain height does not make two villages spatially compatible. Selection must prioritize required groups and use deterministic feasibility/lookahead so an early bridge slot cannot block a valid later combination.
-
-### 2026-07-22
-- Preserve `PickCount` as the backward-compatible default for village group rules. Enable a separate `bUsePickCountRange` switch for inclusive `MinPickCount..MaxPickCount` selection so existing maps and their RNG sequence remain unchanged until explicitly migrated.
-- Keep zero-village probability separate from count range: use `bRequired=false` plus `SpawnChance`. Range Min must remain at least one; required groups fail below Min while optional groups select the available clamped count.
-
-### 2026-07-21
-- Use an authored Level Instance preset rather than Runtime Data Layers for the first playable village activation. V1 loads only `/Game/WorldLayout/L_Village_00` at one selected slot, keeps it hidden until its PCG component is configured as On Demand/non-partitioned, then shows it and generates locally. The fixed source instance must remain absent from the main map.
-- Defer multiple active villages until Road/District discovery is isolated per instance through unique tags and PCG graph-parameter overrides. Multiplayer client streaming and explicit cook registration are also follow-up work.
-
-### 2026-07-20
-- Build village randomization in two phases. V1 only propagates a per-run `RunSeed` and deterministically marks manually placed, stable-ID `AGP_VillageSlot` candidates selected/not selected by group. Do not activate candidate Runtime Data Layers or call city PCG yet: existing `BP_CityAnchor` content may generate on load, so real activation needs an explicit selected-layer contract, streaming-complete gate, city-PCG-complete gate, and vegetation ordering in V2. Keep Region Event zones independent until village placement is proven.
-- Approve Candidate J geometry plus a production-safe variable blend half-width for V2.2. Keep hard IDs and packed visual IDs unchanged; vary only each region-pair's continuous visual influence from 18-32px around 24px with independent 80-240m low-frequency anchors. Each region samples its own nearest boundary-side pixel, while junctions, segment endpoints, and the perimeter return to the 24px baseline. This avoids cross-pair contamination and keeps the material/runtime contract unchanged.
-- Historical stepping stone, superseded by Candidate J above: the first stronger V2.2 preset used 36-180m spacing, 2.5-15m amplitudes, and a 12m cap; it produced 10.575m actual maximum displacement and passed the then-current 51 checks.
-- Do not judge Landscape V2.2 boundary visibility from an editor view until `RT_RegionState_15x1` contains at least two distinct states. A fresh editor map load can leave this transient render target black, making all four V2.2 slots resolve to the same surface even though the MI switch and Weight binding are correct. For non-persistent QA, use placed `BP_RegionStateManager.DebugRandomRegionStates` followed by `RefreshRegionTexture`; do not save the map solely for this validation state.
-
-### 2026-07-19
-- Disturb Landscape region borders offline in the V2.2 visual-weight generator, not with runtime shader noise. Use one independent non-uniform-anchor PCHIP per movable region-pair boundary: truncated-lognormal 36-140m gaps, Beta-distributed 1.75-9m magnitudes with local geometry caps/rare accents, 72% sign persistence, and dynamic 8-24m endpoint fades. Keep junction/perimeter cores fixed and limit each segment's signed mean to 10% of weighted RMS; this gives slower, larger asymmetric bends while the rasterized maximum region-area change stays below 0.5%. Do not normalize every segment to the same peak, force exact zero mean, alternate signs, or combine fixed coarse/detail bands, because those choices reveal a repeating S-wave cadence. Keep hard RegionID/PCG/StateRT and packed visual IDs exact.
-- Make V2.2 the GameMap2 Landscape presentation path: keep the authoritative hard RegionID for gameplay/PCG, but visually blend up to four neighboring region states with fixed slots and normalized RGBA weights. Keep `UseRegionVisualBlendV22` default false in `M_StateMask`, enable it only on `MI_RegionLandscape_GameMap2`, and preserve V2.1/V2 as nested rollback paths.
-- Store four visual IDs in two point-sampled G8 textures (`id0|id1<<4`, `id2|id3<<4`) instead of one G16 texture. G8 normalized samples decode all 256 bytes exactly through float16; G16 did not. Accept one extra sampler to avoid changing the heavy shared master's global precision mode, and keep the RGBA8 weight texture bilinear/uncompressed for validation.
-- Resolve the remaining pair-switch and true-junction seams with Landscape-only V2.1: use an SDF-derived continuous Blend mask plus an auxiliary `R=pair-switch/G=junction` mask, and cover ambiguous cores with one replaceable neutral dirt/gravel surface. Keep its exact full-strength core near one source adjacency (~2 target texels), with smooth feathering outside it; do not increase RegionID resolution again.
-- Gate both V2.1 texture selection and neutral-attribute blending behind the single default-false static bool `UseRegionTransitionV21`. Enable it only on `MI_RegionLandscape_GameMap2`, preserve V2/SeparateEdge as prerequisites, and leave PCG/other MIs pruned on their previous paths. Treat the current bright neutral dirt appearance as validation art that can be changed through unique texture parameters without rebuilding the region materials.
-- Keep the V2 runtime contract owner-relative: decode canonical Pair `(A,B,OwnerIsB)`, reorder the states into Owner/Other, and blend `Owner -> Other` with unsigned Mix `0..0.5`. Canonical-B weight is validation-only. The state-texture A lookup must use canonical A directly, not the owner-valued `RegionID` output; otherwise one side becomes `B -> B` and produces a hard seam.
-- Finish the Landscape-first rollout only on `MI_RegionLandscape_GameMap2`: save `UseRegionBlendV2=true`, PairV2/BlendV2, and the existing slope overlay; leave PCG and other MIs on legacy behavior. Treat the remaining sub-meter true triple-junction fallback and steep outer-wall projection stretch as separate follow-up issues rather than increasing ID texture resolution again.
-
-### 2026-07-18
-- Split the remaining Landscape visual defects into two independent fixes: use a GameMap2-only slope/cliff overlay for outer steep-wall XY projection stretch, and use canonical PairV2 `(A,B,OwnerIsB)` plus unsigned BlendV2 for long pair-switch stripes and junction discontinuities. Keep both features behind default-false static switches and leave PCG/other MIs unchanged. Two-ID data may retain a tiny hard fallback at true triple junctions.
-- Supersede the topology-preserving 1024 seam repair as the final Landscape fix: reconstruct the current authoritative Region labels through per-label SDFs at 4096, derive the second-nearest label, and rebuild Pair and Edge together. Never regenerate from the stale seed list or nearest-upscale the 1024 image. Disable auto Virtual Texture on both outputs; keep Pair Nearest/NoMip and Edge Bilinear/mipped.
-- Repair Landscape Edge seams without changing topology: preserve the filtered source mask, overlay a 2px fully saturated chamfer core with falloff to 8px from every R ownership transition, and keep Pair Nearest plus `BoundaryAlpha=Edge*0.5`.
-- Roll out smooth RegionID boundaries to Landscape first: keep `M_StateMask.UseSeparateEdgeTexture` default false, enable it only on `MI_RegionLandscape_GameMap2`, and leave PCG on the legacy RegionID texture until a separate migration is requested.
-- Runtime vegetation uses hierarchical grids with `GRID128` for the graph default and the current shared grass node at `GRID32`; `L_GameMap1`'s earlier 7,135-instance verification was performed before that authored grass change, at `GRID64`. Keep engine-default 2x generation radii, cleanup multiplier `1.5`, and bounded Surface Samplers.
-- Keep the PCG Landscape Cache at `SerializeOnlyAtCook`: it works in PIE, serializes automatically while cooking, and avoids permanently embedding the cache in the editor map. `NeverSerialize` is invalid for Landscape-backed runtime PCG.
-- Each map's placed `BP_VegetationSpawner` must have a Box that covers its Landscape. `L_LandscapeMap` uses `64000,64000,8000`, aligned horizontally to both 32m grass and 128m default grids while covering its 1.071km Landscape.
-=======
-=======
->>>>>>> origin/main
-=======
->>>>>>> origin/main
 ### 2026-07-24
 - Give Sans Ground Hands a dedicated deferred-decal material with a centered radial opacity mask, pure-red material parameter, and equal footprint axes. Do not reuse or parameter-hack the Sans Sweep fan material; the two warning silhouettes have separate production contracts.
 - Keep the regular-enemy death grains at the designer-approved `User.SpriteSize=(10,10)`. Stage the motion as a readable fall followed by absorption: full gravity through `0.28s`, gravity fade to `0.60s`, attraction from `0.38s`, and a `0.80s` strength ramp.
@@ -111,13 +51,6 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 - Keep AI/GAS/network architecture and bulk-log specialists temporary rather than permanent, selecting a model and reasoning level from the bounded ticket risk.
 - Build the graduation golden path around Lobby ready travel into `L_LandscapeMap`, then one discoverable corruption objective, cleanse feedback, augment, boss, and result. Expand breadth only after this 15–20 minute path is reliable.
 - Treat dynamically named ServerTravel destinations as explicit Cook inputs. Editor package loading is not release proof; keep release status conditional until Cooked server/client travel passes.
-<<<<<<< HEAD
-<<<<<<< HEAD
->>>>>>> origin/main
-=======
->>>>>>> origin/main
-=======
->>>>>>> origin/main
 
 ### 2026-07-09
 - Region events are a separate run-layer system, not a PCG graph mutation. `AGP_GameMode` only asks the placed/optional `AGP_RegionEventDirector` to roll events at zone boundaries; selected `AGP_RegionEventActor` instances own replicated presentation, optional enemy waves, and temporary/final region-state writes through `AGP_GameState`.
@@ -183,36 +116,7 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 - Minimap correctness should not depend on level-authored PCG completion wiring. Keep a startup fallback full-map capture, allow later PCG-ready notifications to restart it, and make the HUD map image resolver tolerate production widget renames such as `MiniMapImage`.
 - The minimap map texture should be clipped by the UI material, not only hidden under ring art. Player cursor heading should default to controller/view yaw so camera-facing a target matches the visible minimap direction.
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-### 2026-07-21
-
-- Isolate streamed village PCG with per-slot Actor Tags plus component-local `UPCGGraphInstance` `RoadTag`/`DistrictTag` overrides. Remove template tags after retagging so legacy/global searches cannot mix simultaneous villages; do not mutate the shared base graph.
-- Keep the automatically managed `PCGWorldActor` in `L_Village_00`; the Director only configures the explicitly identified `PCG_CityGen_FromAnchor` component. Remove fixed village Level Instances from the main map so the Director is the sole runtime owner.
-- Treat multiple villages as an atomic presentation batch: all loaded/configured before visibility, all shown before generation, completion/cancellation delegates before success, and timeout/failure rollback. Multiplayer replication is a separate future feature.
-- Run streamed city PCG sequentially after the all-shown barrier. Complex hierarchical graphs and engine PCG services are shared at world scope; one in-flight city graph removes cross-instance concurrency as a failure variable and spreads the generation spike. Preserve slot-unique tags and log PCG-managed output counts/bounds for runtime proof.
-
-### 2026-07-23
-
-- Keep the player top-left HUD focused on health, mana, and stamina. Remove the vignette, crest label, location label, and status hint; `LocationTextBlock` is optional in native code, so its absence is supported.
-- Keep the player skill wheel at exactly eight clockwise slots using `DA_SkillPool_Player` order. With the current seven skills, the last slot is visible but inactive for future content.
-- Use select-first equipment flow: choose a wheel skill, review it in the center, then click or press Q/E. The same skill cannot occupy both slots; selecting a skill from the opposite slot swaps the displaced skills, or moves it when the target is empty.
-- Keep K as a toggle. While the menu is open, block only the local player's movement, look, and skill input through UI-only focus; never pause the multiplayer world.
-- Preserve the legacy Widget Blueprints and construct the approved radial presentation as a defensive runtime fallback until an authored wheel hierarchy replaces it.
-=======
-=======
->>>>>>> origin/main
-=======
->>>>>>> origin/main
 ### 2026-07-14
 - Open-world exploration events are separate from the legacy linear-zone enemy budget. The event actor owns its spawned combatants and retires survivors through `RequestDeath`; zone/event tracking listens to the terminal `OnEnemyDeathStarted` delegate so scripted and combat deaths share one accounting path without granting cleanup XP.
 - Preserve authored region seed biome values. Corruption affects event eligibility, probability, enemy GAS scaling, and outcome deltas; it does not flatten seed `State` values or write generic active/completed biome states.
 - Production exploration pacing belongs to the placed `L_LandscapeMap` director: delayed/dwell-based evaluation, one active objective, global and per-region cooldowns, party-wide safe spawn distance, and non-deterministic event choice. Temporary PIE acceleration must remain unsaved and is guarded by map automation.
-<<<<<<< HEAD
-<<<<<<< HEAD
->>>>>>> origin/main
-=======
->>>>>>> origin/main
-=======
->>>>>>> origin/main
