@@ -12,6 +12,7 @@
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraSystem.h"
 #include "UObject/ConstructorHelpers.h"
+#include "VFX/GP_EnemyDeathAbsorptionComponent.h"
 
 AGP_MatadorBossDecoyActor::AGP_MatadorBossDecoyActor()
 {
@@ -37,6 +38,12 @@ AGP_MatadorBossDecoyActor::AGP_MatadorBossDecoyActor()
 	bShowWorldHealthBar = false;
 	XPReward = 0.0f;
 	DeathDespawnDelay = 0.75f;
+	if (UGP_EnemyDeathAbsorptionComponent* DeathAbsorptionComponent = GetEnemyDeathAbsorptionComponent())
+	{
+		// The decoy owns a separate visible mesh and bespoke break effect; it is
+		// not a defeated monster reward and must not fly toward a player.
+		DeathAbsorptionComponent->SetDeathAbsorptionEnabled(false);
+	}
 	AutoPossessAI = EAutoPossessAI::Disabled;
 	AIControllerClass = nullptr;
 

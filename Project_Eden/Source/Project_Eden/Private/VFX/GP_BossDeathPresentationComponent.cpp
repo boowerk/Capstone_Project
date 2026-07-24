@@ -8,6 +8,17 @@ UGP_BossDeathPresentationComponent::UGP_BossDeathPresentationComponent()
 	PrimaryComponentTick.bCanEverTick = false;
 	SetIsReplicatedByDefault(false);
 	PresentationActorClass = AGP_BossDeathPresentationActor::StaticClass();
+	// The shared absorption component owns the source-mesh material transition
+	// and hide timing. This component owns only boss-specific shards/particles.
+	SpawnSettings.bHideSourceMesh = false;
+}
+
+void UGP_BossDeathPresentationComponent::ConfigureFragmentMaterial(
+	UMaterialInterface* InFragmentMaterial,
+	bool bInHideSourceMesh)
+{
+	SpawnSettings.FragmentMaterial = InFragmentMaterial;
+	SpawnSettings.bHideSourceMesh = bInHideSourceMesh;
 }
 
 bool UGP_BossDeathPresentationComponent::PlayDeathPresentation(AActor* InstigatorActor)

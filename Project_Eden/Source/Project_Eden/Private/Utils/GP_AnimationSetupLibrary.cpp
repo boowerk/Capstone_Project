@@ -890,12 +890,14 @@ namespace GPSansBossAnimationSetup
 {
 	const FString SansMeshPath = TEXT("/Game/Asset/BossAction/Sans/Sans");
 	const FString SansSkeletonPath = TEXT("/Game/Asset/BossAction/Sans/Sans_Skeleton");
-	const FString SansIdlePath = TEXT("/Game/Asset/BossAction/Sans/Animations/Sans_Zombie_Idle_Loop");
+	const FString SansIdlePath = TEXT("/Game/Asset/BossAction/Sans/Animations/Sans_Idle_Rail_Loop");
 	const FString SansWalkPath = TEXT("/Game/Asset/BossAction/Sans/Animations/Sans_Zombie_Walk_Fwd_Loop");
 	const FString SansRunPath = TEXT("/Game/Asset/BossAction/Sans/Animations/Sans_Zombie_Run_Fwd_Loop");
 	const FString SansJumpLoopPath = TEXT("/Game/Asset/BossAction/Sans/Animations/Sans_Jump_Loop");
 	const FString SansBasicAttackPath = TEXT("/Game/Asset/BossAction/Sans/Animations/Sans_Zombie_Scratch");
 	const FString SansSweepAttackPath = TEXT("/Game/Asset/BossAction/Sans/Animations/Sans_Sword_Heavy_A");
+	const FString SansHeavyAttackPath = TEXT("/Game/Asset/BossAction/Sans/Animations/Sans_Sword_Heavy_B");
+	const FString SansAreaAttackPath = TEXT("/Game/Asset/BossAction/Sans/Animations/Sans_Sword_GroundPound_RM");
 	const FString BlendSpacePackagePath = TEXT("/Game/Asset/BossAction/Sans/BlendSpaces");
 	const FString BlendSpaceName = TEXT("BS_Sans_Boss_Locomotion");
 	const FString AnimBlueprintPackagePath = TEXT("/Game/Asset/BossAction/Sans/AnimBlueprints");
@@ -905,6 +907,8 @@ namespace GPSansBossAnimationSetup
 	const FString MontagePackagePath = TEXT("/Game/Asset/BossAction/Sans/Montages");
 	const FString BasicAttackMontageName = TEXT("AM_Sans_Zombie_Scratch");
 	const FString SweepAttackMontageName = TEXT("AM_Sans_BossSweep");
+	const FString HeavyAttackMontageName = TEXT("AM_Sans_BossHeavy");
+	const FString AreaAttackMontageName = TEXT("AM_Sans_BossArea");
 	const FString BossBlueprintPath = TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_Sans/BP_Boss_Sans");
 	const FName LocomotionSyncGroupName(TEXT("BossLocomotion"));
 	const float AttackMontageBlendInTime = 0.08f;
@@ -1020,9 +1024,12 @@ namespace GPSansBossAnimationSetup
 		return GPFemaleAnimationSetup::SaveAsset(Montage) ? Montage : nullptr;
 	}
 
-	UAnimBlueprint* CreateOrUpdateAnimBlueprint(USkeleton* Skeleton, USkeletalMesh* SkeletalMesh, UBlendSpace1D* BlendSpace, UAnimSequence* JumpLoop)
+	UAnimBlueprint* CreateOrUpdateAnimBlueprint(
+		USkeleton* Skeleton,
+		USkeletalMesh* SkeletalMesh,
+		UAnimSequence* DefaultIdle)
 	{
-		if (!IsValid(Skeleton) || !IsValid(SkeletalMesh) || !IsValid(BlendSpace) || !IsValid(JumpLoop))
+		if (!IsValid(Skeleton) || !IsValid(SkeletalMesh) || !IsValid(DefaultIdle))
 		{
 			return nullptr;
 		}
@@ -1088,71 +1095,26 @@ namespace GPSansBossAnimationSetup
 			return nullptr;
 		}
 
-		FGraphNodeCreator<UAnimGraphNode_BlendSpacePlayer> BlendSpaceNodeCreator(*AnimationGraph);
-		UAnimGraphNode_BlendSpacePlayer* BlendSpaceNode = BlendSpaceNodeCreator.CreateNode();
-		BlendSpaceNode->NodePosX = -650;
-		BlendSpaceNode->NodePosY = 0;
-		BlendSpaceNode->SetAnimationAsset(BlendSpace);
-		BlendSpaceNode->Node.SetGroupName(LocomotionSyncGroupName);
-		BlendSpaceNode->Node.SetGroupRole(EAnimGroupRole::CanBeLeader);
-		BlendSpaceNode->Node.SetGroupMethod(EAnimSyncMethod::SyncGroup);
-		BlendSpaceNodeCreator.Finalize();
-		if (!GPFemaleAnimationSetup::ShowOptionalInputPin(BlendSpaceNode, TEXT("BlendSpace")))
-		{
-			return nullptr;
-		}
-
-		FGraphNodeCreator<UAnimGraphNode_SequencePlayer> JumpNodeCreator(*AnimationGraph);
-		UAnimGraphNode_SequencePlayer* JumpNode = JumpNodeCreator.CreateNode();
-		JumpNode->NodePosX = -650;
-		JumpNode->NodePosY = 240;
-		JumpNode->SetAnimationAsset(JumpLoop);
-		JumpNodeCreator.Finalize();
-		if (!GPFemaleAnimationSetup::ShowOptionalInputPin(JumpNode, TEXT("Sequence")))
-		{
-			return nullptr;
-		}
-
-		FGraphNodeCreator<UAnimGraphNode_BlendListByBool> BlendByBoolNodeCreator(*AnimationGraph);
-		UAnimGraphNode_BlendListByBool* BlendByBoolNode = BlendByBoolNodeCreator.CreateNode();
-		BlendByBoolNode->Node.AddPose();
-		BlendByBoolNode->Node.AddPose();
-		BlendByBoolNode->NodePosX = -260;
-		BlendByBoolNode->NodePosY = 120;
-		BlendByBoolNodeCreator.Finalize();
+		// Sans floats during normal gameplay, so a single authored rail idle is
+		// the stable base pose. Keep the asset directly on the sequence player:
+		// a nullable runtime asset pin would override it with Ref Pose (T-pose).
+		FGraphNodeCreator<UAnimGraphNode_SequencePlayer> IdleNodeCreator(*AnimationGraph);
+		UAnimGraphNode_SequencePlayer* IdleNode = IdleNodeCreator.CreateNode();
+		IdleNode->NodePosX = -520;
+		IdleNode->NodePosY = 0;
+		IdleNode->SetAnimationAsset(DefaultIdle);
+		IdleNodeCreator.Finalize();
 
 		FGraphNodeCreator<UAnimGraphNode_Slot> SlotNodeCreator(*AnimationGraph);
 		UAnimGraphNode_Slot* SlotNode = SlotNodeCreator.CreateNode();
 		SlotNode->Node.SlotName = FName(TEXT("DefaultSlot"));
-		SlotNode->NodePosX = 90;
-		SlotNode->NodePosY = 120;
+		SlotNode->NodePosX = -120;
+		SlotNode->NodePosY = 0;
 		SlotNodeCreator.Finalize();
 
-		const UEdGraphSchema_K2* K2Schema = GetDefault<UEdGraphSchema_K2>();
-		// The boss graph reads the same cached animation-set fields as the player AnimBP structure.
-		UK2Node_VariableGet* LocomotionBlendSpaceNode = K2Schema->SpawnVariableGetNode(FVector2D(-980.0, -200.0), AnimationGraph, TEXT("LocomotionBlendSpace"), UGP_BossAnimInstance::StaticClass());
-		UK2Node_VariableGet* JumpLoopAssetNode = K2Schema->SpawnVariableGetNode(FVector2D(-980.0, 360.0), AnimationGraph, TEXT("JumpLoopAnimation"), UGP_BossAnimInstance::StaticClass());
-		UK2Node_VariableGet* GroundSpeedNode = K2Schema->SpawnVariableGetNode(FVector2D(-960.0, -40.0), AnimationGraph, TEXT("GroundSpeed"), UGP_BossAnimInstance::StaticClass());
-		UK2Node_VariableGet* IsFallingNode = K2Schema->SpawnVariableGetNode(FVector2D(-960.0, 240.0), AnimationGraph, TEXT("bIsFalling"), UGP_BossAnimInstance::StaticClass());
-
-		if (!LocomotionBlendSpaceNode || !JumpLoopAssetNode || !GroundSpeedNode || !IsFallingNode)
-		{
-			UE_LOG(LogTemp, Error, TEXT("Failed to spawn Sans boss anim blueprint getter nodes"));
-			return nullptr;
-		}
-
-		LocomotionBlendSpaceNode->ReconstructNode();
-		JumpLoopAssetNode->ReconstructNode();
-		GroundSpeedNode->ReconstructNode();
-		IsFallingNode->ReconstructNode();
-
-		if (!GPFemaleAnimationSetup::ConnectPins(GPFemaleAnimationSetup::FindFirstOutputPin(LocomotionBlendSpaceNode), GPFemaleAnimationSetup::FindPinChecked(BlendSpaceNode, TEXT("BlendSpace"), EGPD_Input))
-			|| !GPFemaleAnimationSetup::ConnectPins(GPFemaleAnimationSetup::FindFirstOutputPin(JumpLoopAssetNode), GPFemaleAnimationSetup::FindPinChecked(JumpNode, TEXT("Sequence"), EGPD_Input))
-			|| !GPFemaleAnimationSetup::ConnectPins(GPFemaleAnimationSetup::FindFirstOutputPin(GroundSpeedNode), GPFemaleAnimationSetup::FindPinChecked(BlendSpaceNode, TEXT("X"), EGPD_Input))
-			|| !GPFemaleAnimationSetup::ConnectPins(GPFemaleAnimationSetup::FindFirstOutputPin(IsFallingNode), GPFemaleAnimationSetup::FindPinChecked(BlendByBoolNode, TEXT("bActiveValue"), EGPD_Input))
-			|| !GPFemaleAnimationSetup::ConnectPins(GPFemaleAnimationSetup::FindPoseOutputPin(BlendSpaceNode), GPFemaleAnimationSetup::FindPinChecked(BlendByBoolNode, TEXT("BlendPose_0"), EGPD_Input))
-			|| !GPFemaleAnimationSetup::ConnectPins(GPFemaleAnimationSetup::FindPoseOutputPin(JumpNode), GPFemaleAnimationSetup::FindPinChecked(BlendByBoolNode, TEXT("BlendPose_1"), EGPD_Input))
-			|| !GPFemaleAnimationSetup::ConnectPins(GPFemaleAnimationSetup::FindPoseOutputPin(BlendByBoolNode), GPFemaleAnimationSetup::FindPinChecked(SlotNode, TEXT("Source"), EGPD_Input))
+		if (!GPFemaleAnimationSetup::ConnectPins(
+				GPFemaleAnimationSetup::FindPoseOutputPin(IdleNode),
+				GPFemaleAnimationSetup::FindPinChecked(SlotNode, TEXT("Source"), EGPD_Input))
 			|| !GPFemaleAnimationSetup::ConnectPins(GPFemaleAnimationSetup::FindPoseOutputPin(SlotNode), GPFemaleAnimationSetup::FindPinChecked(RootNode, TEXT("Result"), EGPD_Input)))
 		{
 			UE_LOG(LogTemp, Error, TEXT("Failed to wire Sans boss anim blueprint graph"));
@@ -1166,13 +1128,13 @@ namespace GPSansBossAnimationSetup
 
 	UPDA_CharacterAnimationSet* CreateOrUpdateAnimationSet(
 		USkeletalMesh* SkeletalMesh,
-		UBlendSpace* BlendSpace,
-		UAnimSequenceBase* JumpLoop,
 		UAnimBlueprint* AnimBlueprint,
 		UAnimMontage* BasicAttackMontage,
-		UAnimMontage* SweepAttackMontage)
+		UAnimMontage* SweepAttackMontage,
+		UAnimMontage* HeavyAttackMontage,
+		UAnimMontage* AreaAttackMontage)
 	{
-		if (!IsValid(SkeletalMesh) || !IsValid(BlendSpace) || !IsValid(JumpLoop) || !IsValid(AnimBlueprint) || !IsValid(BasicAttackMontage) || !IsValid(SweepAttackMontage))
+		if (!IsValid(SkeletalMesh) || !IsValid(AnimBlueprint) || !IsValid(BasicAttackMontage) || !IsValid(SweepAttackMontage) || !IsValid(HeavyAttackMontage) || !IsValid(AreaAttackMontage))
 		{
 			return nullptr;
 		}
@@ -1205,6 +1167,9 @@ namespace GPSansBossAnimationSetup
 		AnimationSet->LightAttackMontages.Add(BasicAttackMontage);
 		AnimationSet->HeavyAttackMontages.Reset();
 		AnimationSet->HeavyAttackMontages.Add(SweepAttackMontage);
+		AnimationSet->BossSweepAttackMontage = SweepAttackMontage;
+		AnimationSet->BossHeavyAttackMontage = HeavyAttackMontage;
+		AnimationSet->BossAreaAttackMontage = AreaAttackMontage;
 		AnimationSet->MarkPackageDirty();
 
 		return GPFemaleAnimationSetup::SaveAsset(AnimationSet) ? AnimationSet : nullptr;
@@ -1712,14 +1677,8 @@ bool UGP_AnimationSetupLibrary::CreateSansBossAnimationSetup()
 #if WITH_EDITOR
 	USkeletalMesh* SansMesh = GPFemaleAnimationSetup::LoadRequiredAsset<USkeletalMesh>(*GPSansBossAnimationSetup::SansMeshPath);
 	USkeleton* SansSkeleton = GPFemaleAnimationSetup::LoadRequiredAsset<USkeleton>(*GPSansBossAnimationSetup::SansSkeletonPath);
-	UAnimSequence* JumpLoop = GPFemaleAnimationSetup::LoadRequiredAsset<UAnimSequence>(*GPSansBossAnimationSetup::SansJumpLoopPath);
-	if (!SansMesh || !SansSkeleton || !JumpLoop)
-	{
-		return false;
-	}
-
-	UBlendSpace1D* BlendSpace = GPSansBossAnimationSetup::CreateOrUpdateLocomotionBlendSpace(SansSkeleton, SansMesh);
-	if (!BlendSpace)
+	UAnimSequence* DefaultIdle = GPFemaleAnimationSetup::LoadRequiredAsset<UAnimSequence>(*GPSansBossAnimationSetup::SansIdlePath);
+	if (!SansMesh || !SansSkeleton || !DefaultIdle)
 	{
 		return false;
 	}
@@ -1744,7 +1703,30 @@ bool UGP_AnimationSetupLibrary::CreateSansBossAnimationSetup()
 		return false;
 	}
 
-	UAnimBlueprint* AnimBlueprint = GPSansBossAnimationSetup::CreateOrUpdateAnimBlueprint(SansSkeleton, SansMesh, BlendSpace, JumpLoop);
+	UAnimMontage* HeavyAttackMontage = GPSansBossAnimationSetup::CreateOrUpdateMontageFromSequence(
+		SansSkeleton,
+		GPSansBossAnimationSetup::SansHeavyAttackPath,
+		GPSansBossAnimationSetup::HeavyAttackMontageName,
+		TEXT("Sans sword heavy B"));
+	if (!HeavyAttackMontage)
+	{
+		return false;
+	}
+
+	UAnimMontage* AreaAttackMontage = GPSansBossAnimationSetup::CreateOrUpdateMontageFromSequence(
+		SansSkeleton,
+		GPSansBossAnimationSetup::SansAreaAttackPath,
+		GPSansBossAnimationSetup::AreaAttackMontageName,
+		TEXT("Sans sword ground pound"));
+	if (!AreaAttackMontage)
+	{
+		return false;
+	}
+
+	UAnimBlueprint* AnimBlueprint = GPSansBossAnimationSetup::CreateOrUpdateAnimBlueprint(
+		SansSkeleton,
+		SansMesh,
+		DefaultIdle);
 	if (!AnimBlueprint)
 	{
 		return false;
@@ -1752,11 +1734,11 @@ bool UGP_AnimationSetupLibrary::CreateSansBossAnimationSetup()
 
 	UPDA_CharacterAnimationSet* AnimationSet = GPSansBossAnimationSetup::CreateOrUpdateAnimationSet(
 		SansMesh,
-		BlendSpace,
-		JumpLoop,
 		AnimBlueprint,
 		BasicAttackMontage,
-		SweepAttackMontage);
+		SweepAttackMontage,
+		HeavyAttackMontage,
+		AreaAttackMontage);
 	if (!AnimationSet)
 	{
 		return false;

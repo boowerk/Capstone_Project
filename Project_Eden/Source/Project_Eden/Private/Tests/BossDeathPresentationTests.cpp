@@ -44,6 +44,9 @@ bool FBossDeathPresentationConfigurationTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Matador default selects bull arena presentation"),
 		IsValid(MatadorPresentation) ? MatadorPresentation->GetConfiguredPresentationStyle() : EGPBossDeathPresentationStyle::None,
 		EGPBossDeathPresentationStyle::Matador);
+	TestFalse(
+		TEXT("Boss presentation leaves source-mesh dissolve and hide to the shared absorption component"),
+		IsValid(CrystalPresentation) && CrystalPresentation->DoesPresentationHideSourceMesh());
 
 	TestEqual(TEXT("Sans Blueprint names auto-map to the hand-and-crack presentation"),
 		UGP_BossDeathPresentationComponent::ResolveAutoPresentationStyleFromName(

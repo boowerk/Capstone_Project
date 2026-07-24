@@ -1,5 +1,8 @@
 #include "AbilitySystem/Abilities/Enemy/GP_BossHeavyAttack.h"
 
+#include "Animation/AnimMontage.h"
+#include "Animation/PDA_CharacterAnimationSet.h"
+#include "Characters/GP_BaseCharacter.h"
 #include "GameplayEffect.h"
 #include "GameplayTags/GP_Tags.h"
 #include "UObject/ConstructorHelpers.h"
@@ -16,11 +19,18 @@ UGP_BossHeavyAttack::UGP_BossHeavyAttack()
 	HitBoxElevationOffset = 40.0f;
 	bUseGameplayEventForHitTiming = false;
 
-	// Sans does not have a dedicated heavy montage yet, so this branch falls back to the boss AnimationSet scratch montage.
-
 	static ConstructorHelpers::FClassFinder<UGameplayEffect> DamageEffectFinder(TEXT("/Game/GAS_Pattern/AbilitySystem/GameplayEffects/Damage/GE_PrimaryDamage"));
 	if (DamageEffectFinder.Succeeded())
 	{
 		DamageEffectClass = DamageEffectFinder.Class;
 	}
+}
+
+UAnimMontage* UGP_BossHeavyAttack::ResolveConfiguredAttackMontage(AActor* AvatarActor) const
+{
+	const AGP_BaseCharacter* BaseCharacter = Cast<AGP_BaseCharacter>(AvatarActor);
+	const UPDA_CharacterAnimationSet* AnimationSet = IsValid(BaseCharacter) ? BaseCharacter->AnimationSet : nullptr;
+	return IsValid(AnimationSet) && IsValid(AnimationSet->BossHeavyAttackMontage)
+		? AnimationSet->BossHeavyAttackMontage.Get()
+		: Super::ResolveConfiguredAttackMontage(AvatarActor);
 }

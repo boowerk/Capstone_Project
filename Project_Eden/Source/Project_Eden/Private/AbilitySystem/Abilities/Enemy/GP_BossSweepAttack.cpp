@@ -21,6 +21,10 @@ namespace GP_BossSweepAttack_Internal
 	{
 		const AGP_BaseCharacter* BaseCharacter = Cast<AGP_BaseCharacter>(AvatarActor);
 		const UPDA_CharacterAnimationSet* AnimationSet = IsValid(BaseCharacter) ? BaseCharacter->AnimationSet : nullptr;
+		if (IsValid(AnimationSet) && IsValid(AnimationSet->BossSweepAttackMontage))
+		{
+			return AnimationSet->BossSweepAttackMontage;
+		}
 		if (IsValid(AnimationSet) && AnimationSet->HeavyAttackMontages.Num() > 0 && IsValid(AnimationSet->HeavyAttackMontages[0]))
 		{
 			// Sans stores the requested sweep clip as the first heavy montage, mirroring the player combo data layout.

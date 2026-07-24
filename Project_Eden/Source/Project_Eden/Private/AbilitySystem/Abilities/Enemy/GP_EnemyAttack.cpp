@@ -166,6 +166,11 @@ UGP_EnemyAttack::UGP_EnemyAttack()
 	}
 }
 
+UAnimMontage* UGP_EnemyAttack::ResolveConfiguredAttackMontage(AActor* AvatarActor) const
+{
+	return SkillMontage;
+}
+
 void UGP_EnemyAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 	const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo,
 	const FGameplayEventData* TriggerEventData)
@@ -249,7 +254,7 @@ void UGP_EnemyAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 	// 부모의 SkillMontage 변수를 공격 몽타주로 사용
 	UAnimMontage* MontageToPlay = GP_EnemyAttack_Internal::ResolveAttackMontage(
 		AvatarActor,
-		SkillMontage,
+		ResolveConfiguredAttackMontage(AvatarActor),
 		LastSelectedAttackMontage,
 		LastSelectedAttackSide);
 

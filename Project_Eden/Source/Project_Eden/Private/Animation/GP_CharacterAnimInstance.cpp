@@ -434,7 +434,9 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		GeneratedTrajectory = MoveTemp(UpdatedTrajectory);
 		NormalizeTrajectoryForMovementScale(GeneratedTrajectory, MovementSpeedScaleRatio);
 	}
-	if (bCanUseRuntimePoseSearchChooser && PlayerCharacter->IsUsingPostActionAnimVelocity())
+	if (bEnableDebugLog
+		&& bCanUseRuntimePoseSearchChooser
+		&& PlayerCharacter->IsUsingPostActionAnimVelocity())
 	{
 		FVector NormalizedActionMotionVelocity = ActionMotionVelocity;
 		NormalizedActionMotionVelocity.Z = 0.0f;
@@ -455,7 +457,11 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 
 #if !UE_BUILD_SHIPPING
 	const bool bIsUEFNSourceAnimInstance = PlayerCharacter && PlayerCharacter->GetUEFNSourceAnimInstance() == this;
-	if (GEngine && PlayerCharacter && PlayerCharacter->IsLocallyControlled() && bIsUEFNSourceAnimInstance)
+	if (bEnableDebugLog
+		&& GEngine
+		&& PlayerCharacter
+		&& PlayerCharacter->IsLocallyControlled()
+		&& bIsUEFNSourceAnimInstance)
 	{
 		const FString SelectedAnimText = bMotionMatchingResultValid
 			? (MotionMatchingSelectedAnimName.IsNone() ? TEXT("Null Asset") : MotionMatchingSelectedAnimName.ToString())

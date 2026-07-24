@@ -11,4 +11,7 @@ class PROJECT_EDEN_API UGP_BossAreaAttack : public UGP_EnemyAttack
 
 public:
 	UGP_BossAreaAttack();
+
+protected:
+	virtual UAnimMontage* ResolveConfiguredAttackMontage(AActor* AvatarActor) const override;
 };

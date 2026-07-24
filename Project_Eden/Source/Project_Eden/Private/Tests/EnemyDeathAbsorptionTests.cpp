@@ -1,12 +1,19 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
+#include "Actors/GP_MatadorBossDecoyActor.h"
+#include "Characters/GP_CrystalSeraphBossCharacter.h"
 #include "Characters/GP_EnemyCharacter.h"
 #include "Components/SceneComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
+#include "Materials/MaterialInterface.h"
 #include "Misc/AutomationTest.h"
 #include "NiagaraDataInterfaceSkeletalMesh.h"
+#include "NiagaraEmitter.h"
+#include "NiagaraEmitterHandle.h"
+#include "NiagaraSpriteRendererProperties.h"
 #include "NiagaraSystem.h"
+#include "VFX/GP_BossDeathPresentationComponent.h"
 #include "VFX/GP_EnemyDeathAbsorptionComponent.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -27,6 +34,9 @@ bool FEnemyDeathAbsorptionPolicyTest::RunTest(const FString& Parameters)
 	}
 
 	TestTrue(TEXT("The cosmetic multicast component is replicated"), ComponentDefaults->GetIsReplicated());
+	TestTrue(TEXT("Real enemies enable shared death absorption by default"), ComponentDefaults->IsDeathAbsorptionEnabled());
+	TestNotNull(TEXT("A safe default body dissolve material is configured"), ComponentDefaults->GetDefaultDeathDissolveMaterial());
+	TestNotNull(TEXT("A safe default absorption-particle material is configured"), ComponentDefaults->GetDeathParticleMaterial());
 	TestEqual(TEXT("Source mesh parameter contract"), ComponentDefaults->SourceMeshParameterName, FName(TEXT("User.SourceMesh")));
 	TestEqual(
 		TEXT("Target position parameter contract"),
@@ -55,6 +65,34 @@ bool FEnemyDeathAbsorptionPolicyTest::RunTest(const FString& Parameters)
 	TestTrue(
 		TEXT("A first-frame hitch cannot stop emission before Niagara produces a visible sample"),
 		ComponentDefaults->MinimumEmissionFrames >= 3);
+	TestTrue(
+		TEXT("The source material remains long enough for a visible dissolve transition"),
+		ComponentDefaults->SourceMeshHideDelaySeconds >= 0.3f
+			&& ComponentDefaults->SourceMeshHideDelaySeconds < ComponentDefaults->EffectDeactivateTimeSeconds);
+	TestEqual(
+		TEXT("Niagara material override contract"),
+		ComponentDefaults->DeathParticleMaterialParameterName,
+		FName(TEXT("User.DeathParticleMaterial")));
+	TestEqual(
+		TEXT("Body and fragment material progress contract"),
+		ComponentDefaults->DissolveProgressParameterName,
+		FName(TEXT("DissolveProgress")));
+
+	const AGP_CrystalSeraphBossCharacter* CrystalDefaults =
+		GetDefault<AGP_CrystalSeraphBossCharacter>();
+	const UGP_EnemyDeathAbsorptionComponent* CrystalAbsorption =
+		CrystalDefaults ? CrystalDefaults->GetEnemyDeathAbsorptionComponent() : nullptr;
+	TestTrue(
+		TEXT("Bosses participate in the same shared death absorption flow"),
+		IsValid(CrystalAbsorption) && CrystalAbsorption->IsDeathAbsorptionEnabled());
+
+	const AGP_MatadorBossDecoyActor* DecoyDefaults =
+		GetDefault<AGP_MatadorBossDecoyActor>();
+	const UGP_EnemyDeathAbsorptionComponent* DecoyAbsorption =
+		DecoyDefaults ? DecoyDefaults->GetEnemyDeathAbsorptionComponent() : nullptr;
+	TestTrue(
+		TEXT("Matador decoys keep their bespoke break presentation"),
+		IsValid(DecoyAbsorption) && !DecoyAbsorption->IsDeathAbsorptionEnabled());
 
 	const float MaximumStrength = 800.0f;
 	TestEqual(
@@ -184,6 +222,9 @@ bool FEnemyDeathAbsorptionAssetContractTest::RunTest(const FString& Parameters)
 	const FNiagaraVariable SpriteSizeParameter(
 		FNiagaraTypeDefinition::GetVec2Def(),
 		TEXT("User.SpriteSize"));
+	const FNiagaraVariable DeathParticleMaterialParameter(
+		FNiagaraTypeDefinition::GetUMaterialDef(),
+		TEXT("User.DeathParticleMaterial"));
 
 	// These exact User contracts are consumed by the native component before Niagara activation.
 	TestTrue(TEXT("Source mesh data interface is exposed"), UserParameters.IndexOf(SourceMeshParameter) != INDEX_NONE);
@@ -196,6 +237,9 @@ bool FEnemyDeathAbsorptionAssetContractTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Runtime absorption drag is exposed"), UserParameters.IndexOf(AbsorbDragParameter) != INDEX_NONE);
 	TestTrue(TEXT("Visible grain size remains exposed"), UserParameters.IndexOf(SpriteSizeParameter) != INDEX_NONE);
 	TestTrue(
+		TEXT("Per-enemy particle material is exposed"),
+		UserParameters.IndexOf(DeathParticleMaterialParameter) != INDEX_NONE);
+	TestTrue(
 		TEXT("Designer-tuned grains retain their visible 10x10 size"),
 		UserParameters.GetParameterValue<FVector2f>(SpriteSizeParameter).Equals(
 			FVector2f(10.0f, 10.0f),
@@ -204,6 +248,210 @@ bool FEnemyDeathAbsorptionAssetContractTest::RunTest(const FString& Parameters)
 	TestTrue(
 		TEXT("Authored fallback bounds exceed the original +/-100 cm sample"),
 		AbsorptionSystem->GetFixedBounds().GetExtent().GetMin() >= 5000.0f);
+
+	bool bFoundBoundSpriteRenderer = false;
+	for (const FNiagaraEmitterHandle& EmitterHandle : AbsorptionSystem->GetEmitterHandles())
+	{
+		const FVersionedNiagaraEmitterData* EmitterData = EmitterHandle.GetEmitterData();
+		if (!EmitterData)
+		{
+			continue;
+		}
+
+		for (const UNiagaraRendererProperties* RendererProperties : EmitterData->GetRenderers())
+		{
+			const UNiagaraSpriteRendererProperties* SpriteRenderer =
+				Cast<UNiagaraSpriteRendererProperties>(RendererProperties);
+			if (IsValid(SpriteRenderer)
+				&& SpriteRenderer->MaterialUserParamBinding.Parameter == DeathParticleMaterialParameter)
+			{
+				bFoundBoundSpriteRenderer = true;
+				break;
+			}
+		}
+	}
+	TestTrue(
+		TEXT("Sprite Renderer consumes User.DeathParticleMaterial"),
+		bFoundBoundSpriteRenderer);
+
+	return !HasAnyErrors();
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEnemyDeathMaterialAssetContractTest,
+	"ProjectEden.VFX.EnemyDeathAbsorption.MaterialAssetContract",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEnemyDeathMaterialAssetContractTest::RunTest(const FString& Parameters)
+{
+	UMaterialInterface* BodyMaterial = LoadObject<UMaterialInterface>(
+		nullptr,
+		TEXT("/Game/Niagara/Dissolve_SK/EnemyMaterials/M_EnemyDeath_Dissolve.M_EnemyDeath_Dissolve"));
+	UMaterialInterface* ParticleMaterial = LoadObject<UMaterialInterface>(
+		nullptr,
+		TEXT("/Game/Niagara/Dissolve_SK/EnemyMaterials/M_EnemyDeath_AbsorbParticle.M_EnemyDeath_AbsorbParticle"));
+
+	TestNotNull(TEXT("Shared body dissolve material loads"), BodyMaterial);
+	TestNotNull(TEXT("Shared absorption particle material loads"), ParticleMaterial);
+	if (!IsValid(BodyMaterial) || !IsValid(ParticleMaterial))
+	{
+		return false;
+	}
+
+	auto HasScalarParameter = [](const UMaterialInterface* Material, const FName ParameterName)
+	{
+		TArray<FMaterialParameterInfo> ParameterInfos;
+		TArray<FGuid> ParameterIds;
+		Material->GetAllScalarParameterInfo(ParameterInfos, ParameterIds);
+		return ParameterInfos.ContainsByPredicate(
+			[ParameterName](const FMaterialParameterInfo& Info)
+			{
+				return Info.Name == ParameterName;
+			});
+	};
+	auto HasVectorParameter = [](const UMaterialInterface* Material, const FName ParameterName)
+	{
+		TArray<FMaterialParameterInfo> ParameterInfos;
+		TArray<FGuid> ParameterIds;
+		Material->GetAllVectorParameterInfo(ParameterInfos, ParameterIds);
+		return ParameterInfos.ContainsByPredicate(
+			[ParameterName](const FMaterialParameterInfo& Info)
+			{
+				return Info.Name == ParameterName;
+			});
+	};
+
+	TestTrue(
+		TEXT("Body material exposes DissolveProgress"),
+		HasScalarParameter(BodyMaterial, TEXT("DissolveProgress")));
+	TestTrue(
+		TEXT("Body material exposes EdgeWidth"),
+		HasScalarParameter(BodyMaterial, TEXT("EdgeWidth")));
+	TestTrue(
+		TEXT("Body material exposes DeathTint"),
+		HasVectorParameter(BodyMaterial, TEXT("DeathTint")));
+	TestTrue(
+		TEXT("Body material exposes EdgeColor"),
+		HasVectorParameter(BodyMaterial, TEXT("EdgeColor")));
+	TestTrue(
+		TEXT("Particle material exposes DeathTint"),
+		HasVectorParameter(ParticleMaterial, TEXT("DeathTint")));
+	TestTrue(
+		TEXT("Particle material exposes brightness"),
+		HasScalarParameter(ParticleMaterial, TEXT("ParticleBrightness")));
+
+	return !HasAnyErrors();
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEnemyDeathProductionMaterialConfigurationTest,
+	"ProjectEden.VFX.EnemyDeathAbsorption.ProductionMaterialConfiguration",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEnemyDeathProductionMaterialConfigurationTest::RunTest(const FString& Parameters)
+{
+	struct FProductionEnemyExpectation
+	{
+		const TCHAR* GeneratedClassPath;
+		const TCHAR* MaterialLabel;
+		bool bBoss;
+	};
+
+	const FProductionEnemyExpectation Expectations[] =
+	{
+		{
+			TEXT("/Game/Characters/EnemyCharacter/Monsters/FurnaceWalker/BP_FurnaceWalker.BP_FurnaceWalker_C"),
+			TEXT("FurnaceWalker"),
+			false,
+		},
+		{
+			TEXT("/Game/Characters/EnemyCharacter/Monsters/FurnaceStomper/BP_FurnaceStomper.BP_FurnaceStomper_C"),
+			TEXT("FurnaceStomper"),
+			false,
+		},
+		{
+			TEXT("/Game/Characters/EnemyCharacter/Monsters/CyclopsSpecter/BP_CyclopsSpecter.BP_CyclopsSpecter_C"),
+			TEXT("CyclopsSpecter"),
+			false,
+		},
+		{
+			TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/BP_Crystal_Seraph.BP_Crystal_Seraph_C"),
+			TEXT("CrystalSeraph"),
+			true,
+		},
+		{
+			TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_DarkArmorKnight/BP_DarkArmorKnight.BP_DarkArmorKnight_C"),
+			TEXT("DarkArmorKnight"),
+			true,
+		},
+		{
+			TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_Matador/BP_Boss_Matador.BP_Boss_Matador_C"),
+			TEXT("Matador"),
+			true,
+		},
+		{
+			TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_Sans/BP_Boss_Sans.BP_Boss_Sans_C"),
+			TEXT("Sans"),
+			true,
+		},
+	};
+
+	for (const FProductionEnemyExpectation& Expectation : Expectations)
+	{
+		UClass* EnemyClass = LoadObject<UClass>(nullptr, Expectation.GeneratedClassPath);
+		if (!TestNotNull(
+			FString::Printf(TEXT("Production enemy class loads: %s"), Expectation.GeneratedClassPath),
+			EnemyClass))
+		{
+			continue;
+		}
+
+		const AGP_EnemyCharacter* EnemyDefaults =
+			Cast<AGP_EnemyCharacter>(EnemyClass->GetDefaultObject());
+		const UGP_EnemyDeathAbsorptionComponent* AbsorptionComponent =
+			IsValid(EnemyDefaults)
+				? EnemyDefaults->GetEnemyDeathAbsorptionComponent()
+				: nullptr;
+		if (!TestNotNull(
+			FString::Printf(TEXT("%s owns death absorption"), Expectation.MaterialLabel),
+			AbsorptionComponent))
+		{
+			continue;
+		}
+
+		const UMaterialInterface* BodyMaterial =
+			AbsorptionComponent->GetDefaultDeathDissolveMaterial();
+		const UMaterialInterface* ParticleMaterial =
+			AbsorptionComponent->GetDeathParticleMaterial();
+		TestTrue(
+			FString::Printf(TEXT("%s has its auxiliary body material"), Expectation.MaterialLabel),
+			IsValid(BodyMaterial)
+				&& BodyMaterial->GetPathName().Contains(Expectation.MaterialLabel)
+				&& BodyMaterial->GetPathName().Contains(TEXT("_Auxiliary")));
+		TestTrue(
+			FString::Printf(TEXT("%s has its particle material"), Expectation.MaterialLabel),
+			IsValid(ParticleMaterial)
+				&& ParticleMaterial->GetPathName().Contains(Expectation.MaterialLabel));
+		TestTrue(
+			FString::Printf(TEXT("%s has slot material overrides"), Expectation.MaterialLabel),
+			!AbsorptionComponent->GetDeathDissolveMaterialOverrides().IsEmpty());
+
+		if (Expectation.bBoss)
+		{
+			const UGP_BossDeathPresentationComponent* PresentationComponent =
+				EnemyDefaults->GetBossDeathPresentationComponent();
+			TestTrue(
+				FString::Printf(TEXT("%s has a fragment material"), Expectation.MaterialLabel),
+				IsValid(PresentationComponent)
+					&& IsValid(PresentationComponent->GetFragmentMaterial())
+					&& PresentationComponent->GetFragmentMaterial()->GetPathName().Contains(
+						Expectation.MaterialLabel));
+			TestTrue(
+				FString::Printf(TEXT("%s leaves source hide to absorption"), Expectation.MaterialLabel),
+				IsValid(PresentationComponent)
+					&& !PresentationComponent->DoesPresentationHideSourceMesh());
+		}
+	}
 
 	return !HasAnyErrors();
 }

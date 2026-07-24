@@ -77,6 +77,13 @@ AGP_BossDeathPresentationActor::AGP_BossDeathPresentationActor()
 		CylinderMesh = CylinderMeshFinder.Object;
 	}
 
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> CrystalShardMeshFinder(
+		TEXT("/Game/Meshes/FX_Meshes/ICE/SM_IceShard_03.SM_IceShard_03"));
+	if (CrystalShardMeshFinder.Succeeded())
+	{
+		CrystalShardMesh = CrystalShardMeshFinder.Object;
+	}
+
 	static ConstructorHelpers::FObjectFinder<USkeletalMesh> HandMeshFinder(
 		TEXT("/Game/Meshes/PLAZA_DE_TOROS/ActorMesh/SK_RightHand.SK_RightHand"));
 	if (HandMeshFinder.Succeeded())
@@ -162,6 +169,23 @@ void AGP_BossDeathPresentationActor::Tick(float DeltaSeconds)
 			Piece->SetVisibility(true, true);
 		}
 
+		if (Motion.DynamicMaterial.IsValid())
+		{
+			const float DissolveDuration = FMath::Max(
+				0.01f,
+				Settings.FragmentDissolveDurationSeconds);
+			const float DissolveStartSeconds = FMath::Max(
+				Motion.StartDelaySeconds,
+				Motion.HideAtSeconds - DissolveDuration);
+			const float DissolveProgress = FMath::Clamp(
+				(ElapsedSeconds - DissolveStartSeconds) / DissolveDuration,
+				0.0f,
+				1.0f);
+			Motion.DynamicMaterial->SetScalarParameterValue(
+				TEXT("DissolveProgress"),
+				FMath::SmoothStep(0.0f, 1.0f, DissolveProgress));
+		}
+
 		if (ElapsedSeconds >= Motion.HideAtSeconds)
 		{
 			Piece->SetVisibility(false, true);
@@ -245,7 +269,9 @@ void AGP_BossDeathPresentationActor::StartCrystalSeraphPresentation()
 			+ FVector(0.0f, 0.0f, RandomStream.FRandRange(GetScaled(120.0f), GetScaled(500.0f)));
 
 		AddStaticPiece(
-			ConeMesh ? ConeMesh.Get() : CubeMesh.Get(),
+			CrystalShardMesh
+				? CrystalShardMesh.Get()
+				: (ConeMesh ? ConeMesh.Get() : CubeMesh.Get()),
 			Location,
 			FRotator(RandomStream.FRandRange(-60.0f, 60.0f), RandomStream.FRandRange(0.0f, 360.0f), RandomStream.FRandRange(-35.0f, 35.0f)),
 			FVector(
@@ -264,7 +290,9 @@ void AGP_BossDeathPresentationActor::StartCrystalSeraphPresentation()
 		const FVector Location = Center
 			+ FVector(RandomStream.FRandRange(GetScaled(-650.0f), GetScaled(650.0f)), RandomStream.FRandRange(GetScaled(-650.0f), GetScaled(650.0f)), GetScaled(460.0f));
 		AddStaticPiece(
-			ConeMesh ? ConeMesh.Get() : CubeMesh.Get(),
+			CrystalShardMesh
+				? CrystalShardMesh.Get()
+				: (ConeMesh ? ConeMesh.Get() : CubeMesh.Get()),
 			Location,
 			FRotator(-90.0f, RandomStream.FRandRange(0.0f, 360.0f), 0.0f),
 			FVector(GetScaled(0.12f), GetScaled(0.12f), GetScaled(0.8f)),
@@ -459,9 +487,14 @@ void AGP_BossDeathPresentationActor::AddStaticPiece(
 	Piece->SetGenerateOverlapEvents(false);
 	Piece->SetCastShadow(false);
 	Piece->SetStaticMesh(Mesh);
-	if (UMaterialInterface* TintMaterial = CreateTintMaterial(Tint))
+	UMaterialInstanceDynamic* TintMaterial = CreateTintMaterial(Tint);
+	if (IsValid(TintMaterial))
 	{
-		Piece->SetMaterial(0, TintMaterial);
+		const int32 MaterialSlotCount = FMath::Max(1, Piece->GetNumMaterials());
+		for (int32 MaterialIndex = 0; MaterialIndex < MaterialSlotCount; ++MaterialIndex)
+		{
+			Piece->SetMaterial(MaterialIndex, TintMaterial);
+		}
 	}
 	Piece->SetupAttachment(SceneRoot);
 	Piece->RegisterComponent();
@@ -479,6 +512,7 @@ void AGP_BossDeathPresentationActor::AddStaticPiece(
 	Motion.HideAtSeconds = FMath::Max(Motion.StartDelaySeconds + 0.01f, HideAtSeconds);
 	Motion.InitialScale = WorldScale;
 	Motion.TargetScale = TargetScale.IsNearlyZero() ? FVector::ZeroVector : TargetScale;
+	Motion.DynamicMaterial = TintMaterial;
 	Motion.bShrinkOverLifetime = bShrinkOverLifetime;
 	Motion.bStarted = StartDelaySeconds <= KINDA_SMALL_NUMBER;
 	PieceMotions.Add(Motion);
@@ -504,6 +538,10 @@ void AGP_BossDeathPresentationActor::AddSkeletalPiece(
 		return;
 	}
 
+	// Recognizable authored props (Matador's bull and Sans' hands) keep their
+	// original material set. Their existing scale animation handles the exit.
+	(void)Tint;
+
 	const FName ComponentName = MakeUniqueObjectName(this, USkeletalMeshComponent::StaticClass(), TEXT("DeathSkeletalPiece"));
 	USkeletalMeshComponent* Piece = NewObject<USkeletalMeshComponent>(this, ComponentName);
 	Piece->SetMobility(EComponentMobility::Movable);
@@ -516,10 +554,6 @@ void AGP_BossDeathPresentationActor::AddSkeletalPiece(
 		Piece->SetAnimationMode(EAnimationMode::AnimationSingleNode);
 		Piece->SetAnimation(Animation);
 		Piece->Play(true);
-	}
-	if (UMaterialInterface* TintMaterial = CreateTintMaterial(Tint))
-	{
-		Piece->SetMaterial(0, TintMaterial);
 	}
 	Piece->SetupAttachment(SceneRoot);
 	Piece->RegisterComponent();
@@ -537,25 +571,40 @@ void AGP_BossDeathPresentationActor::AddSkeletalPiece(
 	Motion.HideAtSeconds = FMath::Max(Motion.StartDelaySeconds + 0.01f, HideAtSeconds);
 	Motion.InitialScale = WorldScale;
 	Motion.TargetScale = TargetScale.IsNearlyZero() ? FVector::ZeroVector : TargetScale;
+	Motion.DynamicMaterial = nullptr;
 	Motion.bShrinkOverLifetime = bShrinkOverLifetime;
 	Motion.bStarted = StartDelaySeconds <= KINDA_SMALL_NUMBER;
 	PieceMotions.Add(Motion);
 }
 
-UMaterialInterface* AGP_BossDeathPresentationActor::CreateTintMaterial(const FLinearColor& Tint)
+UMaterialInstanceDynamic* AGP_BossDeathPresentationActor::CreateTintMaterial(const FLinearColor& Tint)
 {
-	if (!IsValid(BasicShapeMaterial))
+	UMaterialInterface* MaterialTemplate = IsValid(Settings.FragmentMaterial)
+		? Settings.FragmentMaterial.Get()
+		: BasicShapeMaterial.Get();
+	if (!IsValid(MaterialTemplate))
 	{
 		return nullptr;
 	}
 
-	UMaterialInstanceDynamic* DynamicMaterial = UMaterialInstanceDynamic::Create(BasicShapeMaterial, this);
+	UMaterialInstanceDynamic* DynamicMaterial =
+		UMaterialInstanceDynamic::Create(MaterialTemplate, this);
 	if (!IsValid(DynamicMaterial))
 	{
 		return nullptr;
 	}
 
-	// Different placeholder materials expose different parameter names, so set the common options defensively.
+	const FLinearColor EdgeTint(
+		FMath::Min(Tint.R * 2.2f + 0.08f, 1.0f),
+		FMath::Min(Tint.G * 2.2f + 0.08f, 1.0f),
+		FMath::Min(Tint.B * 2.2f + 0.08f, 1.0f),
+		1.0f);
+
+	// The dedicated death material consumes DeathTint/EdgeColor. Legacy names
+	// remain defensive fallbacks when a designer supplies another material.
+	DynamicMaterial->SetVectorParameterValue(TEXT("DeathTint"), Tint);
+	DynamicMaterial->SetVectorParameterValue(TEXT("EdgeColor"), EdgeTint);
+	DynamicMaterial->SetScalarParameterValue(TEXT("DissolveProgress"), 0.0f);
 	DynamicMaterial->SetVectorParameterValue(TEXT("Color"), Tint);
 	DynamicMaterial->SetVectorParameterValue(TEXT("BaseColor"), Tint);
 	DynamicMaterial->SetVectorParameterValue(TEXT("Tint"), Tint);

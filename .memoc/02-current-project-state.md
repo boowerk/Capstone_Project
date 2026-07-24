@@ -3,20 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-updated: 2026-07-24T06:22:00+09:00
-=======
-updated: 2026-07-24T07:01:06+09:00
->>>>>>> origin/main
-=======
-updated: 2026-07-24T07:01:06+09:00
->>>>>>> origin/main
-=======
-updated: 2026-07-24T07:01:06+09:00
->>>>>>> origin/main
+updated: 2026-07-24T15:40:42+09:00
 status: active
 tags:
   - memoc
@@ -24,10 +11,7 @@ tags:
 ---
 # Current Project State
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-Last synced: 2026-07-24T06:22:00+09:00
+Last synced: 2026-07-24T15:40:42+09:00
 
 ## Current Status
 
@@ -49,36 +33,11 @@ Last synced: 2026-07-24T06:22:00+09:00
 - `L_LandscapeMap` runtime vegetation is also working. Its `BP_VegetationSpawner` is Activated/GenerateAtRuntime/Partitioned, the Box extent is `64000,64000,8000`, and `PCGWorldActor` uses `SerializeOnlyAtCook` with 289 cache entries. The map-specific blocker was the inherited `32,32,32cm` Box, which reduced the sampling area to almost zero. PIE generated 1,911 grass instances at the start and 1,803 after a 400m pawn move; 50 old runtime cells pooled. No Landscape Cache or `No surfaces found` error occurred.
 
 - Historical baseline `/Game/Maps/MainMap/L_LandscapeMap` was restored to the pre-test-deck sculpted LFS object (`ba9e714a...`, 11,416,959 bytes). The current working-copy map is now user-modified relative to Git (10,397,897 bytes, `E8CE0B5D...B728C`, mtime 2026-07-20 01:18:26+09), which predates the 02:26+ Region V2.2 verification; preserve it and do not attribute/revert it as part of this task. The destructive production-map deck generator, generated floors/sign, old deck contract, and obsolete guide were removed. `ProjectEden.Game.LandscapeMap.Integrity` requires a Landscape actor, sculpt components, heightfield collision, and zero `GP.TestEnvironment` actors; the historical editor load/PIE, full Editor build, and integrity test passed (`0512bcf1`, `6042600a`, `8d88b067`).
-=======
-Last synced: 2026-07-24T07:01:06+09:00
-
-## Current Status
-
-- Regular enemy death absorption is current through `9796240f` and `c971a3c2`. `/Game/Niagara/Dissolve_SK/NS_EnemyDeath_Absorb` samples the actual dead enemy through `User.SourceMesh`, keeps the designer-tuned `10x10` grain size, falls under gravity first, then curves toward the server-selected killer's live chest with constant attraction and drag instead of a synchronized distance-scaled spring. Attraction starts at `0.38s`, gravity fades from `0.28s` to `0.60s`, strength ramps to `800` over `0.80s`, playback is `2.6x`, and the effect stops at `1.90s` within the two-second corpse window. If the killer is unusable, authority selects the nearest living connected player once; a reliable multicast gives all three clients the same target. Bosses keep their bespoke death effects. Editor build and the policy, production-asset contract, and enemy-death lifecycle tests pass; relevant Niagara warning/error and NaN scans are clean. PIE visual tuning remains.
->>>>>>> origin/main
+- Enemy death presentation is now shared by all regular enemies and bosses. Normal materials remain untouched while alive; death swaps the primary mesh per slot to that production enemy's generated dissolve instances, swaps auxiliary visual meshes to an enemy-specific white-base fallback, and drives `DissolveProgress` for `0.45s`. `/Game/Niagara/Dissolve_SK/NS_EnemyDeath_Absorb` keeps the existing server-selected-player absorption flow and now receives a per-enemy `User.DeathParticleMaterial`; existing BP death particles still play. Boss static fragments use boss-specific dissolve instances, while authored Matador bull/Sans hand skeletal props retain their own materials. Both player AnimBP debug flags are saved off and native ActionRM/UEFN screen output respects the flag. Rider-equivalent Editor build plus VFX 4/4, boss presentation 3/3, and enemy lifecycle 1/1 automation pass; three-player PIE visual/timing validation remains.
+- 2026-07-24 animation WIP (uncommitted): `main` fast-forwarded cleanly to `b96882b3`; `git lfs pull` hydrated the remote assets that had remained as pointer text. Sans no longer reads nullable legacy locomotion/jump asset variables: `ABP_Sans_Boss` is regenerated as looping `Sans_Idle_Rail_Loop -> DefaultSlot -> Output`, preventing Ref Pose/T-pose while preserving its four attack montages. Matador ABP already contains Idle/Walk and editable Rapier/Cape slots; its native walk flag follows all actual non-teleport movement. Rider-equivalent Editor build, Sans setup commandlet, and `ProjectEden.Combat.Sans.AnimationSetup` pass; PIE presentation remains.
+- The shared player class owns an always-visible sword using `NS_Big_Sword`'s runtime renderer pair: `SM_7` plus `MI_Ice_Inst_4`. It attaches with an identity relative transform to the common `hand_rSocket`; MaskMan, Paladin, and Daelithra skeleton assets own their character-specific position, rotation, and scale, and the component inherits socket/mesh scale instead of overriding it. All three sockets are parented to the deforming `hand_r`; Paladin's authored socket scale is `4.2`. The purple basic-attack slash was not the disabled SkillData burst: `AM_UEFN_Sword_Light_A..D` each contained a direct `AnimNotify_PlayNiagaraEffect -> NS_Free_Magic_Slash`. Those four notifies are removed while timed `NS_ArrowTrail_Magic` and gameplay event notifies remain. Rider-equivalent Editor build and both `ProjectEden.Player.WeaponVisual` tests pass; three-player PIE alignment/effect checks remain.
 
 - Crystal Seraph projectile/reflection VFX is current: `AGP_CrystalShardProjectile` uses `/Game/Meshes/FX_Meshes/ICE/SM_IceShard_03` instead of the prototype cone. `AGP_SeraphLaserActor` has no prototype mesh or runtime Niagara asset paths; `BP_SeraphLaser` owns Telegraph/Active/Reflection Impact/Reflection Beam Niagara defaults, and `BP_Crystal_Seraph` selects it as `SeraphLaserActorClass`. Active VFX now attaches to `SceneRoot` (firing origin), not the collision box centered along the beam. For visible-pipeline validation, `ActiveVFX` and `ReflectionBeamVFX` use `NS_Free_Magic_Attack2`; it was originally assigned only to reflection, which does not play until prism contact. Restart PIE before testing so newly spawned laser actors read updated defaults. All native pattern VFX and death shards/burst use shared `#59ADFF` (`GPCrystalSeraphVFXDefaults`) tint; material assets remain untouched. Rider-equivalent `Build.bat Project_EdenEditor Win64 Development ... -WaitMutex -FromMsBuild -architecture=x64` passed. PIE visual check remains: no rectangular mesh, all four cues visible, shard silhouette, reflection-point brightness.
-
-=======
-Last synced: 2026-07-24T07:01:06+09:00
-
-## Current Status
-
-- Regular enemy death absorption is current through `9796240f` and `c971a3c2`. `/Game/Niagara/Dissolve_SK/NS_EnemyDeath_Absorb` samples the actual dead enemy through `User.SourceMesh`, keeps the designer-tuned `10x10` grain size, falls under gravity first, then curves toward the server-selected killer's live chest with constant attraction and drag instead of a synchronized distance-scaled spring. Attraction starts at `0.38s`, gravity fades from `0.28s` to `0.60s`, strength ramps to `800` over `0.80s`, playback is `2.6x`, and the effect stops at `1.90s` within the two-second corpse window. If the killer is unusable, authority selects the nearest living connected player once; a reliable multicast gives all three clients the same target. Bosses keep their bespoke death effects. Editor build and the policy, production-asset contract, and enemy-death lifecycle tests pass; relevant Niagara warning/error and NaN scans are clean. PIE visual tuning remains.
-
-- Crystal Seraph projectile/reflection VFX is current: `AGP_CrystalShardProjectile` uses `/Game/Meshes/FX_Meshes/ICE/SM_IceShard_03` instead of the prototype cone. `AGP_SeraphLaserActor` has no prototype mesh or runtime Niagara asset paths; `BP_SeraphLaser` owns Telegraph/Active/Reflection Impact/Reflection Beam Niagara defaults, and `BP_Crystal_Seraph` selects it as `SeraphLaserActorClass`. Active VFX now attaches to `SceneRoot` (firing origin), not the collision box centered along the beam. For visible-pipeline validation, `ActiveVFX` and `ReflectionBeamVFX` use `NS_Free_Magic_Attack2`; it was originally assigned only to reflection, which does not play until prism contact. Restart PIE before testing so newly spawned laser actors read updated defaults. All native pattern VFX and death shards/burst use shared `#59ADFF` (`GPCrystalSeraphVFXDefaults`) tint; material assets remain untouched. Rider-equivalent `Build.bat Project_EdenEditor Win64 Development ... -WaitMutex -FromMsBuild -architecture=x64` passed. PIE visual check remains: no rectangular mesh, all four cues visible, shard silhouette, reflection-point brightness.
-
->>>>>>> origin/main
-=======
-Last synced: 2026-07-24T07:01:06+09:00
-
-## Current Status
-
-- Regular enemy death absorption is current through `9796240f` and `c971a3c2`. `/Game/Niagara/Dissolve_SK/NS_EnemyDeath_Absorb` samples the actual dead enemy through `User.SourceMesh`, keeps the designer-tuned `10x10` grain size, falls under gravity first, then curves toward the server-selected killer's live chest with constant attraction and drag instead of a synchronized distance-scaled spring. Attraction starts at `0.38s`, gravity fades from `0.28s` to `0.60s`, strength ramps to `800` over `0.80s`, playback is `2.6x`, and the effect stops at `1.90s` within the two-second corpse window. If the killer is unusable, authority selects the nearest living connected player once; a reliable multicast gives all three clients the same target. Bosses keep their bespoke death effects. Editor build and the policy, production-asset contract, and enemy-death lifecycle tests pass; relevant Niagara warning/error and NaN scans are clean. PIE visual tuning remains.
-
-- Crystal Seraph projectile/reflection VFX is current: `AGP_CrystalShardProjectile` uses `/Game/Meshes/FX_Meshes/ICE/SM_IceShard_03` instead of the prototype cone. `AGP_SeraphLaserActor` has no prototype mesh or runtime Niagara asset paths; `BP_SeraphLaser` owns Telegraph/Active/Reflection Impact/Reflection Beam Niagara defaults, and `BP_Crystal_Seraph` selects it as `SeraphLaserActorClass`. Active VFX now attaches to `SceneRoot` (firing origin), not the collision box centered along the beam. For visible-pipeline validation, `ActiveVFX` and `ReflectionBeamVFX` use `NS_Free_Magic_Attack2`; it was originally assigned only to reflection, which does not play until prism contact. Restart PIE before testing so newly spawned laser actors read updated defaults. All native pattern VFX and death shards/burst use shared `#59ADFF` (`GPCrystalSeraphVFXDefaults`) tint; material assets remain untouched. Rider-equivalent `Build.bat Project_EdenEditor Win64 Development ... -WaitMutex -FromMsBuild -architecture=x64` passed. PIE visual check remains: no rectangular mesh, all four cues visible, shard silhouette, reflection-point brightness.
-
->>>>>>> origin/main
 - The fixed inward demo was removed at `c78e88a9`, `ba0f2bfa`, and `29baec37`: no run seed, peripheral start, Red Rift/Defense/Shrine sequence, guided objective marker, automatic center Dark Armor Knight, or scripted event reward/result path remains. The lobby still travels three players to `L_LandscapeMap`, where the authored PlayerStart expands into three collision-safe slots.
 - Current verification: `Project_EdenEditor Win64 Development` build passed; Landscape integrity, three-player runtime starts, minimap capture, and enemy production animation passed 4/4 under `NullRHI`. No live server or multiplayer PIE session was run by request.
 - The product contract is now exactly three network players (`5e0a4fcb` through `4ca8c603`). `AGP_ThreePlayerGameSession` fixes players/spectators/split-screen to `3/0/1` in lobby and gameplay, exact-three Ready is required, the one authored Landscape PlayerStart expands into three collision/ground-validated stable slots, and debug ForceStart is disabled in Shipping and limited to an explicit `-AllowLobbyForceStart` local host.

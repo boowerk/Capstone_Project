@@ -43,6 +43,9 @@ public:
 		bool bWasCancelled) override;
 
 protected:
+	// Resolve per-avatar data without mutating the shared ability CDO's SkillMontage default.
+	virtual UAnimMontage* ResolveConfiguredAttackMontage(AActor* AvatarActor) const;
+
 	// Derived enemy archetypes can replace the shared overlap hit while keeping montage and gameplay-event timing.
 	virtual void PerformAttackHit();
 	// Derived hits keep one activation-time actor identity while sampling that same actor's live hit-frame location.

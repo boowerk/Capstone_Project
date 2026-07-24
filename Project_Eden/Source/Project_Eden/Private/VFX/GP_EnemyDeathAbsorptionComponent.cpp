@@ -3,15 +3,20 @@
 #include "AbilitySystem/GP_AttributeSet.h"
 #include "Characters/GP_EnemyCharacter.h"
 #include "Characters/GP_PlayerCharacter.h"
+#include "Components/MeshComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Components/WidgetComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/GameStateBase.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerState.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/MaterialInterface.h"
 #include "NiagaraComponent.h"
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraSystem.h"
+#include "UObject/ConstructorHelpers.h"
 
 UGP_EnemyDeathAbsorptionComponent::UGP_EnemyDeathAbsorptionComponent()
 {
@@ -22,11 +27,39 @@ UGP_EnemyDeathAbsorptionComponent::UGP_EnemyDeathAbsorptionComponent()
 	// A soft constructor default lets a missing optional cosmetic remain a quiet no-op instead of a CDO load error.
 	DeathAbsorptionSystem = TSoftObjectPtr<UNiagaraSystem>(
 		FSoftObjectPath(TEXT("/Game/Niagara/Dissolve_SK/NS_EnemyDeath_Absorb.NS_EnemyDeath_Absorb")));
+
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> DefaultDissolveMaterialFinder(
+		TEXT("/Game/Niagara/Dissolve_SK/EnemyMaterials/MI_EnemyDeath_Default.MI_EnemyDeath_Default"));
+	if (DefaultDissolveMaterialFinder.Succeeded())
+	{
+		DefaultDeathDissolveMaterial = DefaultDissolveMaterialFinder.Object;
+	}
+
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> DefaultParticleMaterialFinder(
+		TEXT("/Game/Niagara/Dissolve_SK/EnemyMaterials/MI_EnemyDeathParticle_Default.MI_EnemyDeathParticle_Default"));
+	if (DefaultParticleMaterialFinder.Succeeded())
+	{
+		DeathParticleMaterial = DefaultParticleMaterialFinder.Object;
+	}
 }
 
 UNiagaraSystem* UGP_EnemyDeathAbsorptionComponent::GetDeathAbsorptionSystem() const
 {
 	return DeathAbsorptionSystem.Get();
+}
+
+void UGP_EnemyDeathAbsorptionComponent::ConfigureDeathMaterials(
+	UMaterialInterface* InDefaultMaterial,
+	const TArray<UMaterialInterface*>& InSlotMaterialOverrides,
+	UMaterialInterface* InParticleMaterial)
+{
+	DefaultDeathDissolveMaterial = InDefaultMaterial;
+	DeathDissolveMaterialOverrides.Reset(InSlotMaterialOverrides.Num());
+	for (UMaterialInterface* SlotMaterial : InSlotMaterialOverrides)
+	{
+		DeathDissolveMaterialOverrides.Add(SlotMaterial);
+	}
+	DeathParticleMaterial = InParticleMaterial;
 }
 
 void UGP_EnemyDeathAbsorptionComponent::BeginPlay()
@@ -59,7 +92,8 @@ void UGP_EnemyDeathAbsorptionComponent::TickComponent(
 	UpdateTargetAndBounds();
 	UpdateAbsorbStrength();
 	UpdateFallGravity();
-	HideSourceMeshWhenReady();
+	UpdateDeathDissolveMaterials();
+	HideSourceMeshesWhenReady();
 
 	if (!bEmissionStopped
 		&& PlaybackElapsedSeconds >= FMath::Max(0.01f, EmissionStopTimeSeconds)
@@ -82,7 +116,7 @@ void UGP_EnemyDeathAbsorptionComponent::PlayDeathAbsorption(AActor* DeathInstiga
 	AGP_EnemyCharacter* EnemyOwner = Cast<AGP_EnemyCharacter>(GetOwner());
 	if (!IsValid(EnemyOwner)
 		|| !EnemyOwner->HasAuthority()
-		|| EnemyOwner->IsBossEnemy()
+		|| !bEnableDeathAbsorption
 		|| bAuthorityPlaybackRequested)
 	{
 		return;
@@ -105,7 +139,7 @@ void UGP_EnemyDeathAbsorptionComponent::PlayLocal(AActor* TargetPlayerActor)
 	AGP_EnemyCharacter* EnemyOwner = Cast<AGP_EnemyCharacter>(GetOwner());
 	UWorld* World = GetWorld();
 	if (!IsValid(EnemyOwner)
-		|| EnemyOwner->IsBossEnemy()
+		|| !bEnableDeathAbsorption
 		|| !IsValid(World)
 		|| World->GetNetMode() == NM_DedicatedServer
 		|| bLocalPlaybackActive)
@@ -169,7 +203,14 @@ void UGP_EnemyDeathAbsorptionComponent::PlayLocal(AActor* TargetPlayerActor)
 	ActiveNiagaraComponent->SetVariableFloat(AbsorbKillRadiusParameterName, FMath::Max(0.0f, AbsorbKillRadius));
 	ActiveNiagaraComponent->SetVariableVec3(FallGravityParameterName, FallGravity);
 	ActiveNiagaraComponent->SetVariableFloat(AbsorbDragParameterName, FMath::Max(0.0f, AbsorbDrag));
+	if (IsValid(DeathParticleMaterial))
+	{
+		ActiveNiagaraComponent->SetVariableMaterial(
+			DeathParticleMaterialParameterName,
+			DeathParticleMaterial);
+	}
 	ActiveNiagaraComponent->SetCustomTimeDilation(FMath::Max(0.1f, NiagaraPlaybackRate));
+	ApplyDeathDissolveMaterials();
 	UpdateCorridorFixedBounds();
 	ActiveNiagaraComponent->Activate(true);
 
@@ -191,6 +232,8 @@ void UGP_EnemyDeathAbsorptionComponent::StopLocalPlayback()
 
 	ActiveNiagaraComponent = nullptr;
 	SourceMeshComponent = nullptr;
+	SourceVisualMeshComponents.Reset();
+	ActiveDissolveMaterials.Reset();
 	ActiveTargetActor.Reset();
 	PlaybackTickCount = 0;
 	bEmissionStopped = false;
@@ -424,18 +467,107 @@ void UGP_EnemyDeathAbsorptionComponent::UpdateFallGravity()
 	ActiveNiagaraComponent->SetVariableVec3(FallGravityParameterName, FallGravity * GravityScale);
 }
 
-void UGP_EnemyDeathAbsorptionComponent::HideSourceMeshWhenReady()
+void UGP_EnemyDeathAbsorptionComponent::ApplyDeathDissolveMaterials()
+{
+	AGP_EnemyCharacter* EnemyOwner = Cast<AGP_EnemyCharacter>(GetOwner());
+	if (!IsValid(EnemyOwner) || !IsValid(SourceMeshComponent))
+	{
+		return;
+	}
+
+	SourceVisualMeshComponents.Reset();
+	ActiveDissolveMaterials.Reset();
+
+	TArray<UMeshComponent*> OwnerMeshComponents;
+	EnemyOwner->GetComponents<UMeshComponent>(OwnerMeshComponents);
+
+	// CharacterMesh0 is the Niagara sampling source and receives slot-specific
+	// materials. Other visible boss wings/weapons receive the configured fallback.
+	SourceVisualMeshComponents.AddUnique(SourceMeshComponent);
+	for (UMeshComponent* MeshComponent : OwnerMeshComponents)
+	{
+		if (IsValid(MeshComponent)
+			&& !MeshComponent->IsA<UWidgetComponent>()
+			&& MeshComponent->IsVisible()
+			&& MeshComponent->GetNumMaterials() > 0)
+		{
+			SourceVisualMeshComponents.AddUnique(MeshComponent);
+		}
+	}
+
+	for (UMeshComponent* MeshComponent : SourceVisualMeshComponents)
+	{
+		if (!IsValid(MeshComponent))
+		{
+			continue;
+		}
+
+		const bool bIsPrimaryMesh = MeshComponent == SourceMeshComponent;
+		for (int32 MaterialIndex = 0; MaterialIndex < MeshComponent->GetNumMaterials(); ++MaterialIndex)
+		{
+			UMaterialInterface* ReplacementMaterial = DefaultDeathDissolveMaterial;
+			if (bIsPrimaryMesh
+				&& DeathDissolveMaterialOverrides.IsValidIndex(MaterialIndex)
+				&& IsValid(DeathDissolveMaterialOverrides[MaterialIndex]))
+			{
+				ReplacementMaterial = DeathDissolveMaterialOverrides[MaterialIndex];
+			}
+
+			if (!IsValid(ReplacementMaterial))
+			{
+				continue;
+			}
+
+			UMaterialInstanceDynamic* DynamicMaterial =
+				UMaterialInstanceDynamic::Create(ReplacementMaterial, this);
+			if (!IsValid(DynamicMaterial))
+			{
+				continue;
+			}
+
+			DynamicMaterial->SetScalarParameterValue(DissolveProgressParameterName, 0.0f);
+			MeshComponent->SetMaterial(MaterialIndex, DynamicMaterial);
+			ActiveDissolveMaterials.Add(DynamicMaterial);
+		}
+	}
+}
+
+void UGP_EnemyDeathAbsorptionComponent::UpdateDeathDissolveMaterials()
+{
+	const float DissolveDuration = FMath::Max(0.01f, SourceMeshHideDelaySeconds);
+	const float LinearProgress = FMath::Clamp(PlaybackElapsedSeconds / DissolveDuration, 0.0f, 1.0f);
+	const float SmoothedProgress = FMath::SmoothStep(0.0f, 1.0f, LinearProgress);
+	for (UMaterialInstanceDynamic* DynamicMaterial : ActiveDissolveMaterials)
+	{
+		if (IsValid(DynamicMaterial))
+		{
+			DynamicMaterial->SetScalarParameterValue(
+				DissolveProgressParameterName,
+				SmoothedProgress);
+		}
+	}
+}
+
+void UGP_EnemyDeathAbsorptionComponent::HideSourceMeshesWhenReady()
 {
 	if (bSourceMeshHiddenByComponent
 		|| PlaybackElapsedSeconds < FMath::Max(0.0f, SourceMeshHideDelaySeconds)
-		|| !IsValid(SourceMeshComponent)
 		|| !IsValid(ActiveNiagaraComponent))
 	{
 		return;
 	}
 
-	// Hide only after Niagara exists and sampled the source; asset/spawn failures therefore preserve the ordinary corpse.
-	SourceMeshComponent->SetHiddenInGame(true, true);
+	// Hide only after Niagara sampled the source and every replacement MID reached
+	// the end of its dissolve. Asset/spawn failures preserve the ordinary corpse.
+	for (UMeshComponent* MeshComponent : SourceVisualMeshComponents)
+	{
+		if (IsValid(MeshComponent))
+		{
+			// Each visual mesh is hidden explicitly. Do not propagate into
+			// Niagara/particle children owned by the existing BP death effect.
+			MeshComponent->SetHiddenInGame(true, false);
+		}
+	}
 	bSourceMeshHiddenByComponent = true;
 }
 

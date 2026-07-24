@@ -18,8 +18,12 @@
 #include "Camera/PlayerCameraManager.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
+#include "Materials/MaterialInterface.h"
 #include "NavigationInvokerComponent.h"
 #include "Player/GP_PlayerController.h"
+#include "UObject/ConstructorHelpers.h"
 
 // Animation Headers
 #include "Animation/AnimInstance.h"
@@ -82,6 +86,37 @@ AGP_PlayerCharacter::AGP_PlayerCharacter()
 
 	GetMesh()->SetupAttachment(UEFNSourceMesh);
 	GetMesh()->AddTickPrerequisiteComponent(UEFNSourceMesh);
+
+	// Reuse the actual mesh/material authored for NS_Big_Sword without keeping
+	// its one-shot smoke and spark emitters alive. Each playable skeleton owns a
+	// hand_rSocket, so character-specific placement and scale stay in the asset.
+	PersistentWeaponMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("PersistentWeaponMesh"));
+	PersistentWeaponMesh->SetupAttachment(GetMesh(), TEXT("hand_rSocket"));
+	PersistentWeaponMesh->SetRelativeLocation(FVector::ZeroVector);
+	PersistentWeaponMesh->SetRelativeRotation(FRotator::ZeroRotator);
+	PersistentWeaponMesh->SetRelativeScale3D(FVector::OneVector);
+	PersistentWeaponMesh->SetAbsolute(false, false, false);
+	PersistentWeaponMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	PersistentWeaponMesh->SetGenerateOverlapEvents(false);
+	PersistentWeaponMesh->SetCanEverAffectNavigation(false);
+	PersistentWeaponMesh->SetCastShadow(false);
+	PersistentWeaponMesh->SetReceivesDecals(false);
+	PersistentWeaponMesh->PrimaryComponentTick.bCanEverTick = false;
+
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> NiagaraSwordMeshFinder(
+		TEXT("/Game/Mixed_Magic_VFX_Pack/Static_Meshes/SM_7.SM_7"));
+	if (NiagaraSwordMeshFinder.Succeeded())
+	{
+		PersistentWeaponMesh->SetStaticMesh(NiagaraSwordMeshFinder.Object);
+	}
+
+	// The Niagara renderer overrides SM_7's default material with this instance.
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> NiagaraSwordMaterialFinder(
+		TEXT("/Game/Mixed_Magic_VFX_Pack/Materials/Instance_Materials/MI_Ice_Inst_4.MI_Ice_Inst_4"));
+	if (NiagaraSwordMaterialFinder.Succeeded())
+	{
+		PersistentWeaponMesh->SetMaterial(0, NiagaraSwordMaterialFinder.Object);
+	}
 
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>("CameraBoom");
 	CameraBoom->SetupAttachment(GetRootComponent());

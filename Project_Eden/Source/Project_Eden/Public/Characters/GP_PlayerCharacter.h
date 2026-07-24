@@ -13,6 +13,7 @@ class UCameraComponent;
 class UNavigationInvokerComponent;
 class AGP_WhiteVoidSetActor;
 class USkeletalMeshComponent;
+class UStaticMeshComponent;
 class USkeletalMesh;
 class UAnimInstance;
 class UAnimMontage;
@@ -117,6 +118,7 @@ public:
 	virtual void UpdateAnimationSet() override;
 	UPDA_CharacterAnimationSet* GetAnimationSet() const { return AnimationSet; }
 	UAnimInstance* GetUEFNSourceAnimInstance() const;
+	UStaticMeshComponent* GetPersistentWeaponMesh() const { return PersistentWeaponMesh; }
 
 	float PlayUEFNSourceFallbackMontage(UAnimMontage* Montage, float PlayRate = 1.0f, float PreviousMontageBlendOutTime = 0.1f);
 	bool IsPlayingUEFNSourceFallbackMontage() const;
@@ -260,6 +262,13 @@ private:
 	// Large maps build navigation only near each player; exposing the native component lets designers tune both radii per player Blueprint.
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI|Navigation", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UNavigationInvokerComponent> NavigationInvoker;
+
+	/**
+	 * Always-visible weapon body sourced from NS_Big_Sword's authored mesh renderer.
+	 * It inherits each playable skeleton's hand_rSocket transform; that socket is parented to the deforming hand_r bone.
+	 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Equipment|Weapon|Visual", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UStaticMeshComponent> PersistentWeaponMesh;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|Motion", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
 	float IdleCameraArmLength = 340.0f;

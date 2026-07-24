@@ -40,7 +40,7 @@ struct FGPBossDeathPresentationSpawnSettings
 	float UniformScale = 1.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Death Presentation")
-	bool bHideSourceMesh = true;
+	bool bHideSourceMesh = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Death Presentation", meta = (ClampMin = "0.0", Units = "s"))
 	float SourceMeshHideDelaySeconds = 0.08f;
@@ -48,6 +48,15 @@ struct FGPBossDeathPresentationSpawnSettings
 	// Optional per-BP override lets designers reuse the same presentation code with a stronger Niagara burst.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Death Presentation")
 	TObjectPtr<UNiagaraSystem> OverrideBurstNiagara;
+
+	// Boss-specific death material. The actor creates one MID per fragment so
+	// tint and dissolve progress remain independent.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Death Presentation")
+	TObjectPtr<UMaterialInterface> FragmentMaterial;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Death Presentation",
+		meta = (ClampMin = "0.01", Units = "s"))
+	float FragmentDissolveDurationSeconds = 0.55f;
 };
 
 /** Lightweight local-only actor that turns a boss death into readable clear feedback without requiring death animations. */
@@ -88,6 +97,7 @@ private:
 		float HideAtSeconds = 3.0f;
 		FVector InitialScale = FVector::OneVector;
 		FVector TargetScale = FVector::OneVector;
+		TWeakObjectPtr<UMaterialInstanceDynamic> DynamicMaterial;
 		bool bShrinkOverLifetime = false;
 		bool bStarted = false;
 	};
@@ -126,7 +136,7 @@ private:
 		float StartDelaySeconds = 0.0f,
 		bool bShrinkOverLifetime = false,
 		const FVector& TargetScale = FVector::ZeroVector);
-	UMaterialInterface* CreateTintMaterial(const FLinearColor& Tint);
+	UMaterialInstanceDynamic* CreateTintMaterial(const FLinearColor& Tint);
 	FVector ResolveGroundLocation(const FVector& DesiredLocation) const;
 	FVector RandomHorizontalDirection();
 	float GetScaled(float Value) const;
@@ -143,6 +153,9 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Boss|Death Presentation|Meshes")
 	TObjectPtr<UStaticMesh> CylinderMesh;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Boss|Death Presentation|Meshes")
+	TObjectPtr<UStaticMesh> CrystalShardMesh;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Boss|Death Presentation|Meshes")
 	TObjectPtr<USkeletalMesh> SansHandMesh;

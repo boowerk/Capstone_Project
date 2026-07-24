@@ -6,13 +6,20 @@
 
 class AActor;
 class AGP_PlayerCharacter;
+class UMaterialInstanceDynamic;
+class UMaterialInterface;
+class UMeshComponent;
 class UNiagaraComponent;
 class UNiagaraSystem;
 class USkeletalMeshComponent;
 
 /**
- * Converts a regular enemy's final pose into Niagara particles and attracts
- * those particles toward the one player selected by the authoritative death.
+ * Converts an enemy's final pose into Niagara particles and attracts those
+ * particles toward the one player selected by the authoritative death.
+ *
+ * The component also owns the source-mesh material swap/dissolve lifecycle.
+ * Boss-specific presentation actors remain independent and layer their
+ * bespoke shards/particles on top of this shared death treatment.
  */
 UCLASS(ClassGroup = (Enemy), meta = (BlueprintSpawnableComponent, DisplayName = "Enemy Death Absorption VFX"))
 class PROJECT_EDEN_API UGP_EnemyDeathAbsorptionComponent : public UActorComponent
@@ -39,6 +46,29 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Enemy|Death Absorption")
 	bool IsDeathAbsorptionActive() const { return bLocalPlaybackActive; }
 
+	UFUNCTION(BlueprintCallable, Category = "Enemy|Death Absorption|Materials")
+	void ConfigureDeathMaterials(
+		UMaterialInterface* InDefaultMaterial,
+		const TArray<UMaterialInterface*>& InSlotMaterialOverrides,
+		UMaterialInterface* InParticleMaterial);
+
+	UFUNCTION(BlueprintCallable, Category = "Enemy|Death Absorption")
+	void SetDeathAbsorptionEnabled(bool bEnabled) { bEnableDeathAbsorption = bEnabled; }
+
+	UFUNCTION(BlueprintPure, Category = "Enemy|Death Absorption")
+	bool IsDeathAbsorptionEnabled() const { return bEnableDeathAbsorption; }
+
+	UFUNCTION(BlueprintPure, Category = "Enemy|Death Absorption|Materials")
+	UMaterialInterface* GetDefaultDeathDissolveMaterial() const { return DefaultDeathDissolveMaterial; }
+
+	UFUNCTION(BlueprintPure, Category = "Enemy|Death Absorption|Materials")
+	UMaterialInterface* GetDeathParticleMaterial() const { return DeathParticleMaterial; }
+
+	const TArray<TObjectPtr<UMaterialInterface>>& GetDeathDissolveMaterialOverrides() const
+	{
+		return DeathDissolveMaterialOverrides;
+	}
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -56,7 +86,9 @@ private:
 	void UpdateTargetAndBounds();
 	void UpdateAbsorbStrength();
 	void UpdateFallGravity();
-	void HideSourceMeshWhenReady();
+	void ApplyDeathDissolveMaterials();
+	void UpdateDeathDissolveMaterials();
+	void HideSourceMeshesWhenReady();
 	void UpdateCorridorFixedBounds();
 
 	// The policy helpers are kept side-effect free so target priority and timing can be covered without a live server.
@@ -78,6 +110,25 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|Death Absorption",
 		meta = (AllowPrivateAccess = "true"))
 	TSoftObjectPtr<UNiagaraSystem> DeathAbsorptionSystem;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|Death Absorption",
+		meta = (AllowPrivateAccess = "true"))
+	bool bEnableDeathAbsorption = true;
+
+	// Used for every visible mesh component and as the fallback for unconfigured material slots.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|Death Absorption|Materials",
+		meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UMaterialInterface> DefaultDeathDissolveMaterial;
+
+	// Main CharacterMesh0 slot overrides. Auxiliary wings/weapons use the default material.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|Death Absorption|Materials",
+		meta = (AllowPrivateAccess = "true"))
+	TArray<TObjectPtr<UMaterialInterface>> DeathDissolveMaterialOverrides;
+
+	// Per-enemy Niagara Sprite Renderer material supplied through User.DeathParticleMaterial.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|Death Absorption|Materials",
+		meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UMaterialInterface> DeathParticleMaterial;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|Death Absorption|Target",
 		meta = (AllowPrivateAccess = "true"))
@@ -104,10 +155,11 @@ private:
 		meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "s"))
 	float GravityFadeEndSeconds = 0.60f;
 
-	// The mesh stays visible for the first Niagara sampling frames, then the particles become the only corpse silhouette.
+	// The replacement material visibly dissolves for this duration. Niagara has
+	// already sampled several frames before every source visual is hidden.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|Death Absorption|Timing",
 		meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "s"))
-	float SourceMeshHideDelaySeconds = 0.10f;
+	float SourceMeshHideDelaySeconds = 0.45f;
 
 	// Keep the authored five-second curves close to completion without recreating the previous overly fast 3x motion.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|Death Absorption|Timing",
@@ -185,11 +237,25 @@ private:
 		meta = (AllowPrivateAccess = "true"))
 	FName AbsorbDragParameterName = TEXT("User.AbsorbDrag");
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|Death Absorption|Parameters",
+		meta = (AllowPrivateAccess = "true"))
+	FName DeathParticleMaterialParameterName = TEXT("User.DeathParticleMaterial");
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|Death Absorption|Parameters",
+		meta = (AllowPrivateAccess = "true"))
+	FName DissolveProgressParameterName = TEXT("DissolveProgress");
+
 	UPROPERTY(Transient)
 	TObjectPtr<UNiagaraComponent> ActiveNiagaraComponent;
 
 	UPROPERTY(Transient)
 	TObjectPtr<USkeletalMeshComponent> SourceMeshComponent;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UMeshComponent>> SourceVisualMeshComponents;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UMaterialInstanceDynamic>> ActiveDissolveMaterials;
 
 	TWeakObjectPtr<AActor> ActiveTargetActor;
 	FBox CachedSourceWorldBounds = FBox(EForceInit::ForceInit);

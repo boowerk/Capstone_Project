@@ -1084,12 +1084,13 @@ void AGP_EnemyCharacter::ApplyDeathState()
 	}
 	if (IsValid(BossDeathPresentationComponent))
 	{
-		// Presentation is local-only and no-ops for regular enemies, keeping the GAS death invariant centralised here.
+		// Boss-only shards/particles layer over the shared material dissolve.
 		BossDeathPresentationComponent->PlayDeathPresentation(DeathInstigatorActor);
 	}
-	if (HasAuthority() && !bIsBossEnemy && IsValid(EnemyDeathAbsorptionComponent))
+	if (HasAuthority() && IsValid(EnemyDeathAbsorptionComponent))
 	{
-		// Authority selects one absorption recipient, then the component multicasts that stable actor to every client.
+		// Every real enemy uses the same authority-selected recipient. Presentation
+		// components keep boss-specific particles and fragments as an extra layer.
 		EnemyDeathAbsorptionComponent->PlayDeathAbsorption(DeathInstigatorActor);
 	}
 

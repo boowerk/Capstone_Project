@@ -76,7 +76,10 @@ void UGP_MatadorDecoyAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		StepThrustIndex = CachedPressureComponent->GetStepThrustIndex();
 	}
 
-	bIsWalkingPressure = PressureState == EGPMatadorDecoyPressureState::WalkApproach && GroundSpeed > 3.0f;
+	// The AnimBP already blends Idle/Walk from this flag.  Restricting it to the
+	// pressure approach state left normal follow/return movement visually idle.
+	// Teleports must stay idle because their transform jump can report a large speed.
+	bIsWalkingPressure = GroundSpeed > 3.0f && !bTeleportRequested;
 }
 
 void UGP_MatadorDecoyAnimInstance::NotifyRapierAimStarted(float InAimDuration)

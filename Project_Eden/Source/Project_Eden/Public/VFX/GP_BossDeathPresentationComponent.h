@@ -30,6 +30,15 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Boss|Death Presentation")
 	bool HasPlayedDeathPresentation() const { return bPresentationPlayed; }
 
+	UFUNCTION(BlueprintCallable, Category = "Boss|Death Presentation|Materials")
+	void ConfigureFragmentMaterial(UMaterialInterface* InFragmentMaterial, bool bInHideSourceMesh);
+
+	UFUNCTION(BlueprintPure, Category = "Boss|Death Presentation|Materials")
+	UMaterialInterface* GetFragmentMaterial() const { return SpawnSettings.FragmentMaterial; }
+
+	UFUNCTION(BlueprintPure, Category = "Boss|Death Presentation")
+	bool DoesPresentationHideSourceMesh() const { return SpawnSettings.bHideSourceMesh; }
+
 	UFUNCTION(BlueprintPure, Category = "Boss|Death Presentation")
 	static EGPBossDeathPresentationStyle ResolveAutoPresentationStyleFromName(const FString& OwnerName, const FText& BossDisplayName);
 

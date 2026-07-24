@@ -393,6 +393,16 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Action")
 	TArray<TObjectPtr<UAnimMontage>> HeavyAttackMontages; // Heavy combo order: A, B, C, D.
 
+	// Explicit boss pattern slots avoid overloading the shared player combo order.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Action|Boss")
+	TObjectPtr<UAnimMontage> BossSweepAttackMontage;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Action|Boss")
+	TObjectPtr<UAnimMontage> BossHeavyAttackMontage;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Action|Boss")
+	TObjectPtr<UAnimMontage> BossAreaAttackMontage;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation|Action")
 	TArray<TObjectPtr<UAnimMontage>> RegularAttackMontages; // Regular combo order: A, B, C.
 
