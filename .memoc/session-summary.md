@@ -2,7 +2,7 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-07-24T11:54:00+09:00
+updated: 2026-07-24T15:38:00+09:00
 status: active
 tags:
   - memoc
@@ -11,8 +11,6 @@ created: 2026-07-24T01:26:27
 ---
 # Session Summary
 
-- Packaged Game clients safely stream the replicated seven-village layout and complete visual PCG 7/7; avoid `UnrealEditor.exe -game` for this flow.
-- Development dedicated-server solo start is restored behind `-AllowLobbyForceStart`. Local cooked server/client scripts add the flag; Shipping and unflagged launches remain blocked.
-- Lobby force-start policy test and Editor/Game/Server builds pass.
-- Existing cooked client/server inner binaries were refreshed from the verified builds.
-- Remaining cook warning: `M_StateMask` exceeds the SM5 16-sampler limit; SM6 is valid.
+- `PCG_Vegetation_Global` corrects the tree-only Difference flow while retaining village exclusion and removes its RegionID texture dependency.
+- WindowsServer strips texture pixel payloads even with CPU Availability, so server PCG must use server-cookable graph/world data.
+- User verified vegetation now appears while connected to the dedicated server. The proposed `AGP_GameMode` server-disable code was discarded; the graph remains active on both targets.

@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-24T07:01:06+09:00
+updated: 2026-07-24T15:38:00+09:00
 status: active
 tags:
   - memoc
@@ -16,6 +16,7 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 ## Decision Log
 
 ### 2026-07-24
+- Keep `PCG_Vegetation_Global` active on both clients and dedicated servers, but do not sample RegionID texture pixels in its server path. WindowsServer cooks strip texture platform pixels even when Availability is CPU, so vegetation inputs needed by the server must be server-cookable graph/world data rather than `UTexture` pixel data.
 - Give Sans Ground Hands a dedicated deferred-decal material with a centered radial opacity mask, pure-red material parameter, and equal footprint axes. Do not reuse or parameter-hack the Sans Sweep fan material; the two warning silhouettes have separate production contracts.
 - Keep the regular-enemy death grains at the designer-approved `User.SpriteSize=(10,10)`. Stage the motion as a readable fall followed by absorption: full gravity through `0.28s`, gravity fade to `0.60s`, attraction from `0.38s`, and a `0.80s` strength ramp.
 - Use Niagara Point Attraction with falloff enabled and exponent `0` for constant acceleration, followed by Drag. This supersedes the original distance-scaled spring behavior, which synchronized distant grains and made them snap to the chest together.
