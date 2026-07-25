@@ -3,8 +3,9 @@
 #include "Actors/GP_LevelBuildAnimator.h"
 #include "Engine/World.h"
 #include "Game/GP_EnemySpawnVolume.h"
-#include "Game/GP_GameMode.h"
 #include "Game/GP_RunPortal.h"
+#include "Game/GP_RunProgressionPolicy.h"
+#include "Game/GP_ZoneRuntimeState.h"
 #include "Misc/AutomationTest.h"
 #include "UObject/UnrealType.h"
 
@@ -17,55 +18,55 @@ bool FGPColosseumArrivalPolicyTest::RunTest(const FString& Parameters)
 {
 	TestTrue(
 		TEXT("Ordinary staged zones still count physical presence"),
-		AGP_GameMode::CanCountStagedZonePresence(
+		GPRunProgressionPolicy::CanCountStagedZonePresence(
 			EGPZoneStage::Center,
 			/*bHasMatchingPortalArrival=*/false));
 	TestFalse(
 		TEXT("Colosseum rejects direct or debug-teleport entry"),
-		AGP_GameMode::CanCountStagedZonePresence(
+		GPRunProgressionPolicy::CanCountStagedZonePresence(
 			EGPZoneStage::Colosseum,
 			/*bHasMatchingPortalArrival=*/false));
 	TestTrue(
 		TEXT("Colosseum counts a matching authority portal arrival"),
-		AGP_GameMode::CanCountStagedZonePresence(
+		GPRunProgressionPolicy::CanCountStagedZonePresence(
 			EGPZoneStage::Colosseum,
 			/*bHasMatchingPortalArrival=*/true));
 
 	TestFalse(
 		TEXT("Colosseum does not start before the active party arrives"),
-		AGP_GameMode::ShouldStartColosseumIntro(
+		GPRunProgressionPolicy::ShouldStartColosseumIntro(
 			/*bAllActivePlayersPresent=*/false,
 			/*bIntroStarted=*/false,
 			/*bIntroCompleted=*/false));
 	TestTrue(
 		TEXT("Colosseum starts once after the active party arrives"),
-		AGP_GameMode::ShouldStartColosseumIntro(
+		GPRunProgressionPolicy::ShouldStartColosseumIntro(
 			/*bAllActivePlayersPresent=*/true,
 			/*bIntroStarted=*/false,
 			/*bIntroCompleted=*/false));
 	TestFalse(
 		TEXT("Colosseum intro cannot restart while playing"),
-		AGP_GameMode::ShouldStartColosseumIntro(
+		GPRunProgressionPolicy::ShouldStartColosseumIntro(
 			/*bAllActivePlayersPresent=*/true,
 			/*bIntroStarted=*/true,
 			/*bIntroCompleted=*/false));
 	TestFalse(
 		TEXT("Colosseum intro cannot restart after completion"),
-		AGP_GameMode::ShouldStartColosseumIntro(
+		GPRunProgressionPolicy::ShouldStartColosseumIntro(
 			/*bAllActivePlayersPresent=*/true,
 			/*bIntroStarted=*/true,
 			/*bIntroCompleted=*/true));
 	TestTrue(
 		TEXT("Center still checks the live party before encounter start"),
-		AGP_GameMode::RequiresFullPartyAtEncounterStart(
+		GPRunProgressionPolicy::RequiresFullPartyAtEncounterStart(
 			EGPZoneStage::Center));
 	TestFalse(
 		TEXT("Colosseum does not re-gate on a reconnect after intro admission"),
-		AGP_GameMode::RequiresFullPartyAtEncounterStart(
+		GPRunProgressionPolicy::RequiresFullPartyAtEncounterStart(
 			EGPZoneStage::Colosseum));
 	TestFalse(
 		TEXT("A joiner is not relocated before Colosseum admission"),
-		AGP_GameMode::ShouldRelocateJoiningPlayerToZone(
+		GPRunProgressionPolicy::ShouldRelocateJoiningPlayerToZone(
 			EGPZoneStage::Colosseum,
 			/*bIntroStarted=*/false,
 			/*bIntroCompleted=*/false,
@@ -73,7 +74,7 @@ bool FGPColosseumArrivalPolicyTest::RunTest(const FString& Parameters)
 			/*bZoneCompleted=*/false));
 	TestTrue(
 		TEXT("A joiner follows the party while the Colosseum intro is playing"),
-		AGP_GameMode::ShouldRelocateJoiningPlayerToZone(
+		GPRunProgressionPolicy::ShouldRelocateJoiningPlayerToZone(
 			EGPZoneStage::Colosseum,
 			/*bIntroStarted=*/true,
 			/*bIntroCompleted=*/false,
@@ -81,7 +82,7 @@ bool FGPColosseumArrivalPolicyTest::RunTest(const FString& Parameters)
 			/*bZoneCompleted=*/false));
 	TestTrue(
 		TEXT("A joiner follows the party after the boss encounter starts"),
-		AGP_GameMode::ShouldRelocateJoiningPlayerToZone(
+		GPRunProgressionPolicy::ShouldRelocateJoiningPlayerToZone(
 			EGPZoneStage::Colosseum,
 			/*bIntroStarted=*/true,
 			/*bIntroCompleted=*/true,
@@ -89,7 +90,7 @@ bool FGPColosseumArrivalPolicyTest::RunTest(const FString& Parameters)
 			/*bZoneCompleted=*/false));
 	TestFalse(
 		TEXT("A joiner is not relocated into a completed Colosseum"),
-		AGP_GameMode::ShouldRelocateJoiningPlayerToZone(
+		GPRunProgressionPolicy::ShouldRelocateJoiningPlayerToZone(
 			EGPZoneStage::Colosseum,
 			/*bIntroStarted=*/true,
 			/*bIntroCompleted=*/true,

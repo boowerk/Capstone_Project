@@ -6,6 +6,8 @@
 #include "Game/GP_GameMode.h"
 #include "Game/GP_GameState.h"
 #include "Game/GP_RunPortal.h"
+#include "Game/GP_RunProgressionPolicy.h"
+#include "Game/GP_ZoneRuntimeState.h"
 #include "Game/WorldLayout/GP_VillageLayoutDirector.h"
 #include "Player/GP_PlayerController.h"
 #include "UI/GP_MiddleTravelMapWidget.h"
@@ -84,22 +86,22 @@ bool FGPZoneProgressionContractTest::RunTest(const FString& Parameters)
 
 	TestTrue(
 		TEXT("A solo run advances after its one assigned Outer zone clears"),
-		AGP_GameMode::IsOuterStageReady(1, 1, 1));
+		GPRunProgressionPolicy::IsOuterStageReady(1, 1, 1));
 	TestTrue(
 		TEXT("A two-player run ignores the third unassigned Outer candidate"),
-		AGP_GameMode::IsOuterStageReady(2, 2, 2));
+		GPRunProgressionPolicy::IsOuterStageReady(2, 2, 2));
 	TestFalse(
 		TEXT("A party waits until every active player's assigned Outer zone clears"),
-		AGP_GameMode::IsOuterStageReady(3, 3, 2));
+		GPRunProgressionPolicy::IsOuterStageReady(3, 3, 2));
 	TestTrue(
 		TEXT("A three-player party advances after its three assigned Outer zones clear"),
-		AGP_GameMode::IsOuterStageReady(3, 3, 3));
+		GPRunProgressionPolicy::IsOuterStageReady(3, 3, 3));
 	TestFalse(
 		TEXT("Missing or duplicate Outer assignments cannot advance the stage"),
-		AGP_GameMode::IsOuterStageReady(3, 2, 2));
+		GPRunProgressionPolicy::IsOuterStageReady(3, 2, 2));
 	TestFalse(
 		TEXT("An empty server cannot advance the Outer stage"),
-		AGP_GameMode::IsOuterStageReady(0, 0, 0));
+		GPRunProgressionPolicy::IsOuterStageReady(0, 0, 0));
 	return true;
 }
 

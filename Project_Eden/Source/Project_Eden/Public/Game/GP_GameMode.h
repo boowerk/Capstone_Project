@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Game/GP_ZoneRuntimeState.h"
 #include "GameFramework/GameModeBase.h"
 #include "GP_GameMode.generated.h"
 
@@ -19,24 +20,6 @@ class APlayerState;
 class APawn;
 class APlayerStart;
 enum class EGPZoneStage : uint8;
-
-struct FGPZoneRuntimeState
-{
-	TWeakObjectPtr<AGP_EnemySpawnVolume> Zone;
-	TSet<TWeakObjectPtr<APlayerState>> Participants;
-	TSet<TWeakObjectPtr<APlayerState>> PresentPlayers;
-	TSet<TWeakObjectPtr<APlayerState>> PortalArrivals;
-	int32 MarkersTotal = 0;
-	int32 MarkersTriggered = 0;
-	int32 AliveEnemies = 0;
-	bool bBossPhaseStarted = false;
-	FVector LastEnemyDeathLocation = FVector::ZeroVector;
-	bool bHasLastEnemyDeathLocation = false;
-	bool bIntroStarted = false;
-	bool bIntroCompleted = false;
-	bool bStarted = false;
-	bool bCompleted = false;
-};
 
 /**
  * Server-authoritative progression manager for the linear "city -> boss room -> next city" loop.
@@ -81,36 +64,6 @@ public:
 		AGP_PlayerController* PlayerController,
 		int32 LayoutRevision);
 	virtual void RestartPlayer(AController* NewPlayer) override;
-
-	// Pure progression policy: authored Outer slots are candidates, while only
-	// the unique zones assigned to active players are required for advancement.
-	static bool IsOuterStageReady(
-		int32 ActivePlayerCount,
-		int32 AssignedOuterZoneCount,
-		int32 CompletedAssignedOuterZoneCount);
-
-	static bool IsPartyDefeated(
-		int32 ParticipantCount,
-		int32 EliminatedParticipantCount);
-
-	static bool CanCountStagedZonePresence(
-		EGPZoneStage ZoneStage,
-		bool bHasMatchingPortalArrival);
-
-	static bool ShouldStartColosseumIntro(
-		bool bAllActivePlayersPresent,
-		bool bIntroStarted,
-		bool bIntroCompleted);
-
-	static bool RequiresFullPartyAtEncounterStart(
-		EGPZoneStage ZoneStage);
-
-	static bool ShouldRelocateJoiningPlayerToZone(
-		EGPZoneStage ZoneStage,
-		bool bIntroStarted,
-		bool bIntroCompleted,
-		bool bEncounterStarted,
-		bool bZoneCompleted);
 
 protected:
 	virtual void InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage) override;

@@ -8,13 +8,12 @@
 #include "Game/GP_GameState.h"
 #include "Game/GP_RunSeed.h"
 #include "Game/GP_RunPortal.h"
+#include "Game/GP_RunProgressionPolicy.h"
 #include "Game/GP_ThreePlayerGameSession.h"
 #include "Game/Regions/GP_RegionSpatialSubsystem.h"
 #include "Game/WorldLayout/GP_VillageLayoutDirector.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
-#include "GameFramework/Character.h"
-#include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerStart.h"
@@ -39,62 +38,6 @@ AGP_GameMode::AGP_GameMode()
 	// Match the lobby's seamless transition so arriving clients are carried
 	// into this map instead of being dropped during the load.
 	bUseSeamlessTravel = true;
-}
-
-bool AGP_GameMode::IsOuterStageReady(
-	int32 ActivePlayerCount,
-	int32 AssignedOuterZoneCount,
-	int32 CompletedAssignedOuterZoneCount)
-{
-	return ActivePlayerCount > 0
-		&& AssignedOuterZoneCount == ActivePlayerCount
-		&& CompletedAssignedOuterZoneCount == AssignedOuterZoneCount;
-}
-
-bool AGP_GameMode::IsPartyDefeated(
-	int32 ParticipantCount,
-	int32 EliminatedParticipantCount)
-{
-	return ParticipantCount > 0
-		&& EliminatedParticipantCount >= ParticipantCount;
-}
-
-bool AGP_GameMode::CanCountStagedZonePresence(
-	EGPZoneStage ZoneStage,
-	bool bHasMatchingPortalArrival)
-{
-	return ZoneStage != EGPZoneStage::Colosseum
-		|| bHasMatchingPortalArrival;
-}
-
-bool AGP_GameMode::ShouldStartColosseumIntro(
-	bool bAllActivePlayersPresent,
-	bool bIntroStarted,
-	bool bIntroCompleted)
-{
-	return bAllActivePlayersPresent
-		&& !bIntroStarted
-		&& !bIntroCompleted;
-}
-
-bool AGP_GameMode::RequiresFullPartyAtEncounterStart(
-	EGPZoneStage ZoneStage)
-{
-	// Colosseum admission is frozen when its intro starts. Only Center still
-	// needs a live presence check at the point the encounter itself starts.
-	return ZoneStage == EGPZoneStage::Center;
-}
-
-bool AGP_GameMode::ShouldRelocateJoiningPlayerToZone(
-	EGPZoneStage ZoneStage,
-	bool bIntroStarted,
-	bool bIntroCompleted,
-	bool bEncounterStarted,
-	bool bZoneCompleted)
-{
-	return ZoneStage == EGPZoneStage::Colosseum
-		&& !bZoneCompleted
-		&& (bIntroStarted || bIntroCompleted || bEncounterStarted);
 }
 
 void AGP_GameMode::InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage)
@@ -191,257 +134,6 @@ void AGP_GameMode::Logout(AController* Exiting)
 		EvaluateStagedProgression();
 		EvaluatePartyDefeat();
 	}
-}
-
-void AGP_GameMode::EnsurePartyPlayerStarts(AController* Player)
-{
-	if (bPartyPlayerStartsInitialized)
-	{
-		return;
-	}
-
-	UWorld* World = GetWorld();
-	if (!IsValid(World))
-	{
-		return;
-	}
-
-	TArray<APlayerStart*> AuthoredStarts;
-	for (TActorIterator<APlayerStart> It(World); It; ++It)
-	{
-		if (IsValid(*It) && !It->Tags.Contains(TEXT("GP.RuntimePartyStart")))
-		{
-			AuthoredStarts.Add(*It);
-		}
-	}
-	AuthoredStarts.Sort([](const APlayerStart& Left, const APlayerStart& Right)
-	{
-		// Actor paths are serialized and provide deterministic slot order across server runs.
-		return Left.GetPathName() < Right.GetPathName();
-	});
-
-	UClass* PawnClass = GetDefaultPawnClassForController(Player);
-	const APawn* PawnToFit = PawnClass ? PawnClass->GetDefaultObject<APawn>() : nullptr;
-
-	if (AuthoredStarts.IsEmpty())
-	{
-		UE_LOG(
-			LogTemp,
-			Error,
-			TEXT("[NetworkSpawn] No authored PlayerStart is available for the three-player runtime expansion."));
-		bPartyPlayerStartsInitialized = true;
-		return;
-	}
-
-	for (APlayerStart* AuthoredStart : AuthoredStarts)
-	{
-		if (PartyPlayerStartSlots.Num() >= RequiredPartyPlayerStartCount)
-		{
-			break;
-		}
-		PartyPlayerStartSlots.Add(AuthoredStart);
-	}
-
-	const APlayerStart& Anchor = *AuthoredStarts[0];
-	static const FVector CandidateDirections[] =
-	{
-		FVector(0.0f, 1.0f, 0.0f),
-		FVector(0.0f, -1.0f, 0.0f),
-		FVector(1.0f, 0.0f, 0.0f),
-		FVector(-1.0f, 0.0f, 0.0f),
-		FVector(1.0f, 1.0f, 0.0f).GetSafeNormal(),
-		FVector(1.0f, -1.0f, 0.0f).GetSafeNormal(),
-		FVector(-1.0f, 1.0f, 0.0f).GetSafeNormal(),
-		FVector(-1.0f, -1.0f, 0.0f).GetSafeNormal()
-	};
-
-	for (float RadiusMultiplier = 1.0f;
-		PartyPlayerStartSlots.Num() < RequiredPartyPlayerStartCount && RadiusMultiplier <= 3.0f;
-		RadiusMultiplier += 1.0f)
-	{
-		for (const FVector& Direction : CandidateDirections)
-		{
-			if (APlayerStart* RuntimeStart = SpawnRuntimePartyPlayerStart(
-				Anchor,
-				PawnToFit,
-				Direction,
-				RadiusMultiplier))
-			{
-				RuntimePartyPlayerStarts.Add(RuntimeStart);
-				PartyPlayerStartSlots.Add(RuntimeStart);
-			}
-
-			if (PartyPlayerStartSlots.Num() >= RequiredPartyPlayerStartCount)
-			{
-				break;
-			}
-		}
-	}
-
-	bPartyPlayerStartsInitialized = true;
-	if (PartyPlayerStartSlots.Num() < RequiredPartyPlayerStartCount)
-	{
-		UE_LOG(
-			LogTemp,
-			Error,
-			TEXT("[NetworkSpawn] Only %d/%d collision-safe party starts could be prepared; engine fallback remains enabled."),
-			PartyPlayerStartSlots.Num(),
-			RequiredPartyPlayerStartCount);
-	}
-	else
-	{
-		UE_LOG(
-			LogTemp,
-			Display,
-			TEXT("[NetworkSpawn] Prepared %d stable party starts (%d authored, %d runtime)."),
-			PartyPlayerStartSlots.Num(),
-			FMath::Min(AuthoredStarts.Num(), RequiredPartyPlayerStartCount),
-			RuntimePartyPlayerStarts.Num());
-	}
-}
-
-APlayerStart* AGP_GameMode::SpawnRuntimePartyPlayerStart(
-	const APlayerStart& Anchor,
-	const APawn* PawnToFit,
-	const FVector& LocalDirection,
-	float RadiusMultiplier)
-{
-	UWorld* World = GetWorld();
-	if (!IsValid(World))
-	{
-		return nullptr;
-	}
-
-	const FVector WorldDirection =
-		Anchor.GetActorForwardVector() * LocalDirection.X
-		+ Anchor.GetActorRightVector() * LocalDirection.Y;
-	FVector CandidateLocation =
-		Anchor.GetActorLocation()
-		+ WorldDirection.GetSafeNormal() * PartyPlayerStartSpacing * RadiusMultiplier;
-	const FRotator CandidateRotation = Anchor.GetActorRotation();
-	float MinimumWalkableNormalZ = 0.7f;
-	if (const ACharacter* CharacterToFit = Cast<ACharacter>(PawnToFit))
-	{
-		if (const UCharacterMovementComponent* Movement = CharacterToFit->GetCharacterMovement())
-		{
-			MinimumWalkableNormalZ = Movement->GetWalkableFloorZ();
-		}
-	}
-
-	const auto SnapToWalkableGround = [World, &Anchor, PawnToFit, MinimumWalkableNormalZ](FVector& InOutLocation)
-	{
-		FHitResult GroundHit;
-		FCollisionQueryParams GroundQueryParams(SCENE_QUERY_STAT(GP_RuntimePartyStartGround), false);
-		GroundQueryParams.AddIgnoredActor(&Anchor);
-		const FVector TraceStart(InOutLocation.X, InOutLocation.Y, Anchor.GetActorLocation().Z + 1000.0f);
-		const FVector TraceEnd(InOutLocation.X, InOutLocation.Y, Anchor.GetActorLocation().Z - 2000.0f);
-		if (!World->LineTraceSingleByObjectType(
-			GroundHit,
-			TraceStart,
-			TraceEnd,
-			FCollisionObjectQueryParams(ECC_WorldStatic),
-			GroundQueryParams)
-			|| GroundHit.ImpactNormal.Z < MinimumWalkableNormalZ)
-		{
-			return false;
-		}
-
-		const float PawnHalfHeight = PawnToFit ? PawnToFit->GetDefaultHalfHeight() : 96.0f;
-		InOutLocation.Z = GroundHit.ImpactPoint.Z + PawnHalfHeight + 2.0f;
-		return true;
-	};
-
-	// Never register a start over void or on a slope the production character cannot walk on.
-	if (!SnapToWalkableGround(CandidateLocation))
-	{
-		return nullptr;
-	}
-
-	if (PawnToFit
-		&& World->EncroachingBlockingGeometry(PawnToFit, CandidateLocation, CandidateRotation)
-		&& !World->FindTeleportSpot(PawnToFit, CandidateLocation, CandidateRotation))
-	{
-		return nullptr;
-	}
-
-	// FindTeleportSpot may move XY as well as Z; validate its final surface instead of trusting the first trace.
-	if (!SnapToWalkableGround(CandidateLocation)
-		|| (PawnToFit && World->EncroachingBlockingGeometry(PawnToFit, CandidateLocation, CandidateRotation)))
-	{
-		return nullptr;
-	}
-
-	const float MinimumSeparation = FMath::Max(150.0f, PartyPlayerStartSpacing * 0.6f);
-	for (const TWeakObjectPtr<APlayerStart>& ExistingStart : PartyPlayerStartSlots)
-	{
-		if (ExistingStart.IsValid()
-			&& FVector::DistSquared(ExistingStart->GetActorLocation(), CandidateLocation)
-				< FMath::Square(MinimumSeparation))
-		{
-			return nullptr;
-		}
-	}
-
-	FActorSpawnParameters SpawnParameters;
-	SpawnParameters.ObjectFlags |= RF_Transient;
-	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	APlayerStart* RuntimeStart = World->SpawnActor<APlayerStart>(
-		APlayerStart::StaticClass(),
-		CandidateLocation,
-		CandidateRotation,
-		SpawnParameters);
-	if (IsValid(RuntimeStart))
-	{
-		// PlayerStarts are server-only selection helpers and never need to replicate to clients.
-		RuntimeStart->SetReplicates(false);
-		RuntimeStart->Tags.AddUnique(TEXT("GP.RuntimePartyStart"));
-	}
-	return RuntimeStart;
-}
-
-int32 AGP_GameMode::ResolvePartyStartSlot(AController* Player)
-{
-	if (!IsValid(Player))
-	{
-		return INDEX_NONE;
-	}
-
-	const TWeakObjectPtr<AController> PlayerKey(Player);
-	for (auto It = PartyStartSlotByController.CreateIterator(); It; ++It)
-	{
-		if (!It.Key().IsValid())
-		{
-			It.RemoveCurrent();
-		}
-	}
-
-	if (const int32* ExistingSlot = PartyStartSlotByController.Find(PlayerKey))
-	{
-		return *ExistingSlot;
-	}
-
-	TSet<int32> UsedSlots;
-	for (const TPair<TWeakObjectPtr<AController>, int32>& Assignment : PartyStartSlotByController)
-	{
-		if (Assignment.Key.IsValid())
-		{
-			UsedSlots.Add(Assignment.Value);
-		}
-	}
-
-	// Visual slots must not depend on runtime PlayerStart creation. Maps without a valid
-	// authored start still use the engine spawn fallback, but 2P/3P must retain their
-	// deterministic appearances.
-	const int32 PartySlotCount = FMath::Clamp(RequiredPartyPlayerStartCount, 1, 3);
-	for (int32 SlotIndex = 0; SlotIndex < PartySlotCount; ++SlotIndex)
-	{
-		if (!UsedSlots.Contains(SlotIndex))
-		{
-			PartyStartSlotByController.Add(PlayerKey, SlotIndex);
-			return SlotIndex;
-		}
-	}
-	return INDEX_NONE;
 }
 
 void AGP_GameMode::BeginPlay()
@@ -843,7 +535,7 @@ void AGP_GameMode::HandlePlayerEnteredZoneDetailed(
 
 	const bool bHasMatchingPortalArrival =
 		State->PortalArrivals.Contains(PlayerState);
-	if (!CanCountStagedZonePresence(
+	if (!GPRunProgressionPolicy::CanCountStagedZonePresence(
 		Zone->GetZoneStage(),
 		bHasMatchingPortalArrival))
 	{
@@ -1522,7 +1214,8 @@ void AGP_GameMode::StartStagedZone(AGP_EnemySpawnVolume* Zone)
 	// was present and the intro began. Rechecking PlayerArray after the intro
 	// would let a join/reconnect during playback permanently block the boss.
 	const bool bRequiresFullParty =
-		RequiresFullPartyAtEncounterStart(Zone->GetZoneStage());
+		GPRunProgressionPolicy::RequiresFullPartyAtEncounterStart(
+			Zone->GetZoneStage());
 	if (bRequiresFullParty && !AreAllActivePlayersPresent(*State))
 	{
 		return;
@@ -1619,7 +1312,7 @@ void AGP_GameMode::TryStartColosseumIntro(AGP_EnemySpawnVolume* Zone)
 		return;
 	}
 
-	if (!ShouldStartColosseumIntro(
+	if (!GPRunProgressionPolicy::ShouldStartColosseumIntro(
 		AreAllActivePlayersPresent(*State),
 		State->bIntroStarted,
 		State->bIntroCompleted))
@@ -2007,7 +1700,7 @@ bool AGP_GameMode::GetActiveAssignedOuterZones(
 		}
 	}
 
-	return IsOuterStageReady(
+	return GPRunProgressionPolicy::IsOuterStageReady(
 		ActivePlayerCount,
 		OutAssignedZones.Num(),
 		CompletedAssignedZoneCount);
@@ -2357,7 +2050,7 @@ AGP_EnemySpawnVolume* AGP_GameMode::FindJoinableColosseumZone() const
 
 		const FGPZoneRuntimeState* State = ZoneRuntimeStates.Find(Zone);
 		if (!State
-			|| !ShouldRelocateJoiningPlayerToZone(
+			|| !GPRunProgressionPolicy::ShouldRelocateJoiningPlayerToZone(
 				Zone->GetZoneStage(),
 				State->bIntroStarted,
 				State->bIntroCompleted,
@@ -2727,124 +2420,6 @@ void AGP_GameMode::AssignPlayersToOuterVillageStarts()
 	if (bOuterAssignmentsChanged)
 	{
 		EvaluateStagedProgression();
-	}
-}
-
-void AGP_GameMode::NotifyAllPlayersDead()
-{
-	FinishRun(/*bVictory=*/false);
-}
-
-void AGP_GameMode::NotifyPlayerEliminated(AGP_PlayerState* EliminatedPlayerState)
-{
-	if (bRunFinished
-		|| !IsValid(EliminatedPlayerState)
-		|| !EliminatedPlayerState->IsEliminated())
-	{
-		return;
-	}
-
-	if (UWorld* World = GetWorld())
-	{
-		World->GetTimerManager().SetTimerForNextTick(
-			FTimerDelegate::CreateWeakLambda(this, [this]()
-			{
-				EvaluatePartyDefeat();
-			}));
-	}
-}
-
-void AGP_GameMode::EvaluatePartyDefeat()
-{
-	if (bRunFinished)
-	{
-		return;
-	}
-
-	const AGP_GameState* GPGameState = GetGPGameState();
-	if (!IsValid(GPGameState))
-	{
-		return;
-	}
-
-	int32 ParticipantCount = 0;
-	int32 EliminatedParticipantCount = 0;
-	for (APlayerState* PartyPlayerState : GPGameState->PlayerArray)
-	{
-		if (!IsValid(PartyPlayerState) || PartyPlayerState->IsOnlyASpectator())
-		{
-			continue;
-		}
-
-		const AGP_PlayerState* GPPlayerState = Cast<AGP_PlayerState>(PartyPlayerState);
-		if (!IsValid(GPPlayerState))
-		{
-			continue;
-		}
-
-		if (GPPlayerState->IsEliminated())
-		{
-			// An eliminated member remains part of the run even if their pawn is
-			// later destroyed while the final party decision is being made.
-			++ParticipantCount;
-			++EliminatedParticipantCount;
-			continue;
-		}
-
-		// A connecting PlayerState can replicate before possession. Do not let
-		// that temporary pawn-less slot masquerade as a survivor and prevent an
-		// otherwise valid dedicated-server party wipe.
-		if (IsValid(Cast<AGP_PlayerCharacter>(GPPlayerState->GetPawn())))
-		{
-			++ParticipantCount;
-		}
-	}
-
-	if (IsPartyDefeated(ParticipantCount, EliminatedParticipantCount))
-	{
-		NotifyAllPlayersDead();
-	}
-}
-
-void AGP_GameMode::FinishRun(bool bVictory)
-{
-	if (bRunFinished)
-	{
-		return;
-	}
-
-	bRunFinished = true;
-	UnregisterAllZoneNavigationInvokers();
-
-	if (AGP_GameState* GPGameState = GetGPGameState())
-	{
-		GPGameState->SetMatchPhase(bVictory ? EGPMatchPhase::Victory : EGPMatchPhase::Defeat);
-	}
-
-	OnRunFinished(bVictory);
-
-	// Send the party back to the lobby after a beat so the result screen shows.
-	if (UWorld* World = GetWorld())
-	{
-		if (ReturnToLobbyDelay > 0.0f)
-		{
-			World->GetTimerManager().SetTimer(ReturnToLobbyTimerHandle, this,
-				&AGP_GameMode::ReturnToLobby, ReturnToLobbyDelay, false);
-		}
-		else
-		{
-			ReturnToLobby();
-		}
-	}
-}
-
-void AGP_GameMode::ReturnToLobby()
-{
-	if (UWorld* World = GetWorld())
-	{
-		// Seamless ServerTravel carries every connected client back together.
-		const FString URL = FString::Printf(TEXT("/Game/Maps/%s?listen"), *ReturnMapName);
-		World->ServerTravel(URL);
 	}
 }
 
