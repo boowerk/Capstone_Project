@@ -2,7 +2,7 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-07-25T22:37:02+09:00
+updated: 2026-07-25T22:43:15+09:00
 status: active
 tags:
   - memoc
@@ -16,6 +16,7 @@ created: 2026-07-24T01:26:27
 - `241f1351`: Editor-only `Project_EdenTests` module plus four moved tests.
 - `2e856bf4`: eight AI policy, lobby, run-seed, and session tests moved unchanged.
 - `d9e7ea23`: five combat/UI/runtime contract tests moved unchanged.
-- Uncommitted: three boss presentation test files moved unchanged.
-- Editor/Server builds and all seven contained tests pass; Server excludes the test module.
-- Next: migrate the remaining low-dependency tests, then separate Village streaming/PCG state.
+- `d6126d1d`: three boss presentation test files moved unchanged.
+- Uncommitted: Landscape integrity and Minimap capture tests moved unchanged; both pass.
+- `CrystalSeraphGroggyTests` stayed runtime: `PrismCluster` has a pre-existing asset-size failure.
+- Next: migrate dependency-specific test groups, then separate Village streaming/PCG state.
