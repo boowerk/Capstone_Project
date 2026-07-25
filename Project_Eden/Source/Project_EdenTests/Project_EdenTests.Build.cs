@@ -14,6 +14,7 @@ public class Project_EdenTests : ModuleRules
 			"Engine",
 			"NavigationSystem",
 			"Niagara",
+			"PCG",
 			"Project_Eden",
 			"UMG",
 		});
