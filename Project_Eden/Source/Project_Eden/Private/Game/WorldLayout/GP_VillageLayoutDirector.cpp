@@ -11,11 +11,11 @@
 #include "EngineUtils.h"
 #include "Game/GP_EnemySpawnVolume.h"
 #include "Game/GP_GameState.h"
+#include "Game/WorldLayout/GP_VillagePresetPolicy.h"
 #include "Game/WorldLayout/GP_VillagePresetCatalog.h"
 #include "Game/WorldLayout/GP_VillageSelectionPolicy.h"
 #include "Game/WorldLayout/GP_VillageSlot.h"
 #include "Misc/Crc.h"
-#include "Misc/ScopeExit.h"
 #include "Net/UnrealNetwork.h"
 #include "PCGComponent.h"
 #include "PCGGraph.h"
@@ -24,12 +24,6 @@
 #include "UObject/ConstructorHelpers.h"
 #include "WorldPartition/DataLayer/DataLayerAsset.h"
 #include "WorldPartition/DataLayer/DataLayerManager.h"
-
-#if WITH_EDITOR
-#include "LevelInstance/LevelInstanceActor.h"
-#include "LevelInstance/LevelInstanceLevelStreaming.h"
-#include "LevelInstance/LevelInstanceSubsystem.h"
-#endif
 
 namespace
 {
@@ -42,56 +36,6 @@ namespace
 		const UDataLayerAsset* Asset = nullptr;
 		const UDataLayerInstance* Instance = nullptr;
 	};
-
-	struct FGPVillageFootprint2D
-	{
-		FVector2D Center = FVector2D::ZeroVector;
-		FVector2D AxisX = FVector2D(1.0f, 0.0f);
-		FVector2D AxisY = FVector2D(0.0f, 1.0f);
-		FVector2D Extent = FVector2D::ZeroVector;
-	};
-
-	FGPVillageFootprint2D MakeFootprint2D(
-		const FTransform& SlotTransform,
-		const FGP_VillageFootprint& Footprint)
-	{
-		const FTransform UnitScaleTransform(
-			SlotTransform.GetRotation(),
-			SlotTransform.GetLocation(),
-			FVector::OneVector);
-		const FVector WorldCenter = UnitScaleTransform.TransformPosition(Footprint.FootprintOffset);
-		const float YawRadians = FMath::DegreesToRadians(UnitScaleTransform.Rotator().Yaw);
-
-		FGPVillageFootprint2D Result;
-		Result.Center = FVector2D(WorldCenter.X, WorldCenter.Y);
-		Result.AxisX = FVector2D(FMath::Cos(YawRadians), FMath::Sin(YawRadians));
-		Result.AxisY = FVector2D(-Result.AxisX.Y, Result.AxisX.X);
-		Result.Extent = FVector2D(
-			FMath::Max(FMath::Abs(Footprint.FootprintExtent.X), 1.0f),
-			FMath::Max(FMath::Abs(Footprint.FootprintExtent.Y), 1.0f));
-		return Result;
-	}
-
-	float ProjectedRadius(const FGPVillageFootprint2D& Footprint, const FVector2D& Axis)
-	{
-		return Footprint.Extent.X * FMath::Abs(FVector2D::DotProduct(Footprint.AxisX, Axis))
-			+ Footprint.Extent.Y * FMath::Abs(FVector2D::DotProduct(Footprint.AxisY, Axis));
-	}
-
-	FString MakePresetSortKey(const FGP_VillagePresetDefinition& Preset)
-	{
-		return FString::Printf(
-			TEXT("%s|%s"),
-			*Preset.PresetId.ToString(),
-			*Preset.VillageLevel.ToSoftObjectPath().ToString());
-	}
-
-	FName ResolvePresetId(const FGP_VillagePresetDefinition& Preset)
-	{
-		return Preset.PresetId.IsNone()
-			? FName(*Preset.VillageLevel.ToSoftObjectPath().GetAssetName())
-			: Preset.PresetId;
-	}
 
 	EGPZoneStage ResolveZoneStage(FName GroupId, FName SlotId)
 	{
@@ -146,81 +90,30 @@ int32 AGP_VillageLayoutDirector::SelectVillagePresetIndex(
 	int32 AssignmentAttempt,
 	EGP_VillageSlotSizeClass SlotSizeClass)
 {
-	TMap<FName, int32> PresetIdCounts;
-	TMap<FString, int32> LevelPathCounts;
-	for (const FGP_VillagePresetDefinition& Preset : Presets)
-	{
-		if (Preset.VillageLevel.IsNull() || Preset.SelectionWeight <= 0.0f)
-		{
-			continue;
-		}
+	return GPVillagePresetPolicy::SelectPresetIndex(
+		InRunSeed,
+		SlotId,
+		Presets,
+		AssignmentAttempt,
+		SlotSizeClass);
+}
 
-		++PresetIdCounts.FindOrAdd(ResolvePresetId(Preset));
-		++LevelPathCounts.FindOrAdd(Preset.VillageLevel.ToSoftObjectPath().ToString());
-	}
-
-	TArray<int32> ValidPresetIndices;
-	for (int32 PresetIndex = 0; PresetIndex < Presets.Num(); ++PresetIndex)
-	{
-		const FGP_VillagePresetDefinition& Preset = Presets[PresetIndex];
-		const FName PresetId = ResolvePresetId(Preset);
-		const FString LevelPath = Preset.VillageLevel.ToSoftObjectPath().ToString();
-		if (!Preset.VillageLevel.IsNull()
-			&& Preset.SelectionWeight > 0.0f
-			&& PresetIdCounts.FindRef(PresetId) == 1
-			&& LevelPathCounts.FindRef(LevelPath) == 1
-			&& Preset.PresetSizeClass == SlotSizeClass
-			&& DoesVillageFootprintFitSlot(Preset.Footprint, SlotSizeClass))
-		{
-			ValidPresetIndices.Add(PresetIndex);
-		}
-	}
-
-	ValidPresetIndices.Sort([&Presets](int32 FirstIndex, int32 SecondIndex)
-	{
-		return MakePresetSortKey(Presets[FirstIndex]) < MakePresetSortKey(Presets[SecondIndex]);
-	});
-	if (ValidPresetIndices.IsEmpty())
-	{
-		return INDEX_NONE;
-	}
-
-	float TotalWeight = 0.0f;
-	for (int32 PresetIndex : ValidPresetIndices)
-	{
-		TotalWeight += Presets[PresetIndex].SelectionWeight;
-	}
-
-	const uint32 SlotHash = FCrc::StrCrc32(*SlotId.ToString());
-	FRandomStream RandomStream(static_cast<int32>(
-		HashCombineFast(
-			HashCombineFast(static_cast<uint32>(InRunSeed), SlotHash),
-			HashCombineFast(0xA511E9B3u, static_cast<uint32>(AssignmentAttempt)))));
-	float Roll = RandomStream.FRandRange(0.0f, TotalWeight);
-	for (int32 PresetIndex : ValidPresetIndices)
-	{
-		Roll -= Presets[PresetIndex].SelectionWeight;
-		if (Roll <= 0.0f)
-		{
-			return PresetIndex;
-		}
-	}
-
-	return ValidPresetIndices.Last();
+TArray<FGP_VillagePresetDefinition> AGP_VillageLayoutDirector::MergeVillagePresetSources(
+	const TArray<FGP_VillagePresetDefinition>& PrimaryPresets,
+	const TArray<FGP_VillagePresetDefinition>& CatalogPresets,
+	const TArray<FGP_VillagePresetDefinition>& LegacyPresets)
+{
+	return GPVillagePresetPolicy::MergePresetSources(
+		PrimaryPresets,
+		CatalogPresets,
+		LegacyPresets);
 }
 
 bool AGP_VillageLayoutDirector::DoesVillageFootprintFitSlot(
 	const FGP_VillageFootprint& Footprint,
 	EGP_VillageSlotSizeClass SlotSizeClass)
 {
-	const FVector2D CapacityHalfExtent = GPGetVillageSlotCapacityHalfExtent(SlotSizeClass);
-	const FVector2D RequiredHalfExtent(
-		FMath::Abs(Footprint.FootprintOffset.X)
-			+ FMath::Abs(Footprint.FootprintExtent.X),
-		FMath::Abs(Footprint.FootprintOffset.Y)
-			+ FMath::Abs(Footprint.FootprintExtent.Y));
-	return RequiredHalfExtent.X <= CapacityHalfExtent.X + KINDA_SMALL_NUMBER
-		&& RequiredHalfExtent.Y <= CapacityHalfExtent.Y + KINDA_SMALL_NUMBER;
+	return GPVillagePresetPolicy::DoesFootprintFitSlot(Footprint, SlotSizeClass);
 }
 
 bool AGP_VillageLayoutDirector::DoVillageFootprintsOverlap(
@@ -229,22 +122,11 @@ bool AGP_VillageLayoutDirector::DoVillageFootprintsOverlap(
 	const FTransform& SecondSlotTransform,
 	const FGP_VillageFootprint& SecondFootprint)
 {
-	const FGPVillageFootprint2D First = MakeFootprint2D(FirstSlotTransform, FirstFootprint);
-	const FGPVillageFootprint2D Second = MakeFootprint2D(SecondSlotTransform, SecondFootprint);
-	const FVector2D CenterDelta = Second.Center - First.Center;
-	const FVector2D Axes[] = {First.AxisX, First.AxisY, Second.AxisX, Second.AxisY};
-
-	for (const FVector2D& Axis : Axes)
-	{
-		const float CenterDistance = FMath::Abs(FVector2D::DotProduct(CenterDelta, Axis));
-		const float CombinedRadius = ProjectedRadius(First, Axis) + ProjectedRadius(Second, Axis);
-		if (CenterDistance >= CombinedRadius - KINDA_SMALL_NUMBER)
-		{
-			return false;
-		}
-	}
-
-	return true;
+	return GPVillagePresetPolicy::DoFootprintsOverlap(
+		FirstSlotTransform,
+		FirstFootprint,
+		SecondSlotTransform,
+		SecondFootprint);
 }
 
 AGP_VillageLayoutDirector::AGP_VillageLayoutDirector()
@@ -285,68 +167,6 @@ TArray<FGP_VillagePresetDefinition> AGP_VillageLayoutDirector::GetVillagePresetP
 	return BuildEffectiveVillagePresetPool();
 }
 
-TArray<FGP_VillagePresetDefinition> AGP_VillageLayoutDirector::MergeVillagePresetSources(
-	const TArray<FGP_VillagePresetDefinition>& PrimaryPresets,
-	const TArray<FGP_VillagePresetDefinition>& CatalogPresets,
-	const TArray<FGP_VillagePresetDefinition>& LegacyPresets)
-{
-	TArray<FGP_VillagePresetDefinition> EffectivePresets;
-	TSet<FName> SeenPresetIds;
-	TSet<FString> SeenLevelPaths;
-
-	const auto AddPreset =
-		[&EffectivePresets, &SeenPresetIds, &SeenLevelPaths](
-			const FGP_VillagePresetDefinition& Preset,
-			bool bReserveDisabledIdentity)
-		{
-			if (Preset.VillageLevel.IsNull())
-			{
-				return;
-			}
-
-			const FName PresetId = ResolvePresetId(Preset);
-			const FString LevelPath = Preset.VillageLevel.ToSoftObjectPath().ToString();
-			if (SeenPresetIds.Contains(PresetId)
-				|| SeenLevelPaths.Contains(LevelPath))
-			{
-				return;
-			}
-
-			if (bReserveDisabledIdentity)
-			{
-				SeenPresetIds.Add(PresetId);
-				SeenLevelPaths.Add(LevelPath);
-			}
-
-			if (Preset.SelectionWeight <= 0.0f)
-			{
-				return;
-			}
-
-			EffectivePresets.Add(Preset);
-			if (!bReserveDisabledIdentity)
-			{
-				SeenPresetIds.Add(PresetId);
-				SeenLevelPaths.Add(LevelPath);
-			}
-		};
-
-	for (const FGP_VillagePresetDefinition& Preset : PrimaryPresets)
-	{
-		AddPreset(Preset, false);
-	}
-	for (const FGP_VillagePresetDefinition& Preset : CatalogPresets)
-	{
-		// A disabled catalog row is a tombstone for matching legacy entries.
-		AddPreset(Preset, true);
-	}
-	for (const FGP_VillagePresetDefinition& Preset : LegacyPresets)
-	{
-		AddPreset(Preset, false);
-	}
-	return EffectivePresets;
-}
-
 TArray<FGP_VillagePresetDefinition> AGP_VillageLayoutDirector::BuildEffectiveVillagePresetPool() const
 {
 	TArray<FGP_VillagePresetDefinition> PrimaryPresets;
@@ -363,7 +183,10 @@ TArray<FGP_VillagePresetDefinition> AGP_VillageLayoutDirector::BuildEffectiveVil
 	const TArray<FGP_VillagePresetDefinition> EmptyCatalog;
 	const TArray<FGP_VillagePresetDefinition>& CatalogPresets =
 		VillagePresetCatalog ? VillagePresetCatalog->Presets : EmptyCatalog;
-	return MergeVillagePresetSources(PrimaryPresets, CatalogPresets, VillagePresetPool);
+	return GPVillagePresetPolicy::MergePresetSources(
+		PrimaryPresets,
+		CatalogPresets,
+		VillagePresetPool);
 }
 
 void AGP_VillageLayoutDirector::OnConstruction(const FTransform& Transform)
@@ -571,388 +394,6 @@ bool AGP_VillageLayoutDirector::BuildSelectionForSeed(int32 InRunSeed)
 	return Result.bSucceeded && bDataLayersApplied && bVillageLevelScheduled;
 }
 
-void AGP_VillageLayoutDirector::RebuildPreview()
-{
-#if WITH_EDITOR
-	if (GetWorld() && !GetWorld()->IsGameWorld())
-	{
-		ClearEditorVillagePreview();
-		if (BuildSelectionForSeed(PreviewSeed) && !BuildEditorVillagePreview())
-		{
-			UE_LOG(LogTemp, Error,
-				TEXT("[VillageLayout] Failed to build the transient editor village preview."));
-		}
-		return;
-	}
-#endif
-
-	BuildSelectionForSeed(PreviewSeed);
-}
-
-void AGP_VillageLayoutDirector::ClearVillagePreview()
-{
-	ClearEditorVillagePreview();
-}
-
-void AGP_VillageLayoutDirector::RefreshFootprintPreview()
-{
-#if WITH_EDITOR
-	ClearEditorVillagePreview();
-#endif
-
-	CollectSlots();
-	AssignVillagePresets(PreviewSeed);
-	ApplyFootprintPreview();
-}
-
-void AGP_VillageLayoutDirector::RefreshFootprintPreviewIgnoringSlot(const AGP_VillageSlot* IgnoredSlot)
-{
-#if WITH_EDITOR
-	ClearEditorVillagePreview();
-#endif
-
-	CollectSlots();
-	CachedSlots.RemoveAll([IgnoredSlot](const AGP_VillageSlot* Slot)
-	{
-		return Slot == IgnoredSlot;
-	});
-	AssignVillagePresets(PreviewSeed);
-	ApplyFootprintPreview();
-}
-
-bool AGP_VillageLayoutDirector::BuildEditorVillagePreview()
-{
-#if WITH_EDITOR
-	UWorld* World = GetWorld();
-	if (!World || World->IsGameWorld())
-	{
-		return false;
-	}
-
-	ULevelInstanceSubsystem* LevelInstanceSubsystem = World->GetSubsystem<ULevelInstanceSubsystem>();
-	if (!LevelInstanceSubsystem)
-	{
-		UE_LOG(LogTemp, Error,
-			TEXT("[VillageLayout] Editor preview requires a Level Instance subsystem."));
-		return false;
-	}
-
-	const bool bWasWorldPackageDirty = World->GetOutermost()->IsDirty();
-	TMap<TWeakObjectPtr<UPackage>, bool> PreviewPackageDirtyStates;
-	ON_SCOPE_EXIT
-	{
-		if (!bWasWorldPackageDirty && IsValid(World))
-		{
-			World->GetOutermost()->SetDirtyFlag(false);
-		}
-		for (const TPair<TWeakObjectPtr<UPackage>, bool>& Pair : PreviewPackageDirtyStates)
-		{
-			if (!Pair.Value && Pair.Key.IsValid())
-			{
-				Pair.Key->SetDirtyFlag(false);
-			}
-		}
-	};
-
-	TSet<FName> SelectedSet;
-	for (FName SlotId : SelectedSlotIds)
-	{
-		SelectedSet.Add(SlotId);
-	}
-
-	int32 LoadedPreviewCount = 0;
-	int32 ConfiguredPCGCount = 0;
-	for (AGP_VillageSlot* Slot : CachedSlots)
-	{
-		if (!IsValid(Slot) || !SelectedSet.Contains(Slot->GetSlotId()))
-		{
-			continue;
-		}
-
-		const FName SlotId = Slot->GetSlotId();
-		TSoftObjectPtr<UWorld> AssignedLevel;
-		FGP_VillageFootprint AssignedFootprint;
-		FName AssignedPresetId;
-		if (!ResolveVillagePreset(SlotId, AssignedLevel, AssignedFootprint, AssignedPresetId))
-		{
-			UE_LOG(LogTemp, Error,
-				TEXT("[VillageLayout] No valid editor preview preset is assigned to slot '%s'."),
-				*SlotId.ToString());
-			ClearEditorVillagePreview();
-			return false;
-		}
-
-		const FTransform PreviewTransform(
-			Slot->GetActorRotation(),
-			Slot->GetActorLocation(),
-			FVector::OneVector);
-		FActorSpawnParameters SpawnParams;
-		SpawnParams.Owner = this;
-		SpawnParams.OverrideLevel = World->PersistentLevel;
-		SpawnParams.ObjectFlags = RF_Transient | RF_DuplicateTransient;
-		SpawnParams.bCreateActorPackage = false;
-		SpawnParams.bHideFromSceneOutliner = true;
-		SpawnParams.SpawnCollisionHandlingOverride =
-			ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-		SpawnParams.CustomPreSpawnInitalization =
-			[AssignedLevel](AActor* SpawnedActor)
-			{
-				ALevelInstance* LevelInstance = CastChecked<ALevelInstance>(SpawnedActor);
-				LevelInstance->bIsEditorOnlyActor = true;
-				LevelInstance->SetLockLocation(true);
-				LevelInstance->SetDesiredRuntimeBehavior(
-					ELevelInstanceRuntimeBehavior::LevelStreaming);
-				LevelInstance->SetWorldAsset(AssignedLevel);
-			};
-
-		ALevelInstance* PreviewInstance = World->SpawnActor<ALevelInstance>(
-			ALevelInstance::StaticClass(),
-			PreviewTransform,
-			SpawnParams);
-		if (!PreviewInstance)
-		{
-			UE_LOG(LogTemp, Error,
-				TEXT("[VillageLayout] Failed to spawn editor preview for slot '%s'."),
-				*SlotId.ToString());
-			ClearEditorVillagePreview();
-			return false;
-		}
-
-		PreviewInstance->SetActorLabel(
-			FString::Printf(
-				TEXT("PREVIEW_%s_%s"),
-				*SlotId.ToString(),
-				*AssignedPresetId.ToString()),
-			false);
-		EditorPreviewVillageInstances.Add(PreviewInstance);
-		LevelInstanceSubsystem->BlockLoadLevelInstance(PreviewInstance);
-
-		ULevelStreamingLevelInstance* StreamingLevel = PreviewInstance->GetLevelStreaming();
-		if (!StreamingLevel || !StreamingLevel->GetLoadedLevel())
-		{
-			UE_LOG(LogTemp, Error,
-				TEXT("[VillageLayout] Editor preview level failed to load for slot '%s'."),
-				*SlotId.ToString());
-			ClearEditorVillagePreview();
-			return false;
-		}
-
-		StreamingLevel->SetFlags(RF_DuplicateTransient);
-		UPackage* PreviewLevelPackage = StreamingLevel->GetLoadedLevel()->GetOutermost();
-		PreviewPackageDirtyStates.FindOrAdd(
-			PreviewLevelPackage,
-			PreviewLevelPackage ? PreviewLevelPackage->IsDirty() : false);
-		++LoadedPreviewCount;
-
-		if (!bGeneratePCGInEditorPreview)
-		{
-			continue;
-		}
-
-		UPCGComponent* PCGComponent = FindVillagePCGComponent(StreamingLevel);
-		if (!PCGComponent)
-		{
-			UE_LOG(LogTemp, Error,
-				TEXT("[VillageLayout] Could not find the city PCG component for preview slot '%s'."),
-				*SlotId.ToString());
-			ClearEditorVillagePreview();
-			return false;
-		}
-
-		// Mark the component as preview-owned before changing tags, graph parameters,
-		// or generation settings so none of those edits become authored data.
-		PCGComponent->SetEditingMode(
-			EPCGEditorDirtyMode::Preview,
-			PCGComponent->GetSerializedEditingMode());
-
-		int32 PCGComponentCount = 0;
-		int32 RoadActorCount = 0;
-		int32 DistrictActorCount = 0;
-		if (!ConfigureVillagePCG(
-			StreamingLevel,
-			SlotId,
-			PCGComponentCount,
-			RoadActorCount,
-			DistrictActorCount))
-		{
-			UE_LOG(LogTemp, Error,
-				TEXT("[VillageLayout] Failed to configure editor preview PCG for slot '%s'."),
-				*SlotId.ToString());
-			ClearEditorVillagePreview();
-			return false;
-		}
-
-		EditorPreviewPCGComponents.Add(PCGComponent);
-		ConfiguredPCGCount += PCGComponentCount;
-	}
-
-	if (LoadedPreviewCount != SelectedSlotIds.Num())
-	{
-		UE_LOG(LogTemp, Error,
-			TEXT("[VillageLayout] Loaded %d of %d selected editor preview levels."),
-			LoadedPreviewCount,
-			SelectedSlotIds.Num());
-		ClearEditorVillagePreview();
-		return false;
-	}
-
-	if (bGeneratePCGInEditorPreview)
-	{
-		EditorPreviewSynchronousGeneratedComponents.Reset();
-		EditorPreviewSynchronousCancelledComponents.Reset();
-		FPCGTaskId PreviousTaskId = InvalidPCGTaskId;
-		for (UPCGComponent* PCGComponent : EditorPreviewPCGComponents)
-		{
-			if (!IsValid(PCGComponent))
-			{
-				ClearEditorVillagePreview();
-				return false;
-			}
-
-			TArray<FPCGTaskId> Dependencies;
-			if (PreviousTaskId != InvalidPCGTaskId)
-			{
-				Dependencies.Add(PreviousTaskId);
-			}
-
-			PCGComponent->OnPCGGraphGeneratedDelegate.RemoveAll(this);
-			PCGComponent->OnPCGGraphCancelledDelegate.RemoveAll(this);
-			PCGComponent->OnPCGGraphGeneratedDelegate.AddUObject(
-				this,
-				&AGP_VillageLayoutDirector::HandleEditorPreviewPCGGenerated);
-			PCGComponent->OnPCGGraphCancelledDelegate.AddUObject(
-				this,
-				&AGP_VillageLayoutDirector::HandleEditorPreviewPCGCancelled);
-			const FPCGTaskId TaskId = PCGComponent->GenerateLocalGetTaskId(
-				EPCGComponentGenerationTrigger::GenerateOnDemand,
-				true,
-				EPCGHiGenGrid::Uninitialized,
-				Dependencies);
-			const bool bCompletedSynchronously =
-				EditorPreviewSynchronousGeneratedComponents.Contains(PCGComponent);
-			const bool bCancelledSynchronously =
-				EditorPreviewSynchronousCancelledComponents.Contains(PCGComponent);
-			PCGComponent->OnPCGGraphGeneratedDelegate.RemoveAll(this);
-			PCGComponent->OnPCGGraphCancelledDelegate.RemoveAll(this);
-			if (bCancelledSynchronously
-				|| (TaskId == InvalidPCGTaskId && !bCompletedSynchronously))
-			{
-				UE_LOG(LogTemp, Error,
-					TEXT("[VillageLayout] Failed to schedule an editor preview PCG graph."));
-				ClearEditorVillagePreview();
-				return false;
-			}
-			PreviousTaskId = TaskId;
-		}
-		EditorPreviewSynchronousGeneratedComponents.Reset();
-		EditorPreviewSynchronousCancelledComponents.Reset();
-	}
-
-	UE_LOG(LogTemp, Log,
-		TEXT("[VillageLayout] Editor preview loaded %d transient village level(s); PCG=%s Components=%d."),
-		LoadedPreviewCount,
-		bGeneratePCGInEditorPreview ? TEXT("ScheduledSequentially") : TEXT("Disabled"),
-		ConfiguredPCGCount);
-	return true;
-#else
-	return false;
-#endif
-}
-
-void AGP_VillageLayoutDirector::ClearEditorVillagePreview()
-{
-#if WITH_EDITOR
-	UWorld* World = GetWorld();
-	if (!World || World->IsGameWorld())
-	{
-		return;
-	}
-
-	const bool bWasWorldPackageDirty = World->GetOutermost()->IsDirty();
-	ON_SCOPE_EXIT
-	{
-		if (!bWasWorldPackageDirty && IsValid(World))
-		{
-			World->GetOutermost()->SetDirtyFlag(false);
-		}
-	};
-
-	TSet<UPCGComponent*> CleanedPCGComponents;
-	ULevelInstanceSubsystem* LevelInstanceSubsystem = World->GetSubsystem<ULevelInstanceSubsystem>();
-	for (ALevelInstance* PreviewInstance : EditorPreviewVillageInstances)
-	{
-		if (!IsValid(PreviewInstance)
-			|| PreviewInstance->GetOwner() != this
-			|| PreviewInstance->GetWorld() != World)
-		{
-			continue;
-		}
-
-		if (ULevel* LoadedLevel = PreviewInstance->GetLoadedLevel())
-		{
-			for (AActor* Actor : LoadedLevel->Actors)
-			{
-				if (!IsValid(Actor))
-				{
-					continue;
-				}
-
-				TInlineComponentArray<UPCGComponent*> PCGComponents(Actor);
-				for (UPCGComponent* PCGComponent : PCGComponents)
-				{
-					if (IsValid(PCGComponent) && !CleanedPCGComponents.Contains(PCGComponent))
-					{
-						CleanedPCGComponents.Add(PCGComponent);
-						PCGComponent->OnPCGGraphGeneratedDelegate.RemoveAll(this);
-						PCGComponent->OnPCGGraphCancelledDelegate.RemoveAll(this);
-						PCGComponent->CancelGeneration();
-						PCGComponent->CleanupLocalImmediate(true);
-					}
-				}
-			}
-		}
-
-		if (LevelInstanceSubsystem)
-		{
-			LevelInstanceSubsystem->BlockUnloadLevelInstance(PreviewInstance);
-		}
-		if (IsValid(PreviewInstance))
-		{
-			World->DestroyActor(PreviewInstance, false, false);
-		}
-	}
-
-	if (!EditorPreviewVillageInstances.IsEmpty())
-	{
-		UE_LOG(LogTemp, Log,
-			TEXT("[VillageLayout] Cleared %d transient editor village preview level(s)."),
-			EditorPreviewVillageInstances.Num());
-	}
-	EditorPreviewPCGComponents.Reset();
-	EditorPreviewVillageInstances.Reset();
-	EditorPreviewSynchronousGeneratedComponents.Reset();
-	EditorPreviewSynchronousCancelledComponents.Reset();
-#endif
-}
-
-#if WITH_EDITOR
-void AGP_VillageLayoutDirector::HandleEditorPreviewPCGGenerated(UPCGComponent* PCGComponent)
-{
-	if (IsValid(PCGComponent))
-	{
-		EditorPreviewSynchronousGeneratedComponents.Add(PCGComponent);
-	}
-}
-
-void AGP_VillageLayoutDirector::HandleEditorPreviewPCGCancelled(UPCGComponent* PCGComponent)
-{
-	if (IsValid(PCGComponent))
-	{
-		EditorPreviewSynchronousCancelledComponents.Add(PCGComponent);
-	}
-}
-#endif
-
 UPCGComponent* AGP_VillageLayoutDirector::FindVillagePCGComponent(
 	ULevelStreamingDynamic* StreamingLevel) const
 {
@@ -1020,7 +461,7 @@ void AGP_VillageLayoutDirector::AssignVillagePresets(int32 InRunSeed, int32 Assi
 			continue;
 		}
 
-		const int32 PresetIndex = SelectVillagePresetIndex(
+		const int32 PresetIndex = GPVillagePresetPolicy::SelectPresetIndex(
 			InRunSeed,
 			Slot->GetSlotId(),
 			EffectivePresets,
@@ -1128,7 +569,7 @@ void AGP_VillageLayoutDirector::ApplyFootprintPreview()
 			{
 				continue;
 			}
-			if (DoVillageFootprintsOverlap(
+			if (GPVillagePresetPolicy::DoFootprintsOverlap(
 				FirstSlot->GetActorTransform(),
 				FirstFootprint,
 				SecondSlot->GetActorTransform(),
@@ -1179,7 +620,7 @@ void AGP_VillageLayoutDirector::PopulateCandidateOverlaps(
 				SecondLevel,
 				SecondFootprint,
 				SecondPresetId);
-			if (!DoVillageFootprintsOverlap(
+			if (!GPVillagePresetPolicy::DoFootprintsOverlap(
 				FirstSlot->GetActorTransform(),
 				FirstFootprint,
 				SecondSlot->GetActorTransform(),

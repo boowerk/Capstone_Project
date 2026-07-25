@@ -69,6 +69,8 @@ public:
 		return VillagePresetCatalog;
 	}
 
+	// Compatibility entry points. New policy-only callers should use
+	// GPVillagePresetPolicy directly to avoid depending on the runtime Actor.
 	static int32 SelectVillagePresetIndex(
 		int32 InRunSeed,
 		FName SlotId,
