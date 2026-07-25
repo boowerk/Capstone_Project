@@ -3,7 +3,6 @@
 #include "Actors/GP_CrystalPrismActor.h"
 #include "Actors/GP_CrystalSanctuaryMarkerActor.h"
 #include "Actors/GP_CrystalShardProjectile.h"
-#include "Actors/GP_CrystalSeraphVFXDefaults.h"
 #include "Actors/GP_SeraphLaserActor.h"
 #include "Engine/World.h"
 #include "GameplayTags/GP_Tags.h"
@@ -58,11 +57,12 @@ bool FCrystalSeraphVisualCueTest::RunTest(const FString& Parameters)
 	const UGP_VisualCueComponent* LaserCues = PatternActors[2]->FindComponentByClass<UGP_VisualCueComponent>();
 	const UGP_VisualCueComponent* SanctuaryCues = PatternActors[3]->FindComponentByClass<UGP_VisualCueComponent>();
 
-	const auto HasCrystalSeraphTint = [](const UGP_VisualCueComponent* VisualCueComponent) -> bool
+	const FLinearColor ExpectedCrystalTint(89.f / 255.f, 173.f / 255.f, 1.f, 1.f);
+	const auto HasCrystalSeraphTint = [ExpectedCrystalTint](const UGP_VisualCueComponent* VisualCueComponent) -> bool
 	{
 		return VisualCueComponent
 			&& VisualCueComponent->IsNiagaraTintOverrideEnabled()
-			&& VisualCueComponent->GetNiagaraTintOverrideColor().Equals(GPCrystalSeraphVFXDefaults::GetCrystalTintColor(), 0.001f);
+			&& VisualCueComponent->GetNiagaraTintOverrideColor().Equals(ExpectedCrystalTint, 0.001f);
 	};
 
 	UNiagaraSystem* PrismAura = PrismCues->ResolveNiagara(GPTags::GameplayCue::Ability::Active_Magic);

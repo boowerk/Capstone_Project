@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-26T00:38:16+09:00
+updated: 2026-07-26T00:43:45+09:00
 status: active
 tags:
   - memoc
@@ -11,11 +11,11 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-07-26T00:38:16+09:00
+Last synced: 2026-07-26T00:43:45+09:00
 
 ## Current Status
 
-- Code refactor is committed through `0c3e6cf5` on `refactor/codebase-cleanup`; local `main` is restored to `origin/main` at `187a8bb4`. The current slice exports all 169 native GameplayTag declarations, adds direct GameplayAbilities/GameplayTags test dependencies, and moves five tag-dependent combat/AI test files out of the runtime module unchanged. Editor/Server Development builds pass, the Editor DLL exports GPTags symbols, Server excludes `Project_EdenTests`, and all 16 moved tests pass. `BossTelegraphVFXTests` remains runtime because its existing Dark Knight Charge default contract fails.
+- Code refactor is committed through `8c2d0e76` on `refactor/codebase-cleanup`; local `main` remains aligned with `origin/main` at `187a8bb4`. The current slice moves `CrystalSeraphVFXTests` into the Editor-only module while keeping `GP_CrystalSeraphVFXDefaults` private. Its expectation now independently encodes the `#59ADFF` tint instead of reading the implementation helper. Editor/Server Development builds and `ProjectEden.Combat.CrystalSeraph.VisualCues` pass.
 - `origin/feature/run-result-ui` is merged into `main`: player elimination/recovery, spectating, party defeat policy, and native victory/defeat/eliminated presentation coexist with the initial Outer loading gate. The conflict union preserves both persistent weapon construction and enemy target refresh. Editor Development build and `ProjectEden.RunOutcome.PartyDefeatPolicy` pass.
 - Client village visual-ready ACK now retries local controller discovery for up to 10 seconds and clears its timer on success/end play. The four affected StylizedProvencal roof/wall/decal materials are saved with Instanced Static Mesh usage, and the current `L_LandscapeMap` is committed. The obsolete RegionID GPU-to-CPU availability experiment was restored because vegetation no longer samples that texture.
 - `BuildCookDeployFinal.bat` performs one-shot client/server builds, cooks, packages, and structural verification. The current installed engine advertises only Development Game/Server targets in `BaseEngine.ini`; Shipping is not buildable from this distribution. The script therefore defaults to a clearly labeled Development deployment, rejects unsupported explicit Shipping before compilation, and writes versioned whole-folder releases under `Saved/FinalDeploy`. It still rejects dirty source by default and stages prerequisites for both packages.

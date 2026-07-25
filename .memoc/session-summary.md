@@ -2,7 +2,7 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-07-26T00:38:16+09:00
+updated: 2026-07-26T00:43:45+09:00
 status: active
 tags:
   - memoc
@@ -11,20 +11,8 @@ created: 2026-07-24T01:26:27
 ---
 # Session Summary
 
-- `8dbbca6e`: GameMode policy/state and responsibility splits.
-- `91eddf95`: Village preset policy and editor-preview split.
-- `241f1351`: Editor-only `Project_EdenTests` module plus four moved tests.
-- `2e856bf4`: eight AI policy, lobby, run-seed, and session tests moved unchanged.
-- `d9e7ea23`: five combat/UI/runtime contract tests moved unchanged.
-- `d6126d1d`: three boss presentation test files moved unchanged.
-- `17831460`: Landscape integrity and Minimap capture tests moved unchanged.
-- `ce359f24`: two AI transition test files moved; seven tests pass.
-- `600eccad`: three Niagara-dependent test files moved; seven tests pass.
-- `2339cbb6`: Navigation Invoker contract test moved and passing.
-- `557c91e8`: Village selection/PCG contract test moved unchanged and passing.
-- `0c3e6cf5`: Sans AnimGraph contract test moved unchanged and passing.
-- Branch: `refactor/codebase-cleanup`; local `main` restored to `origin/main` (`187a8bb4`).
-- Uncommitted: export 169 GPTags and move five tag-dependent test files; 16 tests pass.
-- `BossTelegraphVFXTests` stayed runtime: Dark Knight Charge default contract fails.
-- `CrystalSeraphGroggyTests` stayed runtime: `PrismCluster` has a pre-existing asset-size failure.
-- Next: commit the tag boundary, then move Crystal Seraph VFX without exposing its private helper.
+- Branch: `refactor/codebase-cleanup`; local `main` matches `origin/main` at `187a8bb4`.
+- Through `8c2d0e76`: GameMode/Village split, Editor test module, 36 migrated tests, 169 exported gameplay tags.
+- Current: Crystal Seraph VFX test moved to the Editor module with an independent `#59ADFF` expectation. Editor/Server builds and `ProjectEden.Combat.CrystalSeraph.VisualCues` pass.
+- Remaining content mismatches: Dark Knight Charge telegraph and Crystal Prism scale.
+- Next: commit the VFX boundary; handle those content contracts separately.
