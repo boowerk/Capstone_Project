@@ -8,6 +8,7 @@ public class Project_EdenTests : ModuleRules
 
 		PrivateDependencyModuleNames.AddRange(new string[]
 		{
+			"AIModule",
 			"Core",
 			"CoreUObject",
 			"Engine",
