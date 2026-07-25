@@ -43,6 +43,7 @@ bool FBossTelegraphVFXConfigurationTest::RunTest(const FString& Parameters)
 
 	const AGP_CrystalSeraphBossCharacter* CrystalDefaults = GetDefault<AGP_CrystalSeraphBossCharacter>();
 	const AGP_MatadorMageBossCharacter* MatadorDefaults = GetDefault<AGP_MatadorMageBossCharacter>();
+	const AGP_DarkArmorKnightBossCharacter* NativeDarkKnightDefaults = GetDefault<AGP_DarkArmorKnightBossCharacter>();
 	const AGP_EnemyCharacter* GenericEnemyDefaults = GetDefault<AGP_EnemyCharacter>();
 	const UGP_BossTelegraphVFXComponent* CrystalTelegraph = CrystalDefaults->GetBossTelegraphVFXComponent();
 	const UGP_BossTelegraphVFXComponent* MatadorTelegraph = MatadorDefaults->GetBossTelegraphVFXComponent();
@@ -58,6 +59,12 @@ bool FBossTelegraphVFXConfigurationTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Matador Bull is present and unchecked by default"),
 		MatadorDefaults->GetTelegraphVFXPatterns().Contains(GPTags::Ability::Enemy::Utility_MatadorBullPattern)
 		&& !MatadorDefaults->GetTelegraphVFXPatterns().FindRef(GPTags::Ability::Enemy::Utility_MatadorBullPattern));
+	TestEqual(TEXT("Native Dark Knight exposes all eight attack patterns"),
+		NativeDarkKnightDefaults->GetTelegraphVFXPatterns().Num(),
+		8);
+	TestTrue(TEXT("Native Dark Knight Charge is listed and disabled by default"),
+		NativeDarkKnightDefaults->GetTelegraphVFXPatterns().Contains(GPTags::Ability::Boss::DarkKnight::Charge)
+		&& !NativeDarkKnightDefaults->GetTelegraphVFXPatterns().FindRef(GPTags::Ability::Boss::DarkKnight::Charge));
 	TestNull(TEXT("Generic enemy base does not add the component to Sans"),
 		GenericEnemyDefaults->FindComponentByClass<UGP_BossTelegraphVFXComponent>());
 
@@ -96,10 +103,10 @@ bool FBossTelegraphVFXConfigurationTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Dark Knight exposes all eight authored attack patterns"),
 		IsValid(DarkKnightBoss) ? DarkKnightBoss->GetTelegraphVFXPatterns().Num() : 0,
 		8);
-	TestTrue(TEXT("Dark Knight Charge is present and unchecked by default"),
+	TestTrue(TEXT("Production Dark Knight enables the authored Charge telegraph"),
 		IsValid(DarkKnightBoss)
 		&& DarkKnightBoss->GetTelegraphVFXPatterns().Contains(GPTags::Ability::Boss::DarkKnight::Charge)
-		&& !DarkKnightBoss->GetTelegraphVFXPatterns().FindRef(GPTags::Ability::Boss::DarkKnight::Charge));
+		&& DarkKnightBoss->GetTelegraphVFXPatterns().FindRef(GPTags::Ability::Boss::DarkKnight::Charge));
 	TestNull(TEXT("Sans remains excluded from Boss Telegraph VFX"),
 		IsValid(Sans) ? Sans->FindComponentByClass<UGP_BossTelegraphVFXComponent>() : nullptr);
 

@@ -11,6 +11,7 @@
 #include "Engine/TargetPoint.h"
 #include "Kismet/GameplayStatics.h"
 #include "Misc/AutomationTest.h"
+#include "UObject/UnrealType.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FCrystalSeraphGroggyLifecycleTest,
@@ -125,16 +126,63 @@ bool FCrystalSeraphPrismClusterTest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("Prism pattern returns a primary representative"), PrimaryPrism);
 	TestEqual(TEXT("State tracks the primary prism"), StateComponent->GetCrystalPrismActor(), PrimaryPrism);
 
+	// Native actors cover the cluster mechanics below. Production visuals live in the Blueprint child,
+	// so verify that the production boss selects that child and that its authored Sculpture scale remains large.
+	UClass* ProductionBossClass = LoadClass<AGP_CrystalSeraphBossCharacter>(nullptr,
+		TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/BP_Crystal_Seraph.BP_Crystal_Seraph_C"));
+	UClass* ProductionPrismClass = LoadClass<AGP_CrystalPrismActor>(nullptr,
+		TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_CrystalSeraph/BP_CrystalPrism.BP_CrystalPrism_C"));
+	const AGP_CrystalSeraphBossCharacter* ProductionBossDefaults = IsValid(ProductionBossClass)
+		? Cast<AGP_CrystalSeraphBossCharacter>(ProductionBossClass->GetDefaultObject())
+		: nullptr;
+	const FClassProperty* PrismClassProperty = FindFProperty<FClassProperty>(
+		AGP_CrystalSeraphBossCharacter::StaticClass(),
+		TEXT("CrystalPrismActorClass"));
+	const UClass* ConfiguredPrismClass = IsValid(ProductionBossDefaults) && PrismClassProperty
+		? Cast<UClass>(PrismClassProperty->GetObjectPropertyValue_InContainer(ProductionBossDefaults))
+		: nullptr;
+	TestNotNull(TEXT("Loaded production Crystal Seraph Blueprint"), ProductionBossClass);
+	TestNotNull(TEXT("Loaded production Crystal Prism Blueprint"), ProductionPrismClass);
+	TestTrue(TEXT("Production boss selects the production prism Blueprint"),
+		ConfiguredPrismClass == ProductionPrismClass);
+
+	const AGP_CrystalPrismActor* ProductionPrismDefaults = IsValid(ProductionPrismClass)
+		? Cast<AGP_CrystalPrismActor>(ProductionPrismClass->GetDefaultObject())
+		: nullptr;
+	const FStructProperty* PrismScaleProperty = FindFProperty<FStructProperty>(
+		AGP_CrystalPrismActor::StaticClass(),
+		TEXT("PrismVisualScale"));
+	const FVector* ProductionPrismScale = IsValid(ProductionPrismDefaults) && PrismScaleProperty
+		? PrismScaleProperty->ContainerPtrToValuePtr<FVector>(ProductionPrismDefaults)
+		: nullptr;
+	TestTrue(TEXT("Production prism preserves its authored large visual scale"),
+		ProductionPrismScale && ProductionPrismScale->GetMin() >= 2.0f);
+
+	const UStaticMeshComponent* ProductionPrismMesh = nullptr;
+	if (IsValid(ProductionPrismDefaults))
+	{
+		TInlineComponentArray<UStaticMeshComponent*> ProductionMeshComponents;
+		ProductionPrismDefaults->GetComponents(ProductionMeshComponents);
+		for (const UStaticMeshComponent* MeshComponent : ProductionMeshComponents)
+		{
+			if (IsValid(MeshComponent) && MeshComponent->GetFName() == TEXT("PrismMesh"))
+			{
+				ProductionPrismMesh = MeshComponent;
+				break;
+			}
+		}
+	}
+	TestTrue(TEXT("Production prism owns its authored static mesh"),
+		IsValid(ProductionPrismMesh) && IsValid(ProductionPrismMesh->GetStaticMesh()));
+
 	TArray<AActor*> PrismActors;
 	UGameplayStatics::GetAllActorsOfClass(TestWorld, AGP_CrystalPrismActor::StaticClass(), PrismActors);
 	TestEqual(TEXT("Prism pattern lays three crystals"), PrismActors.Num(), 3);
 	for (int32 LeftIndex = 0; LeftIndex < PrismActors.Num(); ++LeftIndex)
 	{
 		const AGP_CrystalPrismActor* PrismActor = Cast<AGP_CrystalPrismActor>(PrismActors[LeftIndex]);
-		const UStaticMeshComponent* PrismMesh = PrismActors[LeftIndex]->FindComponentByClass<UStaticMeshComponent>();
 		const USphereComponent* PrismCollision = PrismActors[LeftIndex]->FindComponentByClass<USphereComponent>();
-		TestTrue(TEXT("Crystal visual is larger than the previous prototype"), IsValid(PrismMesh) && PrismMesh->GetRelativeScale3D().X >= 2.0f);
-		TestTrue(TEXT("Crystal reflection collision matches its larger visual"), IsValid(PrismCollision) && PrismCollision->GetUnscaledSphereRadius() >= 150.0f);
+		TestTrue(TEXT("Crystal retains its enlarged reflection radius"), IsValid(PrismCollision) && PrismCollision->GetUnscaledSphereRadius() >= 150.0f);
 		TestTrue(TEXT("Crystal remains upright after ring placement"), IsValid(PrismActor) && FMath::IsNearlyZero(PrismActor->GetActorRotation().Pitch) && FMath::IsNearlyZero(PrismActor->GetActorRotation().Roll));
 		TestTrue(TEXT("Persistent aura stays smaller than the crystal prototype"), IsValid(PrismActor) && PrismActor->GetPrismAuraScale().GetMax() < 1.0f);
 

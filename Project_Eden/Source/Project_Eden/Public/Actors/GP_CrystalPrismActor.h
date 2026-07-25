@@ -104,7 +104,7 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "cm"))
 	float CollisionRadius = 250.0f;
 
-	// Keep the prototype crystal readable while allowing a Blueprint child to replace or retune its visual footprint.
+	// Keep the native fallback neutral; Blueprint children own mesh-specific visual scale.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Crystal Seraph", meta = (AllowPrivateAccess = "true"))
 	FVector PrismVisualScale = FVector::OneVector;
 
