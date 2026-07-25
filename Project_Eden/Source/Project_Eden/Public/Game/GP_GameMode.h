@@ -226,8 +226,7 @@ private:
 	void SpawnMarkerEnemies(AGP_EnemySpawnVolume* Zone, AGP_EnemySpawnMarker* Marker);
 	void RegisterZoneEnemy(
 		AGP_EnemyCharacter* Enemy,
-		AGP_EnemySpawnVolume* OwningZone = nullptr,
-		int32 CorruptionRegionId = INDEX_NONE);
+		AGP_EnemySpawnVolume* OwningZone = nullptr);
 	void MaybeCompleteZone();
 	void CompleteCurrentZone();
 	void AdvanceZone();
