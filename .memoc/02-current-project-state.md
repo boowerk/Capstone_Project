@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-25T22:18:51+09:00
+updated: 2026-07-25T22:31:09+09:00
 status: active
 tags:
   - memoc
@@ -11,11 +11,11 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-07-25T22:18:51+09:00
+Last synced: 2026-07-25T22:31:09+09:00
 
 ## Current Status
 
-- Code refactor is committed through `241f1351`: GameMode and Village responsibilities are split, and the Editor-only `Project_EdenTests` module owns the first four automation tests. The current slice moves eight additional AI policy, lobby, run-seed, and session tests out of the runtime module without changing their code or names. Editor/Server Development builds pass, all eight moved tests pass, and the Server target contains no test-module reference.
+- Code refactor is committed through `2e856bf4`: GameMode and Village responsibilities are split, and the Editor-only `Project_EdenTests` module owns twelve automation tests. The current slice moves five additional combat, UI, enemy movement, Region spatial, and Crystal Seraph animation contract tests out of the runtime module without changing their code or names. Editor/Server Development builds pass, all five moved tests pass, and the Server target contains no test-module reference.
 - `origin/feature/run-result-ui` is merged into `main`: player elimination/recovery, spectating, party defeat policy, and native victory/defeat/eliminated presentation coexist with the initial Outer loading gate. The conflict union preserves both persistent weapon construction and enemy target refresh. Editor Development build and `ProjectEden.RunOutcome.PartyDefeatPolicy` pass.
 - Client village visual-ready ACK now retries local controller discovery for up to 10 seconds and clears its timer on success/end play. The four affected StylizedProvencal roof/wall/decal materials are saved with Instanced Static Mesh usage, and the current `L_LandscapeMap` is committed. The obsolete RegionID GPU-to-CPU availability experiment was restored because vegetation no longer samples that texture.
 - `BuildCookDeployFinal.bat` performs one-shot client/server builds, cooks, packages, and structural verification. The current installed engine advertises only Development Game/Server targets in `BaseEngine.ini`; Shipping is not buildable from this distribution. The script therefore defaults to a clearly labeled Development deployment, rejects unsupported explicit Shipping before compilation, and writes versioned whole-folder releases under `Saved/FinalDeploy`. It still rejects dirty source by default and stages prerequisites for both packages.
