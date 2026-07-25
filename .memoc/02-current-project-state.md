@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-26T01:15:10+09:00
+updated: 2026-07-26T01:41:58+09:00
 status: active
 tags:
   - memoc
@@ -11,11 +11,11 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-07-26T01:15:10+09:00
+Last synced: 2026-07-26T01:41:58+09:00
 
 ## Current Status
 
-- Code refactor is committed through `d13824a9` on `refactor/codebase-cleanup`; local `main` remains aligned with `origin/main` at `187a8bb4`. The current slice closes the runtime test boundary: the last two files/three cases move to `Project_EdenTests`. Dark Knight tests now distinguish native Charge opt-in (`false`) from the production Blueprint override (`true`), and the Crystal Prism contract verifies that the production boss selects `BP_CrystalPrism` with its authored large scale/static mesh instead of inspecting the obsolete native cone prototype. Editor/Server Development builds and all three affected tests pass.
+- The safe code-centered refactor checkpoint is committed through `c6efa133` on `refactor/codebase-cleanup`; local `main` remains aligned with `origin/main` at `187a8bb4`. All 38 automation source files/65 cases now live in the Editor-only `Project_EdenTests` module, and native gameplay tags are exported across module boundaries. `GP_VillageLayoutDirector.cpp` is reduced to selection/lifecycle policy while runtime streaming and PCG orchestration live in focused translation units; `GP_GameMode.cpp` similarly delegates smoke-probe and Zone-combat implementation. Editor/Server Development builds pass, and the full `ProjectEden` automation suite passes 65/65. No serialized asset contract or intended runtime behavior changed.
 - `origin/feature/run-result-ui` is merged into `main`: player elimination/recovery, spectating, party defeat policy, and native victory/defeat/eliminated presentation coexist with the initial Outer loading gate. The conflict union preserves both persistent weapon construction and enemy target refresh. Editor Development build and `ProjectEden.RunOutcome.PartyDefeatPolicy` pass.
 - Client village visual-ready ACK now retries local controller discovery for up to 10 seconds and clears its timer on success/end play. The four affected StylizedProvencal roof/wall/decal materials are saved with Instanced Static Mesh usage, and the current `L_LandscapeMap` is committed. The obsolete RegionID GPU-to-CPU availability experiment was restored because vegetation no longer samples that texture.
 - `BuildCookDeployFinal.bat` performs one-shot client/server builds, cooks, packages, and structural verification. The current installed engine advertises only Development Game/Server targets in `BaseEngine.ini`; Shipping is not buildable from this distribution. The script therefore defaults to a clearly labeled Development deployment, rejects unsupported explicit Shipping before compilation, and writes versioned whole-folder releases under `Saved/FinalDeploy`. It still rejects dirty source by default and stages prerequisites for both packages.
@@ -261,8 +261,6 @@ Last synced: 2026-05-23T00:00:00
 
 ## Open Tasks
 
-- Resolve `ProjectEden.Combat.Boss.TelegraphVFXConfiguration`: the current Dark Knight production defaults do not satisfy the expected present-but-disabled Charge telegraph entry. The test remains in the runtime module until the content contract is decided.
-- Repair or intentionally update `ProjectEden.Combat.CrystalSeraph.PrismCluster`: all three prism visuals currently fail the expectation that they are larger than the previous prototype. The test was left in the runtime module until this content contract is resolved.
 - Remove stale EarlyTransition notify states from the 22 referenced UEFN Run/Slide animations in the editor and resave them; the broken legacy notify package is intentionally absent, so load-all checks currently emit warning-only missing-package messages.
 - Manually demo-check the current three-player flow in PIE when requested; dedicated/live server execution is not required for the current implementation pass.
 - PIE-check the reimported Paladin and Daelithra meshes with the explicitly reapplied MaskMan runtime Retarget AnimBP; their old experimental target IK Rig/Retargeter assets are not runtime sources.
