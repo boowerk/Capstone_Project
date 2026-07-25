@@ -12,6 +12,15 @@
 				"Engine",
 				"GameplayAbilities"
 			]
+		},
+		{
+			"Name": "Project_EdenTests",
+			"Type": "Editor",
+			"LoadingPhase": "PostEngineInit",
+			"AdditionalDependencies": [
+				"Engine",
+				"Project_Eden"
+			]
 		}
 	],
 	"Plugins": [

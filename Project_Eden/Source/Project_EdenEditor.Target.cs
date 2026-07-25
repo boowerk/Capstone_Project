@@ -10,6 +10,10 @@ public class Project_EdenEditorTarget : TargetRules
 		Type = TargetType.Editor;
 		DefaultBuildSettings = BuildSettingsVersion.V6;
 		IncludeOrderVersion = EngineIncludeOrderVersion.Unreal5_7;
-		ExtraModuleNames.Add("Project_Eden");
+		ExtraModuleNames.AddRange(new string[]
+		{
+			"Project_Eden",
+			"Project_EdenTests",
+		});
 	}
 }
