@@ -2,7 +2,7 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-07-25T23:15:00+09:00
+updated: 2026-07-26T00:38:16+09:00
 status: active
 tags:
   - memoc
@@ -22,6 +22,9 @@ created: 2026-07-24T01:26:27
 - `600eccad`: three Niagara-dependent test files moved; seven tests pass.
 - `2339cbb6`: Navigation Invoker contract test moved and passing.
 - `557c91e8`: Village selection/PCG contract test moved unchanged and passing.
-- Uncommitted: Sans AnimGraph contract test moved unchanged and passing.
+- `0c3e6cf5`: Sans AnimGraph contract test moved unchanged and passing.
+- Branch: `refactor/codebase-cleanup`; local `main` restored to `origin/main` (`187a8bb4`).
+- Uncommitted: export 169 GPTags and move five tag-dependent test files; 16 tests pass.
+- `BossTelegraphVFXTests` stayed runtime: Dark Knight Charge default contract fails.
 - `CrystalSeraphGroggyTests` stayed runtime: `PrismCluster` has a pre-existing asset-size failure.
-- Next: migrate dependency-specific test groups, then separate Village streaming/PCG state.
+- Next: commit the tag boundary, then move Crystal Seraph VFX without exposing its private helper.

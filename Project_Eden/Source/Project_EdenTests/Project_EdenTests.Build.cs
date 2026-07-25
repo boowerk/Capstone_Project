@@ -14,6 +14,8 @@ public class Project_EdenTests : ModuleRules
 			"Core",
 			"CoreUObject",
 			"Engine",
+			"GameplayAbilities",
+			"GameplayTags",
 			"NavigationSystem",
 			"Niagara",
 			"PCG",
