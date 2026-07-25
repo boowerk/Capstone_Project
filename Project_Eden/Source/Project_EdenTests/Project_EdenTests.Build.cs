@@ -9,6 +9,8 @@ public class Project_EdenTests : ModuleRules
 		PrivateDependencyModuleNames.AddRange(new string[]
 		{
 			"AIModule",
+			"AnimGraph",
+			"BlueprintGraph",
 			"Core",
 			"CoreUObject",
 			"Engine",

@@ -2,7 +2,7 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-07-25T23:09:23+09:00
+updated: 2026-07-25T23:15:00+09:00
 status: active
 tags:
   - memoc
@@ -21,6 +21,7 @@ created: 2026-07-24T01:26:27
 - `ce359f24`: two AI transition test files moved; seven tests pass.
 - `600eccad`: three Niagara-dependent test files moved; seven tests pass.
 - `2339cbb6`: Navigation Invoker contract test moved and passing.
-- Uncommitted: Village selection/PCG contract test moved unchanged and passing.
+- `557c91e8`: Village selection/PCG contract test moved unchanged and passing.
+- Uncommitted: Sans AnimGraph contract test moved unchanged and passing.
 - `CrystalSeraphGroggyTests` stayed runtime: `PrismCluster` has a pre-existing asset-size failure.
 - Next: migrate dependency-specific test groups, then separate Village streaming/PCG state.
