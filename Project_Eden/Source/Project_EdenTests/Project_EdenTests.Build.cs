@@ -12,6 +12,7 @@ public class Project_EdenTests : ModuleRules
 			"Core",
 			"CoreUObject",
 			"Engine",
+			"NavigationSystem",
 			"Niagara",
 			"Project_Eden",
 			"UMG",
