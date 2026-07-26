@@ -51,7 +51,7 @@ AGP_SkillTargetPreviewActor::AGP_SkillTargetPreviewActor()
 	AccentEffect->SetGenerateOverlapEvents(false);
 
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> DecalMaterialFinder(
-		TEXT("/Game/Effects/M_BossSweepTelegraph_Decal.M_BossSweepTelegraph_Decal"));
+		TEXT("/Game/Effects/M_EmissiveCircleTelegraph_Decal.M_EmissiveCircleTelegraph_Decal"));
 	if (DecalMaterialFinder.Succeeded())
 	{
 		PreviewDecalMaterial = DecalMaterialFinder.Object;
