@@ -288,10 +288,12 @@ FVector AGP_EnemySpawnVolume::GetSpawnPoint(bool bRandomizeInVolume, bool& bOutP
 
 FVector AGP_EnemySpawnVolume::GetBossSpawnPoint(bool& bOutProjected) const
 {
+	const bool bHasAuthoredBossPoint = IsValid(BossSpawnPoint);
 	const FVector DesiredLocation =
-		IsValid(BossSpawnPoint)
+		bHasAuthoredBossPoint
 			? BossSpawnPoint->GetActorLocation()
-			: (SpawnBox ? SpawnBox->GetComponentLocation() : GetActorLocation());
+			: (SpawnBox ? SpawnBox->GetComponentLocation() : GetActorLocation())
+				+ FVector::UpVector * FMath::Max(0.0f, MaxSpawnHeightAboveGroundAnchor);
 
 	// Most authored boss points are already close to their floor. Resolve them
 	// with the same tight query used by regular ground anchors first.

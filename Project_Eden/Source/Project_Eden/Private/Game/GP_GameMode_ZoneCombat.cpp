@@ -411,7 +411,10 @@ void AGP_GameMode::SpawnZoneEnemyBatch(
 	for (int32 SpawnIndex = 0; SpawnIndex < SpawnCount; ++SpawnIndex)
 	{
 		bool bProjected = false;
-		const FVector SpawnLocation = Zone->GetSpawnPoint(bRandomize, bProjected);
+		const FVector SpawnLocation =
+			bRandomize
+				? Zone->GetSpawnPoint(/*bRandomizeInVolume=*/true, bProjected)
+				: Zone->GetBossSpawnPoint(bProjected);
 		if (!bProjected)
 		{
 			++PlacementFailures;

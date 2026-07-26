@@ -101,6 +101,8 @@ private:
 	friend class FDarkArmorKnightGroggyInterruptTest;
 	// Verifies the production Blueprint cannot serialize away gameplay-critical GAS patterns.
 	friend class FDarkArmorKnightAbilityGrantContractTest;
+	// Verifies the authored Dark Wave path creates its replicated projectile.
+	friend class FDarkArmorKnightDarkWaveSpawnTest;
 #endif
 
 	void GrantDarkKnightAbilities();

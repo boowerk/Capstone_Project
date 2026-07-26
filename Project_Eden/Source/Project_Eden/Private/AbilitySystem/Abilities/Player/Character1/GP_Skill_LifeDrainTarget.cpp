@@ -8,6 +8,7 @@
 #include "GameplayEffect.h"
 #include "GameplayTags/GP_Tags.h"
 #include "TimerManager.h"
+#include "Utils/GP_BlueprintLibrary.h"
 
 UGP_Skill_LifeDrainTarget::UGP_Skill_LifeDrainTarget()
 {
@@ -134,7 +135,10 @@ bool UGP_Skill_LifeDrainTarget::CanContinueDrain() const
 void UGP_Skill_LifeDrainTarget::ApplyDrainTick()
 {
 	AActor* Avatar = GetAvatarActorFromActorInfo();
-	if (!IsValid(Avatar) || !IsValid(ActiveDrainTarget) || !CanContinueDrain())
+	if (!IsValid(Avatar)
+		|| !IsValid(ActiveDrainTarget)
+		|| !CanContinueDrain()
+		|| !UGP_BlueprintLibrary::CanApplyCombatEffect(Avatar, ActiveDrainTarget))
 	{
 		return;
 	}

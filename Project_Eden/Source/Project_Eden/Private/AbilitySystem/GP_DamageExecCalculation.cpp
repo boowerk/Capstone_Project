@@ -5,6 +5,8 @@
 #include "HAL/IConsoleManager.h"
 #include "Math/UnrealMathUtility.h"
 #include "Characters/GP_DarkArmorKnightStateComponent.h"
+#include "Characters/GP_PlayerCharacter.h"
+#include "Player/GP_PlayerState.h"
 
 static TAutoConsoleVariable<int32> CVarGPDamageExecLog(
     TEXT("gp.DamageExec.Log"),
@@ -17,6 +19,19 @@ namespace GPDamageExec
     constexpr float MatadorGuardedFinalDamageMultiplier = 0.1f;
     constexpr float CrystalGuardedFinalDamageMultiplier = 0.15f;
     constexpr float CrystalWingCoreExposedFinalDamageMultiplier = 0.5f;
+
+	bool IsPlayerAbilitySystem(const UAbilitySystemComponent* AbilitySystemComponent)
+	{
+		if (!IsValid(AbilitySystemComponent))
+		{
+			return false;
+		}
+
+		const AActor* OwnerActor = AbilitySystemComponent->GetOwnerActor();
+		const AActor* AvatarActor = AbilitySystemComponent->GetAvatarActor();
+		return (IsValid(OwnerActor) && OwnerActor->IsA<AGP_PlayerState>())
+			|| (IsValid(AvatarActor) && AvatarActor->IsA<AGP_PlayerCharacter>());
+	}
 }
 
 struct FGP_DamageStatics
@@ -89,6 +104,17 @@ UGP_DamageExecCalculation::UGP_DamageExecCalculation()
 
 void UGP_DamageExecCalculation::Execute_Implementation(const FGameplayEffectCustomExecutionParameters& ExecutionParams, OUT FGameplayEffectCustomExecutionOutput& OutExecutionOutput) const
 {
+	const UAbilitySystemComponent* SourceASC = ExecutionParams.GetSourceAbilitySystemComponent();
+	const UAbilitySystemComponent* TargetASC = ExecutionParams.GetTargetAbilitySystemComponent();
+	if (SourceASC != TargetASC
+		&& GPDamageExec::IsPlayerAbilitySystem(SourceASC)
+		&& GPDamageExec::IsPlayerAbilitySystem(TargetASC))
+	{
+		// Final authoritative safety net for direct GameplayEffect applications that
+		// bypass UGP_BlueprintLibrary::CanApplyCombatEffect (for example Life Drain).
+		return;
+	}
+
     const FGameplayEffectSpec& Spec = ExecutionParams.GetOwningSpec();
     const FGameplayTagContainer* SourceTags = Spec.CapturedSourceTags.GetAggregatedTags();
     const FGameplayTagContainer* TargetTags = Spec.CapturedTargetTags.GetAggregatedTags();
@@ -171,7 +197,6 @@ void UGP_DamageExecCalculation::Execute_Implementation(const FGameplayEffectCust
     float Damage_Final = Damage_Modified * ArmorMitigation * (1.0f - Resistance_Elem);
 
     // Boss guarded reductions are final-state modifiers: normal combat is reduced, groggy takes full damage.
-    const UAbilitySystemComponent* TargetASC = ExecutionParams.GetTargetAbilitySystemComponent();
     const bool bCapturedTargetGroggy = TargetTags != nullptr && TargetTags->HasTagExact(GPTags::State::Status::Enemy::Groggy);
     const bool bCapturedTargetMatadorGuarded = TargetTags != nullptr && TargetTags->HasTagExact(GPTags::State::Status::Enemy::MatadorGuarded);
     const bool bCapturedTargetCrystalGuarded = TargetTags != nullptr && TargetTags->HasTagExact(GPTags::State::Status::Enemy::CrystalGuarded);
@@ -211,7 +236,6 @@ void UGP_DamageExecCalculation::Execute_Implementation(const FGameplayEffectCust
 			? TargetAvatar->FindComponentByClass<UGP_DarkArmorKnightStateComponent>()
 			: nullptr)
 		{
-			const UAbilitySystemComponent* SourceASC = ExecutionParams.GetSourceAbilitySystemComponent();
 			AActor* DamageInstigator = SourceASC != nullptr ? SourceASC->GetAvatarActor() : nullptr;
 			const bool bHeavyAttack = Spec.GetDynamicAssetTags().HasTagExact(GPTags::Damage::Element::Brute);
 			DarkKnightStateDamageMultiplier = DarkKnightState->ResolveIncomingDamageMultiplier(DamageInstigator, bHeavyAttack);

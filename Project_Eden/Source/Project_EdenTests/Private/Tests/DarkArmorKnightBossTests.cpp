@@ -15,6 +15,7 @@
 #include "Engine/SkeletalMesh.h"
 #include "Engine/TargetPoint.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
 #include "GameplayTags/GP_Tags.h"
 #include "Misc/AutomationTest.h"
 #include "NiagaraComponent.h"
@@ -251,6 +252,49 @@ bool FDarkArmorKnightAbilityGrantContractTest::RunTest(const FString& Parameters
 
 	Boss->FinishBehaviorAttackCommit(0.0f);
 	Boss->ClearPatternTimers();
+	TestWorld->DestroyWorld(false);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FDarkArmorKnightDarkWaveSpawnTest,
+	"ProjectEden.Combat.DarkArmorKnight.DarkWaveSpawn",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FDarkArmorKnightDarkWaveSpawnTest::RunTest(const FString& Parameters)
+{
+	UWorld* TestWorld = UWorld::CreateWorld(EWorldType::Game, false);
+	if (!TestNotNull(TEXT("Created Dark Wave spawn test world"), TestWorld))
+	{
+		return false;
+	}
+
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AGP_DarkArmorKnightBossCharacter* Boss = TestWorld->SpawnActor<AGP_DarkArmorKnightBossCharacter>(
+		FVector::ZeroVector,
+		FRotator::ZeroRotator,
+		Params);
+	ATargetPoint* Target = TestWorld->SpawnActor<ATargetPoint>(
+		FVector(1500.0f, 0.0f, 0.0f),
+		FRotator::ZeroRotator,
+		Params);
+	if (!TestNotNull(TEXT("Spawned Dark Knight"), Boss)
+		|| !TestNotNull(TEXT("Spawned Dark Wave target"), Target))
+	{
+		TestWorld->DestroyWorld(false);
+		return false;
+	}
+
+	Boss->SpawnDarkWaveVolley(Target, 1);
+
+	int32 SpawnedWaveCount = 0;
+	for (TActorIterator<AGP_DarkWaveProjectile> It(TestWorld); It; ++It)
+	{
+		++SpawnedWaveCount;
+	}
+	TestEqual(TEXT("Dark Wave attack creates one projectile in phase one"), SpawnedWaveCount, 1);
+
 	TestWorld->DestroyWorld(false);
 	return true;
 }

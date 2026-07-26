@@ -11,6 +11,8 @@
 
 AGP_DarkWaveProjectile::AGP_DarkWaveProjectile()
 {
+	SetReplicateMovement(true);
+
 	WaveCollision = CreateDefaultSubobject<UBoxComponent>(TEXT("WaveCollision"));
 	WaveCollision->SetupAttachment(RootScene);
 	WaveCollision->SetBoxExtent(FVector(45.0f, 80.0f, 100.0f));

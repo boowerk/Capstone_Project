@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-26T22:54:56+09:00
+updated: 2026-07-27T01:17:00+09:00
 status: active
 tags:
   - memoc
@@ -11,7 +11,7 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-07-26T22:54:56+09:00
+Last synced: 2026-07-27T01:17:00+09:00
 
 ## Current Status
 
@@ -441,3 +441,12 @@ See `.memoc/worklog/` and generated `.memoc/activity.md`.
 - Dark Wave again spawns `DarkWaveProjectileClass`; `AM_DK_DarkSlash` is a cook-safe hard reference, and the obsolete overlapping cone hit was not retained.
 - `L_LandscapeMap` contains an arena-floor actor tagged `EnemySpawnPoint` inside `Colosseum_01`, enabling staged-portal destination projection.
 - Editor and Server Development builds pass; all six `ProjectEden.Combat.DarkArmorKnight` tests pass.
+
+### 2026-07-27 Matador, Dark Wave, and friendly-fire fixes
+
+- Matador Bulls now spawn at least 90cm above projected ground so their 75cm collision half-height no longer starts embedded and immediately aborts the charge.
+- The Colosseum Matador target point is centered at `(60,126770,417)` in `L_LandscapeMap`.
+- Single-phase boss-zone enemy batches now use the dedicated boss spawn path. Without an authored `BossSpawnPoint`, it resolves from the SpawnBox center with an upward-biased NavMesh projection anchor; portal/recovery `GetSpawnPoint(false)` behavior is unchanged.
+- Dark Wave projectiles replicate movement and log successful volley counts; direct spawn automation passes.
+- Player-to-player combat effects are rejected before hit reactions and again in damage execution. Life Drain also rechecks this filter before damage or self-healing.
+- Editor and Server Win64 Development builds pass, `ProjectEden.Combat` passes 20/20, and `ProjectEden.Game.EnemySpawnPlacement` passes 2/2. Live multiplayer PIE still needs Bull lifecycle, Matador center, and client Dark Wave visibility confirmation.

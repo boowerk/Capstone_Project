@@ -687,6 +687,10 @@ FVector AGP_MatadorMageBossCharacter::ResolveDecoySpawnLocation(AActor* TargetAc
 
 FVector AGP_MatadorMageBossCharacter::ResolveBullSpawnLocation(AActor* DecoyActor, AActor* PlayerTargetActor) const
 {
+	// The bull root collision is 75 cm high. A lower navmesh offset embeds it in the
+	// arena floor, so its first swept movement blocks and the charge immediately ends.
+	constexpr float MinimumBullGroundClearance = 90.0f;
+	const float SafeSpawnHeightOffset = FMath::Max(BullSpawnHeightOffset, MinimumBullGroundClearance);
 	const FVector DecoyLocation = IsValid(DecoyActor) ? DecoyActor->GetActorLocation() : GetActorLocation();
 	const FVector PlayerLocation = IsValid(PlayerTargetActor) ? PlayerTargetActor->GetActorLocation() : GetActorLocation() + GetActorForwardVector() * PreferredAirRange;
 	FVector FromDecoyToPlayer = (PlayerLocation - DecoyLocation).GetSafeNormal2D();
@@ -704,7 +708,7 @@ FVector AGP_MatadorMageBossCharacter::ResolveBullSpawnLocation(AActor* DecoyActo
 		DecoyLocation
 		- FromDecoyToPlayer * BullSpawnDistanceFromTarget
 		+ SideDirection * BullSpawnSideOffsetFromPlayerLine
-		+ FVector(0.0f, 0.0f, BullSpawnHeightOffset);
+		+ FVector(0.0f, 0.0f, SafeSpawnHeightOffset);
 
 	if (UNavigationSystemV1* NavigationSystem = UNavigationSystemV1::GetCurrent(GetWorld()))
 	{
@@ -712,7 +716,7 @@ FVector AGP_MatadorMageBossCharacter::ResolveBullSpawnLocation(AActor* DecoyActo
 		// The bull is a world actor, but starting on navmesh avoids immediate wall-blocks in prototype maps.
 		if (NavigationSystem->ProjectPointToNavigation(DesiredLocation, ProjectedLocation, FVector(260.0f, 260.0f, 320.0f)))
 		{
-			DesiredLocation = ProjectedLocation.Location + FVector(0.0f, 0.0f, BullSpawnHeightOffset);
+			DesiredLocation = ProjectedLocation.Location + FVector(0.0f, 0.0f, SafeSpawnHeightOffset);
 		}
 	}
 

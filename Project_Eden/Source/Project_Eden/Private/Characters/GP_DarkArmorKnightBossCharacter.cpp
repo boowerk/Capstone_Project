@@ -833,6 +833,7 @@ void AGP_DarkArmorKnightBossCharacter::SpawnDarkWaveVolley(AActor* TargetActor, 
 	}
 	const FVector SpawnLocation = GetActorLocation() + FVector(0.0f, 0.0f, 120.0f) + GetActorForwardVector() * 100.0f;
 	const FRotator BaseRotation = (TargetActor->GetActorLocation() + FVector(0.0f, 0.0f, 80.0f) - SpawnLocation).Rotation();
+	int32 SpawnedProjectileCount = 0;
 	for (int32 Index = 0; Index < FMath::Max(1, ProjectileCount); ++Index)
 	{
 		const float CenteredIndex = static_cast<float>(Index) - static_cast<float>(ProjectileCount - 1) * 0.5f;
@@ -840,8 +841,25 @@ void AGP_DarkArmorKnightBossCharacter::SpawnDarkWaveVolley(AActor* TargetActor, 
 		Params.Owner = this;
 		Params.Instigator = this;
 		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-		GetWorld()->SpawnActor<AGP_DarkWaveProjectile>(DarkWaveProjectileClass, SpawnLocation, BaseRotation + FRotator(0.0f, CenteredIndex * 12.0f, 0.0f), Params);
+		if (IsValid(GetWorld()->SpawnActor<AGP_DarkWaveProjectile>(
+			DarkWaveProjectileClass,
+			SpawnLocation,
+			BaseRotation + FRotator(0.0f, CenteredIndex * 12.0f, 0.0f),
+			Params)))
+		{
+			++SpawnedProjectileCount;
+		}
 	}
+
+	UE_LOG(
+		LogTemp,
+		Log,
+		TEXT("[DarkKnight] Dark Wave volley spawned. Boss=%s Target=%s Requested=%d Spawned=%d Location=%s"),
+		*GetNameSafe(this),
+		*GetNameSafe(TargetActor),
+		FMath::Max(1, ProjectileCount),
+		SpawnedProjectileCount,
+		*SpawnLocation.ToCompactString());
 }
 
 void AGP_DarkArmorKnightBossCharacter::SpawnGroundCracks(AActor* TargetActor)

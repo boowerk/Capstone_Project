@@ -9,6 +9,7 @@
 #include "AbilitySystem/Abilities/GP_SkillData.h"
 #include "Actors/GP_BullChargeActor.h"
 #include "Characters/GP_EnemyCharacter.h"
+#include "Characters/GP_PlayerCharacter.h"
 #include "GameplayEffect.h"
 #include "GameplayTags/GP_Tags.h"
 #include "GameFramework/Pawn.h"
@@ -60,6 +61,12 @@ float GetSkillAugmentDamageMultiplierFromActor(const AActor* Actor, const UGP_Sk
 	}
 
 	return 1.0f;
+}
+
+bool IsPlayerCombatActor(const AActor* Actor)
+{
+	return IsValid(Actor)
+		&& (Actor->IsA<AGP_PlayerCharacter>() || GetGPPlayerStateFromActor(Actor) != nullptr);
 }
 
 FGameplayTag ConvertTechElementToDamageElement(FGameplayTag TechElementTag)
@@ -376,6 +383,13 @@ bool UGP_BlueprintLibrary::CanApplyCombatEffect(AActor* Instigator, AActor* Targ
 	if (IsMatadorBullCounterTarget(Instigator, TargetActor))
 	{
 		return true;
+	}
+
+	// All connected players are members of the same co-op party. Block the hit before
+	// gameplay events, knockback, or projectile impact handling can affect a teammate.
+	if (IsPlayerCombatActor(Instigator) && IsPlayerCombatActor(TargetActor))
+	{
+		return false;
 	}
 
 	// Enemy-vs-enemy friendly fire is disabled so bosses, summons, and regular enemies cannot damage each other.

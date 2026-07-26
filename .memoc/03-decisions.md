@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-26T22:54:56+09:00
+updated: 2026-07-27T01:17:00+09:00
 status: active
 tags:
   - memoc
@@ -19,6 +19,9 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 - Preserve explicit F1 attribute and F9 Encounter UMG debug tools, but keep transient engine screen messages and gameplay-world debug primitives out of normal play. Monster/skill `DrawDebug*` code may remain for development only behind a default-off non-Shipping opt-in; Shipping must reject it.
 - Treat production decals, Niagara cues, preview actors, and attack telegraphs as gameplay presentation rather than debug output. Do not hide them through the debug gate.
 - Debug-log flags may control diagnostics only. They must not gate motion correction, damage, targeting, replication, timers, or other gameplay behavior.
+
+### 2026-07-27
+- Treat every connected player as the same co-op party until an explicit team system exists. Block player-to-player combat effects before presentation/knockback and keep a second authoritative damage-execution guard; direct-spec abilities such as Life Drain must recheck the same policy.
 
 ### 2026-07-24
 - Keep elimination/spectating/run-result input state alongside the initial Outer loading gate; neither flow may erase the other's declarations or state. Client village readiness must retry until a local controller exists instead of dropping its one-time ACK.

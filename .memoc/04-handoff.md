@@ -509,3 +509,8 @@ Search first, then open only files named above.
 
 - Source and map fixes are uncommitted. Editor/Server Development builds and all six Dark Knight automation tests pass.
 - Run one cooked dedicated-server/client loop: verify Basic/Heavy/GroundCrack/DarkWave/Charge montages, Dark Wave projectile, authoritative charge movement, and Center completion spawning a working portal to the arena-floor Colosseum destination.
+
+### 2026-07-27 Matador and party combat verification
+
+- In two-client PIE or cooked dedicated play, confirm the Colosseum Matador appears at `(60,126770,417)`, only one Bull remains active during a charge, and the Bull advances instead of immediately colliding with the floor.
+- Confirm Dark Wave is visible and moving on both clients, and melee/projectile/area/Life Drain cannot damage or drain-heal from a teammate while player-to-enemy and enemy-to-player damage remain unchanged.
