@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-26T19:04:36+09:00
+updated: 2026-07-26T20:32:39+09:00
 status: active
 tags:
   - memoc
@@ -11,10 +11,11 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-07-26T19:04:36+09:00
+Last synced: 2026-07-26T20:32:39+09:00
 
 ## Current Status
 
+- Runtime debug presentation cleanup is complete on `fix/runtime-debug-visibility`. Transient engine screen messages are disabled at config and GameInstance initialization, direct C++ screen-message calls are gone, and monster/skill `DrawDebug*` paths require the default-off non-Shipping `g.DrawSkillDebug` opt-in. F1/F9 UMG debug tools are unchanged, and production decals/Niagara/preview actors plus combat and replication paths remain intact. The unused experimental DrawDebugLibrary activation and dead message-duration settings were removed. Post-action trajectory correction is no longer gated by `bEnableDebugLog`. `Project_EdenEditor Win64 Development` builds and the full `ProjectEden` suite passes 70/70. PIE visual verification remains; Matador Bull needs a separate production telegraph decision because its prior orange debug line/box was the only directional warning.
 - Encounter spawn/lifecycle hardening is complete on `fix/encounter-spawn-lifecycle`. Shared ground placement now requires projected candidates to stay within the rise limit and on the trusted anchor's reachable NavMesh. Boss summoned adds try bounded ring alternatives, revalidate the collision-adjusted capsule foot, and die through the normal presentation path when their summoner dies; they remain outside zone-completion counts. Player recovery and active-Colosseum reconnects no longer accept raw or disconnected fallback positions.
 - Marker activation rechecks already-overlapping players on the next tick, and valid marker/zone compositions reserve their full pending count before spawning. Safe-placement failures, staged portal destination failures, and reconnect placement failures warn after the configured timeout but continue retrying instead of discarding encounter content. Logout party-gate evaluation runs after PlayerState removal, and run completion clears object-bound retry timers before scheduling lobby return. `Project_EdenEditor Win64 Development` and the full `ProjectEden` suite pass 69/69.
 - Enemy rooftop spawning is fixed in `04b98379` on `fix/grounded-enemy-spawns`. Regular and marker spawns now project a tight trusted ground anchor, scatter only through `GetRandomReachablePointInRadius`, reject roof-like vertical rises, and fail closed instead of widening to an unrelated NavMesh island. Boss broad projection is retained for vertically offset Level Instances but must be path-reachable from a tight ground anchor. Collision-adjusted capsule feet are revalidated, unsafe placements retry without completing the zone, and multi-boss partial placement rolls back before retry. `Project_EdenEditor` builds; `ProjectEden.Game.EnemySpawnPlacement` and `ProjectEden.Game.ZoneProgression` pass. Village PIE verification remains.
@@ -299,6 +300,8 @@ Last synced: 2026-05-23T00:00:00
 
 ## Commands
 
+- Current editor build: `C:\Engine\Windows\Engine\Build\BatchFiles\Build.bat Project_EdenEditor Win64 Development -Project=C:\Users\dyk66\Desktop\Capstone_Project\Project_Eden\Project_Eden.uproject -WaitMutex -NoHotReloadFromIDE`
+- Full automation: `C:\Engine\Windows\Engine\Binaries\Win64\UnrealEditor-Cmd.exe <uproject> -unattended -nop4 -nosplash -NullRHI -ExecCmds="Automation RunTests ProjectEden; Quit" -TestExit="Automation Test Queue Empty" -log`
 - Unreal Python: execute `Scripts/Editor/import_radial_skill_icons.py` to import the seven radial textures and assign every player-pool SkillData icon.
 - Editor build: close Unreal Editor before the final link; the changed radial-skill C++ already passes UHT and compilation.
 - Unreal Python: created `/Game/Characters/PlayerCharacter/ABP_UEFNSource_Player`

@@ -433,17 +433,19 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		GeneratedTrajectory = MoveTemp(UpdatedTrajectory);
 		NormalizeTrajectoryForMovementScale(GeneratedTrajectory, MovementSpeedScaleRatio);
 	}
-	if (bEnableDebugLog
-		&& bCanUseRuntimePoseSearchChooser
+	if (bCanUseRuntimePoseSearchChooser
 		&& PlayerCharacter->IsUsingPostActionAnimVelocity())
 	{
 		FVector NormalizedActionMotionVelocity = ActionMotionVelocity;
 		NormalizedActionMotionVelocity.Z = 0.0f;
 		OverrideTrajectoryPrediction(GeneratedTrajectory, NormalizedActionMotionVelocity / MovementSpeedScaleRatio);
-		UE_LOG(LogTemp, Warning, TEXT("[ActionRM][AnimTrajectory] Mesh=%s Speed=%.1f Samples=%d"),
-			*GetNameSafe(GetOwningComponent()),
-			NormalizedActionMotionVelocity.Size2D(),
-			GeneratedTrajectory.Samples.Num());
+		if (bEnableDebugLog)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[ActionRM][AnimTrajectory] Mesh=%s Speed=%.1f Samples=%d"),
+				*GetNameSafe(GetOwningComponent()),
+				NormalizedActionMotionVelocity.Size2D(),
+				GeneratedTrajectory.Samples.Num());
+		}
 	}
 
 	CurrentMotionMatchState = ResolveMotionMatchState(MovementMode, MovementState, Gait);

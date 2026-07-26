@@ -23,6 +23,15 @@ tags:
 ---
 # Agent Handoff
 
+## Runtime Debug Visibility Handoff (2026-07-26)
+
+- Branch `fix/runtime-debug-visibility` keeps the F1 attribute widget and F9 Encounter panel unchanged while disabling transient engine screen messages and default gameplay-world debug primitives.
+- `g.DrawSkillDebug` defaults to `0`, is non-Shipping development opt-in only, and is consulted by skill overlap helpers plus Bull/Chain/Matador/LifeDrain/Projectile paths. Village selection drawing is separately default-off and double-opted-in.
+- Production decals, Niagara, preview actors, damage/overlap results, replication, and timers were not routed through the debug gate. Post-action motion trajectory correction was separated from `bEnableDebugLog`.
+- Verification: `Project_EdenEditor Win64 Development` succeeded; full `ProjectEden` automation passed 70/70; direct C++ `AddOnScreenDebugMessage`/`PrintString` search is empty; `git diff --check` passed.
+- Manual PIE gate: trigger representative player skills and Matador/Dark Knight attacks, confirm no debug lines/boxes/spheres or transient screen text, then confirm F1 and F9 still open their dedicated UMG tools.
+- Known presentation decision: Matador Bull's orange `DrawDebug` line/box was its only directional warning. It is now hidden as requested. If the attack still needs a warning, implement a replicated production decal/Niagara telegraph rather than re-enabling DrawDebug.
+
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
