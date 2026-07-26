@@ -5,8 +5,9 @@
 #include "GP_DarkKnightGroundCrackActor.generated.h"
 
 class UGameplayEffect;
+class UDecalComponent;
+class UNiagaraSystem;
 class USphereComponent;
-class UStaticMeshComponent;
 
 /** One adjustable crack marker owns both its telegraph and authoritative GAS explosion. */
 UCLASS(Blueprintable)
@@ -38,7 +39,10 @@ private:
 	TObjectPtr<USphereComponent> DamageArea;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Dark Knight", meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UStaticMeshComponent> CrackMesh;
+	TObjectPtr<UDecalComponent> WarningDecal;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Dark Knight|VFX", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UNiagaraSystem> ExplosionVFX;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Dark Knight", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "cm"))
 	float CrackRadius = 240.0f;

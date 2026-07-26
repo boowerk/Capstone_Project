@@ -88,6 +88,15 @@ void UGP_BossTelegraphVFXComponent::StopTelegraph()
 	DeactivateImmediate();
 }
 
+void UGP_BossTelegraphVFXComponent::SetDefaultTelegraphSystem(UNiagaraSystem* InTelegraphSystem)
+{
+	DefaultTelegraphSystem = InTelegraphSystem;
+	if (IsRegistered())
+	{
+		SetAsset(DefaultTelegraphSystem);
+	}
+}
+
 void UGP_BossTelegraphVFXComponent::OnRegister()
 {
 	// Delay SetAsset until registration; calling it from a component CDO constructor is unsafe in Niagara.

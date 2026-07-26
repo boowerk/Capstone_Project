@@ -2,9 +2,10 @@
 
 #include "Actors/GP_BossCombatUtils.h"
 #include "Components/BoxComponent.h"
-#include "Components/StaticMeshComponent.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "GameplayEffect.h"
+#include "NiagaraComponent.h"
+#include "NiagaraSystem.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Utils/GP_BlueprintLibrary.h"
 
@@ -14,16 +15,16 @@ AGP_DarkWaveProjectile::AGP_DarkWaveProjectile()
 	WaveCollision->SetupAttachment(RootScene);
 	WaveCollision->SetBoxExtent(FVector(45.0f, 80.0f, 100.0f));
 
-	WaveMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("WaveMesh"));
-	WaveMesh->SetupAttachment(WaveCollision);
-	WaveMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	WaveMesh->SetRelativeScale3D(FVector(0.12f, 1.6f, 2.0f));
+	WaveVFX = CreateDefaultSubobject<UNiagaraComponent>(TEXT("WaveVFX"));
+	WaveVFX->SetupAttachment(WaveCollision);
+	WaveVFX->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	WaveVFX->SetAutoActivate(true);
 
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMeshFinder(TEXT("/Engine/BasicShapes/Cube.Cube"));
-	if (CubeMeshFinder.Succeeded())
+	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> WaveVFXFinder(
+		TEXT("/Game/Mixed_Magic_VFX_Pack/VFX/NS_Dark_Solo_Projectile.NS_Dark_Solo_Projectile"));
+	if (WaveVFXFinder.Succeeded())
 	{
-		// A thin cube is a readable temporary sword-wave silhouette and remains editable on child Blueprints.
-		WaveMesh->SetStaticMesh(CubeMeshFinder.Object);
+		WaveVFX->SetAsset(WaveVFXFinder.Object);
 	}
 
 	if (ProjectileMovement)

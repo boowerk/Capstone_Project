@@ -10,12 +10,14 @@
 #include "Actors/GP_DarkWaveProjectile.h"
 #include "Characters/GP_DarkArmorKnightBossCharacter.h"
 #include "Characters/GP_DarkArmorKnightStateComponent.h"
+#include "Components/DecalComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/SkeletalMesh.h"
 #include "Engine/TargetPoint.h"
 #include "Engine/World.h"
 #include "GameplayTags/GP_Tags.h"
 #include "Misc/AutomationTest.h"
+#include "NiagaraComponent.h"
 #include "NiagaraSystem.h"
 #include "TimerManager.h"
 #include "VFX/GP_BossTelegraphVFXComponent.h"
@@ -316,8 +318,34 @@ bool FDarkArmorKnightGuardLifecycleTest::RunTest(const FString& Parameters)
 	}
 	AGP_DarkWaveProjectile* Wave = TestWorld->SpawnActor<AGP_DarkWaveProjectile>(FVector::ZeroVector, FRotator::ZeroRotator, Params);
 	AGP_DarkKnightGroundCrackActor* Crack = TestWorld->SpawnActor<AGP_DarkKnightGroundCrackActor>(FVector::ZeroVector, FRotator::ZeroRotator, Params);
-	TestNotNull(TEXT("Sword wave has a replaceable primitive mesh"), IsValid(Wave) ? Wave->FindComponentByClass<UStaticMeshComponent>() : nullptr);
-	TestNotNull(TEXT("Ground crack has a replaceable primitive mesh"), IsValid(Crack) ? Crack->FindComponentByClass<UStaticMeshComponent>() : nullptr);
+	const UNiagaraComponent* WaveVFX = IsValid(Wave)
+		? Wave->FindComponentByClass<UNiagaraComponent>()
+		: nullptr;
+	const UDecalComponent* CrackDecal = IsValid(Crack)
+		? Crack->FindComponentByClass<UDecalComponent>()
+		: nullptr;
+	TestNull(
+		TEXT("Sword wave no longer exposes an engine primitive mesh"),
+		IsValid(Wave) ? Wave->FindComponentByClass<UStaticMeshComponent>() : nullptr);
+	TestNotNull(TEXT("Sword wave owns a Niagara presentation"), WaveVFX);
+	if (IsValid(WaveVFX) && IsValid(WaveVFX->GetAsset()))
+	{
+		TestEqual(
+			TEXT("Sword wave uses the sprite-only dark projectile system"),
+			WaveVFX->GetAsset()->GetPathName(),
+			FString(TEXT("/Game/Mixed_Magic_VFX_Pack/VFX/NS_Dark_Solo_Projectile.NS_Dark_Solo_Projectile")));
+	}
+	TestNull(
+		TEXT("Ground crack no longer exposes an engine primitive mesh"),
+		IsValid(Crack) ? Crack->FindComponentByClass<UStaticMeshComponent>() : nullptr);
+	TestNotNull(TEXT("Ground crack owns a terrain-conforming warning decal"), CrackDecal);
+	if (IsValid(CrackDecal) && IsValid(CrackDecal->GetDecalMaterial()))
+	{
+		TestEqual(
+			TEXT("Ground crack uses the emissive combat telegraph material"),
+			CrackDecal->GetDecalMaterial()->GetPathName(),
+			FString(TEXT("/Game/Effects/M_EmissiveCircleTelegraph_Decal.M_EmissiveCircleTelegraph_Decal")));
+	}
 
 	TestWorld->DestroyWorld(false);
 	return true;
@@ -392,8 +420,22 @@ bool FDarkArmorKnightChargeTelegraphVFXTest::RunTest(const FString& Parameters)
 	const UNiagaraSystem* TelegraphSystem = IsValid(TelegraphVFX)
 		? TelegraphVFX->GetDefaultTelegraphSystem()
 		: nullptr;
+	const UDecalComponent* TelegraphDecal = IsValid(ChargeDefaults)
+		? ChargeDefaults->FindComponentByClass<UDecalComponent>()
+		: nullptr;
 
 	TestNotNull(TEXT("Charge actor owns a Niagara telegraph component"), TelegraphVFX);
+	TestNull(
+		TEXT("Charge telegraph no longer exposes an engine primitive mesh"),
+		IsValid(ChargeDefaults) ? ChargeDefaults->FindComponentByClass<UStaticMeshComponent>() : nullptr);
+	TestNotNull(TEXT("Charge keeps its authored range as a ground decal"), TelegraphDecal);
+	if (IsValid(TelegraphDecal) && IsValid(TelegraphDecal->GetDecalMaterial()))
+	{
+		TestEqual(
+			TEXT("Charge lane uses the emissive combat telegraph material"),
+			TelegraphDecal->GetDecalMaterial()->GetPathName(),
+			FString(TEXT("/Game/Effects/M_EmissiveCircleTelegraph_Decal.M_EmissiveCircleTelegraph_Decal")));
+	}
 	TestNotNull(TEXT("Charge telegraph component loads the lightning system"), TelegraphSystem);
 	if (IsValid(TelegraphVFX))
 	{
@@ -405,9 +447,9 @@ bool FDarkArmorKnightChargeTelegraphVFXTest::RunTest(const FString& Parameters)
 	if (IsValid(TelegraphSystem))
 	{
 		TestEqual(
-			TEXT("Charge uses the requested lightning telegraph asset"),
+			TEXT("Charge uses the sprite-only lightning telegraph asset"),
 			TelegraphSystem->GetPathName(),
-			FString(TEXT("/Game/Niagara/Vefects/Easy_Impact_Frames/VFX/Extras/Particles/NS_Extra_Lightning_Example_VFX.NS_Extra_Lightning_Example_VFX")));
+			FString(TEXT("/Game/Mixed_Magic_VFX_Pack/VFX/NS_Lightning_Owner_Cast.NS_Lightning_Owner_Cast")));
 	}
 
 	return true;
