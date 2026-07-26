@@ -396,7 +396,7 @@ See `.memoc/worklog/` and generated `.memoc/activity.md`.
 
 ### 2026-07-26 Runtime bug-fix pass
 
-- Uncommitted player life changes add an elimination Niagara scatter, delayed mesh hide/restoration, always-relevant player pawns, and authoritative view-target switching to a living teammate.
+- Committed player life changes add an elimination Niagara scatter, delayed mesh hide/restoration, always-relevant player pawns, and authoritative view-target switching to a living teammate.
 - Player life binding is now explicit in `PossessedBy`/`OnRep_PlayerState`; stale Blueprint-serialized `OnASCInitialized` lists can no longer leave a zero-health player mobile.
 - Ground-position skill selection keeps the software cursor hidden while using a locked Game+UI input mode for the decal trace.
 - Forward roll ignores directional variants, avoids predicted client/server re-rotation, and falls back to the retarget source montage when a party presentation skeleton is incompatible with the MaskMan montage.
@@ -408,3 +408,9 @@ See `.memoc/worklog/` and generated `.memoc/activity.md`.
 - `Project_EdenEditor`, `Project_Eden`, and `Project_EdenServer` Win64 Development builds pass. `ZoneProgression.Contracts`, `Player.LifeState.ProductionContract`, and `Player.Roll.ProductionMontage` pass.
 - User verified death/VFX/spectate/recovery, Client 1 forward-roll visuals, and Seed `437900468` Middle_01 Crystal Seraph spawning before its portal. Remaining proof is two-client input isolation plus recovery into an incomplete assigned Outer.
 - User subsequently verified recovery into an incomplete assigned Outer. The server target now also builds `Project_EdenServer-Cmd.exe`; both dedicated-server launch BATs prefer it, stream live logs in their CMD window, and print the real sandbox/package log path.
+
+### 2026-07-26 Landscape Colosseum completion
+
+- `f838db44` aligns the complete EventMap2 Colosseum structure at the established LandscapeMap gameplay center `(0,126740)`.
+- The saved set contains 1,248 tagged structure actors, one level-build animator, and three retained LandscapeMap helpers. The exact 48-actor duplicate `Fence1` ring was removed while the authoritative `Fence` ring remains.
+- User verified that Colosseum construction completes during play.
