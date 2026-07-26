@@ -466,3 +466,14 @@ Search first, then open only files named above.
 - Removed duplicate enemy registrations/death-budget increments, repaired Dark Knight grants, restored Zone region fallback, removed stale deleted-runtime calls, and cleaned Config conflict markers.
 - Full Editor build/link succeeds; `ProjectEden.Game.ZoneProgression.Contracts` and `ProjectEden.Combat.DarkArmorKnight.ProductionAbilityGrantContract` pass.
 - Restored the three damaged LFS assets: Lobby/Map from valid `feature/vfx-skills` OIDs and FurnaceWalker from the valid pre-corruption `main` OID. `ProjectEden.Game.Lobby.LandscapeTravelConfiguration`, `ProjectEden.Game.LandscapeMap.Integrity`, and `ProjectEden.AI.Enemy.ProductionAnimationContract` all pass.
+
+### 2026-07-26 Runtime bug-fix verification handoff
+
+- Current uncommitted fixes cover explicit HP-zero life binding, death presentation/VFX, long-distance teammate spectating/recovery, ground-target cursor hiding, skeleton-safe forward roll, delayed enemy/boss spawn retries, and Colosseum animation/NavMesh softlocks.
+- Elimination uses a one-time per-controller `GameOnly` lock. It no longer applies `UIOnly` or reclaims Slate focus on every countdown refresh, which previously blocked another same-process PIE viewport.
+- Recovery now prioritizes the player's same-LevelInstance `PlayerStart` while their assigned Outer remains incomplete; completed Outer and later stages retain living-teammate recovery.
+- Editor/Game/Server Development builds and three targeted automation contracts pass. A normal single-player PIE load also completes village and PCG generation.
+- User verified the death presentation/recovery path, Client 1 roll, and Crystal Seraph portal order. Recheck input isolation in both directions and confirm a player killed in an incomplete Outer recovers in their own village.
+- Equip a ground-target skill and verify only its decal appears while the OS/software pointer stays hidden; Q/E test slots were empty during the automated PIE attempt.
+- Existing unrelated warnings remain: PCG Bounds Modifier receives multiple BoundsMin/BoundsMax items, PCGEx ResamplePath can receive fewer than two points, and Fab fence constructor assets are missing.
+- Dedicated-server console support is uncommitted. `Project_EdenServer.Target.cs` builds `Project_EdenServer-Cmd.exe`; local and cooked launch BATs prefer it, keep a visible live-log CMD window, and print the actual server sandbox/package log file. Local verification loaded LobbyMap, listened on port 7778, and wrote `Saved/Cooked/WindowsServer/Project_Eden/Saved/Logs/Project_EdenServer.log`.

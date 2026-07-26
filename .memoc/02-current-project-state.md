@@ -393,3 +393,18 @@ See `.memoc/worklog/` and generated `.memoc/activity.md`.
 - Selecting a wheel entry updates center icon/name/description/cooldown; Q/E click or key equips it, and assigning the opposite equipped skill swaps the two slots instead of duplicating it.
 - The local picker uses UI-only input and blocks move/look/skill input without pausing the multiplayer world. The runtime fallback collapses the complete legacy screen; each `112x112` outer slot owns a centered `96x96` icon layer, names stay in the centered detail panel, and the detail icon is `128x128`.
 - The approved PNG importer has not yet run; `/Game/UI/Asset/SkillIcons/Radial/Textures` must be created and the seven SkillData icons assigned before the new art can appear.
+
+### 2026-07-26 Runtime bug-fix pass
+
+- Uncommitted player life changes add an elimination Niagara scatter, delayed mesh hide/restoration, always-relevant player pawns, and authoritative view-target switching to a living teammate.
+- Player life binding is now explicit in `PossessedBy`/`OnRep_PlayerState`; stale Blueprint-serialized `OnASCInitialized` lists can no longer leave a zero-health player mobile.
+- Ground-position skill selection keeps the software cursor hidden while using a locked Game+UI input mode for the decal trace.
+- Forward roll ignores directional variants, avoids predicted client/server re-rotation, and falls back to the retarget source montage when a party presentation skeleton is incompatible with the MaskMan montage.
+- Zone enemies whose NavMesh projection is not ready remain pending and retry instead of allowing premature zone completion.
+- Boss points use a tight first projection and the nearest authored enemy point fallback. A failed boss spawn retries and blocks progression; it no longer completes the zone or opens a portal. Invalid boss class/count configuration is reported separately.
+- Colosseum build animation skips finished pieces, transforms each completed piece once, uses `PieceDuration=1.35s`, and continues navigation-readiness retries after the warning threshold.
+- Per-player elimination now arms `GameOnly` input once instead of repeatedly applying `UIOnly`; this prevents a dead same-process PIE client from stealing the living client's viewport input.
+- If a player's assigned Outer is incomplete, recovery uses the same-LevelInstance `PlayerStart` used for initial placement. Completed Outer/later-stage recovery still joins a living teammate.
+- `Project_EdenEditor`, `Project_Eden`, and `Project_EdenServer` Win64 Development builds pass. `ZoneProgression.Contracts`, `Player.LifeState.ProductionContract`, and `Player.Roll.ProductionMontage` pass.
+- User verified death/VFX/spectate/recovery, Client 1 forward-roll visuals, and Seed `437900468` Middle_01 Crystal Seraph spawning before its portal. Remaining proof is two-client input isolation plus recovery into an incomplete assigned Outer.
+- User subsequently verified recovery into an incomplete assigned Outer. The server target now also builds `Project_EdenServer-Cmd.exe`; both dedicated-server launch BATs prefer it, stream live logs in their CMD window, and print the real sandbox/package log path.

@@ -125,3 +125,7 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 - Open-world exploration events are separate from the legacy linear-zone enemy budget. The event actor owns its spawned combatants and retires survivors through `RequestDeath`; zone/event tracking listens to the terminal `OnEnemyDeathStarted` delegate so scripted and combat deaths share one accounting path without granting cleanup XP.
 - Preserve authored region seed biome values. Corruption affects event eligibility, probability, enemy GAS scaling, and outcome deltas; it does not flatten seed `State` values or write generic active/completed biome states.
 - Production exploration pacing belongs to the placed `L_LandscapeMap` director: delayed/dwell-based evaluation, one active objective, global and per-region cooldowns, party-wide safe spawn distance, and non-deterministic event choice. Temporary PIE acceleration must remain unsaved and is guarded by map automation.
+
+### 2026-07-26
+- Player recovery respects staged progression: an incomplete assigned Outer recovers at that village's existing `PlayerStart`; after that Outer is complete, recovery may join a living teammate.
+- Keep the normal Windows-subsystem dedicated-server executable for deployment compatibility and build a `-Cmd.exe` sibling for local administration. Launcher BATs prefer the console sibling and use Unreal's native package/sandbox log path instead of assuming the editor `Saved/Logs` directory.
