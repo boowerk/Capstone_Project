@@ -1,7 +1,6 @@
 #include "Game/GP_GameMode.h"
 
 #include "Characters/GP_EnemyCharacter.h"
-#include "Components/CapsuleComponent.h"
 #include "Engine/World.h"
 #include "Game/GP_EnemySpawnMarker.h"
 #include "Game/GP_EnemySpawnVolume.h"
@@ -14,12 +13,7 @@ namespace GPZoneCombat
 
 	FVector GetEnemyGroundLocation(const AGP_EnemyCharacter& Enemy)
 	{
-		FVector GroundLocation = Enemy.GetActorLocation();
-		if (const UCapsuleComponent* Capsule = Enemy.GetCapsuleComponent())
-		{
-			GroundLocation.Z -= Capsule->GetScaledCapsuleHalfHeight();
-		}
-		return GroundLocation;
+		return Enemy.GetSpawnPlacementGroundLocation();
 	}
 
 	bool IsEnemyPlacementValid(

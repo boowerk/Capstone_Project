@@ -159,6 +159,21 @@ FVector AGP_EnemyCharacter::GetBehaviorAnchorLocation() const
 	return bHasBehaviorAnchorLocation ? BehaviorAnchorLocation : GetActorTransform().TransformPosition(BehaviorAnchorOffset);
 }
 
+FVector AGP_EnemyCharacter::GetSpawnPlacementGroundLocation() const
+{
+	if (bHasSpawnPlacementGroundLocation)
+	{
+		return SpawnPlacementGroundLocation;
+	}
+
+	FVector GroundLocation = GetActorLocation();
+	if (const UCapsuleComponent* Capsule = GetCapsuleComponent())
+	{
+		GroundLocation.Z -= Capsule->GetScaledCapsuleHalfHeight();
+	}
+	return GroundLocation;
+}
+
 float AGP_EnemyCharacter::GetBasicMeleeAttackStartRange() const
 {
 	const float ForwardStepRange = FMath::Max(0.0f, BasicMeleeAttackStartRange);
@@ -201,6 +216,21 @@ void AGP_EnemyCharacter::OnConstruction(const FTransform& Transform)
 
 	// Keep editor range rings in sync when designers move the anchor or change range values.
 	RefreshAIRangeVisualizers();
+}
+
+void AGP_EnemyCharacter::PostInitializeComponents()
+{
+	Super::PostInitializeComponents();
+
+	// SpawnActor applies collision adjustment before this callback and dispatches
+	// BeginPlay afterward. Preserve that placement sample so flying/teleporting
+	// enemies cannot invalidate the grounded spawn check with intentional movement.
+	SpawnPlacementGroundLocation = GetActorLocation();
+	if (const UCapsuleComponent* Capsule = GetCapsuleComponent())
+	{
+		SpawnPlacementGroundLocation.Z -= Capsule->GetScaledCapsuleHalfHeight();
+	}
+	bHasSpawnPlacementGroundLocation = true;
 }
 
 bool AGP_EnemyCharacter::BuildInitialEnemyEvaluation(FEnemyLLMEvaluation& OutEvaluation) const

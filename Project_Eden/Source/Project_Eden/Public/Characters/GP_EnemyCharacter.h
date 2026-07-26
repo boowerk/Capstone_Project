@@ -122,6 +122,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "AI")
 	FVector GetBehaviorAnchorLocation() const;
 
+	// Captured after spawn collision adjustment but before BeginPlay gameplay movement.
+	FVector GetSpawnPlacementGroundLocation() const;
+
 	UFUNCTION(BlueprintPure, Category = "AI|Ranges")
 	float GetReturnHomeDistance() const { return FMath::Max(0.0f, ReturnHomeDistance); }
 
@@ -234,6 +237,7 @@ public:
 
 protected:
 	virtual void OnConstruction(const FTransform& Transform) override;
+	virtual void PostInitializeComponents() override;
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
@@ -424,6 +428,8 @@ private:
 
 	FVector BehaviorAnchorLocation = FVector::ZeroVector;
 	bool bHasBehaviorAnchorLocation = false;
+	FVector SpawnPlacementGroundLocation = FVector::ZeroVector;
+	bool bHasSpawnPlacementGroundLocation = false;
 	bool bXPRewardGranted = false;
 	bool bDeathRequested = false;
 

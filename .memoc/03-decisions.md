@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-26T22:38:22+09:00
+updated: 2026-07-26T22:54:56+09:00
 status: active
 tags:
   - memoc
@@ -142,3 +142,4 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 - Use a dedicated emissive circular deferred-decal material for player ground targeting and Dark Knight ground warnings. Keep region landscape materials and lighting untouched; visibility-critical combat warnings must remain readable through their own Emissive output.
 - Keep the shared boss telegraph default unchanged for other bosses. Dark Knight overrides it at construction and BeginPlay with the sprite-only `NS_Lightning_Owner_Cast`, and its native Charge fallback uses the same system so the old example Niagara mesh renderers cannot reappear.
 - Preserve Dark Knight gameplay geometry while replacing presentation primitives: Charge keeps its 1600x360 warning as a projected decal, Ground Crack keeps its 240cm radius as a decal, and Dark Wave keeps its collision box while using a Niagara component.
+- Validate spawned enemies against the collision-adjusted capsule foot captured after component initialization but before `BeginPlay`. This preserves strict grounded roof rejection while allowing flying bosses such as Crystal Seraph to move vertically during `BeginPlay`.

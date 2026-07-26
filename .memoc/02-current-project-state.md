@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-26T22:38:22+09:00
+updated: 2026-07-26T22:54:56+09:00
 status: active
 tags:
   - memoc
@@ -11,10 +11,11 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-07-26T22:38:22+09:00
+Last synced: 2026-07-26T22:54:56+09:00
 
 ## Current Status
 
+- Crystal Seraph boss-phase spawning is repaired. Enemy placement now snapshots the collision-adjusted capsule foot in `PostInitializeComponents`, before `BeginPlay` movement, so flying bosses may rise immediately without weakening the 50cm grounded roof guard. Editor Development builds and both `ProjectEden.Game.EnemySpawnPlacement` tests pass.
 - Dark Knight VFX visibility work is merged into `refactor/codebase-cleanup`: the emissive circular deferred-decal material now drives player ground targeting and Dark Knight ground warnings, while Dark Knight placeholder primitives/example mesh-rendering Niagara cues are replaced with decals and sprite-only Niagara. Gameplay geometry and timing remain unchanged. The source branch passed the Editor Development build and all 19 `ProjectEden.Combat` automation cases; post-merge verification remains.
 - Runtime debug presentation cleanup is complete on `fix/runtime-debug-visibility`. Transient engine screen messages are disabled at config and GameInstance initialization, direct C++ screen-message calls are gone, and monster/skill `DrawDebug*` paths require the default-off non-Shipping `g.DrawSkillDebug` opt-in. F1/F9 UMG debug tools are unchanged, and production decals/Niagara/preview actors plus combat and replication paths remain intact. The unused experimental DrawDebugLibrary activation and dead message-duration settings were removed. Post-action trajectory correction is no longer gated by `bEnableDebugLog`. `Project_EdenEditor Win64 Development` builds and the full `ProjectEden` suite passes 70/70. PIE visual verification remains; Matador Bull needs a separate production telegraph decision because its prior orange debug line/box was the only directional warning.
 - Encounter spawn/lifecycle hardening is complete on `fix/encounter-spawn-lifecycle`. Shared ground placement now requires projected candidates to stay within the rise limit and on the trusted anchor's reachable NavMesh. Boss summoned adds try bounded ring alternatives, revalidate the collision-adjusted capsule foot, and die through the normal presentation path when their summoner dies; they remain outside zone-completion counts. Player recovery and active-Colosseum reconnects no longer accept raw or disconnected fallback positions.
