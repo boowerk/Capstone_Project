@@ -5,9 +5,9 @@
 #include "GP_DarkWaveProjectile.generated.h"
 
 class UBoxComponent;
-class UStaticMeshComponent;
+class UNiagaraComponent;
 
-/** Prototype sword-wave projectile. The cube mesh/component can be replaced on a Blueprint child later. */
+/** Dark sword-wave projectile with a native Niagara presentation and authoritative collision. */
 UCLASS(Blueprintable)
 class PROJECT_EDEN_API AGP_DarkWaveProjectile : public AGP_Projectile
 {
@@ -24,7 +24,7 @@ private:
 	TObjectPtr<UBoxComponent> WaveCollision;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Dark Knight", meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UStaticMeshComponent> WaveMesh;
+	TObjectPtr<UNiagaraComponent> WaveVFX;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Boss|Dark Knight", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
 	float AttackPowerDamageCoefficient = 1.0f;

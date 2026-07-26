@@ -2,9 +2,11 @@
 
 #include "Actors/GP_BossCombatUtils.h"
 #include "Characters/GP_DarkArmorKnightBossCharacter.h"
-#include "Components/StaticMeshComponent.h"
+#include "Components/DecalComponent.h"
 #include "GameplayEffect.h"
+#include "Materials/MaterialInterface.h"
 #include "Net/UnrealNetwork.h"
+#include "NiagaraSystem.h"
 #include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
 #include "VFX/GP_BossTelegraphVFXComponent.h"
@@ -17,11 +19,14 @@ AGP_DarkKnightChargeActor::AGP_DarkKnightChargeActor()
 
 	SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("SceneRoot"));
 	SetRootComponent(SceneRoot);
-	TelegraphMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("TelegraphMesh"));
-	TelegraphMesh->SetupAttachment(SceneRoot);
-	TelegraphMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	TelegraphMesh->SetRelativeLocation(FVector(800.0f, 0.0f, 12.0f));
-	TelegraphMesh->SetRelativeScale3D(FVector(16.0f, 3.6f, 0.04f));
+	TelegraphDecal = CreateDefaultSubobject<UDecalComponent>(TEXT("TelegraphDecal"));
+	TelegraphDecal->SetupAttachment(SceneRoot);
+	TelegraphDecal->SetRelativeLocation(FVector(MaxChargeDistance * 0.5f, 0.0f, 8.0f));
+	TelegraphDecal->SetRelativeRotation(FRotator(-90.0f, 0.0f, 0.0f));
+	// Local Z becomes actor forward after the downward rotation, preserving the authored 1600 x 360 warning lane.
+	TelegraphDecal->DecalSize = FVector(96.0f, HitRadius, MaxChargeDistance * 0.5f);
+	TelegraphDecal->SetFadeScreenSize(0.001f);
+	TelegraphDecal->SetSortOrder(20);
 
 	// Reusable designer component exposes its Niagara asset, scale, auto-activation, and lead time in Blueprint Details.
 	ChargeTelegraphVFXComponent = CreateDefaultSubobject<UGP_BossTelegraphVFXComponent>(TEXT("ChargeTelegraphVFXComponent"));
@@ -29,10 +34,19 @@ AGP_DarkKnightChargeActor::AGP_DarkKnightChargeActor()
 	// The legacy charge coordinator intentionally auto-plays its own cue; boss-level components remain opt-in.
 	ChargeTelegraphVFXComponent->SetTelegraphVFXEnabled(true);
 
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMeshFinder(TEXT("/Engine/BasicShapes/Cube.Cube"));
-	if (CubeMeshFinder.Succeeded())
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> TelegraphMaterialFinder(
+		TEXT("/Game/Effects/M_EmissiveCircleTelegraph_Decal.M_EmissiveCircleTelegraph_Decal"));
+	if (TelegraphMaterialFinder.Succeeded())
 	{
-		TelegraphMesh->SetStaticMesh(CubeMeshFinder.Object);
+		TelegraphDecal->SetDecalMaterial(TelegraphMaterialFinder.Object);
+	}
+
+	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> ChargeVFXFinder(
+		TEXT("/Game/Mixed_Magic_VFX_Pack/VFX/NS_Lightning_Owner_Cast.NS_Lightning_Owner_Cast"));
+	if (ChargeVFXFinder.Succeeded())
+	{
+		// This sprite-only system avoids exposing the source meshes used by the old example Niagara asset.
+		ChargeTelegraphVFXComponent->SetDefaultTelegraphSystem(ChargeVFXFinder.Object);
 	}
 
 	static ConstructorHelpers::FClassFinder<UGameplayEffect> DamageEffectFinder(TEXT("/Game/GAS_Pattern/AbilitySystem/GameplayEffects/Damage/GE_PrimaryDamage"));
@@ -104,6 +118,10 @@ void AGP_DarkKnightChargeActor::OnRep_SkipInternalTelegraph()
 		ChargeTelegraphVFXComponent->StopTelegraph();
 		ChargeTelegraphVFXComponent->SetVisibility(false, true);
 	}
+	if (bSkipInternalTelegraph && IsValid(TelegraphDecal))
+	{
+		TelegraphDecal->SetVisibility(false, true);
+	}
 }
 
 void AGP_DarkKnightChargeActor::Tick(float DeltaSeconds)
@@ -172,7 +190,10 @@ void AGP_DarkKnightChargeActor::StartCharge()
 	bChargeActive = true;
 	DistanceTravelled = 0.0f;
 	ChargeElapsed = 0.0f;
-	TelegraphMesh->SetVisibility(false, true);
+	if (IsValid(TelegraphDecal))
+	{
+		TelegraphDecal->SetVisibility(false, true);
+	}
 	const bool bMontageStarted = Boss->PlayPatternMontage(GPTags::Ability::Boss::DarkKnight::Charge);
 	// Root motion can own travel only when this exact montage invocation started.
 	bActiveUsesMontageRootMotion = bUseMontageRootMotion && bMontageStarted;

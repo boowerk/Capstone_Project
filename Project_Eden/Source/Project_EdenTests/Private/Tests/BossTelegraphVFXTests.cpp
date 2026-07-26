@@ -7,6 +7,7 @@
 #include "Engine/World.h"
 #include "GameplayTags/GP_Tags.h"
 #include "Misc/AutomationTest.h"
+#include "NiagaraSystem.h"
 #include "UObject/UnrealType.h"
 #include "VFX/GP_BossTelegraphVFXComponent.h"
 
@@ -98,6 +99,17 @@ bool FBossTelegraphVFXConfigurationTest::RunTest(const FString& Parameters)
 		DarkKnight->GetComponents(DarkKnightTelegraphs);
 	}
 	TestEqual(TEXT("Dark Knight reuses one Blueprint telegraph component"), DarkKnightTelegraphs.Num(), 1);
+	const UNiagaraSystem* ProductionDarkKnightSystem = DarkKnightTelegraphs.IsEmpty()
+		? nullptr
+		: DarkKnightTelegraphs[0]->GetDefaultTelegraphSystem();
+	TestNotNull(TEXT("Production Dark Knight resolves its dedicated telegraph system"), ProductionDarkKnightSystem);
+	if (IsValid(ProductionDarkKnightSystem))
+	{
+		TestEqual(
+			TEXT("Production Dark Knight cannot restore the mesh-rendering example system"),
+			ProductionDarkKnightSystem->GetPathName(),
+			FString(TEXT("/Game/Mixed_Magic_VFX_Pack/VFX/NS_Lightning_Owner_Cast.NS_Lightning_Owner_Cast")));
+	}
 	const AGP_DarkArmorKnightBossCharacter* DarkKnightBoss = Cast<AGP_DarkArmorKnightBossCharacter>(DarkKnight);
 	TestNotNull(TEXT("Dark Knight Blueprint keeps its native boss parent"), DarkKnightBoss);
 	TestEqual(TEXT("Dark Knight exposes all eight authored attack patterns"),

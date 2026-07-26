@@ -5,10 +5,10 @@
 #include "GP_DarkKnightChargeActor.generated.h"
 
 class AGP_DarkArmorKnightBossCharacter;
+class UDecalComponent;
 class UGameplayEffect;
 class UGP_BossTelegraphVFXComponent;
 class USphereComponent;
-class UStaticMeshComponent;
 
 /** Server-owned charge coordinator. Root-motion charge keeps body movement and dash animation synchronized. */
 UCLASS(Blueprintable)
@@ -50,7 +50,7 @@ private:
 	TObjectPtr<USceneComponent> SceneRoot;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Dark Knight", meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UStaticMeshComponent> TelegraphMesh;
+	TObjectPtr<UDecalComponent> TelegraphDecal;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|Dark Knight|VFX", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UGP_BossTelegraphVFXComponent> ChargeTelegraphVFXComponent;

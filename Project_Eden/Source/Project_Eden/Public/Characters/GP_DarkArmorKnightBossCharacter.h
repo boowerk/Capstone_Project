@@ -12,6 +12,7 @@ class UGameplayEffect;
 class UAnimMontage;
 class UGP_BossTelegraphVFXComponent;
 class UGP_DarkArmorKnightStateComponent;
+class UNiagaraSystem;
 
 UCLASS(Blueprintable)
 class PROJECT_EDEN_API AGP_DarkArmorKnightBossCharacter : public AGP_EnemyCharacter
@@ -109,6 +110,7 @@ private:
 	void RecordPatternUse(const FGameplayTag& PatternTag);
 	float ResolvePatternCooldown(const FGameplayTag& PatternTag) const;
 	void ClearPatternTimers();
+	void ApplyDarkKnightTelegraphSystem();
 	bool IsPatternInterrupted() const;
 	void SpawnDarkWaveVolley(AActor* TargetActor, int32 ProjectileCount);
 	void SpawnGroundCracks(AActor* TargetActor);
@@ -125,6 +127,10 @@ private:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Dark Knight|VFX",
 		meta = (AllowPrivateAccess = "true", DisplayName = "Telegraph VFX Patterns"))
 	TMap<FGameplayTag, bool> TelegraphVFXPatterns;
+
+	/** Sprite-only override prevents the shared example system from exposing its source meshes on this boss. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Dark Knight|VFX", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UNiagaraSystem> DarkKnightTelegraphSystem;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Dark Knight|Actors", meta = (AllowPrivateAccess = "true"))
 	TSubclassOf<AGP_DarkWaveProjectile> DarkWaveProjectileClass;

@@ -24,6 +24,7 @@
 #include "GameplayEffect.h"
 #include "GameplayTags/GP_Tags.h"
 #include "Kismet/GameplayStatics.h"
+#include "NiagaraSystem.h"
 #include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
 #include "VFX/GP_BossDeathPresentationComponent.h"
@@ -106,6 +107,12 @@ AGP_DarkArmorKnightBossCharacter::AGP_DarkArmorKnightBossCharacter()
 	DarkWaveProjectileClass = AGP_DarkWaveProjectile::StaticClass();
 	GroundCrackActorClass = AGP_DarkKnightGroundCrackActor::StaticClass();
 	ChargeActorClass = AGP_DarkKnightChargeActor::StaticClass();
+	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> TelegraphSystemFinder(
+		TEXT("/Game/Mixed_Magic_VFX_Pack/VFX/NS_Lightning_Owner_Cast.NS_Lightning_Owner_Cast"));
+	if (TelegraphSystemFinder.Succeeded())
+	{
+		DarkKnightTelegraphSystem = TelegraphSystemFinder.Object;
+	}
 	static ConstructorHelpers::FObjectFinder<UAnimMontage> PreAttackMontageFinder(TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_DarkArmorKnight/Animations/AM_DK_Windup.AM_DK_Windup"));
 	if (PreAttackMontageFinder.Succeeded())
 	{
@@ -159,11 +166,14 @@ void AGP_DarkArmorKnightBossCharacter::OnConstruction(const FTransform& Transfor
 	// Reapply common assets after serialized Blueprint defaults so patrol/chase/leash behavior remains inherited.
 	BehaviorTreeAssetOverride = LoadObject<UBehaviorTree>(nullptr, TEXT("/Game/Characters/EnemyCharacter/BT/Boss/BT_BossCommon.BT_BossCommon"));
 	BlackboardAssetOverride = LoadObject<UBlackboardData>(nullptr, TEXT("/Game/Characters/EnemyCharacter/BT/Boss/BB_BossCommon.BB_BossCommon"));
+	ApplyDarkKnightTelegraphSystem();
 }
 
 void AGP_DarkArmorKnightBossCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+	// BeginPlay is the final guard for Blueprint-added components that registered after construction.
+	ApplyDarkKnightTelegraphSystem();
 	if (IsValid(DarkKnightStateComponent))
 	{
 		DarkKnightStateComponent->OnGroggyChanged.AddUniqueDynamic(this, &ThisClass::HandleGroggyChanged);
@@ -177,6 +187,15 @@ void AGP_DarkArmorKnightBossCharacter::BeginPlay()
 		DarkKnightStateComponent->InitializeDarkKnightState(this);
 	}
 	GrantDarkKnightAbilities();
+}
+
+void AGP_DarkArmorKnightBossCharacter::ApplyDarkKnightTelegraphSystem()
+{
+	if (UGP_BossTelegraphVFXComponent* TelegraphComponent = GetBossTelegraphVFXComponent();
+		IsValid(TelegraphComponent) && IsValid(DarkKnightTelegraphSystem))
+	{
+		TelegraphComponent->SetDefaultTelegraphSystem(DarkKnightTelegraphSystem);
+	}
 }
 
 void AGP_DarkArmorKnightBossCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)

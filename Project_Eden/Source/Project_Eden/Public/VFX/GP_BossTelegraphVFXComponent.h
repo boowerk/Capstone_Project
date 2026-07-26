@@ -52,6 +52,13 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Boss|Telegraph")
 	UNiagaraSystem* GetDefaultTelegraphSystem() const { return DefaultTelegraphSystem; }
 
+	/**
+	 * Replaces both the fallback and the active asset once the component is registered.
+	 * Native subobjects can call this in their owner constructor without invoking Niagara on a CDO.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Boss|Telegraph")
+	void SetDefaultTelegraphSystem(UNiagaraSystem* InTelegraphSystem);
+
 protected:
 	virtual void OnRegister() override;
 	virtual void Activate(bool bReset = false) override;
