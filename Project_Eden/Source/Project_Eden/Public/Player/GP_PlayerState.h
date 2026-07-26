@@ -160,9 +160,6 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Debug|Progression", meta = (AllowPrivateAccess = "true"))
 	bool bDebugXPChanges = false;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Debug|Progression", meta = (AllowPrivateAccess = "true", EditCondition = "bDebugXPChanges", ClampMin = "0.1", Units = "s"))
-	float DebugXPMessageDuration = 2.0f;
-
 	UPROPERTY(ReplicatedUsing = OnRep_Slot01SkillData, BlueprintReadOnly, Category = "Skill|Equipment", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UGP_SkillData> Slot01SkillData;
 

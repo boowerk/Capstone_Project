@@ -1,5 +1,6 @@
 #include "Actors/GP_BullChargeActor.h"
 
+#include "AbilitySystem/Abilities/GP_GameplayAbility.h"
 #include "Animation/AnimationAsset.h"
 #include "Actors/GP_MatadorBossDecoyActor.h"
 #include "AbilitySystemBlueprintLibrary.h"
@@ -133,7 +134,7 @@ void AGP_BullChargeActor::BeginPlay()
 			SpawnedEffect->SetVariableLinearColor(TEXT("User.Color_Wave"), BullSpawnEffectColor);
 		}
 	}
-	if (bShowDebugVisuals)
+	if (bShowDebugVisuals && UGP_GameplayAbility::IsSkillDebugDrawEnabled())
 	{
 		DrawTelegraph();
 	}
@@ -248,7 +249,10 @@ void AGP_BullChargeActor::InitializeBullCharge(AActor* InInitialTargetActor, AAc
 	}
 
 	SetActorRotation(ChargeDirection.Rotation());
-	DrawTelegraph();
+	if (bShowDebugVisuals && UGP_GameplayAbility::IsSkillDebugDrawEnabled())
+	{
+		DrawTelegraph();
+	}
 
 	if (HasAuthority())
 	{
@@ -653,7 +657,7 @@ void AGP_BullChargeActor::TickDecoyCircleRedirect(float DeltaSeconds)
 		return;
 	}
 
-	if (bShowDebugVisuals)
+	if (bShowDebugVisuals && UGP_GameplayAbility::IsSkillDebugDrawEnabled())
 	{
 		for (int32 SampleIndex = 0; SampleIndex < 12; ++SampleIndex)
 		{
@@ -739,7 +743,7 @@ bool AGP_BullChargeActor::TryRedirectTowardPlayerFromDecoy()
 	SetChargeState(EGPMatadorBullChargeState::RedirectedByDecoyToPlayer);
 	DecoyActor->PlayBullRedirectPresentation(this, PlayerTarget);
 	BP_OnBullRedirected(DecoyActor.Get(), PlayerTarget);
-	if (bShowDebugVisuals)
+	if (bShowDebugVisuals && UGP_GameplayAbility::IsSkillDebugDrawEnabled())
 	{
 		DrawDebugLine(
 			GetWorld(),
@@ -921,6 +925,11 @@ bool AGP_BullChargeActor::BeginChargeImpact()
 
 void AGP_BullChargeActor::DrawTelegraph() const
 {
+	if (!bShowDebugVisuals || !UGP_GameplayAbility::IsSkillDebugDrawEnabled())
+	{
+		return;
+	}
+
 	UWorld* World = GetWorld();
 	if (!World)
 	{

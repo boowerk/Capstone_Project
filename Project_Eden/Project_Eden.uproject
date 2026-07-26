@@ -106,10 +106,6 @@
 		{
 			"Name": "MotionTrajectory",
 			"Enabled": true
-		},
-		{
-			"Name": "DrawDebugLibrary",
-			"Enabled": true
 		}
 	]
 }

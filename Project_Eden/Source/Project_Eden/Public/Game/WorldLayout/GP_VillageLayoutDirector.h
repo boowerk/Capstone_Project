@@ -24,6 +24,9 @@ class PROJECT_EDEN_API AGP_VillageLayoutDirector : public AActor
 public:
 	AGP_VillageLayoutDirector();
 
+	static bool IsDebugDrawingOptInEnabled();
+	bool IsDebugDrawingRequested() const { return bDrawDebug; }
+
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	UFUNCTION(BlueprintCallable, Category = "Village")
@@ -145,7 +148,7 @@ protected:
 	bool bGeneratePCGInEditorPreview = true;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Village|Debug")
-	bool bDrawDebug = true;
+	bool bDrawDebug = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Village|Debug", meta = (ClampMin = "0.0", Units = "s"))
 	float DebugDrawDuration = 30.0f;

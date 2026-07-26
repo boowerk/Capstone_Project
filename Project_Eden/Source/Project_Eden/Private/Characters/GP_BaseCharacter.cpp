@@ -6,8 +6,6 @@
 #include "Animation/PDA_CharacterAnimationSet.h"
 #include "Animation/GP_CharacterAnimInstance.h"
 #include "Components/SkeletalMeshComponent.h"
-#include "DrawDebugHelpers.h"
-#include "Engine/Engine.h"
 #include "GameplayEffect.h"
 #include "GameplayTags/GP_Tags.h"
 #include "NiagaraComponent.h"
@@ -329,14 +327,6 @@ void AGP_BaseCharacter::ShowHealthDebugMessage(const FString& InstigatorName, fl
 		*ElementName);
 
 	UE_LOG(LogTemp, Log, TEXT("%s"), *DebugMessage);
-
-	if (GEngine)
-	{
-		GEngine->AddOnScreenDebugMessage(INDEX_NONE, DebugHealthMessageDuration, FColor::Red, DebugMessage);
-	}
-
-	// World-space text confirms the damaged actor even when several enemies are on screen.
-	DrawDebugString(GetWorld(), GetActorLocation() + DebugHealthTextOffset, DebugMessage, nullptr, FColor::Red, DebugHealthMessageDuration, true);
 }
 
 void AGP_BaseCharacter::BindAttributeDelegates(UAbilitySystemComponent* ASC, UAttributeSet* AS)

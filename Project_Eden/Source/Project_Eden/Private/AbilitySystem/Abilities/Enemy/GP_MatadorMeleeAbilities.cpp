@@ -2,6 +2,7 @@
 
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
+#include "AbilitySystem/Abilities/GP_GameplayAbility.h"
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 #include "AI/Data/EnemyBlackboardKeys.h"
 #include "AIController.h"
@@ -146,7 +147,7 @@ namespace GPMatadorMelee
 			}
 		}
 
-		if (bDrawDebug)
+		if (bDrawDebug && UGP_GameplayAbility::IsSkillDebugDrawEnabled())
 		{
 			const FVector Origin = AvatarActor->GetActorLocation() + FVector(0.0f, 0.0f, ElevationOffset);
 			const float DrawDistance = ForwardOffset + Radius;
@@ -692,7 +693,9 @@ void UGP_MatadorRapierThrustAbility::SetRapierGlow(AActor* AvatarActor, float Gl
 
 void UGP_MatadorRapierThrustAbility::DrawRapierTelegraph(AActor* AvatarActor, const FVector& Direction, FColor Color, float Duration) const
 {
-	if (!bShowTemporaryTelegraph || !IsValid(AvatarActor))
+	if (!bShowTemporaryTelegraph
+		|| !UGP_GameplayAbility::IsSkillDebugDrawEnabled()
+		|| !IsValid(AvatarActor))
 	{
 		return;
 	}
@@ -919,7 +922,9 @@ void UGP_MatadorCapeGustAbility::FinishCapeGust()
 
 void UGP_MatadorCapeGustAbility::DrawCapeTelegraph(AActor* AvatarActor, const FVector& Direction, FColor Color, float Duration) const
 {
-	if (!bShowTemporaryTelegraph || !IsValid(AvatarActor))
+	if (!bShowTemporaryTelegraph
+		|| !UGP_GameplayAbility::IsSkillDebugDrawEnabled()
+		|| !IsValid(AvatarActor))
 	{
 		return;
 	}

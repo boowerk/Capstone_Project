@@ -61,14 +61,6 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Debug|Health")
 	bool bDebugHealthChanges = false;
 
-	// Keeps debug text visible long enough to confirm whether the UI missed an actual health change.
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Debug|Health", meta = (EditCondition = "bDebugHealthChanges", ClampMin = "0.1", Units = "s"))
-	float DebugHealthMessageDuration = 2.0f;
-
-	// Draws the health debug label above the damaged character instead of covering the actor mesh.
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Debug|Health", meta = (EditCondition = "bDebugHealthChanges"))
-	FVector DebugHealthTextOffset = FVector(0.0f, 0.0f, 140.0f);
-
 	UFUNCTION(NetMulticast, Unreliable)
 	void MulticastShowDamageNumber(int32 DamageAmount, EWeaponElement Element);
 

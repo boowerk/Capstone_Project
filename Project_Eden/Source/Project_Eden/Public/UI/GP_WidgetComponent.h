@@ -33,9 +33,6 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Debug|Health")
 	bool bDebugAttributeChanges = false;
 
-	UPROPERTY(EditAnywhere, Category = "Debug|Health", meta = (EditCondition = "bDebugAttributeChanges", ClampMin = "0.1", Units = "s"))
-	float DebugAttributeMessageDuration = 1.5f;
-
 private:
 	TWeakObjectPtr<AGP_BaseCharacter> GASCharacter;
 	TWeakObjectPtr<UGP_AbilitySystemComponent> AbilitySystemComponent;

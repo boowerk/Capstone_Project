@@ -2,7 +2,6 @@
 #include "CharacterTrajectoryComponent.h"
 #include "Characters/GP_PlayerCharacter.h"
 #include "ChooserFunctionLibrary.h"
-#include "Engine/Engine.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "PoseSearch/PoseSearchDatabase.h"
@@ -454,47 +453,6 @@ void UGP_CharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	LastLocalVelocityDirection = LocalVelocityDirection;
 	LastVerticalVelocity = WorldVelocity.Z;
 	LastActorYaw = CurrentYaw;
-
-#if !UE_BUILD_SHIPPING
-	const bool bIsUEFNSourceAnimInstance = PlayerCharacter && PlayerCharacter->GetUEFNSourceAnimInstance() == this;
-	if (bEnableDebugLog
-		&& GEngine
-		&& PlayerCharacter
-		&& PlayerCharacter->IsLocallyControlled()
-		&& bIsUEFNSourceAnimInstance)
-	{
-		const FString SelectedAnimText = bMotionMatchingResultValid
-			? (MotionMatchingSelectedAnimName.IsNone() ? TEXT("Null Asset") : MotionMatchingSelectedAnimName.ToString())
-			: TEXT("Invalid Result");
-		const FString DebugText = FString::Printf(
-			TEXT("DBG v3 Mesh: %s (UEFNSource) \nMM Speed2D: %.1f \nRaw Speed: %.1f \nSpeed Scale: %.2f \nProfile Scale: %.2f \nMaxWalk: %.1f \nGait: %s \nState: %s \nStance: %s \nMoveMode: %s \nTurn:%d \nStop:%d \nPivot:%d \nSpin:%d \nPivotDot: %.2f \nYawRate: %.1f \nIdleT: %.2f \nStopT: %.2f \nPivotT: %.2f \nLandT: %.2f"),
-			*GetNameSafe(GetSkelMeshComponent()),
-			Speed2D,
-			GroundSpeed,
-			MovementSpeedScaleRatio,
-			PlayerCharacter ? PlayerCharacter->GetActiveMovementSpeedProfile().MovementSpeedScaleRatio : 1.0f,
-			MovementComponent ? MovementComponent->MaxWalkSpeed : 0.0f,
-			*UEnum::GetValueAsString(Gait),
-			*UEnum::GetValueAsString(CurrentMotionMatchState),
-			*UEnum::GetValueAsString(Stance),
-			*UEnum::GetValueAsString(MovementMode),
-			ShouldTurnInPlace ? 1 : 0,
-			IsStopping ? 1 : 0,
-			IsPivoting ? 1 : 0,
-			ShouldSpinTransition ? 1 : 0,
-			PivotDirectionDot,
-			YawRate,
-			TimeSinceMovementStopped,
-			TimeSinceStopStarted,
-			TimeSincePivotStarted,
-			TimeSinceLastLanded);
-		GEngine->AddOnScreenDebugMessage(
-			0x4D4D4452,
-			0.f,
-			FColor::Cyan,
-			DebugText);
-	}
-#endif
 }
 
 

@@ -1,5 +1,6 @@
 #include "Actors/GP_ChainEffectActor.h"
 
+#include "AbilitySystem/Abilities/GP_GameplayAbility.h"
 #include "Characters/GP_MatadorBossStateComponent.h"
 #include "Components/SceneComponent.h"
 #include "DrawDebugHelpers.h"
@@ -33,7 +34,7 @@ void AGP_ChainEffectActor::Tick(float DeltaSeconds)
 		SetChainStage(MatadorStateComponent->GetChainBreakCount());
 	}
 
-	if (bShowDebugVisuals)
+	if (bShowDebugVisuals && UGP_GameplayAbility::IsSkillDebugDrawEnabled())
 	{
 		DrawChainPreview();
 	}
@@ -81,6 +82,11 @@ void AGP_ChainEffectActor::SetChainStage(int32 NewStage)
 
 void AGP_ChainEffectActor::DrawChainPreview() const
 {
+	if (!bShowDebugVisuals || !UGP_GameplayAbility::IsSkillDebugDrawEnabled())
+	{
+		return;
+	}
+
 	UWorld* World = GetWorld();
 	if (!World || !IsValid(MainBossActor) || !IsValid(DecoyActor))
 	{

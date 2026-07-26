@@ -2,7 +2,6 @@
 #include "AbilitySystem/GP_AbilitySystemComponent.h"
 #include "AbilitySystem/Abilities/GP_SkillAugmentData.h"
 #include "AbilitySystemComponent.h"
-#include "Engine/Engine.h"
 #include "Net/UnrealNetwork.h"
 #include "AbilitySystem/GP_AttributeSet.h"
 #include "AbilitySystem/Abilities/GP_SkillData.h"
@@ -451,11 +450,6 @@ void AGP_PlayerState::MulticastShowXPDebug_Implementation(float AddedXP, int32 P
 		NewXPToNextLevel);
 
 	UE_LOG(LogTemp, Log, TEXT("%s"), *DebugMessage);
-
-	if (GEngine)
-	{
-		GEngine->AddOnScreenDebugMessage(INDEX_NONE, DebugXPMessageDuration, FColor::Green, DebugMessage);
-	}
 }
 
 bool AGP_PlayerState::DoesAugmentApplyToSkill(const UGP_SkillAugmentData* AugmentData, FGameplayTag SkillIdTag) const
