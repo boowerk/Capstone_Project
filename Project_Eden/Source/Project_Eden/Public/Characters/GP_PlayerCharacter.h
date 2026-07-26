@@ -22,6 +22,8 @@ class UPDA_CharacterAnimationSet;
 class UAnimSequenceBase;
 class UBlendSpace;
 class UGP_SkillData;
+class UNiagaraComponent;
+class UNiagaraSystem;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnSkillEquipped, FGameplayTag, SlotTag, UGP_SkillData*, SkillData);
 DECLARE_MULTICAST_DELEGATE(FOnActionRootMotionCancelInput);
@@ -173,6 +175,19 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Life State", meta = (ClampMin = "0.01", ClampMax = "1.0"))
 	float RecoveryHealthFraction = 0.5f;
+
+	// Local mesh-reproduction burst shown while the pawn enters its temporary
+	// eliminated/spectator state. The mesh returns when recovery completes.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Life State|VFX")
+	TObjectPtr<UNiagaraSystem> EliminationVFX;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Life State|VFX",
+		meta = (ClampMin = "0.01", Units = "s"))
+	float EliminationMeshHideDelay = 0.45f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Run|Life State|VFX",
+		meta = (ClampMin = "0.01", Units = "s"))
+	float EliminationVFXEmissionTime = 0.08f;
 
 protected:
 	// =========================================================================
@@ -468,7 +483,17 @@ private:
 	bool bPrimaryAttackInProgress = false;
 	float LastPrimaryAttackMovementLogTime = -1000.0f;
 	bool bEliminationStateApplied = false;
+	bool bMainMeshVisibleBeforeElimination = true;
+	bool bSourceMeshVisibleBeforeElimination = false;
+	bool bWeaponVisibleBeforeElimination = true;
 	FTimerHandle EliminationRecoveryTimerHandle;
+	FTimerHandle EliminationVisualTimerHandle;
+	FTimerHandle EliminationVFXStopTimerHandle;
+	float EliminationVFXStartTime = 0.0f;
+	int32 EliminationVFXEmissionFrameCount = 0;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UNiagaraComponent> ActiveEliminationVFXComponent;
 
 	bool bTrackActionMotion = false;
 	FVector LastActionMotionSampleLocation = FVector::ZeroVector;
@@ -498,6 +523,8 @@ private:
 	bool GiveAbilityToSlot(FGameplayTag SlotTag, TSubclassOf<UGameplayAbility> AbilityClass, UObject* SourceObject = nullptr);
 	void ClearAbilitySlot(FGameplayTag SlotTag);
 	void ApplyEliminationState(bool bNewEliminated);
+	void TryStopEliminationVFXEmission();
+	void RefreshPartySpectatorTargetsOnServer() const;
 	void TryRecoverFromElimination();
 	AGP_PlayerCharacter* FindLivingRecoveryAnchor() const;
 	void RequestEnemyTargetRefresh() const;

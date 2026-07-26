@@ -1031,6 +1031,15 @@ void AGP_PlayerController::ApplyRunStateInputLock(bool bShouldLock)
 			&& (GPGameState->GetMatchPhase() == EGPMatchPhase::Victory
 				|| GPGameState->GetMatchPhase() == EGPMatchPhase::Defeat);
 
+		if (!bRunIsTerminal && !bLockStateChanged)
+		{
+			// RefreshRunStatePresentation updates the elimination countdown
+			// repeatedly. Reapplying even GameOnly input mode each time can move
+			// Slate focus back to this viewport and interrupt another local PIE
+			// client. The per-controller lock only needs to be armed on entry.
+			return;
+		}
+
 		if (bRunIsTerminal)
 		{
 			// The run is over, so an unclaimed in-run reward no longer needs to
@@ -1057,18 +1066,30 @@ void AGP_PlayerController::ApplyRunStateInputLock(bool bShouldLock)
 			Server_ClearMoveInput();
 		}
 
-		// Reapply idempotently. A late UI RPC must not be able to replace the
-		// terminal/death input mode after this lock has already been entered.
+		// Terminal presentation is intentionally reapplied because the whole run
+		// is over. Elimination returns above after its one-time local lock.
 		ResetIgnoreInputFlags();
 		SetIgnoreMoveInput(true);
 		SetIgnoreLookInput(true);
 
-		FInputModeUIOnly InputMode;
-		if (IsValid(RunResultWidget))
+		if (bRunIsTerminal)
 		{
-			InputMode.SetWidgetToFocus(RunResultWidget->TakeWidget());
+			FInputModeUIOnly InputMode;
+			if (IsValid(RunResultWidget))
+			{
+				InputMode.SetWidgetToFocus(RunResultWidget->TakeWidget());
+			}
+			SetInputMode(InputMode);
 		}
-		SetInputMode(InputMode);
+		else
+		{
+			// Elimination is a per-player state. Do not give its presentation
+			// widget exclusive Slate focus: in single-process multi-client PIE,
+			// UI-only focus can also steal keyboard input from the other PIE
+			// viewport. The eliminated controller is already blocked by its
+			// ignore flags and every gameplay action checks the owner PlayerState.
+			SetInputMode(FInputModeGameOnly());
+		}
 		SetShowMouseCursor(false);
 		return;
 	}
@@ -1077,6 +1098,79 @@ void AGP_PlayerController::ApplyRunStateInputLock(bool bShouldLock)
 	SetInputMode(FInputModeGameOnly());
 	SetShowMouseCursor(false);
 	RestoreDeferredAugmentSelectWidget();
+}
+
+void AGP_PlayerController::RefreshEliminationSpectatingOnServer()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	AGP_PlayerState* OwnerPlayerState = GetPlayerState<AGP_PlayerState>();
+	if (!IsValid(OwnerPlayerState) || !OwnerPlayerState->IsEliminated())
+	{
+		if (APawn* OwnedPawn = GetPawn();
+			IsValid(OwnedPawn) && GetViewTarget() != OwnedPawn)
+		{
+			SetViewTargetWithBlend(OwnedPawn, 0.35f);
+		}
+		return;
+	}
+
+	const AGP_GameState* GPGameState =
+		GetWorld() ? GetWorld()->GetGameState<AGP_GameState>() : nullptr;
+	if (!IsValid(GPGameState))
+	{
+		return;
+	}
+
+	const FVector Origin =
+		IsValid(GetPawn()) ? GetPawn()->GetActorLocation() : FVector::ZeroVector;
+	APawn* ExistingViewTarget = Cast<APawn>(GetViewTarget());
+	APawn* BestTarget = nullptr;
+	float BestDistanceSquared = TNumericLimits<float>::Max();
+	for (APlayerState* PartyPlayerState : GPGameState->PlayerArray)
+	{
+		const AGP_PlayerState* PartyGPPlayerState =
+			Cast<AGP_PlayerState>(PartyPlayerState);
+		APawn* CandidatePawn =
+			IsValid(PartyGPPlayerState) ? PartyGPPlayerState->GetPawn() : nullptr;
+		if (!IsValid(PartyGPPlayerState)
+			|| PartyGPPlayerState == OwnerPlayerState
+			|| PartyGPPlayerState->IsOnlyASpectator()
+			|| PartyGPPlayerState->IsEliminated()
+			|| !IsValid(CandidatePawn))
+		{
+			continue;
+		}
+
+		// Keep the existing living target. Re-selecting a newly closer pawn on
+		// the server while the local presentation retains its previous target
+		// would split the camera from the connection's relevancy origin.
+		if (CandidatePawn == ExistingViewTarget)
+		{
+			BestTarget = CandidatePawn;
+			break;
+		}
+
+		const float DistanceSquared =
+			FVector::DistSquared(Origin, CandidatePawn->GetActorLocation());
+		if (DistanceSquared < BestDistanceSquared)
+		{
+			BestDistanceSquared = DistanceSquared;
+			BestTarget = CandidatePawn;
+		}
+	}
+
+	if (IsValid(BestTarget) && GetViewTarget() != BestTarget)
+	{
+		UE_LOG(LogTemp, Log,
+			TEXT("[PlayerLife] Controller '%s' now spectates '%s'."),
+			*GetNameSafe(this),
+			*GetNameSafe(BestTarget));
+		SetViewTargetWithBlend(BestTarget, 0.45f);
+	}
 }
 
 APawn* AGP_PlayerController::ResolveLivingSpectatorTarget(
@@ -1097,21 +1191,41 @@ APawn* AGP_PlayerController::ResolveLivingSpectatorTarget(
 	AGP_PlayerState* BestPlayerState = nullptr;
 	float BestDistanceSquared = TNumericLimits<float>::Max();
 	const FVector Origin = IsValid(GetPawn()) ? GetPawn()->GetActorLocation() : FVector::ZeroVector;
+	APawn* ExistingViewTarget = Cast<APawn>(GetViewTarget());
 
 	for (APlayerState* PartyPlayerState : GPGameState->PlayerArray)
 	{
 		AGP_PlayerState* GPPartyPlayerState = Cast<AGP_PlayerState>(PartyPlayerState);
-		APawn* CandidatePawn = IsValid(GPPartyPlayerState) ? GPPartyPlayerState->GetPawn() : nullptr;
 		if (!IsValid(GPPartyPlayerState)
 			|| GPPartyPlayerState == BoundRunPlayerState.Get()
 			|| GPPartyPlayerState->IsOnlyASpectator()
-			|| GPPartyPlayerState->IsEliminated()
-			|| !IsValid(CandidatePawn))
+			|| GPPartyPlayerState->IsEliminated())
 		{
 			continue;
 		}
 
 		++OutLivingPlayerCount;
+		APawn* CandidatePawn = GPPartyPlayerState->GetPawn();
+		if (!IsValid(CandidatePawn))
+		{
+			continue;
+		}
+
+		// A server SetViewTarget RPC is authoritative for network relevancy.
+		// Prefer that living pawn over the locally cached presentation target.
+		if (CandidatePawn == ExistingViewTarget)
+		{
+			BestTarget = CandidatePawn;
+			BestPlayerState = GPPartyPlayerState;
+			BestDistanceSquared = -2.0f;
+			continue;
+		}
+
+		if (BestDistanceSquared < -1.0f)
+		{
+			continue;
+		}
+
 		if (CandidatePawn == LivingSpectatorTarget.Get())
 		{
 			BestTarget = CandidatePawn;
@@ -1696,12 +1810,16 @@ void AGP_PlayerController::UpdateSkillSelectionInputMode()
 	bWasGroundPositionSelectionActive = bGroundSelectionActive;
 	if (bGroundSelectionActive)
 	{
-		bShowMouseCursor = true;
+		// Ground targeting is presented by the world decal. Keep the software
+		// cursor hidden while retaining its position for the decal trace.
+		bShowMouseCursor = false;
 		SetIgnoreLookInput(true);
 
 		FInputModeGameAndUI InputMode;
-		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-		InputMode.SetHideCursorDuringCapture(false);
+		// The invisible pointer still drives the ground trace, so keep it inside
+		// the viewport instead of losing mouse position at a window edge.
+		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::LockAlways);
+		InputMode.SetHideCursorDuringCapture(true);
 		SetInputMode(InputMode);
 		return;
 	}

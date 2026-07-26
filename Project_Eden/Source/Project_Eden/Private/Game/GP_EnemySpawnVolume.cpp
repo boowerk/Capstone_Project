@@ -14,7 +14,7 @@ namespace GPEnemySpawnVolume
 	constexpr float MinProjectionHorizontalExtent = 600.0f;
 	constexpr float MinProjectionVerticalExtent = 1000.0f;
 	constexpr float ProjectionVerticalPadding = 200.0f;
-	const FVector AuthoredPointProjectionExtent(200.0f, 200.0f, 300.0f);
+	const FVector AuthoredPointProjectionExtent(300.0f, 300.0f, 800.0f);
 }
 
 AGP_EnemySpawnVolume::AGP_EnemySpawnVolume()
@@ -287,10 +287,50 @@ FVector AGP_EnemySpawnVolume::GetBossSpawnPoint(bool& bOutProjected) const
 			? BossSpawnPoint->GetActorLocation()
 			: (SpawnBox ? SpawnBox->GetComponentLocation() : GetActorLocation());
 
-	return ProjectToNavmesh(
+	FVector ProjectedLocation = ProjectToNavmesh(
 		DesiredLocation,
 		GPEnemySpawnVolume::AuthoredPointProjectionExtent,
 		bOutProjected);
+	if (bOutProjected)
+	{
+		return ProjectedLocation;
+	}
+
+	// Level-instance pivots can leave an authored boss point vertically offset
+	// from the landscape. Regular enemy points in this same encounter have
+	// already proven that their nearby nav tiles are usable, so prefer the
+	// closest one over spawning a boss at an unprojected raw position.
+	const AActor* ClosestProjectedPoint = nullptr;
+	float ClosestDistanceSquared = TNumericLimits<float>::Max();
+	for (const AActor* EnemySpawnPoint : EnemySpawnPoints)
+	{
+		if (!IsValid(EnemySpawnPoint))
+		{
+			continue;
+		}
+
+		bool bCandidateProjected = false;
+		const FVector CandidateLocation = ProjectToNavmesh(
+			EnemySpawnPoint->GetActorLocation(),
+			GetSpawnProjectionExtent(),
+			bCandidateProjected);
+		if (!bCandidateProjected)
+		{
+			continue;
+		}
+
+		const float DistanceSquared =
+			FVector::DistSquared2D(DesiredLocation, CandidateLocation);
+		if (DistanceSquared < ClosestDistanceSquared)
+		{
+			ClosestDistanceSquared = DistanceSquared;
+			ClosestProjectedPoint = EnemySpawnPoint;
+			ProjectedLocation = CandidateLocation;
+		}
+	}
+
+	bOutProjected = IsValid(ClosestProjectedPoint);
+	return bOutProjected ? ProjectedLocation : DesiredLocation;
 }
 
 FVector AGP_EnemySpawnVolume::GetSpawnPointNearMarker(const AGP_EnemySpawnMarker* Marker, bool& bOutProjected) const

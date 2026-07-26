@@ -22,6 +22,9 @@
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Materials/MaterialInterface.h"
+#include "NiagaraComponent.h"
+#include "NiagaraFunctionLibrary.h"
+#include "NiagaraSystem.h"
 #include "NavigationInvokerComponent.h"
 #include "NavigationSystem.h"
 #include "Player/GP_PlayerController.h"
@@ -59,6 +62,11 @@ AGP_PlayerCharacter::AGP_PlayerCharacter()
 {
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.bStartWithTickEnabled = true;
+
+	// Party members can begin tens of thousands of centimeters apart. Keep all
+	// three player pawns relevant so an eliminated client can spectate a living
+	// teammate even when their villages are outside the default net-cull range.
+	bAlwaysRelevant = true;
 
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
 
@@ -125,6 +133,13 @@ AGP_PlayerCharacter::AGP_PlayerCharacter()
 		PersistentWeaponMesh->SetMaterial(0, NiagaraSwordMaterialFinder.Object);
 	}
 
+	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> EliminationVFXFinder(
+		TEXT("/Game/Niagara/Dissolve_SK/NS_EnemyDeath_Absorb.NS_EnemyDeath_Absorb"));
+	if (EliminationVFXFinder.Succeeded())
+	{
+		EliminationVFX = EliminationVFXFinder.Object;
+	}
+
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>("CameraBoom");
 	CameraBoom->SetupAttachment(GetRootComponent());
 	CameraBoom->TargetArmLength = NormalCameraArmLength;
@@ -146,8 +161,6 @@ AGP_PlayerCharacter::AGP_PlayerCharacter()
 
 	WhiteVoidSetClass = AGP_WhiteVoidSetActor::StaticClass();
 
-	OnASCInitialized.AddDynamic(this, &ThisClass::BindPlayerLifeState);
-
 	// 태그 추가 함수 추가후 호출 예정지
 }
 
@@ -157,6 +170,8 @@ AGP_PlayerCharacter::~AGP_PlayerCharacter()
 	{
 		World->GetTimerManager().ClearTimer(RestoreLagTimerHandle);
 		World->GetTimerManager().ClearTimer(EliminationRecoveryTimerHandle);
+		World->GetTimerManager().ClearTimer(EliminationVisualTimerHandle);
+		World->GetTimerManager().ClearTimer(EliminationVFXStopTimerHandle);
 	}
 
 	OnActionRootMotionCancelInput.Clear();
@@ -1126,6 +1141,10 @@ void AGP_PlayerCharacter::PossessedBy(AController* NewController)
 	GetAbilitySystemComponent()->RegisterGameplayTagEvent(GPTags::State::Movement::Sprinting, EGameplayTagEventType::NewOrRemoved).AddUObject(this, &ThisClass::OnSprintingTagChanged);
 	GetAbilitySystemComponent()->RegisterGameplayTagEvent(GPTags::State::Status::Fixed, EGameplayTagEventType::NewOrRemoved).AddUObject(this, &ThisClass::OnFixedTagChanged);
 
+	// Blueprint CDOs serialize BlueprintAssignable invocation lists and can
+	// overwrite bindings added by a newer native constructor. Bind this
+	// gameplay-critical path explicitly after the ASC has its avatar.
+	BindPlayerLifeState(GetAbilitySystemComponent(), GetAttributeSet());
 	OnASCInitialized.Broadcast(GetAbilitySystemComponent(), GetAttributeSet());
 	GiveStartupAbilities();
 	InitializeAttributes();
@@ -1142,6 +1161,7 @@ void AGP_PlayerCharacter::OnRep_PlayerState()
 	GetAbilitySystemComponent()->RegisterGameplayTagEvent(GPTags::State::Movement::Sprinting, EGameplayTagEventType::NewOrRemoved).AddUObject(this, &ThisClass::OnSprintingTagChanged);
 	GetAbilitySystemComponent()->RegisterGameplayTagEvent(GPTags::State::Status::Fixed, EGameplayTagEventType::NewOrRemoved).AddUObject(this, &ThisClass::OnFixedTagChanged);
 
+	BindPlayerLifeState(GetAbilitySystemComponent(), GetAttributeSet());
 	OnASCInitialized.Broadcast(GetAbilitySystemComponent(), GetAttributeSet());
 }
 
@@ -1216,7 +1236,12 @@ void AGP_PlayerCharacter::HandleOutOfHealth(AActor* InstigatorActor, AActor* Out
 	}
 
 	const float SafeRecoveryDelay = FMath::Max(0.1f, EliminationRecoveryDelay);
+	UE_LOG(LogTemp, Log,
+		TEXT("[PlayerLife] Player '%s' entered eliminated state; recovery in %.1f seconds."),
+		*GPPlayerState->GetPlayerName(),
+		SafeRecoveryDelay);
 	GPPlayerState->SetEliminated(true, World->GetTimeSeconds() + SafeRecoveryDelay);
+	RefreshPartySpectatorTargetsOnServer();
 
 	World->GetTimerManager().SetTimer(
 		EliminationRecoveryTimerHandle,
@@ -1246,6 +1271,92 @@ void AGP_PlayerCharacter::ApplyEliminationState(bool bNewEliminated)
 	bEliminationStateApplied = bNewEliminated;
 	if (bNewEliminated)
 	{
+		bMainMeshVisibleBeforeElimination =
+			IsValid(GetMesh()) && GetMesh()->IsVisible();
+		bSourceMeshVisibleBeforeElimination =
+			IsValid(UEFNSourceMesh) && UEFNSourceMesh->IsVisible();
+		bWeaponVisibleBeforeElimination =
+			IsValid(PersistentWeaponMesh) && PersistentWeaponMesh->IsVisible();
+
+		if (GetNetMode() != NM_DedicatedServer
+			&& IsValid(EliminationVFX)
+			&& IsValid(GetMesh())
+			&& IsValid(GetMesh()->GetSkeletalMeshAsset())
+			&& IsValid(GetRootComponent()))
+		{
+			ActiveEliminationVFXComponent =
+				UNiagaraFunctionLibrary::SpawnSystemAttached(
+				EliminationVFX,
+				GetRootComponent(),
+				NAME_None,
+				FVector::ZeroVector,
+				FRotator::ZeroRotator,
+				EAttachLocation::KeepRelativeOffset,
+				/*bAutoDestroy=*/true,
+				/*bAutoActivate=*/false,
+				ENCPoolMethod::None,
+				/*bPreCullCheck=*/false);
+			if (IsValid(ActiveEliminationVFXComponent))
+			{
+				// NS_EnemyDeath_Absorb contains a sample Manny only as an
+				// editor fallback. Bind the actual replicated player mesh before
+				// activation and disable attraction to leave a pure scatter.
+				UNiagaraFunctionLibrary::OverrideSystemUserVariableSkeletalMeshComponent(
+					ActiveEliminationVFXComponent,
+					TEXT("User.SourceMesh"),
+					GetMesh());
+				ActiveEliminationVFXComponent->SetVariablePosition(
+					TEXT("User.AbsorbTargetPosition"),
+					GetMesh()->Bounds.Origin);
+				ActiveEliminationVFXComponent->SetVariableFloat(
+					TEXT("User.AbsorbStrength"),
+					0.0f);
+				ActiveEliminationVFXComponent->SetVariableFloat(
+					TEXT("User.AbsorbKillRadius"),
+					0.0f);
+				ActiveEliminationVFXComponent->SetVariableVec3(
+					TEXT("User.FallGravity"),
+					FVector(0.0f, 0.0f, -160.0f));
+				ActiveEliminationVFXComponent->SetVariableFloat(
+					TEXT("User.AbsorbDrag"),
+					1.4f);
+				ActiveEliminationVFXComponent->Activate(true);
+
+				EliminationVFXStartTime = GetWorld()->GetTimeSeconds();
+				EliminationVFXEmissionFrameCount = 0;
+				EliminationVFXStopTimerHandle =
+					GetWorldTimerManager().SetTimerForNextTick(
+						FTimerDelegate::CreateUObject(
+							this,
+							&ThisClass::TryStopEliminationVFXEmission));
+			}
+		}
+
+		GetWorldTimerManager().SetTimer(
+			EliminationVisualTimerHandle,
+			FTimerDelegate::CreateWeakLambda(this, [this]()
+			{
+				if (!IsEliminated())
+				{
+					return;
+				}
+
+				if (USkeletalMeshComponent* MainMesh = GetMesh())
+				{
+					MainMesh->SetVisibility(false, /*bPropagateToChildren=*/false);
+				}
+				if (IsValid(UEFNSourceMesh))
+				{
+					UEFNSourceMesh->SetVisibility(false, /*bPropagateToChildren=*/false);
+				}
+				if (IsValid(PersistentWeaponMesh))
+				{
+					PersistentWeaponMesh->SetVisibility(false);
+				}
+			}),
+			FMath::Max(0.01f, EliminationMeshHideDelay),
+			false);
+
 		if (UAbilitySystemComponent* ASC = GetAbilitySystemComponent())
 		{
 			ASC->CancelAllAbilities();
@@ -1272,6 +1383,32 @@ void AGP_PlayerCharacter::ApplyEliminationState(bool bNewEliminated)
 		return;
 	}
 
+	GetWorldTimerManager().ClearTimer(EliminationVisualTimerHandle);
+	GetWorldTimerManager().ClearTimer(EliminationVFXStopTimerHandle);
+	if (IsValid(ActiveEliminationVFXComponent))
+	{
+		ActiveEliminationVFXComponent->DeactivateImmediate();
+		ActiveEliminationVFXComponent->DestroyComponent();
+	}
+	ActiveEliminationVFXComponent = nullptr;
+
+	if (USkeletalMeshComponent* MainMesh = GetMesh())
+	{
+		MainMesh->SetVisibility(
+			bMainMeshVisibleBeforeElimination,
+			/*bPropagateToChildren=*/false);
+	}
+	if (IsValid(UEFNSourceMesh))
+	{
+		UEFNSourceMesh->SetVisibility(
+			bSourceMeshVisibleBeforeElimination,
+			/*bPropagateToChildren=*/false);
+	}
+	if (IsValid(PersistentWeaponMesh))
+	{
+		PersistentWeaponMesh->SetVisibility(bWeaponVisibleBeforeElimination);
+	}
+
 	SetActorEnableCollision(true);
 	SetCanBeDamaged(true);
 	if (UCapsuleComponent* Capsule = GetCapsuleComponent())
@@ -1289,6 +1426,53 @@ void AGP_PlayerCharacter::ApplyEliminationState(bool bNewEliminated)
 	}
 	RefreshCurrentMaxWalkSpeed();
 	RequestEnemyTargetRefresh();
+}
+
+void AGP_PlayerCharacter::RefreshPartySpectatorTargetsOnServer() const
+{
+	UWorld* World = GetWorld();
+	if (!HasAuthority() || !IsValid(World))
+	{
+		return;
+	}
+
+	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator();
+		It;
+		++It)
+	{
+		if (AGP_PlayerController* PartyController =
+			Cast<AGP_PlayerController>(It->Get()))
+		{
+			PartyController->RefreshEliminationSpectatingOnServer();
+		}
+	}
+}
+
+void AGP_PlayerCharacter::TryStopEliminationVFXEmission()
+{
+	if (!IsEliminated() || !IsValid(ActiveEliminationVFXComponent))
+	{
+		return;
+	}
+
+	++EliminationVFXEmissionFrameCount;
+	const float ElapsedSeconds = GetWorld()
+		? GetWorld()->GetTimeSeconds() - EliminationVFXStartTime
+		: EliminationVFXEmissionTime;
+	if (EliminationVFXEmissionFrameCount >= 3
+		&& ElapsedSeconds >= FMath::Max(0.01f, EliminationVFXEmissionTime))
+	{
+		// Stop new grains while allowing emitted particles to complete their
+		// scatter and auto-destroy. The frame gate survives a first-frame hitch.
+		ActiveEliminationVFXComponent->Deactivate();
+		return;
+	}
+
+	EliminationVFXStopTimerHandle =
+		GetWorldTimerManager().SetTimerForNextTick(
+			FTimerDelegate::CreateUObject(
+				this,
+				&ThisClass::TryStopEliminationVFXEmission));
 }
 
 void AGP_PlayerCharacter::TryRecoverFromElimination()
@@ -1321,8 +1505,28 @@ void AGP_PlayerCharacter::TryRecoverFromElimination()
 			false);
 	};
 
-	AGP_PlayerCharacter* RecoveryAnchor = FindLivingRecoveryAnchor();
-	if (!IsValid(RecoveryAnchor))
+	FTransform RecoveryAnchorTransform = FTransform::Identity;
+	bool bHasRecoveryAnchor = false;
+	if (AGP_GameMode* GPGameMode = GetWorld()->GetAuthGameMode<AGP_GameMode>())
+	{
+		bHasRecoveryAnchor =
+			GPGameMode->TryGetIncompleteAssignedOuterRecoveryTransform(
+				GPPlayerState,
+				RecoveryAnchorTransform);
+	}
+
+	if (!bHasRecoveryAnchor)
+	{
+		if (AGP_PlayerCharacter* LivingRecoveryAnchor =
+			FindLivingRecoveryAnchor())
+		{
+			RecoveryAnchorTransform =
+				LivingRecoveryAnchor->GetActorTransform();
+			bHasRecoveryAnchor = true;
+		}
+	}
+
+	if (!bHasRecoveryAnchor)
 	{
 		// A living pawn can be briefly unavailable during possession/streaming.
 		// Party-defeat evaluation will end the run when nobody is actually alive.
@@ -1340,9 +1544,11 @@ void AGP_PlayerCharacter::TryRecoverFromElimination()
 		return;
 	}
 
-	const FVector AnchorLocation = RecoveryAnchor->GetActorLocation();
-	const FVector AnchorForward = RecoveryAnchor->GetActorForwardVector();
-	const FVector AnchorRight = RecoveryAnchor->GetActorRightVector();
+	const FVector AnchorLocation = RecoveryAnchorTransform.GetLocation();
+	const FVector AnchorForward =
+		RecoveryAnchorTransform.GetUnitAxis(EAxis::X);
+	const FVector AnchorRight =
+		RecoveryAnchorTransform.GetUnitAxis(EAxis::Y);
 	const TArray<FVector> RecoveryCandidates =
 	{
 		AnchorLocation - AnchorForward * 160.0f + AnchorRight * (260.0f * SideSign),
@@ -1359,7 +1565,7 @@ void AGP_PlayerCharacter::TryRecoverFromElimination()
 		CapsuleRadius,
 		CapsuleHalfHeight);
 	FCollisionQueryParams RecoveryQueryParams(SCENE_QUERY_STAT(GP_EliminationRecovery), false, this);
-	const FRotator RecoveryRotation = RecoveryAnchor->GetActorRotation();
+	const FRotator RecoveryRotation = RecoveryAnchorTransform.Rotator();
 
 	FVector SafeRecoveryLocation = FVector::ZeroVector;
 	bool bFoundSafeRecoveryLocation = false;
@@ -1419,6 +1625,7 @@ void AGP_PlayerCharacter::TryRecoverFromElimination()
 	}
 
 	GPPlayerState->SetEliminated(false);
+	RefreshPartySpectatorTargetsOnServer();
 }
 
 AGP_PlayerCharacter* AGP_PlayerCharacter::FindLivingRecoveryAnchor() const

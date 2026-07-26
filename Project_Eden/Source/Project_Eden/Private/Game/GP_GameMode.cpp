@@ -492,6 +492,14 @@ void AGP_GameMode::RegisterZoneNavigationInvoker(AGP_EnemySpawnVolume* Zone)
 
 void AGP_GameMode::UnregisterZoneNavigationInvoker(AGP_EnemySpawnVolume* Zone)
 {
+	if (FTimerHandle* RetryTimer = ZoneNavigationStartRetryTimers.Find(Zone))
+	{
+		if (UWorld* World = GetWorld())
+		{
+			World->GetTimerManager().ClearTimer(*RetryTimer);
+		}
+		ZoneNavigationStartRetryTimers.Remove(Zone);
+	}
 	ZoneNavigationStartRetries.Remove(Zone);
 	if (!IsValid(Zone) || !RegisteredNavigationInvokerZones.Remove(Zone))
 	{
@@ -506,6 +514,16 @@ void AGP_GameMode::UnregisterZoneNavigationInvoker(AGP_EnemySpawnVolume* Zone)
 
 void AGP_GameMode::UnregisterAllZoneNavigationInvokers()
 {
+	if (UWorld* World = GetWorld())
+	{
+		for (TPair<TWeakObjectPtr<AGP_EnemySpawnVolume>, FTimerHandle>& Pair :
+			ZoneNavigationStartRetryTimers)
+		{
+			World->GetTimerManager().ClearTimer(Pair.Value);
+		}
+	}
+	ZoneNavigationStartRetryTimers.Reset();
+
 	for (const TWeakObjectPtr<AGP_EnemySpawnVolume>& Zone : RegisteredNavigationInvokerZones)
 	{
 		if (Zone.IsValid())
@@ -623,6 +641,9 @@ void AGP_GameMode::StartZone(int32 ZoneIndex)
 	bRunStarted = true;
 	CurrentZoneIndex = ZoneIndex;
 	AliveZoneEnemies = 0;
+	PendingZoneEnemySpawns = 0;
+	CurrentZoneBossSpawnRetryCount = 0;
+	bCurrentZoneBossSpawnRetryPending = false;
 	bCurrentZoneBossPhaseStarted = false;
 	bHasLastDeathLocation = false;
 
@@ -824,25 +845,41 @@ void AGP_GameMode::StartStagedZone(AGP_EnemySpawnVolume* Zone)
 			const int32 MaxRetries = FMath::Max(
 				1,
 				FMath::CeilToInt(ZoneNavigationReadyTimeout / RetryInterval));
-			int32& RetryCount = ZoneNavigationStartRetries.FindOrAdd(Zone);
-			if (RetryCount >= MaxRetries)
+
+			// Overlap, portal-arrival, and intro completion paths can all ask to
+			// start the same zone while navigation is dirty. Keep exactly one
+			// retry chain per zone instead of multiplying 4 Hz polling timers.
+			if (const FTimerHandle* ExistingTimer =
+					ZoneNavigationStartRetryTimers.Find(Zone);
+				ExistingTimer && GetWorld()
+				&& GetWorld()->GetTimerManager().IsTimerActive(*ExistingTimer))
 			{
-				UE_LOG(LogTemp, Error,
-					TEXT("[GP_GameMode] Zone '%s' could not start: navigation was not ready after %.1f seconds. Check NavMeshBoundsVolume coverage and RecastNavMesh Runtime Generation=Dynamic."),
-					*Zone->GetZoneId().ToString(),
-					ZoneNavigationReadyTimeout);
 				return;
 			}
 
-			++RetryCount;
+			int32& RetryCount = ZoneNavigationStartRetries.FindOrAdd(Zone);
+			if (RetryCount == MaxRetries)
+			{
+				UE_LOG(LogTemp, Warning,
+					TEXT("[GP_GameMode] Zone '%s' navigation is still not ready after %.1f seconds; retries will continue. Check NavMeshBoundsVolume coverage and RecastNavMesh Runtime Generation=Dynamic."),
+					*Zone->GetZoneId().ToString(),
+					ZoneNavigationReadyTimeout);
+			}
+
+			// Navigation can remain dirty while the Colosseum pieces finish
+			// moving. A fixed retry cutoff would permanently soft-lock the
+			// encounter even if Recast finishes a moment later.
+			RetryCount = FMath::Min(RetryCount + 1, MaxRetries + 1);
 			if (UWorld* World = GetWorld())
 			{
 				const TWeakObjectPtr<AGP_EnemySpawnVolume> WeakZone = Zone;
-				FTimerHandle RetryTimer;
+				FTimerHandle& RetryTimer =
+					ZoneNavigationStartRetryTimers.FindOrAdd(WeakZone);
 				World->GetTimerManager().SetTimer(
 					RetryTimer,
 					FTimerDelegate::CreateWeakLambda(this, [this, WeakZone]()
 					{
+						ZoneNavigationStartRetryTimers.Remove(WeakZone);
 						if (WeakZone.IsValid())
 						{
 							StartStagedZone(WeakZone.Get());
@@ -855,11 +892,22 @@ void AGP_GameMode::StartStagedZone(AGP_EnemySpawnVolume* Zone)
 		}
 	}
 
+	if (FTimerHandle* RetryTimer = ZoneNavigationStartRetryTimers.Find(Zone))
+	{
+		if (UWorld* World = GetWorld())
+		{
+			World->GetTimerManager().ClearTimer(*RetryTimer);
+		}
+		ZoneNavigationStartRetryTimers.Remove(Zone);
+	}
 	ZoneNavigationStartRetries.Remove(Zone);
 	State->bStarted = true;
 	State->MarkersTotal = Zone->GetMarkerCount();
 	State->MarkersTriggered = 0;
 	State->AliveEnemies = 0;
+	State->PendingEnemySpawns = 0;
+	State->BossSpawnRetryCount = 0;
+	State->bBossSpawnRetryPending = false;
 	State->bBossPhaseStarted = false;
 	State->bHasLastEnemyDeathLocation = false;
 	bRunStarted = true;
@@ -1077,19 +1125,34 @@ void AGP_GameMode::MaybeCompleteStagedZone(AGP_EnemySpawnVolume* Zone)
 
 	const bool bAllMarkersDone =
 		State->MarkersTotal == 0 || State->MarkersTriggered >= State->MarkersTotal;
-	if (bAllMarkersDone && State->AliveEnemies == 0)
+	if (bAllMarkersDone
+		&& State->AliveEnemies == 0
+		&& State->PendingEnemySpawns == 0)
 	{
 		if (Zone->HasBossPhase() && !State->bBossPhaseStarted)
 		{
-			State->bBossPhaseStarted = true;
-			if (SpawnZoneBossEnemies(Zone) > 0)
+			if (State->bBossSpawnRetryPending)
 			{
 				return;
 			}
 
-			UE_LOG(LogTemp, Error,
-				TEXT("[GP_GameMode] Zone '%s' boss phase had no successful spawns; completing zone to avoid a soft lock."),
-				*Zone->GetZoneId().ToString());
+			State->bBossPhaseStarted = true;
+			const int32 BossSpawnCount = SpawnZoneBossEnemies(Zone);
+			if (BossSpawnCount > 0)
+			{
+				State->BossSpawnRetryCount = 0;
+				return;
+			}
+			if (BossSpawnCount == INDEX_NONE)
+			{
+				return;
+			}
+
+			// A missing nav tile is not a defeated boss. Keep the encounter
+			// blocked and retry instead of incorrectly opening the next portal.
+			State->bBossPhaseStarted = false;
+			ScheduleZoneBossSpawnRetry(Zone);
+			return;
 		}
 		CompleteStagedZone(Zone);
 	}
@@ -1297,6 +1360,69 @@ bool AGP_GameMode::GetActiveAssignedOuterZones(
 		ActivePlayerCount,
 		OutAssignedZones.Num(),
 		CompletedAssignedZoneCount);
+}
+
+bool AGP_GameMode::TryGetIncompleteAssignedOuterRecoveryTransform(
+	APlayerState* PlayerState,
+	FTransform& OutRecoveryTransform) const
+{
+	OutRecoveryTransform = FTransform::Identity;
+	if (!bUseStagedZoneProgression || !IsValid(PlayerState) || !IsValid(GetWorld()))
+	{
+		return false;
+	}
+
+	const TWeakObjectPtr<AGP_EnemySpawnVolume>* AssignedZonePtr =
+		AssignedOuterZonesByPlayer.Find(
+			TWeakObjectPtr<APlayerState>(PlayerState));
+	AGP_EnemySpawnVolume* AssignedZone =
+		AssignedZonePtr ? AssignedZonePtr->Get() : nullptr;
+	const FGPZoneRuntimeState* AssignedState =
+		IsValid(AssignedZone)
+			? ZoneRuntimeStates.Find(
+				TWeakObjectPtr<AGP_EnemySpawnVolume>(AssignedZone))
+			: nullptr;
+	if (!IsValid(AssignedZone)
+		|| AssignedZone->GetZoneStage() != EGPZoneStage::Outer
+		|| !AssignedState
+		|| AssignedState->bCompleted)
+	{
+		return false;
+	}
+
+	APlayerStart* MatchingStart = nullptr;
+	for (TActorIterator<APlayerStart> It(GetWorld()); It; ++It)
+	{
+		APlayerStart* CandidateStart = *It;
+		if (!IsValid(CandidateStart)
+			|| CandidateStart->GetLevel() != AssignedZone->GetLevel())
+		{
+			continue;
+		}
+
+		if (!MatchingStart
+			|| CandidateStart->GetFName().LexicalLess(
+				MatchingStart->GetFName()))
+		{
+			MatchingStart = CandidateStart;
+		}
+	}
+
+	if (!IsValid(MatchingStart))
+	{
+		UE_LOG(LogTemp, Error,
+			TEXT("[PlayerLife] Incomplete assigned Outer '%s' has no PlayerStart for '%s'."),
+			*AssignedZone->GetZoneId().ToString(),
+			*GetNameSafe(PlayerState));
+		return false;
+	}
+
+	OutRecoveryTransform = MatchingStart->GetActorTransform();
+	UE_LOG(LogTemp, Log,
+		TEXT("[PlayerLife] Player '%s' will recover at incomplete assigned Outer '%s'."),
+		*GetNameSafe(PlayerState),
+		*AssignedZone->GetZoneId().ToString());
+	return true;
 }
 
 bool AGP_GameMode::HaveAllActivePlayersMiddleCredit() const

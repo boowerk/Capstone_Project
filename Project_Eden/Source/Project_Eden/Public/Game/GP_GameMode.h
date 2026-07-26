@@ -50,6 +50,12 @@ public:
 	// The final defeat check is deferred so a same-frame boss kill can win.
 	void NotifyPlayerEliminated(AGP_PlayerState* EliminatedPlayerState);
 
+	// While a player's assigned Outer is still incomplete, recovery must keep
+	// them in that village instead of moving them to another party member.
+	bool TryGetIncompleteAssignedOuterRecoveryTransform(
+		APlayerState* PlayerState,
+		FTransform& OutRecoveryTransform) const;
+
 	// Called by a Middle-selection portal on the server.
 	void OpenMiddleTravelSelection(AGP_PlayerController* PlayerController);
 	bool RequestMiddleTravel(
@@ -177,6 +183,7 @@ private:
 	TMap<TWeakObjectPtr<AGP_LevelBuildAnimator>, TWeakObjectPtr<AGP_EnemySpawnVolume>>
 		ColosseumIntroZonesByAnimator;
 	TMap<TWeakObjectPtr<AGP_EnemySpawnVolume>, int32> ZoneNavigationStartRetries;
+	TMap<TWeakObjectPtr<AGP_EnemySpawnVolume>, FTimerHandle> ZoneNavigationStartRetryTimers;
 	TSet<EGPZoneStage> UnlockedStages;
 	TSet<TWeakObjectPtr<AGP_EnemySpawnVolume>> RegisteredNavigationInvokerZones;
 	TMap<TWeakObjectPtr<APlayerController>, int32> VillageVisualReadyRevisions;
@@ -189,6 +196,9 @@ private:
 	int32 CurrentZoneIndex = INDEX_NONE;
 	int32 PendingZoneIndex = INDEX_NONE;
 	int32 AliveZoneEnemies = 0;
+	int32 PendingZoneEnemySpawns = 0;
+	int32 CurrentZoneBossSpawnRetryCount = 0;
+	bool bCurrentZoneBossSpawnRetryPending = false;
 
 	// Location of the most recent zone enemy death. The advance portal spawns here
 	// (where the last monster fell) instead of the zone center. Reset per zone start.
@@ -222,7 +232,14 @@ private:
 	void UnlockZone(int32 ZoneIndex);
 	void StartZone(int32 ZoneIndex);
 	void SpawnZoneEnemies(AGP_EnemySpawnVolume* Zone);
+	void SpawnZoneEnemyBatch(
+		AGP_EnemySpawnVolume* Zone,
+		TSubclassOf<AGP_EnemyCharacter> EnemyClass,
+		int32 SpawnCount,
+		bool bRandomize,
+		int32 RetryCount);
 	int32 SpawnZoneBossEnemies(AGP_EnemySpawnVolume* Zone);
+	void ScheduleZoneBossSpawnRetry(AGP_EnemySpawnVolume* Zone);
 	void SpawnMarkerEnemies(AGP_EnemySpawnVolume* Zone, AGP_EnemySpawnMarker* Marker);
 	void RegisterZoneEnemy(
 		AGP_EnemyCharacter* Enemy,

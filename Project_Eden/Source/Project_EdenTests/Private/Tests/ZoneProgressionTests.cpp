@@ -81,6 +81,17 @@ bool FGPZoneProgressionContractTest::RunTest(const FString& Parameters)
 
 	const FGPZoneRuntimeState RuntimeDefaults;
 	TestEqual(TEXT("Zone runtime begins with no enemies"), RuntimeDefaults.AliveEnemies, 0);
+	TestEqual(
+		TEXT("Zone runtime begins with no pending enemy spawns"),
+		RuntimeDefaults.PendingEnemySpawns,
+		0);
+	TestEqual(
+		TEXT("Zone runtime begins with no boss-spawn retries"),
+		RuntimeDefaults.BossSpawnRetryCount,
+		0);
+	TestFalse(
+		TEXT("Zone runtime begins without a pending boss-spawn retry"),
+		RuntimeDefaults.bBossSpawnRetryPending);
 	TestFalse(TEXT("Zone runtime begins inactive"), RuntimeDefaults.bStarted);
 	TestFalse(TEXT("Zone runtime begins uncleared"), RuntimeDefaults.bCompleted);
 

@@ -84,6 +84,10 @@ public:
 
 	bool GetSkillSelectionCursorLocation(FVector& OutTargetLocation) const;
 
+	// Authority updates the connection's real view target as well as the remote
+	// camera so actors around the watched teammate remain network relevant.
+	void RefreshEliminationSpectatingOnServer();
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;

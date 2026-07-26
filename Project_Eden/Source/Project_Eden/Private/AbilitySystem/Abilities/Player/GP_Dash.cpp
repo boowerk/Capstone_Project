@@ -4,7 +4,10 @@
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
 #include "Animation/GP_AnimNotify_SendGameplayEvent.h"
 #include "Animation/AnimInstance.h"
+#include "Animation/AnimMontage.h"
 #include "Characters/GP_PlayerCharacter.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Engine/SkeletalMesh.h"
 #include "GameplayTags/GP_Tags.h"
 #include "Animation/PDA_CharacterAnimationSet.h"
 #include "TimerManager.h"
@@ -37,6 +40,19 @@ float FindFirstGameplayEventNotifyTime(const UAnimMontage* Montage, const FGamep
 
 	return -1.0f;
 }
+
+bool IsMontageCompatibleWithPresentationMesh(
+	const UAnimMontage* Montage,
+	const AGP_PlayerCharacter* PlayerCharacter)
+{
+	const USkeletalMeshComponent* MeshComponent =
+		IsValid(PlayerCharacter) ? PlayerCharacter->GetMesh() : nullptr;
+	const USkeletalMesh* SkeletalMesh =
+		IsValid(MeshComponent) ? MeshComponent->GetSkeletalMeshAsset() : nullptr;
+	return IsValid(Montage)
+		&& IsValid(SkeletalMesh)
+		&& Montage->GetSkeleton() == SkeletalMesh->GetSkeleton();
+}
 }
 
 UGP_Dash::UGP_Dash()
@@ -68,22 +84,6 @@ void UGP_Dash::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FG
 		return;
 	}
 
-	const FVector InputDirection = PC->GetLastMovementInputVector();
-	if (!InputDirection.IsNearlyZero())
-	{
-		const FRotator InputBasisRotation = PC->GetController()
-			? FRotator(0.0f, PC->GetController()->GetControlRotation().Yaw, 0.0f)
-			: PC->GetActorRotation();
-		const FVector LocalInputDirection = InputBasisRotation.UnrotateVector(InputDirection);
-		const FVector2D LocalInputDirection2D(LocalInputDirection.X, LocalInputDirection.Y);
-		const FVector2D LocalInputNormal = LocalInputDirection2D.GetSafeNormal();
-		if (LocalInputNormal.X < 0.5f)
-		{
-			EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-			return;
-		}
-	}
-
 	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
 	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
@@ -104,6 +104,15 @@ void UGP_Dash::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FG
 		SourceDashMontage = AnimSet->SourceRollMontages.Roll_RM;
 	}
 
+	// Party slots use different presentation skeletons. A MaskMan montage
+	// played directly on Daelithra/Paladin produces corrupted poses; those
+	// meshes must consume the source montage through the existing retarget path.
+	if (IsValid(DashMontage)
+		&& !IsMontageCompatibleWithPresentationMesh(DashMontage, PC))
+	{
+		DashMontage = nullptr;
+	}
+
 	if (!IsValid(DashMontage) && !IsValid(SourceDashMontage))
 	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
@@ -111,20 +120,9 @@ void UGP_Dash::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FG
 	}
 
 	// 캐릭터 회전 로직: 입력 방향이 없으면 바라보는 방향, 있으면 입력 방향으로 즉시 회전
-	FVector DashDirection = PC->GetLastMovementInputVector();
-	if (DashDirection.IsNearlyZero())
-	{
-		DashDirection = PC->GetActorForwardVector();
-	}
-    
-	DashDirection.Z = 0.0f;
-    
-	if (!DashDirection.IsNearlyZero())
-	{
-		DashDirection.Normalize();
-		PC->SetActorRotation(DashDirection.Rotation());
-	}
-
+	// Forward-only roll: root motion follows the character's already-replicated
+	// facing. Avoid a second client/server input-derived rotation that can cause
+	// prediction correction on remote players.
 	PC->BeginActionMotionTracking();
 	ActiveDashMontage = DashMontage;
 

@@ -14,6 +14,9 @@ struct FGPZoneRuntimeState
 	int32 MarkersTotal = 0;
 	int32 MarkersTriggered = 0;
 	int32 AliveEnemies = 0;
+	int32 PendingEnemySpawns = 0;
+	int32 BossSpawnRetryCount = 0;
+	bool bBossSpawnRetryPending = false;
 	bool bBossPhaseStarted = false;
 	FVector LastEnemyDeathLocation = FVector::ZeroVector;
 	bool bHasLastEnemyDeathLocation = false;

@@ -85,8 +85,14 @@ void AGP_LevelBuildAnimator::Tick(float DeltaSeconds)
 	for (int32 PieceIndex = 0; PieceIndex < Pieces.Num(); ++PieceIndex)
 	{
 		FGPLevelBuildPiece& Piece = Pieces[PieceIndex];
+		if (Piece.bFinished)
+		{
+			continue;
+		}
+
 		if (!IsValid(Piece.Actor))
 		{
+			Piece.bFinished = true;
 			continue;
 		}
 
@@ -102,20 +108,15 @@ void AGP_LevelBuildAnimator::Tick(float DeltaSeconds)
 			BP_OnBuildPieceStarted(Piece.Actor, PieceIndex);
 		}
 
-		const float LocalAlpha = FMath::Clamp(RawLocalAlpha, 0.0f, 1.0f);
-		ApplyPieceTransform(Piece, LocalAlpha);
-
-		if (LocalAlpha >= 1.0f)
+		if (RawLocalAlpha >= 1.0f)
 		{
-			if (!Piece.bFinished)
-			{
-				Piece.bFinished = true;
-				Piece.Actor->SetActorTransform(Piece.FinalTransform, false, nullptr, ETeleportType::TeleportPhysics);
-				BP_OnBuildPieceFinished(Piece.Actor, PieceIndex);
-			}
+			Piece.Actor->SetActorTransform(Piece.FinalTransform, false, nullptr, ETeleportType::TeleportPhysics);
+			Piece.bFinished = true;
+			BP_OnBuildPieceFinished(Piece.Actor, PieceIndex);
 		}
 		else
 		{
+			ApplyPieceTransform(Piece, FMath::Max(0.0f, RawLocalAlpha));
 			bAllFinished = false;
 		}
 	}
@@ -267,7 +268,7 @@ void AGP_LevelBuildAnimator::FinishBuild()
 {
 	for (FGPLevelBuildPiece& Piece : Pieces)
 	{
-		if (IsValid(Piece.Actor))
+		if (!Piece.bFinished && IsValid(Piece.Actor))
 		{
 			Piece.Actor->SetActorTransform(Piece.FinalTransform, false, nullptr, ETeleportType::TeleportPhysics);
 		}
