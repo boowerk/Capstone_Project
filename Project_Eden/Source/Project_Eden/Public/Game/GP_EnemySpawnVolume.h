@@ -89,6 +89,12 @@ public:
 	FVector GetSpawnPoint(bool bRandomizeInVolume, bool& bOutProjected) const;
 	FVector GetBossSpawnPoint(bool& bOutProjected) const;
 	FVector GetSpawnPointNearMarker(const AGP_EnemySpawnMarker* Marker, bool& bOutProjected) const;
+	bool IsSpawnGroundLocationValid(
+		const FVector& GroundAnchor,
+		const FVector& CandidateGroundLocation) const;
+	bool IsFinalSpawnGroundLocationValid(
+		const FVector& RequestedGroundLocation,
+		const FVector& ActualGroundLocation) const;
 
 	UPROPERTY(BlueprintAssignable, Category = "Zone")
 	FGPOnPlayerEnteredZone OnPlayerEnteredZone;
@@ -152,6 +158,18 @@ protected:
 		meta = (ClampMin = "0.0", Units = "cm"))
 	float EnemySpawnPointScatterRadius = 300.0f;
 
+	// Backup guard for connected NavMesh that climbs onto nearby geometry.
+	// Downward projection remains unrestricted so vertically offset Level Instances still recover.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Zone|Spawn Points",
+		meta = (ClampMin = "0.0", Units = "cm"))
+	float MaxSpawnHeightAboveGroundAnchor = 250.0f;
+
+	// Collision adjustment may move a capsule slightly above its requested nav
+	// point, but must never lift an enemy onto another actor or a roof.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Zone|Spawn Points",
+		meta = (ClampMin = "0.0", Units = "cm"))
+	float MaxFinalSpawnHeightAboveNavmesh = 50.0f;
+
 private:
 	UPROPERTY()
 	TArray<TObjectPtr<AGP_EnemySpawnMarker>> Markers;
@@ -165,12 +183,16 @@ private:
 	bool bUnlocked = false;
 	bool bEntered = false;
 
-	FVector ProjectToNavmesh(const FVector& DesiredLocation, bool& bOutProjected) const;
 	FVector ProjectToNavmesh(const FVector& DesiredLocation, const FVector& QueryExtent, bool& bOutProjected) const;
-	FVector GetSpawnProjectionExtent() const;
-	FVector GetRandomPointInSpawnBox() const;
-	FVector GetPointWithScatter(const FVector& Origin, float ScatterRadius) const;
+	bool TryGetReachableSpawnPoint(
+		const FVector& DesiredAnchor,
+		float ScatterRadius,
+		const FVector& ProjectionExtent,
+		FVector& OutSpawnLocation) const;
+	bool IsNavLocationReachableFromGroundAnchor(
+		const FVector& CandidateLocation) const;
 	bool IsPointInsideSpawnBox(const FVector& WorldLocation) const;
+	bool IsPointInsideSpawnBox2D(const FVector& WorldLocation) const;
 	void CollectTaggedSpawnPoints();
 
 	UFUNCTION()
