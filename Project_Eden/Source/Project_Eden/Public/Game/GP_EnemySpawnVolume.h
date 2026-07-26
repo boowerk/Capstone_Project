@@ -89,6 +89,10 @@ public:
 	FVector GetSpawnPoint(bool bRandomizeInVolume, bool& bOutProjected) const;
 	FVector GetBossSpawnPoint(bool& bOutProjected) const;
 	FVector GetSpawnPointNearMarker(const AGP_EnemySpawnMarker* Marker, bool& bOutProjected) const;
+	FVector GetSpawnPointNearLocation(
+		const FVector& AnchorLocation,
+		float ScatterRadius,
+		bool& bOutProjected) const;
 	bool IsSpawnGroundLocationValid(
 		const FVector& GroundAnchor,
 		const FVector& CandidateGroundLocation) const;
@@ -183,7 +187,6 @@ private:
 	bool bUnlocked = false;
 	bool bEntered = false;
 
-	FVector ProjectToNavmesh(const FVector& DesiredLocation, const FVector& QueryExtent, bool& bOutProjected) const;
 	bool TryGetReachableSpawnPoint(
 		const FVector& DesiredAnchor,
 		float ScatterRadius,

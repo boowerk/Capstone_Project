@@ -6,13 +6,23 @@
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerState.h"
 #include "Kismet/GameplayStatics.h"
-#include "NavigationSystem.h"
+#include "Navigation/GP_GroundPlacement.h"
 
 namespace GPEnemySpawnVolume
 {
 	constexpr int32 SpawnProjectionAttempts = 8;
-	const FVector AuthoredPointProjectionExtent(300.0f, 300.0f, 300.0f);
-	const FVector BossPointProjectionExtent(300.0f, 300.0f, 800.0f);
+	const FGPGroundPlacementSettings AuthoredPointSettings
+	{
+		FVector(300.0f, 300.0f, 300.0f),
+		250.0f,
+		SpawnProjectionAttempts
+	};
+	const FGPGroundPlacementSettings BossPointSettings
+	{
+		FVector(300.0f, 300.0f, 800.0f),
+		250.0f,
+		SpawnProjectionAttempts
+	};
 }
 
 AGP_EnemySpawnVolume::AGP_EnemySpawnVolume()
@@ -165,33 +175,25 @@ void AGP_EnemySpawnVolume::HandleBoxEndOverlap(
 	}
 }
 
-FVector AGP_EnemySpawnVolume::ProjectToNavmesh(const FVector& DesiredLocation, const FVector& QueryExtent, bool& bOutProjected) const
-{
-	bOutProjected = false;
-
-	if (const UNavigationSystemV1* NavigationSystem = UNavigationSystemV1::GetCurrent(GetWorld()))
-	{
-		FNavLocation ProjectedLocation;
-		if (NavigationSystem->ProjectPointToNavigation(DesiredLocation, ProjectedLocation, QueryExtent))
-		{
-			bOutProjected = true;
-			return ProjectedLocation.Location;
-		}
-	}
-
-	return DesiredLocation;
-}
-
 bool AGP_EnemySpawnVolume::TryGetReachableSpawnPoint(
 	const FVector& DesiredAnchor,
 	float ScatterRadius,
 	const FVector& ProjectionExtent,
 	FVector& OutSpawnLocation) const
 {
-	bool bAnchorProjected = false;
-	const FVector GroundAnchor =
-		ProjectToNavmesh(DesiredAnchor, ProjectionExtent, bAnchorProjected);
-	if (!bAnchorProjected || !IsSpawnGroundLocationValid(DesiredAnchor, GroundAnchor))
+	FGPGroundPlacementSettings Settings =
+		GPEnemySpawnVolume::AuthoredPointSettings;
+	Settings.ProjectionExtent = ProjectionExtent;
+	Settings.MaxHeightAboveAnchor =
+		FMath::Max(0.0f, MaxSpawnHeightAboveGroundAnchor);
+
+	FVector GroundAnchor;
+	if (!GPGroundPlacement::TryProjectGroundAnchor(
+			GetWorld(),
+			DesiredAnchor,
+			Settings,
+			GroundAnchor)
+		|| !IsPointInsideSpawnBox2D(GroundAnchor))
 	{
 		return false;
 	}
@@ -203,25 +205,25 @@ bool AGP_EnemySpawnVolume::TryGetReachableSpawnPoint(
 		return true;
 	}
 
-	if (const UNavigationSystemV1* NavigationSystem =
-		UNavigationSystemV1::GetCurrent(GetWorld()))
+	// Keep the zone-bound predicate outside the common navigation utility.
+	// One random query per iteration preserves the authored eight-attempt
+	// behavior while allowing out-of-zone candidates to be retried.
+	Settings.MaxAttempts = 1;
+	for (int32 AttemptIndex = 0;
+		AttemptIndex < GPEnemySpawnVolume::SpawnProjectionAttempts;
+		++AttemptIndex)
 	{
-		for (int32 AttemptIndex = 0;
-			AttemptIndex < GPEnemySpawnVolume::SpawnProjectionAttempts;
-			++AttemptIndex)
+		FVector ReachableLocation;
+		if (GPGroundPlacement::TryGetRandomReachableGround(
+				GetWorld(),
+				GroundAnchor,
+				ReachableRadius,
+				Settings,
+				ReachableLocation)
+			&& IsPointInsideSpawnBox2D(ReachableLocation))
 		{
-			FNavLocation ReachableLocation;
-			if (NavigationSystem->GetRandomReachablePointInRadius(
-					GroundAnchor,
-					ReachableRadius,
-					ReachableLocation)
-				&& IsSpawnGroundLocationValid(
-					GroundAnchor,
-					ReachableLocation.Location))
-			{
-				OutSpawnLocation = ReachableLocation.Location;
-				return true;
-			}
+			OutSpawnLocation = ReachableLocation;
+			return true;
 		}
 	}
 
@@ -249,7 +251,7 @@ FVector AGP_EnemySpawnVolume::GetSpawnPoint(bool bRandomizeInVolume, bool& bOutP
 			if (TryGetReachableSpawnPoint(
 				SpawnPoint->GetActorLocation(),
 				EnemySpawnPointScatterRadius,
-				GPEnemySpawnVolume::AuthoredPointProjectionExtent,
+				GPEnemySpawnVolume::AuthoredPointSettings.ProjectionExtent,
 				ReachableLocation))
 			{
 				bOutProjected = true;
@@ -273,7 +275,7 @@ FVector AGP_EnemySpawnVolume::GetSpawnPoint(bool bRandomizeInVolume, bool& bOutP
 	if (TryGetReachableSpawnPoint(
 		CenterLocation,
 		ScatterRadius,
-		GPEnemySpawnVolume::AuthoredPointProjectionExtent,
+		GPEnemySpawnVolume::AuthoredPointSettings.ProjectionExtent,
 		ReachableLocation))
 	{
 		bOutProjected = true;
@@ -293,12 +295,17 @@ FVector AGP_EnemySpawnVolume::GetBossSpawnPoint(bool& bOutProjected) const
 
 	// Most authored boss points are already close to their floor. Resolve them
 	// with the same tight query used by regular ground anchors first.
-	FVector ProjectedLocation = ProjectToNavmesh(
+	FGPGroundPlacementSettings AuthoredSettings =
+		GPEnemySpawnVolume::AuthoredPointSettings;
+	AuthoredSettings.MaxHeightAboveAnchor =
+		FMath::Max(0.0f, MaxSpawnHeightAboveGroundAnchor);
+	FVector ProjectedLocation;
+	bOutProjected = GPGroundPlacement::TryProjectGroundAnchor(
+		GetWorld(),
 		DesiredLocation,
-		GPEnemySpawnVolume::AuthoredPointProjectionExtent,
-		bOutProjected);
-	if (bOutProjected
-		&& IsSpawnGroundLocationValid(DesiredLocation, ProjectedLocation))
+		AuthoredSettings,
+		ProjectedLocation);
+	if (bOutProjected && IsPointInsideSpawnBox2D(ProjectedLocation))
 	{
 		return ProjectedLocation;
 	}
@@ -307,12 +314,17 @@ FVector AGP_EnemySpawnVolume::GetBossSpawnPoint(bool& bOutProjected) const
 	// Some Level Instance pivots leave the boss point far above its floor. A
 	// broad downward projection is accepted only if a tight, trusted ground
 	// anchor in this zone can path to it; isolated roof islands therefore fail.
-	ProjectedLocation = ProjectToNavmesh(
+	FGPGroundPlacementSettings BossSettings =
+		GPEnemySpawnVolume::BossPointSettings;
+	BossSettings.MaxHeightAboveAnchor =
+		FMath::Max(0.0f, MaxSpawnHeightAboveGroundAnchor);
+	bOutProjected = GPGroundPlacement::TryProjectGroundAnchor(
+		GetWorld(),
 		DesiredLocation,
-		GPEnemySpawnVolume::BossPointProjectionExtent,
-		bOutProjected);
+		BossSettings,
+		ProjectedLocation);
 	if (bOutProjected
-		&& IsSpawnGroundLocationValid(DesiredLocation, ProjectedLocation)
+		&& IsPointInsideSpawnBox2D(ProjectedLocation)
 		&& IsNavLocationReachableFromGroundAnchor(ProjectedLocation))
 	{
 		return ProjectedLocation;
@@ -336,7 +348,7 @@ FVector AGP_EnemySpawnVolume::GetBossSpawnPoint(bool& bOutProjected) const
 		if (!TryGetReachableSpawnPoint(
 			EnemySpawnPoint->GetActorLocation(),
 			0.0f,
-			GPEnemySpawnVolume::AuthoredPointProjectionExtent,
+			GPEnemySpawnVolume::AuthoredPointSettings.ProjectionExtent,
 			CandidateLocation))
 		{
 			continue;
@@ -359,35 +371,29 @@ FVector AGP_EnemySpawnVolume::GetBossSpawnPoint(bool& bOutProjected) const
 bool AGP_EnemySpawnVolume::IsNavLocationReachableFromGroundAnchor(
 	const FVector& CandidateLocation) const
 {
-	const UNavigationSystemV1* NavigationSystem =
-		UNavigationSystemV1::GetCurrent(GetWorld());
-	if (!NavigationSystem)
-	{
-		return false;
-	}
-
-	auto HasPathFrom = [this, NavigationSystem, &CandidateLocation](
+	auto HasPathFrom = [this, &CandidateLocation](
 		const FVector& DesiredGroundAnchor)
 	{
-		bool bAnchorProjected = false;
-		const FVector GroundAnchor = ProjectToNavmesh(
-			DesiredGroundAnchor,
-			GPEnemySpawnVolume::AuthoredPointProjectionExtent,
-			bAnchorProjected);
-		if (!bAnchorProjected
-			|| !IsSpawnGroundLocationValid(
+		FGPGroundPlacementSettings Settings =
+			GPEnemySpawnVolume::AuthoredPointSettings;
+		Settings.MaxHeightAboveAnchor =
+			FMath::Max(0.0f, MaxSpawnHeightAboveGroundAnchor);
+		FVector GroundAnchor;
+		if (!GPGroundPlacement::TryProjectGroundAnchor(
+				GetWorld(),
 				DesiredGroundAnchor,
-				GroundAnchor))
+				Settings,
+				GroundAnchor)
+			|| !IsPointInsideSpawnBox2D(GroundAnchor))
 		{
 			return false;
 		}
 
-		FVector::FReal PathLength = 0.0;
-		return NavigationSystem->GetPathLength(
-				GroundAnchor,
-				CandidateLocation,
-				PathLength)
-			== ENavigationQueryResult::Success;
+		return GPGroundPlacement::IsReachableGround(
+			GetWorld(),
+			GroundAnchor,
+			CandidateLocation,
+			MaxSpawnHeightAboveGroundAnchor);
 	};
 
 	for (const AActor* EnemySpawnPoint : EnemySpawnPoints)
@@ -412,13 +418,24 @@ FVector AGP_EnemySpawnVolume::GetSpawnPointNearMarker(const AGP_EnemySpawnMarker
 		return GetActorLocation();
 	}
 
-	FVector ReachableLocation;
-	bOutProjected = TryGetReachableSpawnPoint(
+	return GetSpawnPointNearLocation(
 		Marker->GetActorLocation(),
 		Marker->GetSpawnScatterRadius(),
-		GPEnemySpawnVolume::AuthoredPointProjectionExtent,
+		bOutProjected);
+}
+
+FVector AGP_EnemySpawnVolume::GetSpawnPointNearLocation(
+	const FVector& AnchorLocation,
+	float ScatterRadius,
+	bool& bOutProjected) const
+{
+	FVector ReachableLocation;
+	bOutProjected = TryGetReachableSpawnPoint(
+		AnchorLocation,
+		ScatterRadius,
+		GPEnemySpawnVolume::AuthoredPointSettings.ProjectionExtent,
 		ReachableLocation);
-	return bOutProjected ? ReachableLocation : Marker->GetActorLocation();
+	return bOutProjected ? ReachableLocation : AnchorLocation;
 }
 
 bool AGP_EnemySpawnVolume::IsPointInsideSpawnBox(const FVector& WorldLocation) const
@@ -457,10 +474,11 @@ bool AGP_EnemySpawnVolume::IsSpawnGroundLocationValid(
 	const FVector& CandidateGroundLocation) const
 {
 	return !GroundAnchor.ContainsNaN()
-		&& !CandidateGroundLocation.ContainsNaN()
-		&& IsPointInsideSpawnBox2D(CandidateGroundLocation)
-		&& CandidateGroundLocation.Z
-			<= GroundAnchor.Z + FMath::Max(0.0f, MaxSpawnHeightAboveGroundAnchor);
+		&& GPGroundPlacement::IsGroundRiseWithinLimit(
+			GroundAnchor,
+			CandidateGroundLocation,
+			MaxSpawnHeightAboveGroundAnchor)
+		&& IsPointInsideSpawnBox2D(CandidateGroundLocation);
 }
 
 bool AGP_EnemySpawnVolume::IsFinalSpawnGroundLocationValid(
@@ -468,11 +486,11 @@ bool AGP_EnemySpawnVolume::IsFinalSpawnGroundLocationValid(
 	const FVector& ActualGroundLocation) const
 {
 	return !RequestedGroundLocation.ContainsNaN()
-		&& !ActualGroundLocation.ContainsNaN()
-		&& IsPointInsideSpawnBox2D(ActualGroundLocation)
-		&& ActualGroundLocation.Z
-			<= RequestedGroundLocation.Z
-				+ FMath::Max(0.0f, MaxFinalSpawnHeightAboveNavmesh);
+		&& GPGroundPlacement::IsGroundRiseWithinLimit(
+			RequestedGroundLocation,
+			ActualGroundLocation,
+			MaxFinalSpawnHeightAboveNavmesh)
+		&& IsPointInsideSpawnBox2D(ActualGroundLocation);
 }
 
 void AGP_EnemySpawnVolume::CollectTaggedSpawnPoints()

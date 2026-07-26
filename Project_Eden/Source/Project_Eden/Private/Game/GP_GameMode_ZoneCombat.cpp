@@ -69,76 +69,244 @@ void AGP_GameMode::HandleMarkerTriggered(AGP_EnemySpawnVolume* Zone, AGP_EnemySp
 void AGP_GameMode::SpawnMarkerEnemies(AGP_EnemySpawnVolume* Zone, AGP_EnemySpawnMarker* Marker)
 {
 	UWorld* World = GetWorld();
-	if (!World || !IsValid(Zone) || !Marker)
+	if (bRunFinished || !World || !IsValid(Zone) || !IsValid(Marker))
 	{
 		return;
 	}
 
+	int32* PendingSpawnCount = nullptr;
+	if (bUseStagedZoneProgression)
+	{
+		FGPZoneRuntimeState* State = ZoneRuntimeStates.Find(Zone);
+		if (!State || !State->bStarted || State->bCompleted)
+		{
+			return;
+		}
+		PendingSpawnCount = &State->PendingEnemySpawns;
+	}
+	else
+	{
+		if (!OrderedZones.IsValidIndex(CurrentZoneIndex)
+			|| OrderedZones[CurrentZoneIndex] != Zone)
+		{
+			return;
+		}
+		PendingSpawnCount = &PendingZoneEnemySpawns;
+	}
+
+	int32 TotalSpawnCount = 0;
 	for (const FGP_EnemySpawnEntry& Entry : Marker->GetSpawns())
 	{
-		if (!*Entry.EnemyClass)
+		if (!*Entry.EnemyClass || Entry.Count <= 0)
+		{
+			if (Entry.Count > 0)
+			{
+				UE_LOG(LogTemp, Error,
+					TEXT("[GP_GameMode] Marker '%s' in zone '%s' has %d spawn(s) with no valid enemy class; those invalid entries remain ignored."),
+					*Marker->GetName(),
+					*Zone->GetZoneId().ToString(),
+					Entry.Count);
+			}
+			continue;
+		}
+		TotalSpawnCount += Entry.Count;
+	}
+
+	// Reserve every valid entry before attempting any of them. This prevents a
+	// fast death or a failed first entry from observing a transient zero and
+	// completing the one-shot marker encounter too early.
+	*PendingSpawnCount += TotalSpawnCount;
+	for (const FGP_EnemySpawnEntry& Entry : Marker->GetSpawns())
+	{
+		if (*Entry.EnemyClass && Entry.Count > 0)
+		{
+			SpawnMarkerEnemyBatch(
+				Zone,
+				Marker->GetActorLocation(),
+				Marker->GetSpawnScatterRadius(),
+				Marker->GetName(),
+				Entry.EnemyClass,
+				Entry.Count,
+				/*RetryCount=*/0);
+		}
+	}
+}
+
+void AGP_GameMode::SpawnMarkerEnemyBatch(
+	AGP_EnemySpawnVolume* Zone,
+	const FVector& MarkerLocation,
+	float MarkerScatterRadius,
+	const FString& MarkerName,
+	TSubclassOf<AGP_EnemyCharacter> EnemyClass,
+	int32 SpawnCount,
+	int32 RetryCount)
+{
+	UWorld* World = GetWorld();
+	if (bRunFinished
+		|| !IsValid(World)
+		|| !IsValid(Zone)
+		|| !*EnemyClass
+		|| SpawnCount <= 0)
+	{
+		return;
+	}
+
+	int32* PendingSpawnCount = nullptr;
+	if (bUseStagedZoneProgression)
+	{
+		FGPZoneRuntimeState* State = ZoneRuntimeStates.Find(Zone);
+		if (!State || !State->bStarted || State->bCompleted)
+		{
+			return;
+		}
+		PendingSpawnCount = &State->PendingEnemySpawns;
+	}
+	else
+	{
+		if (!OrderedZones.IsValidIndex(CurrentZoneIndex)
+			|| OrderedZones[CurrentZoneIndex] != Zone)
+		{
+			return;
+		}
+		PendingSpawnCount = &PendingZoneEnemySpawns;
+	}
+
+	int32 SpawnedCount = 0;
+	for (int32 SpawnIndex = 0; SpawnIndex < SpawnCount; ++SpawnIndex)
+	{
+		AGP_EnemyCharacter* SpawnedEnemy = nullptr;
+		for (int32 AttemptIndex = 0;
+			AttemptIndex < GPZoneCombat::ImmediatePlacementAttempts;
+			++AttemptIndex)
+		{
+			bool bProjected = false;
+			const FVector SpawnLocation =
+				Zone->GetSpawnPointNearLocation(
+					MarkerLocation,
+					MarkerScatterRadius,
+					bProjected);
+			if (!bProjected)
+			{
+				continue;
+			}
+
+			FActorSpawnParameters SpawnParameters;
+			SpawnParameters.SpawnCollisionHandlingOverride =
+				ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+			SpawnedEnemy = World->SpawnActor<AGP_EnemyCharacter>(
+				EnemyClass,
+				SpawnLocation,
+				FRotator::ZeroRotator,
+				SpawnParameters);
+			if (!IsValid(SpawnedEnemy))
+			{
+				continue;
+			}
+
+			if (!GPZoneCombat::IsEnemyPlacementValid(
+				*Zone,
+				SpawnLocation,
+				*SpawnedEnemy))
+			{
+				SpawnedEnemy->Destroy();
+				SpawnedEnemy = nullptr;
+				continue;
+			}
+			break;
+		}
+
+		if (!IsValid(SpawnedEnemy))
 		{
 			continue;
 		}
 
-		for (int32 SpawnIndex = 0; SpawnIndex < Entry.Count; ++SpawnIndex)
+		++SpawnedCount;
+		SpawnedEnemy->SpawnDefaultController();
+		RegisterZoneEnemy(SpawnedEnemy, Zone);
+	}
+
+	*PendingSpawnCount =
+		FMath::Max(0, *PendingSpawnCount - SpawnedCount);
+	const int32 PlacementFailures = SpawnCount - SpawnedCount;
+	if (PlacementFailures > 0)
+	{
+		const float RetryInterval =
+			FMath::Max(0.05f, ZoneNavigationRetryInterval);
+		const int32 WarningRetryCount = FMath::Max(
+			1,
+			FMath::CeilToInt(
+				ZoneNavigationReadyTimeout / RetryInterval));
+		if (RetryCount == 0)
 		{
-			AGP_EnemyCharacter* SpawnedEnemy = nullptr;
-			for (int32 AttemptIndex = 0;
-				AttemptIndex < GPZoneCombat::ImmediatePlacementAttempts;
-				++AttemptIndex)
-			{
-				bool bProjected = false;
-				const FVector SpawnLocation =
-					Zone->GetSpawnPointNearMarker(Marker, bProjected);
-				if (!bProjected)
+			UE_LOG(LogTemp, Warning,
+				TEXT("[GP_GameMode] Marker '%s' in zone '%s' is waiting to place %d enemy spawn(s) on safe ground."),
+				*MarkerName,
+				*Zone->GetZoneId().ToString(),
+				PlacementFailures);
+		}
+		else if (RetryCount == WarningRetryCount)
+		{
+			UE_LOG(LogTemp, Error,
+				TEXT("[GP_GameMode] Marker '%s' in zone '%s' still cannot place %d enemy spawn(s) after %.1f seconds; retries continue and progression remains blocked."),
+				*MarkerName,
+				*Zone->GetZoneId().ToString(),
+				PlacementFailures,
+				ZoneNavigationReadyTimeout);
+		}
+
+		const TWeakObjectPtr<AGP_EnemySpawnVolume> WeakZone = Zone;
+		const int32 NextRetryCount =
+			FMath::Min(RetryCount + 1, WarningRetryCount + 1);
+		FTimerHandle RetryTimer;
+		World->GetTimerManager().SetTimer(
+			RetryTimer,
+			FTimerDelegate::CreateWeakLambda(
+				this,
+				[this,
+					WeakZone,
+					MarkerLocation,
+					MarkerScatterRadius,
+					MarkerName,
+					EnemyClass,
+					PlacementFailures,
+					NextRetryCount]()
 				{
-					continue;
-				}
+					if (WeakZone.IsValid())
+					{
+						SpawnMarkerEnemyBatch(
+							WeakZone.Get(),
+							MarkerLocation,
+							MarkerScatterRadius,
+							MarkerName,
+							EnemyClass,
+							PlacementFailures,
+							NextRetryCount);
+					}
+				}),
+			RetryInterval,
+			false);
+	}
 
-				FActorSpawnParameters SpawnParameters;
-				SpawnParameters.SpawnCollisionHandlingOverride =
-					ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
-
-				SpawnedEnemy = World->SpawnActor<AGP_EnemyCharacter>(
-					Entry.EnemyClass,
-					SpawnLocation,
-					FRotator::ZeroRotator,
-					SpawnParameters);
-				if (!IsValid(SpawnedEnemy))
-				{
-					continue;
-				}
-
-				if (!GPZoneCombat::IsEnemyPlacementValid(
-					*Zone,
-					SpawnLocation,
-					*SpawnedEnemy))
-				{
-					SpawnedEnemy->Destroy();
-					SpawnedEnemy = nullptr;
-					continue;
-				}
-
-				break;
-			}
-
-			if (!IsValid(SpawnedEnemy))
-			{
-				UE_LOG(LogTemp, Warning,
-					TEXT("[GP_GameMode] Skipped marker spawn in zone '%s': no safe ground placement was available."),
-					*Zone->GetName());
-				continue;
-			}
-
-			SpawnedEnemy->SpawnDefaultController();
-			RegisterZoneEnemy(SpawnedEnemy, Zone);
+	if (RetryCount > 0)
+	{
+		if (bUseStagedZoneProgression)
+		{
+			MaybeCompleteStagedZone(Zone);
+		}
+		else
+		{
+			MaybeCompleteZone();
 		}
 	}
 }
 
 void AGP_GameMode::MaybeCompleteZone()
 {
+	if (bRunFinished)
+	{
+		return;
+	}
+
 	// In marker mode the zone clears only once every marker has fired and nothing is left alive.
 	const bool bAllMarkersDone = (MarkersTotal == 0) || (MarkersTriggered >= MarkersTotal);
 	if (bAllMarkersDone
@@ -290,16 +458,19 @@ void AGP_GameMode::SpawnZoneEnemyBatch(
 	const int32 MaxRetries = FMath::Max(
 		1,
 		FMath::CeilToInt(ZoneNavigationReadyTimeout / RetryInterval));
-	const bool bCanRetryPlacement =
-		PlacementFailures > 0 && RetryCount < MaxRetries;
-
-	if (!bCanRetryPlacement)
+	if (PlacementFailures > 0)
 	{
-		ResolvedSpawnCount += PlacementFailures;
-		if (PlacementFailures > 0)
+		if (RetryCount == 0)
+		{
+			UE_LOG(LogTemp, Warning,
+				TEXT("[GP_GameMode] Zone '%s' is waiting to place %d enemy spawn(s) on safe ground."),
+				*Zone->GetZoneId().ToString(),
+				PlacementFailures);
+		}
+		else if (RetryCount == MaxRetries)
 		{
 			UE_LOG(LogTemp, Error,
-				TEXT("[GP_GameMode] Zone '%s' abandoned %d enemy spawn(s): no safe navigation/collision placement was available for %.1f seconds."),
+				TEXT("[GP_GameMode] Zone '%s' still cannot place %d enemy spawn(s) after %.1f seconds; retries continue and progression remains blocked."),
 				*Zone->GetZoneId().ToString(),
 				PlacementFailures,
 				ZoneNavigationReadyTimeout);
@@ -308,15 +479,17 @@ void AGP_GameMode::SpawnZoneEnemyBatch(
 
 	*PendingSpawnCount = FMath::Max(0, *PendingSpawnCount - ResolvedSpawnCount);
 
-	if (bCanRetryPlacement)
+	if (PlacementFailures > 0)
 	{
 		const TWeakObjectPtr<AGP_EnemySpawnVolume> WeakZone = Zone;
+		const int32 NextRetryCount =
+			FMath::Min(RetryCount + 1, MaxRetries + 1);
 		FTimerHandle RetryTimer;
 		World->GetTimerManager().SetTimer(
 			RetryTimer,
 			FTimerDelegate::CreateWeakLambda(
 				this,
-				[this, WeakZone, EnemyClass, PlacementFailures, bRandomize, RetryCount]()
+				[this, WeakZone, EnemyClass, PlacementFailures, bRandomize, NextRetryCount]()
 				{
 					if (WeakZone.IsValid())
 					{
@@ -325,7 +498,7 @@ void AGP_GameMode::SpawnZoneEnemyBatch(
 							EnemyClass,
 							PlacementFailures,
 							bRandomize,
-							RetryCount + 1);
+							NextRetryCount);
 					}
 				}),
 			RetryInterval,
@@ -351,7 +524,7 @@ void AGP_GameMode::SpawnZoneEnemyBatch(
 int32 AGP_GameMode::SpawnZoneBossEnemies(AGP_EnemySpawnVolume* Zone)
 {
 	UWorld* World = GetWorld();
-	if (!IsValid(Zone) || !World)
+	if (bRunFinished || !IsValid(Zone) || !World)
 	{
 		return 0;
 	}
@@ -508,7 +681,7 @@ void AGP_GameMode::ScheduleZoneBossSpawnRetry(AGP_EnemySpawnVolume* Zone)
 		RetryTimer,
 		FTimerDelegate::CreateWeakLambda(this, [this, WeakZone]()
 		{
-			if (!WeakZone.IsValid())
+			if (bRunFinished || !WeakZone.IsValid())
 			{
 				return;
 			}

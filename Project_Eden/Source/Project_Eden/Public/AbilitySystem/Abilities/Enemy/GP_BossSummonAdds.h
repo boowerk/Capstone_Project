@@ -41,7 +41,19 @@ protected:
 
 private:
 	int32 CountAliveSummonedAdds();
-	bool TrySpawnSummonedAdd(AActor* AvatarActor, int32 SpawnIndex, int32 SpawnTotal);
+	bool TryGetSummonerGroundAnchor(
+		AActor* AvatarActor,
+		FVector& OutGroundAnchor) const;
+	bool TrySpawnSummonedAdd(
+		AActor* AvatarActor,
+		const FVector& SummonerGroundAnchor,
+		int32 SpawnIndex,
+		int32 SpawnTotal);
+
+	UFUNCTION()
+	void HandleSummonerDeath(
+		AGP_EnemyCharacter* Summoner,
+		AActor* DeathInstigator);
 
 	TArray<TWeakObjectPtr<AGP_EnemyCharacter>> SummonedAdds;
 };

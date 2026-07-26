@@ -3,6 +3,9 @@
 #include "Misc/AutomationTest.h"
 
 #include "Game/GP_EnemySpawnVolume.h"
+#include "Navigation/GP_GroundPlacement.h"
+
+#include <limits>
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FGPEnemySpawnGroundPolicyTest,
@@ -13,6 +16,34 @@ bool FGPEnemySpawnGroundPolicyTest::RunTest(const FString& Parameters)
 {
 	const AGP_EnemySpawnVolume* ZoneDefaults = GetDefault<AGP_EnemySpawnVolume>();
 	const FVector GroundAnchor = FVector::ZeroVector;
+
+	TestTrue(
+		TEXT("Shared ground policy accepts ordinary connected-ground rise"),
+		GPGroundPlacement::IsGroundRiseWithinLimit(
+			GroundAnchor,
+			FVector(0.0f, 0.0f, 250.0f),
+			250.0f));
+	TestFalse(
+		TEXT("Shared ground policy rejects roof-height rise"),
+		GPGroundPlacement::IsGroundRiseWithinLimit(
+			GroundAnchor,
+			FVector(0.0f, 0.0f, 251.0f),
+			250.0f));
+	TestTrue(
+		TEXT("Shared ground policy permits downward Level Instance correction"),
+		GPGroundPlacement::IsGroundRiseWithinLimit(
+			GroundAnchor,
+			FVector(0.0f, 0.0f, -1000.0f),
+			250.0f));
+	TestFalse(
+		TEXT("Shared ground policy rejects non-finite candidates"),
+		GPGroundPlacement::IsGroundRiseWithinLimit(
+			GroundAnchor,
+			FVector(
+				std::numeric_limits<FVector::FReal>::quiet_NaN(),
+				0.0f,
+				0.0f),
+			250.0f));
 
 	TestTrue(
 		TEXT("Normal connected-ground elevation remains valid"),

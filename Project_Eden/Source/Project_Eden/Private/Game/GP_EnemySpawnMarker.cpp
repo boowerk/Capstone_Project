@@ -2,6 +2,7 @@
 
 #include "Characters/GP_PlayerCharacter.h"
 #include "Components/SphereComponent.h"
+#include "TimerManager.h"
 
 AGP_EnemySpawnMarker::AGP_EnemySpawnMarker()
 {
@@ -36,21 +37,60 @@ void AGP_EnemySpawnMarker::BeginPlay()
 void AGP_EnemySpawnMarker::Activate(AGP_EnemySpawnVolume* OwningZone)
 {
 	OwnerZone = OwningZone;
-	bActive = true;
+	bActive = IsValid(OwningZone);
+	if (!bActive || bTriggered || GetNetMode() == NM_Client)
+	{
+		return;
+	}
+
+	// A player may already be inside this always-querying sphere when the zone
+	// arms it. Defer the scan so legacy StartZone can finish broadcasting its
+	// start event before an empty marker is allowed to complete the zone.
+	GetWorldTimerManager().SetTimerForNextTick(
+		FTimerDelegate::CreateWeakLambda(this, [this]()
+		{
+			EvaluateExistingOverlaps();
+		}));
 }
 
 void AGP_EnemySpawnMarker::HandleOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
 	UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
-	if (bTriggered || !bActive || !Cast<AGP_PlayerCharacter>(OtherActor))
+	TryTriggerForActor(OtherActor);
+}
+
+bool AGP_EnemySpawnMarker::TryTriggerForActor(AActor* OtherActor)
+{
+	if (bTriggered
+		|| !bActive
+		|| !IsValid(OwnerZone)
+		|| !Cast<AGP_PlayerCharacter>(OtherActor))
+	{
+		return false;
+	}
+
+	bTriggered = true;
+	OwnerZone->NotifyMarkerTriggered(this);
+	return true;
+}
+
+void AGP_EnemySpawnMarker::EvaluateExistingOverlaps()
+{
+	if (bTriggered || !bActive || !IsValid(OwnerZone) || !IsValid(Trigger))
 	{
 		return;
 	}
 
-	bTriggered = true;
-
-	if (IsValid(OwnerZone))
+	Trigger->UpdateOverlaps();
+	TArray<AActor*> OverlappingPlayers;
+	Trigger->GetOverlappingActors(
+		OverlappingPlayers,
+		AGP_PlayerCharacter::StaticClass());
+	for (AActor* OverlappingPlayer : OverlappingPlayers)
 	{
-		OwnerZone->NotifyMarkerTriggered(this);
+		if (TryTriggerForActor(OverlappingPlayer))
+		{
+			return;
+		}
 	}
 }
