@@ -504,3 +504,8 @@ Search first, then open only files named above.
 - Logout gate evaluation waits until the departing PlayerState has left `PlayerArray`; FinishRun clears retry callbacks before scheduling lobby return.
 - Verified: `Project_EdenEditor Win64 Development` and full `ProjectEden` automation 69/69.
 - Not verified: multiplayer PIE for a player already inside a marker when it activates, NavMesh delayed longer than 10 seconds, boss death with live adds, Center start after one waiting player disconnects, and active-Colosseum reconnect while NavMesh is rebuilding.
+
+### 2026-07-27 Dark Knight and Colosseum portal verification
+
+- Source and map fixes are uncommitted. Editor/Server Development builds and all six Dark Knight automation tests pass.
+- Run one cooked dedicated-server/client loop: verify Basic/Heavy/GroundCrack/DarkWave/Charge montages, Dark Wave projectile, authoritative charge movement, and Center completion spawning a working portal to the arena-floor Colosseum destination.

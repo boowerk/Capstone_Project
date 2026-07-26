@@ -112,9 +112,16 @@ private:
 	void ClearPatternTimers();
 	void ApplyDarkKnightTelegraphSystem();
 	bool IsPatternInterrupted() const;
+	bool PlayDarkKnightMontage(UAnimMontage* MontageToPlay);
 	void SpawnDarkWaveVolley(AActor* TargetActor, int32 ProjectileCount);
 	void SpawnGroundCracks(AActor* TargetActor);
 	bool ExecutePatternNow(FGameplayTag PatternTag, AActor* TargetActor);
+
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastPlayDarkKnightMontage(UAnimMontage* MontageToPlay);
+
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastStopDarkKnightMontages(float BlendOutTime);
 
 	UFUNCTION()
 	void HandleGroggyChanged(bool bNewGroggy);
@@ -154,6 +161,10 @@ private:
 	/** Shared pre-attack stance; actual strike montage starts after this readable cue. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Dark Knight|Animation", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UAnimMontage> PreAttackMontage;
+
+	/** Cook-safe authored sword slash used by Dark Wave instead of a runtime string lookup. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Dark Knight|Animation", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UAnimMontage> DarkWaveAttackMontage;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Dark Knight|Animation", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "s"))
 	float PreAttackDuration = 1.0f;

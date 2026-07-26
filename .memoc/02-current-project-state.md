@@ -434,3 +434,10 @@ See `.memoc/worklog/` and generated `.memoc/activity.md`.
 - `MF_RegionGround_Grassland1` now feeds its original material attributes and `MF_RS_GravelDryEarth` into `BlendMaterialAttributes`.
 - `T_RegionGround_MacroNoise_1024.R` controls the spatial blend, so the surface is no longer a single material over the whole state.
 - The material function compiles and is saved; only a visual scale/ratio pass in a known State 1 region remains.
+
+### 2026-07-27 Dark Knight client presentation and Colosseum portal
+
+- Dark Knight montage playback remains authoritative while reliable multicasts mirror windup/attack playback and groggy interruption to clients. Dedicated servers use `AlwaysTickPoseAndRefreshBones` for charge root motion.
+- Dark Wave again spawns `DarkWaveProjectileClass`; `AM_DK_DarkSlash` is a cook-safe hard reference, and the obsolete overlapping cone hit was not retained.
+- `L_LandscapeMap` contains an arena-floor actor tagged `EnemySpawnPoint` inside `Colosseum_01`, enabling staged-portal destination projection.
+- Editor and Server Development builds pass; all six `ProjectEden.Combat.DarkArmorKnight` tests pass.

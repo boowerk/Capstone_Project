@@ -118,6 +118,12 @@ AGP_DarkArmorKnightBossCharacter::AGP_DarkArmorKnightBossCharacter()
 	{
 		PreAttackMontage = PreAttackMontageFinder.Object;
 	}
+	static ConstructorHelpers::FObjectFinder<UAnimMontage> DarkWaveAttackMontageFinder(
+		TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_DarkArmorKnight/Animations/AM_DK_DarkSlash.AM_DK_DarkSlash"));
+	if (DarkWaveAttackMontageFinder.Succeeded())
+	{
+		DarkWaveAttackMontage = DarkWaveAttackMontageFinder.Object;
+	}
 
 	DarkKnightAbilityClasses =
 	{
@@ -146,6 +152,10 @@ AGP_DarkArmorKnightBossCharacter::AGP_DarkArmorKnightBossCharacter()
 		// The supplied knightBoss asset is skeletal, so the character mesh owns it directly.
 		GetMesh()->SetSkeletalMesh(KnightMeshFinder.Object);
 	}
+	// Charge root motion is authoritative. Dedicated servers must evaluate the
+	// montage even though this mesh is never rendered there.
+	GetMesh()->VisibilityBasedAnimTickOption =
+		EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
 
 	static ConstructorHelpers::FClassFinder<UGameplayEffect> DamageEffectFinder(TEXT("/Game/GAS_Pattern/AbilitySystem/GameplayEffects/Damage/GE_PrimaryDamage"));
 	if (DamageEffectFinder.Succeeded())
@@ -499,7 +509,7 @@ bool AGP_DarkArmorKnightBossCharacter::ExecuteChargeAttack(AActor* TargetActor)
 bool AGP_DarkArmorKnightBossCharacter::ExecuteDarkWave(AActor* TargetActor)
 {
 	TargetActor = ResolvePatternTarget(TargetActor);
-	if (!HasAuthority() || !IsValid(TargetActor))
+	if (!HasAuthority() || !IsValid(TargetActor) || !*DarkWaveProjectileClass)
 	{
 		return false;
 	}
@@ -509,11 +519,11 @@ bool AGP_DarkArmorKnightBossCharacter::ExecuteDarkWave(AActor* TargetActor)
 	for (int32 Index = 0; Index < SlashCount; ++Index)
 	{
 		FTimerHandle& Handle = PatternTimerHandles.AddDefaulted_GetRef();
-		GetWorldTimerManager().SetTimer(Handle, [WeakThis = TWeakObjectPtr<AGP_DarkArmorKnightBossCharacter>(this)]()
+		GetWorldTimerManager().SetTimer(Handle, [WeakThis = TWeakObjectPtr<AGP_DarkArmorKnightBossCharacter>(this), WeakTarget = TWeakObjectPtr<AActor>(TargetActor)]()
 		{
-			if (WeakThis.IsValid() && !WeakThis->IsPatternInterrupted())
+			if (WeakThis.IsValid() && WeakTarget.IsValid() && !WeakThis->IsPatternInterrupted())
 			{
-				WeakThis->ApplyConeDamage(WeakThis->GetDarkWaveMaxRange(), 60.0f, 1.35f, 325.0f);
+				WeakThis->SpawnDarkWaveVolley(WeakTarget.Get(), 1);
 			}
 		}, 0.78f + Index * 0.30f, false);
 	}
@@ -557,8 +567,7 @@ bool AGP_DarkArmorKnightBossCharacter::StartPatternWithWindup(FGameplayTag Patte
 	bool bWindupStarted = false;
 	if (bUsesWindup && IsValid(PreAttackMontage))
 	{
-		UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
-		if (!IsValid(AnimInstance) || AnimInstance->Montage_Play(PreAttackMontage, 1.0f) <= 0.0f)
+		if (!PlayDarkKnightMontage(PreAttackMontage))
 		{
 			return false;
 		}
@@ -613,15 +622,50 @@ bool AGP_DarkArmorKnightBossCharacter::PlayPatternMontage(FGameplayTag PatternTa
 	// Dark Wave is delivered with the authored sword slash, not the old cast pose.
 	if (PatternTag == GPTags::Ability::Boss::DarkKnight::DarkWave)
 	{
-		MontageToPlay = LoadObject<UAnimMontage>(nullptr, TEXT("/Game/Characters/EnemyCharacter/Boss/BP_Boss_DarkArmorKnight/Animations/AM_DK_DarkSlash.AM_DK_DarkSlash"));
+		MontageToPlay = DarkWaveAttackMontage;
 	}
-	UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
-	if (!IsValid(MontageToPlay) || !IsValid(AnimInstance))
+	return PlayDarkKnightMontage(MontageToPlay);
+}
+
+bool AGP_DarkArmorKnightBossCharacter::PlayDarkKnightMontage(UAnimMontage* MontageToPlay)
+{
+	if (!HasAuthority() || !IsValid(MontageToPlay))
 	{
 		return false;
 	}
 
-	return AnimInstance->Montage_Play(MontageToPlay, 1.0f) > 0.0f;
+	UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
+	if (!IsValid(AnimInstance) || AnimInstance->Montage_Play(MontageToPlay, 1.0f) <= 0.0f)
+	{
+		return false;
+	}
+
+	// AI attacks originate on the dedicated server. Mirror the authored montage
+	// to simulated clients while keeping the authority copy for root motion.
+	MulticastPlayDarkKnightMontage(MontageToPlay);
+	return true;
+}
+
+void AGP_DarkArmorKnightBossCharacter::MulticastPlayDarkKnightMontage_Implementation(UAnimMontage* MontageToPlay)
+{
+	// PlayDarkKnightMontage already started the authority copy used by root motion.
+	if (HasAuthority() || !IsValid(MontageToPlay))
+	{
+		return;
+	}
+
+	if (UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr)
+	{
+		AnimInstance->Montage_Play(MontageToPlay, 1.0f);
+	}
+}
+
+void AGP_DarkArmorKnightBossCharacter::MulticastStopDarkKnightMontages_Implementation(float BlendOutTime)
+{
+	if (UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr)
+	{
+		AnimInstance->Montage_Stop(BlendOutTime);
+	}
 }
 
 void AGP_DarkArmorKnightBossCharacter::HandleChargeFinished(bool bHitTarget, AActor* TargetActor)
@@ -845,10 +889,7 @@ void AGP_DarkArmorKnightBossCharacter::HandleGroggyChanged(bool bNewGroggy)
 			ActiveChargeActor->Destroy();
 		}
 		ActiveChargeActor.Reset();
-		if (UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr)
-		{
-			AnimInstance->Montage_Stop(0.12f);
-		}
+		MulticastStopDarkKnightMontages(0.12f);
 	}
 	if (UCharacterMovementComponent* Movement = GetCharacterMovement())
 	{
