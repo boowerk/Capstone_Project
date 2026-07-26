@@ -129,3 +129,5 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 ### 2026-07-26
 - Player recovery respects staged progression: an incomplete assigned Outer recovers at that village's existing `PlayerStart`; after that Outer is complete, recovery may join a living teammate.
 - Keep the normal Windows-subsystem dedicated-server executable for deployment compatibility and build a `-Cmd.exe` sibling for local administration. Launcher BATs prefer the console sibling and use Unreal's native package/sandbox log path instead of assuming the editor `Saved/Logs` directory.
+- Treat tagged enemy spawn points as trusted ground anchors: project them with a tight vertical extent, scatter only on the same reachable NavMesh island, and fail closed while authored anchors are unavailable. Never widen to arbitrary roof NavMesh as a fallback.
+- Keep the boss-only broad vertical projection for Level Instance offsets, but accept it only when a tight ground anchor can path to the candidate. Revalidate the spawned capsule foot separately with a strict `50cm` upward allowance and retry unsafe or partial boss placement.

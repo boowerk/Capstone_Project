@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-26T01:41:58+09:00
+updated: 2026-07-26T18:16:00+09:00
 status: active
 tags:
   - memoc
@@ -11,10 +11,11 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-07-26T01:41:58+09:00
+Last synced: 2026-07-26T18:16:00+09:00
 
 ## Current Status
 
+- Enemy rooftop spawning is fixed in `04b98379` on `fix/grounded-enemy-spawns`. Regular and marker spawns now project a tight trusted ground anchor, scatter only through `GetRandomReachablePointInRadius`, reject roof-like vertical rises, and fail closed instead of widening to an unrelated NavMesh island. Boss broad projection is retained for vertically offset Level Instances but must be path-reachable from a tight ground anchor. Collision-adjusted capsule feet are revalidated, unsafe placements retry without completing the zone, and multi-boss partial placement rolls back before retry. `Project_EdenEditor` builds; `ProjectEden.Game.EnemySpawnPlacement` and `ProjectEden.Game.ZoneProgression` pass. Village PIE verification remains.
 - The safe code-centered refactor checkpoint is committed through `c6efa133` on `refactor/codebase-cleanup`; local `main` remains aligned with `origin/main` at `187a8bb4`. All 38 automation source files/65 cases now live in the Editor-only `Project_EdenTests` module, and native gameplay tags are exported across module boundaries. `GP_VillageLayoutDirector.cpp` is reduced to selection/lifecycle policy while runtime streaming and PCG orchestration live in focused translation units; `GP_GameMode.cpp` similarly delegates smoke-probe and Zone-combat implementation. Editor/Server Development builds pass, and the full `ProjectEden` automation suite passes 65/65. No serialized asset contract or intended runtime behavior changed.
 - `origin/feature/run-result-ui` is merged into `main`: player elimination/recovery, spectating, party defeat policy, and native victory/defeat/eliminated presentation coexist with the initial Outer loading gate. The conflict union preserves both persistent weapon construction and enemy target refresh. Editor Development build and `ProjectEden.RunOutcome.PartyDefeatPolicy` pass.
 - Client village visual-ready ACK now retries local controller discovery for up to 10 seconds and clears its timer on success/end play. The four affected StylizedProvencal roof/wall/decal materials are saved with Instanced Static Mesh usage, and the current `L_LandscapeMap` is committed. The obsolete RegionID GPU-to-CPU availability experiment was restored because vegetation no longer samples that texture.

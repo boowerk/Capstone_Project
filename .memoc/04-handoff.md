@@ -477,3 +477,10 @@ Search first, then open only files named above.
 - Equip a ground-target skill and verify only its decal appears while the OS/software pointer stays hidden; Q/E test slots were empty during the automated PIE attempt.
 - Existing unrelated warnings remain: PCG Bounds Modifier receives multiple BoundsMin/BoundsMax items, PCGEx ResamplePath can receive fewer than two points, and Fab fence constructor assets are missing.
 - Dedicated-server console support is uncommitted. `Project_EdenServer.Target.cs` builds `Project_EdenServer-Cmd.exe`; local and cooked launch BATs prefer it, keep a visible live-log CMD window, and print the actual server sandbox/package log file. Local verification loaded LobbyMap, listened on port 7778, and wrote `Saved/Cooked/WindowsServer/Project_Eden/Saved/Logs/Project_EdenServer.log`.
+
+### 2026-07-26 Grounded enemy spawning
+
+- Commit `04b98379` on `fix/grounded-enemy-spawns` removes the intermittent roof-spawn path. `EnemySpawnPoint`/marker scatter now stays on the ground anchor's reachable NavMesh island; authored failures return pending instead of using a broad SpawnBox query.
+- Bosses retain the `800cm` projection needed by vertically offset Level Instances, but broad candidates must be path-connected to a tight zone ground anchor. Collision-adjusted capsule feet above the requested nav floor are rejected; partial boss batches roll back and retry.
+- Verified: `Project_EdenEditor Win64 Development`, `ProjectEden.Game.EnemySpawnPlacement.GroundPolicy`, and `ProjectEden.Game.ZoneProgression.Contracts`.
+- Not verified: a live/PIE multi-wave sweep across `L_Village_00..03`. Watch for intentional elevated combat platforms that may need a larger per-zone `MaxSpawnHeightAboveGroundAnchor`; do not disable the connected-nav requirement.
