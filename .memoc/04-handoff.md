@@ -360,6 +360,7 @@ _None yet._
 
 ## Verified
 
+- 2026-07-26 Dark Knight/skill-range VFX cleanup: `Project_EdenEditor Win64 Development` built successfully. `ProjectEden.Combat` completed 19/19 with zero non-success results, including Dark Knight Charge/GroundCrack/DarkWave visual contracts, production telegraph override, and `SkillTargetPreview.UsesEmissiveDecal`. Branch commits are `1ec905b6`, `0b4e5d4d`, and `57af6e32`.
 - 2026-07-21 origin merge: `Project_EdenEditor Win64 Development` build passed; `ProjectEden.AI` 22/22, `ProjectEden.Combat.DarkArmorKnight` 6/6, `ProjectEden.Game.Network` 2/2, and `ProjectEden.Game.Lobby` 2/2 passed without live server execution.
 - `ABP_UEFNSource_Player` compiles and saves.
 - `BP_GP_PlayerCharacter` CDO shows `UEFNSourceMesh.animClass = /Game/Characters/PlayerCharacter/ABP_UEFNSource_Player.ABP_UEFNSource_Player_C`.
@@ -388,6 +389,7 @@ _None yet._
 
 ## Not Verified
 
+- 2026-07-26 PIE visual check remains for the Dark Knight Charge lane, Ground Crack radius/impact, Dark Wave orientation/scale, and player ground-skill range on both bright and very dark uneven terrain. No live multiplayer session was run because the user did not request one.
 - 2026-07-23 Prism shield-surface reflection and `PrismBodyCollision` passed full UBT. PIE-check body blocking, foot IK, and surface reflection location.
 - 2026-07-23 Reflection now disables the incoming laser `DamageBox` and spawns its outbound segment visual-only. The source compiled successfully, but final DLL linking is pending because `UnrealEditor.exe` still holds `UnrealEditor-Project_Eden.dll`. PIE-check that shielded reflection deals no player damage while an unreflected beam still does.
 - 2026-06-24 boss target marker VFX death cleanup is built and automated, but PIE still needs a multiplayer visual check for death, first acquisition, and target swaps.

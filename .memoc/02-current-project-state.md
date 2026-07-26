@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-26T01:41:58+09:00
+updated: 2026-07-26T16:58:04+09:00
 status: active
 tags:
   - memoc
@@ -11,10 +11,11 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-07-26T01:41:58+09:00
+Last synced: 2026-07-26T16:58:04+09:00
 
 ## Current Status
 
+- Branch `fix/dark-knight-skill-vfx-visibility` now contains three focused commits from `refactor/codebase-cleanup` HEAD `22604db3`: `1ec905b6` adds a reusable emissive circular deferred-decal material, `0b4e5d4d` replaces Dark Knight engine Cube/Cylinder and mesh-rendering example cues with decals plus sprite-only Niagara systems, and `57af6e32` moves the player ground-skill range preview to that lighting-independent material. Gameplay radii, charge distance, collision, damage, and timing are unchanged. `Project_EdenEditor Win64 Development` builds, and all 19 `ProjectEden.Combat` automation cases pass. PIE visual confirmation in representative dark/uneven regions remains.
 - The safe code-centered refactor checkpoint is committed through `c6efa133` on `refactor/codebase-cleanup`; local `main` remains aligned with `origin/main` at `187a8bb4`. All 38 automation source files/65 cases now live in the Editor-only `Project_EdenTests` module, and native gameplay tags are exported across module boundaries. `GP_VillageLayoutDirector.cpp` is reduced to selection/lifecycle policy while runtime streaming and PCG orchestration live in focused translation units; `GP_GameMode.cpp` similarly delegates smoke-probe and Zone-combat implementation. Editor/Server Development builds pass, and the full `ProjectEden` automation suite passes 65/65. No serialized asset contract or intended runtime behavior changed.
 - `origin/feature/run-result-ui` is merged into `main`: player elimination/recovery, spectating, party defeat policy, and native victory/defeat/eliminated presentation coexist with the initial Outer loading gate. The conflict union preserves both persistent weapon construction and enemy target refresh. Editor Development build and `ProjectEden.RunOutcome.PartyDefeatPolicy` pass.
 - Client village visual-ready ACK now retries local controller discovery for up to 10 seconds and clears its timer on success/end play. The four affected StylizedProvencal roof/wall/decal materials are saved with Instanced Static Mesh usage, and the current `L_LandscapeMap` is committed. The obsolete RegionID GPU-to-CPU availability experiment was restored because vegetation no longer samples that texture.
