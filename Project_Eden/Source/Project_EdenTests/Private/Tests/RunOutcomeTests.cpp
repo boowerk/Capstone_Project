@@ -1,7 +1,10 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Game/GP_RunProgressionPolicy.h"
+#include "Game/GP_GameMode.h"
+#include "Engine/World.h"
 #include "Misc/AutomationTest.h"
+#include "TimerManager.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FGPPartyDefeatPolicyTest,
@@ -26,6 +29,55 @@ bool FGPPartyDefeatPolicyTest::RunTest(const FString& Parameters)
 		TEXT("Solo elimination ends a solo run"),
 		GPRunProgressionPolicy::IsPartyDefeated(1, 1));
 	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FGPFinishRunClearsPendingCallbacksTest,
+	"ProjectEden.RunOutcome.FinishClearsPendingCallbacks",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FGPFinishRunClearsPendingCallbacksTest::RunTest(
+	const FString& Parameters)
+{
+	UWorld* TestWorld = UWorld::CreateWorld(EWorldType::Game, false);
+	if (!TestNotNull(TEXT("Created run-outcome test world"), TestWorld))
+	{
+		return false;
+	}
+
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.SpawnCollisionHandlingOverride =
+		ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AGP_GameMode* GameMode = TestWorld->SpawnActor<AGP_GameMode>(
+		FVector::ZeroVector,
+		FRotator::ZeroRotator,
+		SpawnParameters);
+	if (!TestNotNull(TEXT("Spawned gameplay GameMode"), GameMode))
+	{
+		TestWorld->DestroyWorld(false);
+		return false;
+	}
+
+	FTimerHandle PendingCallbackHandle;
+	TestWorld->GetTimerManager().SetTimer(
+		PendingCallbackHandle,
+		GameMode,
+		&AGP_GameMode::NotifyAllPlayersDead,
+		60.0f,
+		false);
+	TestTrue(
+		TEXT("Object-bound callback exists before the run finishes"),
+		TestWorld->GetTimerManager().TimerExists(
+			PendingCallbackHandle));
+
+	GameMode->NotifyAllPlayersDead();
+	TestFalse(
+		TEXT("Finishing the run clears pre-existing GameMode callbacks"),
+		TestWorld->GetTimerManager().TimerExists(
+			PendingCallbackHandle));
+
+	TestWorld->DestroyWorld(false);
+	return !HasAnyErrors();
 }
 
 #endif

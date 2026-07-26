@@ -184,6 +184,8 @@ private:
 		ColosseumIntroZonesByAnimator;
 	TMap<TWeakObjectPtr<AGP_EnemySpawnVolume>, int32> ZoneNavigationStartRetries;
 	TMap<TWeakObjectPtr<AGP_EnemySpawnVolume>, FTimerHandle> ZoneNavigationStartRetryTimers;
+	TMap<TWeakObjectPtr<AController>, int32> ColosseumRelocationRetryCounts;
+	TMap<TWeakObjectPtr<AController>, FTimerHandle> ColosseumRelocationRetryTimers;
 	TSet<EGPZoneStage> UnlockedStages;
 	TSet<TWeakObjectPtr<AGP_EnemySpawnVolume>> RegisteredNavigationInvokerZones;
 	TMap<TWeakObjectPtr<APlayerController>, int32> VillageVisualReadyRevisions;
@@ -241,6 +243,14 @@ private:
 	int32 SpawnZoneBossEnemies(AGP_EnemySpawnVolume* Zone);
 	void ScheduleZoneBossSpawnRetry(AGP_EnemySpawnVolume* Zone);
 	void SpawnMarkerEnemies(AGP_EnemySpawnVolume* Zone, AGP_EnemySpawnMarker* Marker);
+	void SpawnMarkerEnemyBatch(
+		AGP_EnemySpawnVolume* Zone,
+		const FVector& MarkerLocation,
+		float MarkerScatterRadius,
+		const FString& MarkerName,
+		TSubclassOf<AGP_EnemyCharacter> EnemyClass,
+		int32 SpawnCount,
+		int32 RetryCount);
 	void RegisterZoneEnemy(
 		AGP_EnemyCharacter* Enemy,
 		AGP_EnemySpawnVolume* OwningZone = nullptr);
@@ -253,6 +263,7 @@ private:
 	void ReturnToLobby();
 	void UnlockStage(EGPZoneStage Stage);
 	void StartStagedZone(AGP_EnemySpawnVolume* Zone);
+	void TryStartPendingCenterZones();
 	void TryStartColosseumIntro(AGP_EnemySpawnVolume* Zone);
 	void TryStartPendingColosseumIntros();
 	AGP_LevelBuildAnimator* FindColosseumBuildAnimator(

@@ -1,4 +1,5 @@
 #include "Actors/GP_Projectile.h"
+#include "AbilitySystem/Abilities/GP_GameplayAbility.h"
 #include "AbilitySystem/Abilities/GP_SkillData.h"
 #include "Components/ShapeComponent.h" 
 #include "GameFramework/ProjectileMovementComponent.h"
@@ -149,7 +150,7 @@ void AGP_Projectile::OnProjectileOverlap(UPrimitiveComponent* OverlappedComponen
 				GetActorLocation(),
 				SkillData->SplashRadius * SplashRadiusMultiplier,
 				GetInstigator(),
-				SkillData->bDrawSplashDebug);
+				SkillData->bDrawSplashDebug && UGP_GameplayAbility::IsSkillDebugDrawEnabled());
 			SplashActors.Remove(OtherActor);
 
 			UGP_BlueprintLibrary::ApplyGameplayEffectAndEventToActors(

@@ -17,6 +17,11 @@ void UGP_GameInstance::Init()
 
 	if (GEngine)
 	{
+		// Keep transient engine debug messages out of normal gameplay in every build
+		// configuration. Individual debug tools use their own explicit opt-in gates.
+		GEngine->bEnableOnScreenDebugMessages = false;
+		GEngine->bEnableOnScreenDebugMessagesDisplay = false;
+
 		GEngine->OnNetworkFailure().AddUObject(this, &UGP_GameInstance::HandleNetworkFailure);
 		GEngine->OnTravelFailure().AddUObject(this, &UGP_GameInstance::HandleTravelFailure);
 	}

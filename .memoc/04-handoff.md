@@ -23,6 +23,15 @@ tags:
 ---
 # Agent Handoff
 
+## Runtime Debug Visibility Handoff (2026-07-26)
+
+- Branch `fix/runtime-debug-visibility` keeps the F1 attribute widget and F9 Encounter panel unchanged while disabling transient engine screen messages and default gameplay-world debug primitives.
+- `g.DrawSkillDebug` defaults to `0`, is non-Shipping development opt-in only, and is consulted by skill overlap helpers plus Bull/Chain/Matador/LifeDrain/Projectile paths. Village selection drawing is separately default-off and double-opted-in.
+- Production decals, Niagara, preview actors, damage/overlap results, replication, and timers were not routed through the debug gate. Post-action motion trajectory correction was separated from `bEnableDebugLog`.
+- Verification: `Project_EdenEditor Win64 Development` succeeded; full `ProjectEden` automation passed 70/70; direct C++ `AddOnScreenDebugMessage`/`PrintString` search is empty; `git diff --check` passed.
+- Manual PIE gate: trigger representative player skills and Matador/Dark Knight attacks, confirm no debug lines/boxes/spheres or transient screen text, then confirm F1 and F9 still open their dedicated UMG tools.
+- Known presentation decision: Matador Bull's orange `DrawDebug` line/box was its only directional warning. It is now hidden as requested. If the attack still needs a warning, implement a replicated production decal/Niagara telegraph rather than re-enabling DrawDebug.
+
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -477,3 +486,19 @@ Search first, then open only files named above.
 - Equip a ground-target skill and verify only its decal appears while the OS/software pointer stays hidden; Q/E test slots were empty during the automated PIE attempt.
 - Existing unrelated warnings remain: PCG Bounds Modifier receives multiple BoundsMin/BoundsMax items, PCGEx ResamplePath can receive fewer than two points, and Fab fence constructor assets are missing.
 - Dedicated-server console support is uncommitted. `Project_EdenServer.Target.cs` builds `Project_EdenServer-Cmd.exe`; local and cooked launch BATs prefer it, keep a visible live-log CMD window, and print the actual server sandbox/package log file. Local verification loaded LobbyMap, listened on port 7778, and wrote `Saved/Cooked/WindowsServer/Project_Eden/Saved/Logs/Project_EdenServer.log`.
+
+### 2026-07-26 Grounded enemy spawning
+
+- Commit `04b98379` on `fix/grounded-enemy-spawns` removes the intermittent roof-spawn path. `EnemySpawnPoint`/marker scatter now stays on the ground anchor's reachable NavMesh island; authored failures return pending instead of using a broad SpawnBox query.
+- Bosses retain the `800cm` projection needed by vertically offset Level Instances, but broad candidates must be path-connected to a tight zone ground anchor. Collision-adjusted capsule feet above the requested nav floor are rejected; partial boss batches roll back and retry.
+- Verified: `Project_EdenEditor Win64 Development`, `ProjectEden.Game.EnemySpawnPlacement.GroundPolicy`, and `ProjectEden.Game.ZoneProgression.Contracts`.
+- Not verified: a live/PIE multi-wave sweep across `L_Village_00..03`. Watch for intentional elevated combat platforms that may need a larger per-zone `MaxSpawnHeightAboveGroundAnchor`; do not disable the connected-nav requirement.
+
+### 2026-07-26 Encounter spawn lifecycle
+
+- Branch `fix/encounter-spawn-lifecycle` extends the grounded-spawn fix without changing configured enemy classes, counts, marker radii, recovery candidate order, or zone-completion ownership.
+- Marker, zone-batch, staged-portal, and active-Colosseum safe-placement failures remain pending and retry. The configured timeout is now a one-time diagnostic threshold rather than a content-abandonment point.
+- Boss summoned adds use connected ground alternatives and final-foot validation, then retire through normal enemy death presentation when the boss dies. They intentionally do not become zone objectives.
+- Logout gate evaluation waits until the departing PlayerState has left `PlayerArray`; FinishRun clears retry callbacks before scheduling lobby return.
+- Verified: `Project_EdenEditor Win64 Development` and full `ProjectEden` automation 69/69.
+- Not verified: multiplayer PIE for a player already inside a marker when it activates, NavMesh delayed longer than 10 seconds, boss death with live adds, Center start after one waiting player disconnects, and active-Colosseum reconnect while NavMesh is rebuilding.

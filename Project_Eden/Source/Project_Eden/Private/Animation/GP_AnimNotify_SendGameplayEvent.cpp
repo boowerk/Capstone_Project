@@ -41,11 +41,6 @@ void UGP_AnimNotify_SendGameplayEvent::Notify(USkeletalMeshComponent* MeshComp, 
 	{
 		SendEvent(GPTags::Ability::Skill::Primary);
 	}
-	// if (GEngine)
-	// {
-	// 	FString DebugMsg = FString::Printf(TEXT("노티파이 발동 액터: %s / 태그: %s"), *OwnerActor->GetName(), *GameplayEventTag.ToString());
-	// 	GEngine->AddOnScreenDebugMessage(-1, 3.0f, FColor::Yellow, DebugMsg);
-	// }
 }
 
 FString UGP_AnimNotify_SendGameplayEvent::GetNotifyName_Implementation() const

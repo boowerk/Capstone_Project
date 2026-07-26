@@ -26,7 +26,6 @@
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraSystem.h"
 #include "NavigationInvokerComponent.h"
-#include "NavigationSystem.h"
 #include "Player/GP_PlayerController.h"
 #include "UObject/ConstructorHelpers.h"
 #include "AI/Controllers/EnemyAIController.h"
@@ -51,6 +50,7 @@
 #include "Utils/GP_BlueprintLibrary.h"
 #include "Game/GP_GameMode.h"
 #include "Game/GP_GameState.h"
+#include "Navigation/GP_GroundPlacement.h"
 
 static int32 GGPActionInertiaDebug = 0;
 static FAutoConsoleVariableRef CVarGPActionInertiaDebug(
@@ -1536,9 +1536,8 @@ void AGP_PlayerCharacter::TryRecoverFromElimination()
 
 	const float SideSign = (GPPlayerState->GetPlayerId() & 1) == 0 ? 1.0f : -1.0f;
 	UWorld* World = GetWorld();
-	UNavigationSystemV1* NavigationSystem = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
 	UCapsuleComponent* Capsule = GetCapsuleComponent();
-	if (!IsValid(NavigationSystem) || !IsValid(Capsule))
+	if (!IsValid(World) || !IsValid(Capsule))
 	{
 		ScheduleRecoveryRetry();
 		return;
@@ -1559,6 +1558,23 @@ void AGP_PlayerCharacter::TryRecoverFromElimination()
 		AnchorLocation + AnchorForward * 300.0f
 	};
 
+	const FGPGroundPlacementSettings RecoveryGroundSettings
+	{
+		FVector(300.0f, 300.0f, 500.0f),
+		250.0f,
+		8
+	};
+	FVector RecoveryGroundAnchor;
+	if (!GPGroundPlacement::TryProjectGroundAnchor(
+			World,
+			AnchorLocation,
+			RecoveryGroundSettings,
+			RecoveryGroundAnchor))
+	{
+		ScheduleRecoveryRetry();
+		return;
+	}
+
 	const float CapsuleRadius = Capsule->GetScaledCapsuleRadius();
 	const float CapsuleHalfHeight = Capsule->GetScaledCapsuleHalfHeight();
 	const FCollisionShape RecoveryCapsule = FCollisionShape::MakeCapsule(
@@ -1571,16 +1587,18 @@ void AGP_PlayerCharacter::TryRecoverFromElimination()
 	bool bFoundSafeRecoveryLocation = false;
 	for (const FVector& RecoveryCandidate : RecoveryCandidates)
 	{
-		FNavLocation ProjectedRecoveryLocation;
-		if (!NavigationSystem->ProjectPointToNavigation(
+		FVector ProjectedRecoveryGround;
+		if (!GPGroundPlacement::TryProjectReachableGround(
+			World,
+			RecoveryGroundAnchor,
 			RecoveryCandidate,
-			ProjectedRecoveryLocation,
-			FVector(300.0f, 300.0f, 500.0f)))
+			RecoveryGroundSettings,
+			ProjectedRecoveryGround))
 		{
 			continue;
 		}
 
-		const FVector CandidateCapsuleCenter = ProjectedRecoveryLocation.Location
+		const FVector CandidateCapsuleCenter = ProjectedRecoveryGround
 			+ FVector(0.0f, 0.0f, CapsuleHalfHeight + 2.0f);
 		if (World->OverlapBlockingTestByProfile(
 			CandidateCapsuleCenter,

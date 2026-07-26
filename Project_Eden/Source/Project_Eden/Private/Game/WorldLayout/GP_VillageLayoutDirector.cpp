@@ -10,8 +10,29 @@
 #include "Game/WorldLayout/GP_VillagePresetCatalog.h"
 #include "Game/WorldLayout/GP_VillageSelectionPolicy.h"
 #include "Game/WorldLayout/GP_VillageSlot.h"
+#include "HAL/IConsoleManager.h"
 #include "Net/UnrealNetwork.h"
 #include "UObject/ConstructorHelpers.h"
+
+namespace
+{
+#if !UE_BUILD_SHIPPING
+	TAutoConsoleVariable<int32> CVarVillageDebugDrawEnabled(
+		TEXT("gp.Village.DebugDraw"),
+		0,
+		TEXT("Enables village selection debug drawing in non-Shipping builds."),
+		ECVF_Cheat);
+#endif
+}
+
+bool AGP_VillageLayoutDirector::IsDebugDrawingOptInEnabled()
+{
+#if UE_BUILD_SHIPPING
+	return false;
+#else
+	return CVarVillageDebugDrawEnabled.GetValueOnGameThread() != 0;
+#endif
+}
 
 int32 AGP_VillageLayoutDirector::SelectVillagePresetIndex(
 	int32 InRunSeed,
@@ -311,7 +332,7 @@ bool AGP_VillageLayoutDirector::BuildSelectionForSeed(int32 InRunSeed)
 		UE_LOG(LogTemp, Warning, TEXT("[VillageLayout] %s"), *Warning);
 	}
 
-	if (bDrawDebug)
+	if (bDrawDebug && IsDebugDrawingOptInEnabled())
 	{
 		DrawSelectionDebug();
 	}

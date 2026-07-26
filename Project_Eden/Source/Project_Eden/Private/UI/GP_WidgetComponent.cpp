@@ -5,7 +5,6 @@
 #include "Characters/GP_BaseCharacter.h"
 #include "UI/GP_AttributeWidget.h"
 #include "Blueprint/WidgetTree.h"
-#include "Engine/Engine.h"
 #include "GeometryCollection/GeometryCollectionParticlesData.h"
 
 UGP_WidgetComponent::UGP_WidgetComponent()
@@ -119,10 +118,6 @@ void UGP_WidgetComponent::BindToAttributeChanges()
 	{
 		const FString DebugMessage = FString::Printf(TEXT("[HP UI Debug] No attribute widgets bound for %s"), *GetNameSafe(GetOwner()));
 		UE_LOG(LogTemp, Warning, TEXT("%s"), *DebugMessage);
-		if (GEngine)
-		{
-			GEngine->AddOnScreenDebugMessage(INDEX_NONE, DebugAttributeMessageDuration, FColor::Yellow, DebugMessage);
-		}
 	}
 }
 
@@ -141,11 +136,6 @@ void UGP_WidgetComponent::DebugLogAttributeUpdate(const TTuple<FGameplayAttribut
 		NewMaxValue);
 
 	UE_LOG(LogTemp, Log, TEXT("%s"), *DebugMessage);
-
-	if (GEngine)
-	{
-		GEngine->AddOnScreenDebugMessage(INDEX_NONE, DebugAttributeMessageDuration, FColor::Cyan, DebugMessage);
-	}
 }
 
 bool UGP_WidgetComponent::BindWidgetToAttributeChanges(UWidget* WidgetObject, const TTuple<FGameplayAttribute, FGameplayAttribute>& Pair) const

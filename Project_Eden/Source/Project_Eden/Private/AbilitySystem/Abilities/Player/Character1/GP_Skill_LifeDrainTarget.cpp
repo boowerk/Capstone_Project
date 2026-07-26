@@ -194,7 +194,7 @@ void UGP_Skill_LifeDrainTarget::ApplyDrainTick()
 		}
 	}
 
-	if (bDrawDrainDebug || ShouldDrawDebug())
+	if (IsSkillDebugDrawEnabled() && (bDrawDrainDebug || bDrawDebugs))
 	{
 		if (UWorld* World = GetWorld())
 		{

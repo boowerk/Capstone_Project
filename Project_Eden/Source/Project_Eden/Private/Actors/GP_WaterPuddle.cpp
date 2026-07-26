@@ -77,7 +77,6 @@ void AGP_WaterPuddle::BeginPlay()
 		if (!DecalDynamicMaterial->GetScalarParameterValue(TEXT("Opacity"), TempValue))
 		{
 			UE_LOG(LogTemp, Error, TEXT("[%s] 머티리얼에 'Opacity' 파라미터가 없습니다! 페이드 연출이 작동하지 않습니다."), *GetName());
-			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, FString::Printf(TEXT("%s: Opacity Parameter Missing!"), *GetName()));
 		}
 	}
 

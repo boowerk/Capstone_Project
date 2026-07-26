@@ -93,6 +93,15 @@ void AGP_GameMode::FinishRun(bool bVictory)
 	}
 
 	bRunFinished = true;
+	if (UWorld* World = GetWorld())
+	{
+		// Clear object-bound navigation, portal, spawn, logout, and relocation
+		// callbacks before the result window. The lobby-return timer is created
+		// below after this cleanup.
+		World->GetTimerManager().ClearAllTimersForObject(this);
+	}
+	ColosseumRelocationRetryTimers.Reset();
+	ColosseumRelocationRetryCounts.Reset();
 	UnregisterAllZoneNavigationInvokers();
 
 	if (AGP_GameState* GPGameState = GetGPGameState())

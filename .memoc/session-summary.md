@@ -2,7 +2,7 @@
 memoc: true
 type: state
 scope: project-memory
-updated: 2026-07-26T14:10:00+09:00
+updated: 2026-07-26T20:32:39+09:00
 status: active
 tags:
   - memoc
@@ -12,8 +12,7 @@ created: 2026-07-24T01:26:27
 # Session Summary
 
 - Branch `refactor/codebase-cleanup`.
-- Runtime/player/zone stabilization is committed through `11aa86f2`; targeted builds and tests pass.
-- User verified death, spectate/recovery, roll, Seraph order, Outer recovery, and Colosseum construction.
-- State 3 remains an uncommitted uniform Gravel/Dried Grass experiment that looks too dark.
-- State 1 now mixes its original surface with `MF_RS_GravelDryEarth` using `T_RegionGround_MacroNoise_1024.R`; it compiles and is saved.
-- Next: inspect a known State 1 region close-up, then tune mix ratio and UV scale. Recheck two-client input isolation and ground-skill decal visibility.
+- Landscape states are restricted to `{0,1,2,4}`; MWAM textures and current region surfaces are committed through `5a13f781`.
+- Merging `origin/fix/runtime-debug-visibility` adds grounded enemy placement, encounter lifecycle hardening, hidden transient screen/DrawDebug presentation, and trajectory correction independent of debug logging.
+- The incoming branch passed the Editor build and all 70 ProjectEden automation tests.
+- PIE still needs a visual pass for hidden runtime debug output and retained F1/F9 tools.

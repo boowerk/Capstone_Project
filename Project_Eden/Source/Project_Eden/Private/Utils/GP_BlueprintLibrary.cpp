@@ -5,6 +5,7 @@
 #include "Engine/OverlapResult.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
+#include "AbilitySystem/Abilities/GP_GameplayAbility.h"
 #include "AbilitySystem/Abilities/GP_SkillData.h"
 #include "Actors/GP_BullChargeActor.h"
 #include "Characters/GP_EnemyCharacter.h"
@@ -196,7 +197,7 @@ TArray<AActor*> UGP_BlueprintLibrary::SphereOverlapActorsAtLocation(UObject* Wor
 		}
 	}
 	
-	if (bDrawDebug) // UGP_Primary::DrawDebugsHitBoxOverlap에서 기능 이전함
+	if (bDrawDebug && UGP_GameplayAbility::IsSkillDebugDrawEnabled()) // UGP_Primary::DrawDebugsHitBoxOverlap에서 기능 이전함
 	{
 		DrawDebugSphere(World, Location, Radius, 16, FColor::Red, false, 3.f);
 		for (const FOverlapResult& Result : OverlapResults)
@@ -250,7 +251,7 @@ TArray<AActor*> UGP_BlueprintLibrary::BoxOverlapActorsAtLocation(UObject* WorldC
 		}
 	}
 
-	if (bDrawDebug)
+	if (bDrawDebug && UGP_GameplayAbility::IsSkillDebugDrawEnabled())
 	{
 		DrawDebugBox(World, Location, BoxExtent, RotationQuat, FColor::Red, false, 3.f);
 		for (const FOverlapResult& Result : OverlapResults)
@@ -323,7 +324,7 @@ TArray<AActor*> UGP_BlueprintLibrary::ForwardArcMeleeHitBoxOverlap(AActor* Avata
 		}
 	}
 
-	if (bDrawDebug)
+	if (bDrawDebug && UGP_GameplayAbility::IsSkillDebugDrawEnabled())
 	{
 		DrawDebugSphere(World, HitBoxLocation, Radius, 16, FColor::Orange, false, 3.f);
 		const FVector Origin = AvatarActor->GetActorLocation() + FVector(0.f, 0.f, ElevationOffset);

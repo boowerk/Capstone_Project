@@ -2272,7 +2272,6 @@ void AGP_PlayerController::Server_TestToggleSkill_Implementation()
 			PC->EquipSkillByClass(GPTags::Ability::Skill::Slot02, WaterPuddleAbilityClass);
 			bSkillsEquipped = true;
 
-			if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Cyan, TEXT("Skills Equipped to Slot 1 & 2!"));
 			UE_LOG(LogTemp, Warning, TEXT("Server: WaterPuddle equipped to Slot 1 & 2"));
 		}
 	}
@@ -2299,7 +2298,6 @@ void AGP_PlayerController::Server_TestToggleSkill_Implementation()
 		}
 
 		bSkillsEquipped = false;
-		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Orange, TEXT("Skills Unequipped!"));
 		UE_LOG(LogTemp, Warning, TEXT("Server: WaterPuddle unequipped from Slot 1 & 2"));
 	}
 }
@@ -2392,11 +2390,6 @@ void AGP_PlayerController::EquipTestSkillPreset(AGP_PlayerCharacter* PlayerChara
 	const FString PresetName = Preset.PresetName.IsEmpty()
 		? FString::Printf(TEXT("Preset %d"), PresetIndex)
 		: Preset.PresetName.ToString();
-
-	if (GEngine)
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Cyan, FString::Printf(TEXT("%s equipped"), *PresetName));
-	}
 
 	UE_LOG(LogTemp, Warning, TEXT("Server: Test preset %d equipped from data asset (%s)"), PresetIndex, *PresetName);
 }

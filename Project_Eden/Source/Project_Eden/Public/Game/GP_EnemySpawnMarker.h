@@ -45,7 +45,12 @@ protected:
 private:
 	bool bActive = false;
 	bool bTriggered = false;
+
+	UPROPERTY()
 	TObjectPtr<AGP_EnemySpawnVolume> OwnerZone = nullptr;
+
+	bool TryTriggerForActor(AActor* OtherActor);
+	void EvaluateExistingOverlaps();
 
 	UFUNCTION()
 	void HandleOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,

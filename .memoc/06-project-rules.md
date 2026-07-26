@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-26T15:04:51+09:00
+updated: 2026-07-26T20:32:39+09:00
 status: active
 tags:
   - memoc
@@ -36,6 +36,8 @@ Durable user and project preferences live here. Update when the user gives a rul
 - Split every task into the smallest independently reviewable and reversible functional units. As a default, one implementation unit produces one commit, including its directly related tests.
 - Never mix unrelated refactors, formatting, documentation, or binary asset changes into a functional commit. Stage explicit file paths only after reviewing the current status and diff.
 - When adding or modifying code, leave comments that explain the relevant intent or constraint.
+- Keep explicit dedicated debug UI tools available, including the F1 attribute widget and F9 Encounter panel. Normal gameplay must not show transient engine screen messages or monster/skill `DrawDebug*` primitives by default; production decals, Niagara cues, previews, and telegraphs are not debug UI.
+- Never place gameplay behavior behind a debug-log flag. Debug flags may gate diagnostic output only.
 - Follow the repository's commit title style from history: `type(scope): short summary`, such as `feat(ui): add native tab navigation for character stats menu`.
-- After C++ changes, Codex should run the normal local/Rider-compatible build so the user does not wait on first editor launch. Before building, check for `UnrealEditor.exe`; if it is running, close it first, then build. If a build fails because Live Coding/editor/game is active, close the editor/game and rerun the same build command. For `Project_Eden`, use the generated Rider/UE project-file engine path, currently `D:\Engine\Windows\Engine\Build\BatchFiles\Build.bat`, not `C:\Program Files\Epic Games\UE_5.7\...`; mixing engine paths can invalidate external plugin outputs and cause repeated `McpAutomationBridge` rebuilds. Do not use MCP-triggered rebuild commands. If the normal editor target emits MCP plugin log lines because the project has that plugin enabled, treat that as normal project build output, not as an MCP-triggered rebuild.
+- After C++ changes, Codex should run the normal local/Rider-compatible build so the user does not wait on first editor launch. Before building, check for `UnrealEditor.exe`; if it is running, close it first, then build. If a build fails because Live Coding/editor/game is active, close the editor/game and rerun the same build command. For `Project_Eden`, use the generated Rider/UE project-file engine path, currently `C:\Engine\Windows\Engine\Build\BatchFiles\Build.bat`, not `C:\Program Files\Epic Games\UE_5.7\...`; mixing engine paths can invalidate external plugin outputs and cause repeated external-plugin rebuilds. Do not use MCP-triggered rebuild commands. If the normal editor target emits plugin log lines because the project has that plugin enabled, treat that as normal project build output, not as an MCP-triggered rebuild.
 - For the current graduation slice, do not launch additional live dedicated/listen multi-client tests unless the user explicitly asks. Keep server integration functional and verify it with normal builds and local automation.

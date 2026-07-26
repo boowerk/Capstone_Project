@@ -105,6 +105,18 @@ void AGP_GameMode::RestartPlayer(AController* NewPlayer)
 
 void AGP_GameMode::Logout(AController* Exiting)
 {
+	const TWeakObjectPtr<AController> ExitingControllerKey(Exiting);
+	if (FTimerHandle* RetryTimer =
+		ColosseumRelocationRetryTimers.Find(ExitingControllerKey))
+	{
+		if (UWorld* World = GetWorld())
+		{
+			World->GetTimerManager().ClearTimer(*RetryTimer);
+		}
+	}
+	ColosseumRelocationRetryTimers.Remove(ExitingControllerKey);
+	ColosseumRelocationRetryCounts.Remove(ExitingControllerKey);
+
 	// Release the deterministic slot immediately so a reconnect does not wait for garbage collection.
 	PartyStartSlotByController.Remove(TWeakObjectPtr<AController>(Exiting));
 	APlayerState* ExitingPlayerState =
@@ -122,13 +134,27 @@ void AGP_GameMode::Logout(AController* Exiting)
 	}
 	Super::Logout(Exiting);
 
-	// A disconnected player must no longer hold the rest of the active party at
-	// the Outer gate. Super removes its PlayerState from GameState first.
+	// Controller::Destroyed removes PlayerState from GameState only after
+	// Logout returns. Re-evaluate party gates on the next tick so the departing
+	// member cannot keep Center/Colosseum or defeat evaluation blocked.
 	if (bZoneProgressionInitialized && !bRunFinished)
 	{
-		TryStartPendingColosseumIntros();
-		EvaluateStagedProgression();
-		EvaluatePartyDefeat();
+		if (UWorld* World = GetWorld())
+		{
+			World->GetTimerManager().SetTimerForNextTick(
+				FTimerDelegate::CreateWeakLambda(this, [this]()
+				{
+					if (!bZoneProgressionInitialized || bRunFinished)
+					{
+						return;
+					}
+
+					TryStartPendingCenterZones();
+					TryStartPendingColosseumIntros();
+					EvaluateStagedProgression();
+					EvaluatePartyDefeat();
+				}));
+		}
 	}
 }
 
@@ -170,6 +196,13 @@ void AGP_GameMode::BeginPlay()
 
 void AGP_GameMode::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearAllTimersForObject(this);
+	}
+	ColosseumRelocationRetryTimers.Reset();
+	ColosseumRelocationRetryCounts.Reset();
+
 	for (const TPair<
 		TWeakObjectPtr<AGP_LevelBuildAnimator>,
 		TWeakObjectPtr<AGP_EnemySpawnVolume>>& Pair : ColosseumIntroZonesByAnimator)
@@ -1022,6 +1055,25 @@ void AGP_GameMode::TryStartPendingColosseumIntros()
 	}
 }
 
+void AGP_GameMode::TryStartPendingCenterZones()
+{
+	for (TPair<
+		TWeakObjectPtr<AGP_EnemySpawnVolume>,
+		FGPZoneRuntimeState>& Pair : ZoneRuntimeStates)
+	{
+		AGP_EnemySpawnVolume* Zone = Pair.Key.Get();
+		if (IsValid(Zone)
+			&& Zone->GetZoneStage() == EGPZoneStage::Center
+			&& !Pair.Value.bStarted
+			&& !Pair.Value.bCompleted)
+		{
+			// StartStagedZone performs the authoritative active-party presence
+			// check again after the departing PlayerState leaves PlayerArray.
+			StartStagedZone(Zone);
+		}
+	}
+}
+
 AGP_LevelBuildAnimator* AGP_GameMode::FindColosseumBuildAnimator(
 	const AGP_EnemySpawnVolume* Zone) const
 {
@@ -1085,7 +1137,7 @@ AGP_LevelBuildAnimator* AGP_GameMode::FindColosseumBuildAnimator(
 void AGP_GameMode::HandleColosseumBuildFinished(
 	AGP_LevelBuildAnimator* Animator)
 {
-	if (!HasAuthority() || !IsValid(Animator))
+	if (!HasAuthority() || bRunFinished || !IsValid(Animator))
 	{
 		return;
 	}
@@ -1118,7 +1170,7 @@ void AGP_GameMode::HandleColosseumBuildFinished(
 void AGP_GameMode::MaybeCompleteStagedZone(AGP_EnemySpawnVolume* Zone)
 {
 	FGPZoneRuntimeState* State = ZoneRuntimeStates.Find(Zone);
-	if (!State || !State->bStarted || State->bCompleted)
+	if (bRunFinished || !State || !State->bStarted || State->bCompleted)
 	{
 		return;
 	}
@@ -1198,6 +1250,11 @@ void AGP_GameMode::CompleteStagedZone(AGP_EnemySpawnVolume* Zone)
 
 void AGP_GameMode::EvaluateStagedProgression()
 {
+	if (bRunFinished)
+	{
+		return;
+	}
+
 	TArray<AGP_EnemySpawnVolume*> ActiveOuterZones;
 	if (GetActiveAssignedOuterZones(ActiveOuterZones)
 		&& !UnlockedStages.Contains(EGPZoneStage::Middle))
@@ -1785,10 +1842,24 @@ bool AGP_GameMode::TryRelocatePlayerToActiveColosseum(
 	if (!HasAuthority()
 		|| bRunFinished
 		|| !bUseStagedZoneProgression
-		|| !IsValid(PlayerController))
+		|| !IsValid(PlayerController)
+		|| !IsValid(GetWorld()))
 	{
 		return false;
 	}
+
+	UWorld* World = GetWorld();
+	const TWeakObjectPtr<AController> ControllerKey(PlayerController);
+	const auto ClearRetryState = [this, World, ControllerKey]()
+	{
+		if (FTimerHandle* RetryTimer =
+			ColosseumRelocationRetryTimers.Find(ControllerKey))
+		{
+			World->GetTimerManager().ClearTimer(*RetryTimer);
+		}
+		ColosseumRelocationRetryTimers.Remove(ControllerKey);
+		ColosseumRelocationRetryCounts.Remove(ControllerKey);
+	};
 
 	AGP_EnemySpawnVolume* Zone = FindJoinableColosseumZone();
 	APawn* PlayerPawn = PlayerController->GetPawn();
@@ -1798,21 +1869,90 @@ bool AGP_GameMode::TryRelocatePlayerToActiveColosseum(
 		|| !IsValid(PlayerPawn)
 		|| !IsValid(PlayerState))
 	{
+		ClearRetryState();
 		return false;
 	}
 
 	FGPZoneRuntimeState* State = ZoneRuntimeStates.Find(Zone);
 	if (!State)
 	{
+		ClearRetryState();
 		return false;
 	}
 
+	const auto ScheduleRetry =
+		[this, World, ControllerKey, Zone]() -> bool
+	{
+		if (const FTimerHandle* ExistingTimer =
+				ColosseumRelocationRetryTimers.Find(ControllerKey);
+			ExistingTimer
+				&& World->GetTimerManager().IsTimerActive(*ExistingTimer))
+		{
+			return true;
+		}
+
+		const float RetryInterval =
+			FMath::Max(0.05f, ZoneNavigationRetryInterval);
+		const int32 WarningRetryCount = FMath::Max(
+			1,
+			FMath::CeilToInt(
+				ZoneNavigationReadyTimeout / RetryInterval));
+		int32& RetryCount =
+			ColosseumRelocationRetryCounts.FindOrAdd(ControllerKey);
+		if (RetryCount == 0)
+		{
+			UE_LOG(LogTemp, Warning,
+				TEXT("[GP_GameMode] Joining player is waiting for a safe arrival point in active Colosseum zone '%s'."),
+				*Zone->GetZoneId().ToString());
+		}
+		else if (RetryCount == WarningRetryCount)
+		{
+			UE_LOG(LogTemp, Error,
+				TEXT("[GP_GameMode] Active Colosseum zone '%s' still has no safe arrival after %.1f seconds; relocation retries continue."),
+				*Zone->GetZoneId().ToString(),
+				ZoneNavigationReadyTimeout);
+		}
+		RetryCount =
+			FMath::Min(RetryCount + 1, WarningRetryCount + 1);
+
+		const TWeakObjectPtr<AController> WeakController =
+			ControllerKey;
+		FTimerHandle& RetryTimer =
+			ColosseumRelocationRetryTimers.FindOrAdd(ControllerKey);
+		World->GetTimerManager().SetTimer(
+			RetryTimer,
+			FTimerDelegate::CreateWeakLambda(
+				this,
+				[this, WeakController]()
+				{
+					ColosseumRelocationRetryTimers.Remove(
+						WeakController);
+					if (bRunFinished || !WeakController.IsValid())
+					{
+						ColosseumRelocationRetryCounts.Remove(
+							WeakController);
+						return;
+					}
+
+					if (!TryRelocatePlayerToActiveColosseum(
+						WeakController.Get()))
+					{
+						// The encounter may have ended while navigation was
+						// pending. Resume the ordinary Outer assignment path.
+						AssignPlayersToOuterVillageStarts();
+					}
+				}),
+			RetryInterval,
+			false);
+		return true;
+	};
+
 	bool bProjected = false;
-	FVector ArrivalLocation =
+	const FVector ArrivalLocation =
 		Zone->GetSpawnPoint(/*bRandomizeInVolume=*/false, bProjected);
 	if (!bProjected)
 	{
-		ArrivalLocation = Zone->GetActorLocation();
+		return ScheduleRetry();
 	}
 
 	const FVector SafeArrival =
@@ -1831,9 +1971,10 @@ bool AGP_GameMode::TryRelocatePlayerToActiveColosseum(
 			TEXT("[GP_GameMode] Failed to relocate joining player '%s' to active Colosseum zone '%s'."),
 			*GetNameSafe(PlayerState),
 			*Zone->GetZoneId().ToString());
-		return false;
+		return ScheduleRetry();
 	}
 
+	ClearRetryState();
 	if (AGP_PlayerController* GPPlayerController =
 		Cast<AGP_PlayerController>(PlayerController))
 	{
@@ -1863,7 +2004,10 @@ void AGP_GameMode::SpawnPortalBetweenZones(
 	int32 RetryCount)
 {
 	UWorld* World = GetWorld();
-	if (!World || !IsValid(FromZone) || !IsValid(ToZone))
+	if (bRunFinished
+		|| !World
+		|| !IsValid(FromZone)
+		|| !IsValid(ToZone))
 	{
 		return;
 	}
@@ -1882,27 +2026,45 @@ void AGP_GameMode::SpawnPortalBetweenZones(
 	if (!bTargetProjected)
 	{
 		const float RetryInterval = FMath::Max(0.05f, ZoneNavigationRetryInterval);
-		const int32 MaxRetries = FMath::Max(
+		const int32 WarningRetryCount = FMath::Max(
 			1,
 			FMath::CeilToInt(ZoneNavigationReadyTimeout / RetryInterval));
-		if (bUseZoneNavigationInvokers && RetryCount < MaxRetries)
+		if (bUseZoneNavigationInvokers)
 		{
+			if (RetryCount == 0)
+			{
+				UE_LOG(LogTemp, Warning,
+					TEXT("[GP_GameMode] Staged portal to zone '%s' is waiting for a safe NavMesh destination."),
+					*ToZone->GetZoneId().ToString());
+			}
+			else if (RetryCount == WarningRetryCount)
+			{
+				UE_LOG(LogTemp, Error,
+					TEXT("[GP_GameMode] Staged portal to zone '%s' still has no safe destination after %.1f seconds; retries continue."),
+					*ToZone->GetZoneId().ToString(),
+					ZoneNavigationReadyTimeout);
+			}
+
 			const TWeakObjectPtr<AGP_EnemySpawnVolume> WeakFromZone = FromZone;
 			const TWeakObjectPtr<AGP_EnemySpawnVolume> WeakToZone = ToZone;
+			const int32 NextRetryCount =
+				FMath::Min(RetryCount + 1, WarningRetryCount + 1);
 			FTimerHandle RetryTimer;
 			World->GetTimerManager().SetTimer(
 				RetryTimer,
 				FTimerDelegate::CreateWeakLambda(
 					this,
-					[this, WeakFromZone, WeakToZone, PreferredSpawnLocation, RetryCount]()
+					[this, WeakFromZone, WeakToZone, PreferredSpawnLocation, NextRetryCount]()
 					{
-						if (WeakFromZone.IsValid() && WeakToZone.IsValid())
+						if (!bRunFinished
+							&& WeakFromZone.IsValid()
+							&& WeakToZone.IsValid())
 						{
 							SpawnPortalBetweenZones(
 								WeakFromZone.Get(),
 								WeakToZone.Get(),
 								PreferredSpawnLocation,
-								RetryCount + 1);
+								NextRetryCount);
 						}
 					}),
 				RetryInterval,
@@ -1911,9 +2073,8 @@ void AGP_GameMode::SpawnPortalBetweenZones(
 		}
 
 		UE_LOG(LogTemp, Error,
-			TEXT("[GP_GameMode] Skipped staged portal to zone '%s': navigation was not ready after %.1f seconds."),
-			*ToZone->GetZoneId().ToString(),
-			ZoneNavigationReadyTimeout);
+			TEXT("[GP_GameMode] Skipped staged portal to zone '%s': no NavMesh destination exists and zone navigation invokers are disabled."),
+			*ToZone->GetZoneId().ToString());
 		return;
 	}
 
