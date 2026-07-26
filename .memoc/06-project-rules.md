@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-18T19:49:02+09:00
+updated: 2026-07-26T15:04:51+09:00
 status: active
 tags:
   - memoc
@@ -28,6 +28,7 @@ Durable user and project preferences live here. Update when the user gives a rul
 - Keep logs concise; do not paste temporary command output unless it changes future work.
 - Preserve user changes and avoid reverting unrelated work.
 - State unverified parts honestly in the final answer and handoff.
+- When asking the user to create, open, edit, or save an Unreal asset, always provide its exact Content Browser path, intended asset name/save folder, and local disk path when applicable.
 
 ## Project-Specific Rules
 

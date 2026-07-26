@@ -414,3 +414,15 @@ See `.memoc/worklog/` and generated `.memoc/activity.md`.
 - `f838db44` aligns the complete EventMap2 Colosseum structure at the established LandscapeMap gameplay center `(0,126740)`.
 - The saved set contains 1,248 tagged structure actors, one level-build animator, and three retained LandscapeMap helpers. The exact 48-actor duplicate `Fence1` ring was removed while the authoritative `Fence` ring remains.
 - User verified that Colosseum construction completes during play.
+
+### 2026-07-26 State 3 ground visual experiment
+
+- Existing `MF_RegionGround_Grassland3` now blends existing Gravel Ground 70% with Dried Grass 30%; Region state logic and PCG are unchanged.
+- Exact State 3 seed inspection confirms the new material is active, but the constant per-pixel blend reads almost black and remains grass-like in the current map lighting. Refine the spatial mask/brightness before committing.
+- The temporary Codex test material function was removed; only the existing State 3 function remains modified.
+
+### 2026-07-26 State 1 mixed ground experiment
+
+- `MF_RegionGround_Grassland1` now feeds its original material attributes and `MF_RS_GravelDryEarth` into `BlendMaterialAttributes`.
+- `T_RegionGround_MacroNoise_1024.R` controls the spatial blend, so the surface is no longer a single material over the whole state.
+- The material function compiles and is saved; only a visual scale/ratio pass in a known State 1 region remains.

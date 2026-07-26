@@ -13,7 +13,7 @@ created: 2026-07-24T01:26:27
 
 - Branch `refactor/codebase-cleanup`.
 - Runtime/player/zone stabilization is committed through `11aa86f2`; targeted builds and tests pass.
-- User verified death, spectate/recovery, Client 1 roll, Seraph order, Outer recovery, and Colosseum construction.
-- `f838db44` completes the LandscapeMap Colosseum at `(0,126740)` from EventMap2.
-- Final Colosseum set: 1,248 structure actors, one build animator, and three retained local helpers; the duplicate 48-piece `Fence1` ring was removed.
-- Recheck only two-client input isolation and ground-skill decal visibility.
+- User verified death, spectate/recovery, roll, Seraph order, Outer recovery, and Colosseum construction.
+- State 3 remains an uncommitted uniform Gravel/Dried Grass experiment that looks too dark.
+- State 1 now mixes its original surface with `MF_RS_GravelDryEarth` using `T_RegionGround_MacroNoise_1024.R`; it compiles and is saved.
+- Next: inspect a known State 1 region close-up, then tune mix ratio and UV scale. Recheck two-client input isolation and ground-skill decal visibility.
