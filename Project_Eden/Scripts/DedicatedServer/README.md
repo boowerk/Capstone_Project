@@ -14,10 +14,25 @@ StartDevServer_LocalExe.bat
 `StartDevServer_LocalExe.bat` prefers:
 
 ```text
+Binaries/Win64/Project_EdenServer-Cmd.exe
 Binaries/Win64/Project_EdenServer.exe
 ```
 
-It falls back to cooked or staged server builds only if the local server exe is missing.
+The server target builds both files. `Project_EdenServer-Cmd.exe` is the
+console-subsystem variant used for live logs; the regular executable remains
+available for deployment compatibility. The launcher falls back to cooked,
+staged, or regular server builds when the local console executable is missing.
+Run the BAT instead of double-clicking `Project_EdenServer.exe`. The BAT keeps
+a visible CMD window, streams the complete server log there, and also writes a
+dedicated file to:
+
+```text
+Saved/Cooked/WindowsServer/Project_Eden/Saved/Logs/Project_EdenServer.log
+```
+
+Unreal redirects local dedicated-server file output into its cooked sandbox;
+the launcher prints this resolved path before startup. The window remains open
+with the exit code if the server stops or crashes.
 
 ## Cooked Server Loop
 
@@ -32,9 +47,15 @@ StartDevServer_Cooked.bat
 `StartDevServer_Cooked.bat` prefers:
 
 ```text
+Saved/DedicatedServer/WindowsServer/Project_EdenServer-Cmd.exe
+Saved/StagedBuilds/WindowsServer/Project_EdenServer-Cmd.exe
 Saved/DedicatedServer/WindowsServer/Project_EdenServer.exe
 Saved/StagedBuilds/WindowsServer/Project_EdenServer.exe
 ```
+
+Like the local launcher, it shows live server output in its CMD window and
+writes `Project_Eden/Saved/Logs/Project_EdenServer.log` inside the selected
+DedicatedServer or StagedBuilds package. The launcher prints the exact path.
 
 The launcher rejects a package when its successful-cook stamp is missing, a
 project input is newer, or the package index does not contain `BP_RunPortal`.

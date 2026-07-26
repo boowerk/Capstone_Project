@@ -56,6 +56,8 @@ function Find-ServerExecutable {
     param([string]$CookRoot)
 
     foreach ($relativePath in @(
+        "Project_EdenServer-Cmd.exe",
+        "Project_Eden\Binaries\Win64\Project_EdenServer-Cmd.exe",
         "Project_EdenServer.exe",
         "Project_Eden\Binaries\Win64\Project_EdenServer.exe"
     )) {

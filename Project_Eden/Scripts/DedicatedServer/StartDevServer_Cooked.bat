@@ -1,7 +1,8 @@
 @echo off
 setlocal EnableExtensions
+title Project Eden Dedicated Server - Cooked - Port 7778
 
-set "PROJECT_ROOT=%~dp0..\..\"
+for %%I in ("%~dp0..\..") do set "PROJECT_ROOT=%%~fI\"
 set "UPROJECT=%PROJECT_ROOT%Project_Eden.uproject"
 set "COOKED_SERVER_RESOLVER=%~dp0ResolveCookedServer.ps1"
 
@@ -42,10 +43,25 @@ if "%SERVER_EXE%"=="" (
 )
 
 set "PATH=%UE_SERVER_ROOT%\Engine\Binaries\Win64;%PATH%"
+set "SERVER_WINDOW_ARG="
+if /I not "%SERVER_EXE:~-8%"=="-Cmd.exe" set "SERVER_WINDOW_ARG=-log"
+set "SERVER_LOG=%PROJECT_ROOT%Saved\DedicatedServer\WindowsServer\Project_Eden\Saved\Logs\Project_EdenServer.log"
+echo(%SERVER_EXE%| findstr /I /C:"\Saved\StagedBuilds\WindowsServer\" >nul
+if not errorlevel 1 set "SERVER_LOG=%PROJECT_ROOT%Saved\StagedBuilds\WindowsServer\Project_Eden\Saved\Logs\Project_EdenServer.log"
+for %%I in ("%SERVER_LOG%") do if not exist "%%~dpI" mkdir "%%~dpI" >nul 2>nul
+cls
 echo Starting Project_EdenServer with engine root: %UE_SERVER_ROOT%
 echo Server exe: %SERVER_EXE%
+echo Live log: %SERVER_LOG%
+echo Close this window or press Ctrl+C to stop the server.
 echo Solo debug start: enabled
+echo.
 pushd "%PROJECT_ROOT%"
-"%SERVER_EXE%" -log -port=7778 -AllowLobbyForceStart
+"%SERVER_EXE%" %SERVER_WINDOW_ARG% -LOG=Project_EdenServer.log -stdout -FullStdOutLogOutput -forcelogflush -port=7778 -AllowLobbyForceStart
+set "SERVER_EXIT_CODE=%ERRORLEVEL%"
 popd
+echo.
+echo Project_EdenServer exited with code %SERVER_EXIT_CODE%.
+echo Full log: %SERVER_LOG%
 pause
+exit /b %SERVER_EXIT_CODE%
