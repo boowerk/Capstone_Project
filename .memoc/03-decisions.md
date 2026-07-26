@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-24T16:35:00+09:00
+updated: 2026-07-26T19:04:36+09:00
 status: active
 tags:
   - memoc
@@ -131,3 +131,6 @@ Durable project decisions live here. Keep entries short, dated, and useful to fu
 - Keep the normal Windows-subsystem dedicated-server executable for deployment compatibility and build a `-Cmd.exe` sibling for local administration. Launcher BATs prefer the console sibling and use Unreal's native package/sandbox log path instead of assuming the editor `Saved/Logs` directory.
 - Treat tagged enemy spawn points as trusted ground anchors: project them with a tight vertical extent, scatter only on the same reachable NavMesh island, and fail closed while authored anchors are unavailable. Never widen to arbitrary roof NavMesh as a fallback.
 - Keep the boss-only broad vertical projection for Level Instance offsets, but accept it only when a tight ground anchor can path to the candidate. Revalidate the spawned capsule foot separately with a strict `50cm` upward allowance and retry unsafe or partial boss placement.
+- Treat every valid configured enemy count as an encounter obligation. Safe-placement timeouts are diagnostic thresholds only; keep the count pending and retry rather than silently shrinking a marker, zone batch, staged portal, or active-Colosseum relocation.
+- Boss-summoned adds preserve their existing pressure-only role: do not register them in zone completion counts. On summoner death, retire them through `RequestDeath` with the real death instigator so ordinary VFX and cleanup still run.
+- Re-evaluate party-gated Center/Colosseum progression one tick after `Logout`, because Controller cleanup removes the departing PlayerState only after `GameMode::Logout` returns. When a run finishes, clear object-bound retry timers before creating the lobby-return timer.

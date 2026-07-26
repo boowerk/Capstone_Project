@@ -484,3 +484,12 @@ Search first, then open only files named above.
 - Bosses retain the `800cm` projection needed by vertically offset Level Instances, but broad candidates must be path-connected to a tight zone ground anchor. Collision-adjusted capsule feet above the requested nav floor are rejected; partial boss batches roll back and retry.
 - Verified: `Project_EdenEditor Win64 Development`, `ProjectEden.Game.EnemySpawnPlacement.GroundPolicy`, and `ProjectEden.Game.ZoneProgression.Contracts`.
 - Not verified: a live/PIE multi-wave sweep across `L_Village_00..03`. Watch for intentional elevated combat platforms that may need a larger per-zone `MaxSpawnHeightAboveGroundAnchor`; do not disable the connected-nav requirement.
+
+### 2026-07-26 Encounter spawn lifecycle
+
+- Branch `fix/encounter-spawn-lifecycle` extends the grounded-spawn fix without changing configured enemy classes, counts, marker radii, recovery candidate order, or zone-completion ownership.
+- Marker, zone-batch, staged-portal, and active-Colosseum safe-placement failures remain pending and retry. The configured timeout is now a one-time diagnostic threshold rather than a content-abandonment point.
+- Boss summoned adds use connected ground alternatives and final-foot validation, then retire through normal enemy death presentation when the boss dies. They intentionally do not become zone objectives.
+- Logout gate evaluation waits until the departing PlayerState has left `PlayerArray`; FinishRun clears retry callbacks before scheduling lobby return.
+- Verified: `Project_EdenEditor Win64 Development` and full `ProjectEden` automation 69/69.
+- Not verified: multiplayer PIE for a player already inside a marker when it activates, NavMesh delayed longer than 10 seconds, boss death with live adds, Center start after one waiting player disconnects, and active-Colosseum reconnect while NavMesh is rebuilding.
