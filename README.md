@@ -15,7 +15,7 @@
 | 엔진 | Unreal Engine 5.7.2 기반 팀 커스텀 빌드 (`ProjectEden_Engine`) |
 | 플랫폼 | Windows Client / Dedicated Server |
 | 주요 기술 | C++, Blueprint, GAS, UMG, PCG, Niagara, Enhanced Input |
-| 김도윤 역할 | 게임 진행·PCG/Region 런타임·플레이어 시스템·멀티플레이·빌드 자동화 |
+| 김도윤 | 게임 진행·PCG/Region 런타임·플레이어 시스템·멀티플레이·빌드 자동화 |
 
 ## 게임 개요
 
@@ -74,7 +74,7 @@ MainMenuMap
 다만 최신 `main`의 `L_LandscapeMap`에는 구역·적 생성·목표가 배치되지 않아 보스전과 승패·결과 전환이 자동 실행되지 않습니다.
 현재 기본 실행 범위는 **3인 자유 탐색·전투**입니다.
 
-## 김도윤 담당
+## 김도윤
 
 김도윤은 아래 영역을 중심으로 구현했으며, 게임 UI와 자동화 테스트는 공동 작업했습니다.
 
