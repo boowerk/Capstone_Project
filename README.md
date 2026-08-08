@@ -165,16 +165,6 @@ cd Project_Eden\Scripts\DedicatedServer
 전체 배포본은 `BuildCookDeployFinal.bat`가 Client와 Server를 함께 빌드·패키징하고 필수 산출물을 확인합니다.
 세부 사용법은 [`Dedicated Server Scripts`](Project_Eden/Scripts/DedicatedServer/README.md)에 정리되어 있습니다.
 
-## 검증 상태
+최신 `main`에서 `Project_EdenEditor`, `Project_EdenServer`, `Project_Eden` Win64 Development 빌드를 확인했습니다.
 
-- 최신 `main`의 C++ 소스, 설정, 스크립트와 Git 이력을 기준으로 README 내용을 대조했습니다.
-- `ProjectEden.*` Unreal Automation Test 65개가 38개 C++ 소스 파일에 정의되어 있으며, 진행·세션·전투·UI 회귀 조건을 다룹니다.
-- [전용 서버 스크립트 문서](Project_Eden/Scripts/DedicatedServer/README.md#verified-test-state)에 2026-05-19 원격 클라이언트로 GAS 투사체·피해·쿨다운·VFX를 확인한 기록이 있습니다.
-- 최신 `main` 기준 `Project_EdenEditor`, `Project_EdenServer`, `Project_Eden` Win64 Development 빌드를 확인했습니다. 전체 LFS 콘텐츠가 필요한 3인 패키지 실행은 이번 정리에서 재현하지 않았습니다.
-
-## 외부 에셋과 Git LFS
-
-`.uasset`, `.umap`, `.fbx`, `.wav`는 [`.gitattributes`](.gitattributes)에 따라 Git LFS로 관리합니다.
-LFS 파일을 받지 않으면 맵과 Blueprint를 열거나 Cook할 수 없으므로 빌드 전에 `git lfs pull`이 필요합니다.
-
-저장소에는 팀 제작물과 Unreal Marketplace/Fab 외부 에셋이 함께 포함되어 있으며, 외부 에셋은 각 원본 라이선스를 따릅니다.
+일부 그래픽·VFX에는 Unreal Marketplace/Fab 외부 에셋을 사용했습니다.
