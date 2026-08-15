@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-27T01:17:00+09:00
+updated: 2026-08-13T03:36:00+09:00
 status: active
 tags:
   - memoc
@@ -14,6 +14,16 @@ tags:
 Durable project decisions live here. Keep entries short, dated, and useful to future agents.
 
 ## Decision Log
+
+### 2026-08-13
+- Publish Project Eden proof as privacy-safe PNG and short self-hosted GIF assets; do not create MOV or invent an external evidence-video URL.
+- Treat the successful world-sync run as Dedicated Server evidence for Snapshot, local generation, first-attempt ACK approval, and per-client placement only. It does not prove ACK retry or player movement.
+- Treat the PlayerState before/after composite as evidence of server-authority `AddXP(125)` and the `CurrentLevel` RepNotify augment-picker path on three remote clients. It does not prove numeric XP/level parity, selected-augment replication, equipment, or elimination state.
+
+### 2026-08-12
+- Describe village placement as a per-client latest-Revision gate, not an all-client ACK barrier. Placement also requires zone progression, a valid Pawn, and an Outer PlayerStart; a Listen Server's local host is exempt from the ACK check.
+- Treat the public Project Eden team demo only as actual team gameplay/environment evidence and its final split view as a 2-player result. It does not prove 3 clients, Dedicated/Listen NetMode, Snapshot/ACK/retry/gate behavior, deterministic selection, or PlayerState RepNotify.
+- Keep automation evidence distinct from multiplayer evidence. The privacy-safe Village Selection PNG is a local summary rendered from a fresh Unreal Automation exported JSON result, not a direct Automation UI screenshot.
 
 ### 2026-07-26
 - Preserve explicit F1 attribute and F9 Encounter UMG debug tools, but keep transient engine screen messages and gameplay-world debug primitives out of normal play. Monster/skill `DrawDebug*` code may remain for development only behind a default-off non-Shipping opt-in; Shipping must reject it.

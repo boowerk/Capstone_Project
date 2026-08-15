@@ -2,8 +2,8 @@
 memoc: true
 type: actor
 scope: project-memory
-created: 2026-07-23T17:46:03
-updated: 2026-07-23T17:46:03
+created: 2026-08-13T04:30:58
+updated: 2026-08-13T04:30:58
 status: active
 tags:
   - memoc

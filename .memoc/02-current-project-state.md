@@ -3,7 +3,7 @@ memoc: true
 type: state
 scope: project-memory
 created: 2026-05-21T07:03:24
-updated: 2026-07-27T01:17:00+09:00
+updated: 2026-08-13T13:30:28+09:00
 status: active
 tags:
   - memoc
@@ -11,10 +11,12 @@ tags:
 ---
 # Current Project State
 
-Last synced: 2026-07-27T01:17:00+09:00
+Last synced: 2026-08-13T13:30:28+09:00
 
 ## Current Status
 
+- Git/MEMOC 기여도 재감사로 `douyun0623`가 현 프로덕션 PCG 그래프·Loop·SubGraph 15개와 멀티 마을 PCG runtime/snapshot orchestration의 작성자임을 확인했다. 포트폴리오 사이트와 PDF에 Skill/Augment 런타임, IP 로비·Seamless Travel, Zone·NavMesh·안전 배치 재시도, Region 표현, 관전·복구, Editor/Development 배포 도구를 추가하고 PCGEx·외부 아트 및 공동 Ready 정책을 제외/구분했다. Vercel 프로덕션 재배포, Astro check/build, 1440×900·390×844 QA, 공개 PDF 해시 일치 확인을 완료했다. 새 gameplay 코드나 debug instrumentation은 추가하지 않았다.
+- Portfolio evidence now includes an actual Packaged Win64 Development Dedicated Server + 3-client run: Revision 1 Snapshot, seven instances, `Selected=Generated=7` on every client, three first-attempt visual-ready ACKs, and three per-client placements. A second actual run shows gameplay before server `AddXP(125)` and the augment picker afterwards on all three remote clients; the server invoked three PlayerStates and all three succeeded. The external Astro site and 10-page PDF use these PNG/GIF assets and are deployed at the existing Vercel production URL. `astro check`, static build, desktop 1440x1000 and mobile 390x844 QA pass. No gameplay C++ or permanent debug instrumentation was added. Remaining evidence gaps are ACK retry N>=2, runtime reverse-order comparison, 3-player movement, numeric PlayerState parity, selected-augment array, equipment, and elimination replication.
 - Crystal Seraph boss-phase spawning is repaired. Enemy placement now snapshots the collision-adjusted capsule foot in `PostInitializeComponents`, before `BeginPlay` movement, so flying bosses may rise immediately without weakening the 50cm grounded roof guard. Editor Development builds and both `ProjectEden.Game.EnemySpawnPlacement` tests pass.
 - Dark Knight VFX visibility work is merged into `refactor/codebase-cleanup`: the emissive circular deferred-decal material now drives player ground targeting and Dark Knight ground warnings, while Dark Knight placeholder primitives/example mesh-rendering Niagara cues are replaced with decals and sprite-only Niagara. Gameplay geometry and timing remain unchanged. The source branch passed the Editor Development build and all 19 `ProjectEden.Combat` automation cases; post-merge verification remains.
 - Runtime debug presentation cleanup is complete on `fix/runtime-debug-visibility`. Transient engine screen messages are disabled at config and GameInstance initialization, direct C++ screen-message calls are gone, and monster/skill `DrawDebug*` paths require the default-off non-Shipping `g.DrawSkillDebug` opt-in. F1/F9 UMG debug tools are unchanged, and production decals/Niagara/preview actors plus combat and replication paths remain intact. The unused experimental DrawDebugLibrary activation and dead message-duration settings were removed. Post-action trajectory correction is no longer gated by `bEnableDebugLog`. `Project_EdenEditor Win64 Development` builds and the full `ProjectEden` suite passes 70/70. PIE visual verification remains; Matador Bull needs a separate production telegraph decision because its prior orange debug line/box was the only directional warning.

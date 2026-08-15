@@ -420,3 +420,23 @@ Last: 2026-06-17T13:01:55+09:00
 
 ## Verify
 - User reported editor Live Coding compile succeeded after the generic attack suppression patch. Full external UBT still needs Live Coding disabled/closed editor.
+
+## [2026-08-12T18:38:29] archived summary (945B)
+
+---
+memoc: true
+type: state
+scope: project-memory
+updated: 2026-08-13T03:36:00+09:00
+status: active
+tags:
+  - memoc
+  - memoc/state
+created: 2026-07-24T01:26:27
+---
+# Session Summary
+
+- Branch `refactor/codebase-cleanup`; no gameplay C++ or permanent debug instrumentation changed.
+- Packaged UE 5.7.2 Development Dedicated Server + 3 clients proves Revision 1 Snapshot, 7/7 local generation, first-attempt ACKs, and per-client placement. A separate same-run before/after PNG proves server AddXP(125) 3/3 and CurrentLevel RepNotify augment UI on all three clients.
+- Public assets are a short 3-client GIF plus 1920x1080 placement and PlayerState PNGs. The Astro site and 10-page PDF are rebuilt and deployed at the existing Vercel URL; desktop/mobile QA pass.
+- Still unproven: ACK retry N>=2, runtime reverse-order comparison image, 3-player movement, numeric PlayerState parity, selected-augment array, equipment and elimination replication.

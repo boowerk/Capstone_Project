@@ -23,6 +23,21 @@ tags:
 ---
 # Agent Handoff
 
+## Portfolio Evidence Handoff (2026-08-13)
+
+- Actual packaged UE 5.7.2 Development evidence is complete for Dedicated Server + 3 clients. World-sync assets show Revision 1, seven Snapshot instances, 7/7 local generation, first-attempt ACKs, and per-client placement; PlayerState assets show before/after UI plus server `AddXP(125)` on 3/3 PlayerStates.
+- Public assets live in the external `doyun-game-client-portfolio/public/images/project-eden/evidence` directory. The Astro page and regenerated 10-page PDF are deployed to `https://doyun-game-client-portfolio.vercel.app`; check/build and desktop 1440x1000/mobile 390x844 QA pass with no broken media, overflow, console warnings, or errors.
+- No gameplay C++ or permanent debug overlay was added. Capture helpers use packaged executables and transient `-ExecCmds` (`DEFER`, `KE`, `SHOT SHOWUI`). Do not publish raw desktop captures or local logs because they are internal evidence sources.
+- Still uncaptured: ACK retry with N>=2, runtime reverse-candidate comparison, actual 3-player movement, numeric PlayerState parity, selected augment array, equipment-slot replication, and elimination-state replication. The public YouTube team demo remains team-result evidence only.
+
+## Portfolio Evidence Handoff (2026-08-12)
+
+- Final reproducible evidence is under `artifacts/evidence`: actual public-team-demo frames for the 2-player hero, environment, combat, and boss plus a fresh Unreal Automation exported-JSON summary for Village Selection. All five files are true 1920x1080 PNGs with no text/EXIF metadata chunks or alternate streams.
+- The external `doyun-game-client-portfolio` repo has the images, accurate captions/alts, team-demo URL, `CAPTURE_GUIDE.md`, and `ASSET_MANIFEST.md`. `astro check`, static build, desktop 1425x891, and mobile 375x812 QA pass with all images loaded and no console errors/overflow.
+- Do not call current placement an all-client barrier: it is a per-client latest-Revision gate with zone/Pawn/Outer-start prerequisites; Listen host bypasses ACK. The public demo proves only team gameplay and a 2-player result.
+- Still uncaptured: 3-client world sync, ACK retry with `N>=2` plus server approval, runtime reverse-candidate comparison, and remote-client PlayerState/RepNotify evidence. No public URLs exist for these. No gameplay/debug code was added.
+- A UI-only 3-client capture attempt was abandoned after the user requested no Computer Use. The spawned Editor process was stopped after prolonged idle/no window, and the ignored local PIE settings were restored to Standalone/1 client/640x480/default server debug drawing.
+
 ## Runtime Debug Visibility Handoff (2026-07-26)
 
 - Branch `fix/runtime-debug-visibility` keeps the F1 attribute widget and F9 Encounter panel unchanged while disabling transient engine screen messages and default gameplay-world debug primitives.
